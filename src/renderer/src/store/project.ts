@@ -1,53 +1,44 @@
 import { produce } from 'immer'
-import { create } from 'zustand'
-import { temporal } from 'zundo'
+import { useStore } from 'zustand'
 import {
   childModules,
   defaultConstraints,
   defaultLayout,
-  emptyProject,
   globalTypeNames,
+  growAncestors,
+  LAYOUT_PAD,
   leafHeight,
   newId,
   portRows,
+  pruneViews,
   subtreeIds,
   typeUsages,
   uniqueName
 } from '@/model/project'
 import type { Endpoint, Id, Project, Rect, TypeDef } from '@/model/types'
+import { activeDoc, useDoc } from './documents'
 
-interface ProjectState {
-  project: Project
+export { growAncestors }
+import type { ProjectState } from './projectStore'
+
+// The functions below act on the active document; each document keeps its own undo history.
+
+/** Select from the active document's project. */
+export function useProjectStore<T>(selector: (s: ProjectState) => T): T {
+  const store = useDoc((d) => d.store)
+  return useStore(store, selector)
 }
 
-// Consecutive edits closer than this are merged into one undo step (typing, dragging).
-const MERGE_MS = 400
-
-export const useProjectStore = create<ProjectState>()(
-  temporal(() => ({ project: emptyProject() }), {
-    partialize: (s) => ({ project: s.project }),
-    equality: (a, b) => a.project === b.project,
-    handleSet: (handleSet) => {
-      let last = 0
-      return (...args) => {
-        const now = Date.now()
-        // Typed as setState, but zundo passes its internal 4-argument handler.
-        if (now - last > MERGE_MS) (handleSet as (...a: typeof args) => void)(...args)
-        last = now
-      }
-    }
-  })
-)
-
-export const history = () => useProjectStore.temporal.getState()
-export const getProject = (): Project => useProjectStore.getState().project
+const projectStore = () => activeDoc().store
+export const history = () => projectStore().temporal.getState()
+export const getProject = (): Project => projectStore().getState().project
 
 export function update(fn: (draft: Project) => void): void {
-  useProjectStore.setState((s) => ({ project: produce(s.project, fn) }))
+  projectStore().setState((s) => ({ project: produce(s.project, fn) }))
 }
 
 export function replaceProject(project: Project): void {
-  useProjectStore.setState({ project })
+  projectStore().setState({ project })
   history().clear()
 }
 
@@ -61,21 +52,7 @@ export function redo(): void {
 
 // Modules
 
-const PAD = 20
-
-/** Keep `id` inside its parent's content area (below header and ports), growing ancestors as needed. */
-function growAncestors(d: Project, id: Id): void {
-  let child = d.modules.find((m) => m.id === id)
-  while (child?.parentId) {
-    const parent = d.modules.find((m) => m.id === child!.parentId)
-    if (!parent) return
-    child.layout.x = Math.max(child.layout.x, PAD / 2)
-    child.layout.y = Math.max(child.layout.y, leafHeight(portRows(parent)))
-    parent.layout.width = Math.max(parent.layout.width, child.layout.x + child.layout.width + PAD)
-    parent.layout.height = Math.max(parent.layout.height, child.layout.y + child.layout.height + PAD)
-    child = parent
-  }
-}
+const PAD = LAYOUT_PAD
 
 export function addModule(parentId: Id | null, x: number, y: number): Id {
   const id = newId()
@@ -112,6 +89,33 @@ export function deleteModule(id: Id): void {
     const ids = subtreeIds(d, id)
     d.modules = d.modules.filter((m) => !ids.has(m.id))
     d.links = d.links.filter((l) => !ids.has(l.from.moduleId) && !ids.has(l.to.moduleId))
+    pruneViews(d)
+  })
+}
+
+/** Delete modules (with their content) and notes in one undo step. */
+export function deleteItems(ids: Id[]): void {
+  update((d) => {
+    const gone = new Set<Id>()
+    for (const id of ids)
+      if (d.modules.some((m) => m.id === id)) for (const s of subtreeIds(d, id)) gone.add(s)
+    d.modules = d.modules.filter((m) => !gone.has(m.id))
+    d.links = d.links.filter((l) => !gone.has(l.from.moduleId) && !gone.has(l.to.moduleId))
+    d.notes = d.notes.filter((n) => !ids.includes(n.id))
+    pruneViews(d)
+  })
+}
+
+/** Set several module and note rects in one undo step. */
+export function setLayouts(layouts: Map<Id, Partial<Rect>>): void {
+  update((d) => {
+    for (const [id, r] of layouts) {
+      const m = d.modules.find((m) => m.id === id)
+      if (m) Object.assign(m.layout, r)
+      const n = d.notes.find((n) => n.id === id)
+      if (n) Object.assign(n.layout, r)
+    }
+    for (const id of layouts.keys()) growAncestors(d, id)
   })
 }
 
@@ -235,5 +239,90 @@ export function deleteInterface(id: Id): void {
   update((d) => {
     d.interfaces = d.interfaces.filter((i) => i.id !== id)
     for (const m of d.modules) for (const p of m.ports) if (p.interfaceId === id) p.interfaceId = null
+  })
+}
+
+// Views
+
+export function addView(name: string, rootModuleId: Id | null): Id {
+  const id = newId()
+  update((d) => {
+    d.views.push({
+      id,
+      name: uniqueName(
+        name,
+        d.views.map((v) => v.name)
+      ),
+      rootModuleId,
+      hidden: []
+    })
+  })
+  return id
+}
+
+export function renameView(id: Id, name: string): void {
+  update((d) => {
+    const v = d.views.find((v) => v.id === id)
+    if (v) v.name = name
+  })
+}
+
+export function deleteView(id: Id): void {
+  update((d) => {
+    d.views = d.views.filter((v) => v.id !== id)
+  })
+}
+
+/** Show or hide modules in a stored view. */
+export function setHidden(viewId: Id, ids: Id[], hidden: boolean): void {
+  update((d) => {
+    const v = d.views.find((v) => v.id === viewId)
+    if (!v) return
+    const set = new Set(v.hidden)
+    for (const id of ids) {
+      if (hidden) set.add(id)
+      else set.delete(id)
+    }
+    v.hidden = [...set]
+  })
+}
+
+// Notes
+
+export function addNote(kind: 'note' | 'frame', x: number, y: number): Id {
+  const id = newId()
+  update((d) => {
+    d.notes.push({
+      id,
+      kind,
+      text: kind === 'note' ? 'Note' : 'Group',
+      layout: kind === 'note' ? { x, y, width: 180, height: 100 } : { x, y, width: 420, height: 280 }
+    })
+  })
+  return id
+}
+
+export function updateNote(id: Id, fn: (n: Project['notes'][number]) => void): void {
+  update((d) => {
+    const n = d.notes.find((n) => n.id === id)
+    if (n) fn(n)
+  })
+}
+
+export function setModuleColor(ids: Id[], color: string | undefined): void {
+  update((d) => {
+    for (const m of d.modules)
+      if (ids.includes(m.id)) {
+        if (color) m.color = color
+        else delete m.color
+      }
+  })
+}
+
+export function reverseLink(id: Id): void {
+  update((d) => {
+    const l = d.links.find((l) => l.id === id)
+    if (!l) return
+    ;[l.from, l.to] = [l.to, l.from]
   })
 }

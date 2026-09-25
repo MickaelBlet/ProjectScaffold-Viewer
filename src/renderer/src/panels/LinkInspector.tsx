@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { findPort, IDENTIFIER_RE, modulePath } from '@/model/project'
 import { deleteLink, update, useProjectStore } from '@/store/project'
 import { select } from '@/store/ui'
+import { navigate } from '@/actions'
 import { CommitInput, NumberInput, Row, Section, Select, TextArea } from '@/components/fields'
 import { PERFORMANCE_CLASSES, TRANSPORTS, type Endpoint, type Link } from '@/model/types'
 
@@ -23,7 +24,11 @@ export function LinkInspector({ id }: { id: string }): ReactNode {
   })()
 
   const endpoint = (e: Endpoint): ReactNode => (
-    <button type="button" className="link-button" onClick={() => select({ kind: 'module', id: e.moduleId })}>
+    <button
+      type="button"
+      className="link-button"
+      onClick={() => navigate({ kind: 'module', id: e.moduleId })}
+    >
       {modulePath(project, e.moduleId)}:{findPort(project, e.moduleId, e.portId)?.name ?? '?'}
     </button>
   )

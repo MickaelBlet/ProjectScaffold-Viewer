@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { fileName, openRecentProject } from '@/fileOps'
 import { useUiStore } from '@/store/ui'
+import { useDoc } from '@/store/documents'
 
 /** Toolbar dropdown listing the recent documents. */
 export function RecentMenu(): ReactNode {
   const recent = useUiStore((s) => s.recent)
-  const filePath = useUiStore((s) => s.filePath)
+  const filePath = useDoc((d) => d.filePath)
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 

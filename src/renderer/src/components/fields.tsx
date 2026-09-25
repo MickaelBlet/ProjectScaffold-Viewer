@@ -195,3 +195,49 @@ export function MetadataEditor(props: {
     </div>
   )
 }
+
+export const PALETTE = [
+  '#e0513b',
+  '#d98b00',
+  '#d6c21f',
+  '#2e9e5b',
+  '#2e9e8f',
+  '#3b8fd1',
+  '#3b6fe0',
+  '#8a4fd1',
+  '#d14f9e',
+  '#7a8496'
+]
+
+/** Swatches plus a free color; `undefined` is no color. */
+export function ColorPicker(props: {
+  value: string | undefined
+  onChange: (v: string | undefined) => void
+}): ReactNode {
+  return (
+    <div className="swatches">
+      <button
+        type="button"
+        className={`swatch none ${props.value ? '' : 'active'}`}
+        title="No color"
+        onClick={() => props.onChange(undefined)}
+      />
+      {PALETTE.map((c) => (
+        <button
+          key={c}
+          type="button"
+          className={`swatch ${props.value === c ? 'active' : ''}`}
+          style={{ background: c }}
+          title={c}
+          onClick={() => props.onChange(c)}
+        />
+      ))}
+      <input
+        type="color"
+        title="Custom color"
+        value={props.value && /^#[0-9a-f]{6}$/i.test(props.value) ? props.value : '#888888'}
+        onChange={(e) => props.onChange(e.target.value)}
+      />
+    </div>
+  )
+}

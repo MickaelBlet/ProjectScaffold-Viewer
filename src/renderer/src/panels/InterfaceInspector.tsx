@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { IDENTIFIER_RE, modulePath, nameError, newId, uniqueName } from '@/model/project'
 import { deleteInterface, update, useProjectStore } from '@/store/project'
 import { select } from '@/store/ui'
+import { navigate } from '@/actions'
 import { CommitInput, IconButton, Row, Section, TextArea } from '@/components/fields'
 import { TypeEditor } from '@/components/TypeEditor'
 import type { Interface, Message } from '@/model/types'
@@ -130,7 +131,7 @@ export function InterfaceInspector({ id }: { id: string }): ReactNode {
               <button
                 type="button"
                 className="link-button"
-                onClick={() => select({ kind: 'module', id: module.id })}
+                onClick={() => navigate({ kind: 'module', id: module.id })}
               >
                 {modulePath(project, module.id)}:{port.name}
               </button>{' '}

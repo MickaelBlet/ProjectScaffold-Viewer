@@ -1,5 +1,5 @@
-// Browser build: a single self-contained HTML file (dist-web/index.html) that works
-// from file:// or any static host. The renderer uses webApi.ts instead of the preload API.
+// Single self-contained HTML file (dist-web/index.html) that works
+// from file:// or any static host.
 import { resolve } from 'node:path'
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'

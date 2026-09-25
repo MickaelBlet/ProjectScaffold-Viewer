@@ -1,9 +1,9 @@
-// Browser implementation of the preload API, used when the renderer runs outside Electron.
+// Browser implementation of the file API.
 // Files go through the File System Access API when available (Chrome, Edge), otherwise
 // through a file input and a download. Paths are file names: browsers never expose real paths.
 // Recent documents live in IndexedDB: their last known content, and their file handle when
 // available so that reopening reads the file again and Save rewrites it.
-import type { Api, Draft, MenuAction, OpenResult, SaveRequest } from '../../preload/api'
+import type { Api, OpenResult, SaveRequest, Session } from './api'
 
 type Permission = 'granted' | 'denied' | 'prompt'
 
@@ -102,7 +102,10 @@ async function writeFile(req: SaveRequest): Promise<string | null> {
   }
   if (fs.showSaveFilePicker) {
     try {
-      const handle = await fs.showSaveFilePicker({ suggestedName: req.defaultName, types: [TYPES[req.format]] })
+      const handle = await fs.showSaveFilePicker({
+        suggestedName: req.defaultName,
+        types: [TYPES[req.format]]
+      })
       await write(handle, req.content)
       handles.set(handle.name, handle)
       return handle.name
@@ -166,7 +169,12 @@ async function storeRecent(list: RecentEntry[]): Promise<void> {
   } catch {
     try {
       // From file:// the origin is opaque and file handles cannot be stored: keep the contents.
-      await withStore('readwrite', (s) => s.put(list.map(({ name, content }) => ({ name, content })), 'list'))
+      await withStore('readwrite', (s) =>
+        s.put(
+          list.map(({ name, content }) => ({ name, content })),
+          'list'
+        )
+      )
     } catch (e) {
       // Private browsing or blocked storage: recent documents only last for the session.
       console.warn('Recent documents not stored:', e)
@@ -184,7 +192,7 @@ async function remember(entry: RecentEntry): Promise<void> {
 }
 
 /** Reads the entry's file again when permitted, else falls back to the stored content. */
-async function readRecent(entry: RecentEntry, ask: boolean): Promise<OpenResult> {
+async function readRecent(entry: RecentEntry, ask: boolean, touch = true): Promise<OpenResult> {
   const { handle } = entry
   let content = entry.content
   if (handle) {
@@ -192,62 +200,63 @@ async function readRecent(entry: RecentEntry, ask: boolean): Promise<OpenResult>
     handles.set(entry.name, handle)
     try {
       const opts = { mode: 'readwrite' } as const
-      const perm = ask
-        ? await handle.requestPermission?.(opts)
-        : await handle.queryPermission?.(opts)
+      const perm = ask ? await handle.requestPermission?.(opts) : await handle.queryPermission?.(opts)
       if (perm === 'granted') content = await (await handle.getFile()).text()
     } catch {
       // File moved or deleted: keep the stored content.
     }
   }
-  await remember({ ...entry, content })
+  if (touch) await remember({ ...entry, content })
   return { path: entry.name, content }
 }
 
 // localStorage rather than IndexedDB: synchronous, so the last edits are written while
 // the page unloads.
-const DRAFT_KEY = 'project-scaffold:draft'
+const SESSION_KEY = 'project-scaffold:session'
+/** Single unsaved document of earlier versions. */
+const LEGACY_DRAFT_KEY = 'project-scaffold:draft'
 
-function saveDraft(draft: Draft | null): void {
+function saveSession(session: Session): void {
   try {
-    if (draft) localStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
-    else localStorage.removeItem(DRAFT_KEY)
+    localStorage.setItem(SESSION_KEY, JSON.stringify(session))
+    localStorage.removeItem(LEGACY_DRAFT_KEY)
   } catch {
     // Blocked storage or quota exceeded: edits are lost on reload.
   }
 }
 
-async function loadDraft(): Promise<Draft | null> {
-  let draft: Draft | null
+function readSession(): Session | null {
   try {
-    draft = JSON.parse(localStorage.getItem(DRAFT_KEY) ?? 'null') as Draft | null
+    const session = JSON.parse(localStorage.getItem(SESSION_KEY) ?? 'null') as Session | null
+    if (session && Array.isArray(session.docs)) return session
+    const draft = JSON.parse(localStorage.getItem(LEGACY_DRAFT_KEY) ?? 'null') as {
+      path: string | null
+      content: string
+    } | null
+    if (draft && typeof draft.content === 'string')
+      return { docs: [{ path: draft.path, content: draft.content }], active: 0 }
   } catch {
-    return null
+    // Unreadable: start afresh.
   }
-  if (!draft || typeof draft.content !== 'string') return null
-  // Save rewrites the draft's file when it is a recent one with a handle.
-  const handle = (await loadRecent()).find((e) => e.name === draft.path)?.handle
-  if (handle) handles.set(handle.name, handle)
-  return draft
+  return null
+}
+
+async function loadSession(): Promise<Session | null> {
+  const session = readSession()
+  if (!session) return null
+  // Save rewrites the documents' files when they are recent ones with a handle.
+  const recent = await loadRecent()
+  for (const doc of session.docs) {
+    const handle = recent.find((e) => e.name === doc.path)?.handle
+    if (handle) handles.set(handle.name, handle)
+  }
+  return session
 }
 
 let dirty = false
 window.addEventListener('beforeunload', (e) => {
   if (dirty) e.preventDefault()
 })
-
-/** Keyboard shortcuts of the Electron menu. Browser-reserved ones (Ctrl+N) are unavailable. */
-function shortcut(e: KeyboardEvent): MenuAction | null {
-  if (!(e.ctrlKey || e.metaKey) || e.altKey) return null
-  const key = e.key.toLowerCase()
-  if (key === 'o' && !e.shiftKey) return 'open'
-  if (key === 's') return e.shiftKey ? 'save-as' : 'save'
-  if (key === 'e') return e.shiftKey ? 'export-json' : 'export-yaml'
-  if (key === 'm' && !e.shiftKey) return 'add-module'
-  if (key === 'z') return e.shiftKey ? 'redo' : 'undo'
-  if (key === 'y' && !e.shiftKey) return 'redo'
-  return null
-}
 
 const webApi: Api = {
   openFile,
@@ -261,30 +270,22 @@ const webApi: Api = {
     const entry = (await loadRecent()).find((e) => e.name === path)
     return entry ? readRecent(entry, true) : null
   },
+  reopen: async (path) => {
+    const entry = (await loadRecent()).find((e) => e.name === path)
+    return entry ? readRecent(entry, false, false) : null
+  },
   clearRecent: () => storeRecent([]),
   onRecentChange: (cb) => {
     recentListeners.add(cb)
     return () => recentListeners.delete(cb)
   },
-  onOpenRecent: () => () => undefined,
   setDirty: (value) => {
     dirty = value
   },
-  saveDraft,
-  loadDraft,
-  onMenu: (cb) => {
-    const listener = (e: KeyboardEvent): void => {
-      const action = shortcut(e)
-      if (!action) return
-      e.preventDefault()
-      cb(action)
-    }
-    window.addEventListener('keydown', listener)
-    return () => window.removeEventListener('keydown', listener)
-  }
+  saveSession,
+  loadSession
 }
 
 export function installWebApi(): void {
-  // Declared non-optional for Electron; absent in a plain browser.
-  if (!(window as Partial<Window>).api) window.api = webApi
+  window.api = webApi
 }

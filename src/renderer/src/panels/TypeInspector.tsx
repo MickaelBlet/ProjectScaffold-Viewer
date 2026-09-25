@@ -1,7 +1,8 @@
 import { useState, type ReactNode } from 'react'
-import { nameError, newId, uniqueName } from '@/model/project'
+import { nameError, newId, typeUsageTargets, uniqueName } from '@/model/project'
 import { deleteType, update, useProjectStore } from '@/store/project'
 import { select } from '@/store/ui'
+import { navigate } from '@/actions'
 import { CommitInput, IconButton, NumberInput, Row, Section, Select, TextArea } from '@/components/fields'
 import { TypeEditor } from '@/components/TypeEditor'
 import { INT_PRIMITIVES, type Field, type TypeDef } from '@/model/types'
@@ -100,6 +101,7 @@ export function TypeInspector({ id }: { id: string }): ReactNode {
   const [blocked, setBlocked] = useState<string[]>([])
   const t = project.types.find((t) => t.id === id)
   if (!t) return <p className="muted">Type deleted.</p>
+  const usages = typeUsageTargets(project, id)
 
   return (
     <>
@@ -194,6 +196,19 @@ export function TypeInspector({ id }: { id: string }): ReactNode {
           <TypeEditor value={t.type} onChange={(nt) => withType<'alias'>(id, (x) => void (x.type = nt))} />
         </Section>
       )}
+
+      <Section title={`Used by (${usages.length})`}>
+        <ul className="plain">
+          {usages.map((u) => (
+            <li key={u.where}>
+              <button type="button" className="link-button" onClick={() => navigate(u.owner)}>
+                {u.where}
+              </button>
+            </li>
+          ))}
+        </ul>
+        {!usages.length && <p className="muted">Not used.</p>}
+      </Section>
 
       <div className="actions">
         <button

@@ -6,11 +6,22 @@ import {
   deleteModule,
   deletePort,
   reparentModule,
+  setModuleColor,
   update,
   useProjectStore
 } from '@/store/project'
 import { select } from '@/store/ui'
-import { CommitInput, IconButton, MetadataEditor, Row, Section, Select, TextArea } from '@/components/fields'
+import { navigate } from '@/actions'
+import {
+  ColorPicker,
+  CommitInput,
+  IconButton,
+  MetadataEditor,
+  Row,
+  Section,
+  Select,
+  TextArea
+} from '@/components/fields'
 import type { Module, Project } from '@/model/types'
 
 function withModule(id: string, fn: (m: Module, d: Project) => void): void {
@@ -49,7 +60,7 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
             <button
               type="button"
               className="link-button"
-              onClick={() => select({ kind: 'module', id: mod.parentId! })}
+              onClick={() => navigate({ kind: 'module', id: mod.parentId! })}
             >
               {parent}
             </button>
@@ -140,13 +151,17 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
               <button
                 type="button"
                 className="link-button"
-                onClick={() => select({ kind: 'link', id: l.id })}
+                onClick={() => navigate({ kind: 'link', id: l.id })}
               >
                 {l.name}
               </button>
             </li>
           ))}
         </ul>
+      </Section>
+
+      <Section title="Color">
+        <ColorPicker value={mod.color} onChange={(c) => setModuleColor([id], c)} />
       </Section>
 
       <Section title="Metadata">
