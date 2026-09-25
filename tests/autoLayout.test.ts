@@ -53,3 +53,24 @@ describe('autoLayout', () => {
     expect(p.modules).toEqual([])
   })
 })
+
+describe('autoLayout, vertical', () => {
+  it('moves ports to top / bottom and layers downwards', async () => {
+    const p = await arrange(example, null, { orientation: 'vertical', spacing: 70 })
+    expect(p.orientation).toBe('vertical')
+    checkNoOverlap(p)
+    checkChildrenInside(p)
+    const byName = (n: string) => p.modules.find((m) => m.name === n)!.layout
+    // Sensor sends to Controller and Logger: they are below it.
+    expect(byName('Controller').y).toBeGreaterThan(byName('Sensor').y + byName('Sensor').height)
+    expect(byName('Logger').y).toBeGreaterThan(byName('Sensor').y + byName('Sensor').height)
+  })
+
+  it('arranges horizontally again', async () => {
+    const v = await arrange(example, null, { orientation: 'vertical', spacing: 70 })
+    const h = await arrange(v, null, { orientation: 'horizontal', spacing: 70 })
+    expect(h.orientation).toBe('horizontal')
+    checkNoOverlap(h)
+    checkChildrenInside(h)
+  })
+})

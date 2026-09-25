@@ -47,6 +47,7 @@ import { commandItem as item, keyLabel } from '@/commands'
 import { fileName } from '@/fileOps'
 import { openView, registerCanvas } from '@/shell/controllers'
 import { ModuleNode } from './ModuleNode'
+import { floatingPortSides, neededHeight, type PortSides } from './portSides'
 import { NoteNode } from './NoteNode'
 import { ExternalNode, type ExternalNodeData, type ExternalPort } from './ExternalNode'
 import { LinkEdge, PERF_COLORS } from './LinkEdge'
@@ -64,7 +65,7 @@ interface Guide {
 }
 
 /** React Flow nodes of a view: its modules (parents first), notes and outside stand-ins. */
-function toNodes(p: Project, view: View, selected: Set<Id>): Node[] {
+function toNodes(p: Project, view: View, selected: Set<Id>, sides: PortSides | null): Node[] {
   const visible = visibleModuleIds(p, view)
   const nodes: Node[] = []
   if (!view.rootModuleId)
@@ -83,17 +84,18 @@ function toNodes(p: Project, view: View, selected: Set<Id>): Node[] {
   for (const m of p.modules) {
     if (!visible.has(m.id)) continue
     const isRoot = m.id === view.rootModuleId
+    const placements = sides?.get(m.id)
     nodes.push({
       id: m.id,
       type: 'module',
       position: { x: m.layout.x, y: m.layout.y },
       width: m.layout.width,
-      height: m.layout.height,
+      height: placements ? Math.max(m.layout.height, neededHeight(m.ports, placements)) : m.layout.height,
       parentId: isRoot ? undefined : (m.parentId ?? undefined),
       // The root of a drill-down view is the frame of the view.
       draggable: !isRoot,
       selected: selected.has(m.id),
-      data: {}
+      data: placements ? { sides: placements } : {}
     })
   }
   if (view.rootModuleId) nodes.push(...externalNodes(p, view, visible))
@@ -136,7 +138,7 @@ function externalNodes(p: Project, view: View, visible: Set<Id>): Node<ExternalN
       height,
       draggable: false,
       selectable: false,
-      data: { label: modulePath(p, moduleId), ports }
+      data: { label: modulePath(p, moduleId), ports, side: sender ? 'right' : 'left' }
     }
   })
 }
@@ -230,7 +232,15 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
   const selectedLink = selection?.kind === 'link' ? selection.id : null
 
   const [nodes, setNodes, onNodesChangeBase] = useNodesState<Node>([])
-  useEffect(() => setNodes(toNodes(project, view, selectedSet)), [project, view, selectedSet, setNodes])
+  // Ports follow their links when link ends are auto-oriented.
+  const sides = useMemo(
+    () => (settings.autoOrientLinks ? floatingPortSides(project, visible) : null),
+    [project, visible, settings.autoOrientLinks]
+  )
+  useEffect(
+    () => setNodes(toNodes(project, view, selectedSet, sides)),
+    [project, view, selectedSet, sides, setNodes]
+  )
   const edges = useMemo(
     () => toEdges(project, visible, !!view.rootModuleId, selectedLink),
     [project, visible, view.rootModuleId, selectedLink]
@@ -518,7 +528,8 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
       'separator',
       item('view.openModule'),
       item('view.openModuleSplit'),
-      item('arrange.auto', 'Arrange content'),
+      item('arrange.horizontal', 'Arrange content horizontally'),
+      item('arrange.vertical', 'Arrange content vertically'),
       item('view.hide'),
       'separator',
       item('edit.cut'),
@@ -573,7 +584,8 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
           ]),
       { label: 'Paste here', keys: keyLabel('Ctrl+V'), run: () => void paste(undefined, { at, parent }) },
       'separator',
-      item('arrange.auto', view.rootModuleId ? 'Arrange view' : 'Arrange all'),
+      item('arrange.horizontal', view.rootModuleId ? 'Arrange view horizontally' : 'Arrange horizontally'),
+      item('arrange.vertical', view.rootModuleId ? 'Arrange view vertically' : 'Arrange vertically'),
       item('view.fitAll'),
       item('edit.selectAll'),
       ...(view.hidden.length ? [item('view.showAll')] : []),
@@ -589,9 +601,7 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
       ref={container}
       onPointerDownCapture={focusView}
       onDoubleClick={(e) => {
-        if (!(e.target as HTMLElement).classList.contains('react-flow__pane')) return
-        const at = screenToFlowPosition({ x: e.clientX, y: e.clientY })
-        addModuleAt(at, moduleAt(at) ?? view.rootModuleId)
+        if ((e.target as HTMLElement).classList.contains('react-flow__pane')) paneMenu(e)
       }}
     >
       <Breadcrumbs view={view} />

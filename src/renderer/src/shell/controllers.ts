@@ -36,11 +36,12 @@ export function activeCanvas(): CanvasController | undefined {
 
 // Dock layouts
 
-export type ToolId = 'explorer' | 'outline' | 'inspector' | 'problems' | 'search' | 'settings'
+export type ToolId = 'explorer' | 'outline' | 'links' | 'inspector' | 'problems' | 'search' | 'settings'
 
 export const TOOL_TITLES: Record<ToolId, string> = {
   explorer: 'Explorer',
   outline: 'Outline',
+  links: 'Links',
   inspector: 'Inspector',
   problems: 'Problems',
   search: 'Search',
@@ -73,6 +74,13 @@ export function buildDefaultLayout(api: DockviewApi): void {
     component: 'outline',
     title: TOOL_TITLES.outline,
     position: { referencePanel: 'explorer', direction: 'below' }
+  })
+  api.addPanel({
+    id: 'links',
+    component: 'links',
+    title: TOOL_TITLES.links,
+    inactive: true,
+    position: { referencePanel: 'outline', direction: 'within' }
   })
   api.addPanel({
     id: 'inspector',
@@ -145,6 +153,7 @@ export function showTool(id: ToolId, focus = true): void {
   const beside: Record<ToolId, [string, 'left' | 'right' | 'below' | 'within']> = {
     explorer: [EDITOR_AREA, 'left'],
     outline: ['explorer', 'below'],
+    links: ['outline', 'within'],
     inspector: [EDITOR_AREA, 'right'],
     problems: [EDITOR_AREA, 'below'],
     search: ['problems', 'within'],

@@ -3,13 +3,13 @@ import { useStore } from 'zustand'
 import {
   childModules,
   defaultConstraints,
-  defaultLayout,
+  defaultSize,
   globalTypeNames,
   growAncestors,
   LAYOUT_PAD,
-  leafHeight,
+  contentTop,
+  minSize,
   newId,
-  portRows,
   pruneViews,
   subtreeIds,
   typeUsages,
@@ -68,7 +68,7 @@ export function addModule(parentId: Id | null, x: number, y: number): Id {
       parentId,
       metadata: {},
       ports: [],
-      layout: defaultLayout(x, y)
+      layout: { x, y, ...defaultSize({ ports: [] }, d.orientation) }
     })
     growAncestors(d, id)
   })
@@ -79,7 +79,7 @@ export function addModule(parentId: Id | null, x: number, y: number): Id {
 export function addSubmodule(parentId: Id): Id {
   const p = getProject()
   const parent = p.modules.find((m) => m.id === parentId)
-  const top = leafHeight(parent ? portRows(parent) : 0) + PAD
+  const top = (parent ? contentTop(parent, p.orientation) : 0) + PAD
   const bottom = Math.max(top, ...childModules(p, parentId).map((c) => c.layout.y + c.layout.height + PAD))
   return addModule(parentId, PAD, bottom)
 }
@@ -159,7 +159,9 @@ export function addPort(moduleId: Id, role: 'in' | 'out'): void {
       m.ports.map((p) => p.name)
     )
     m.ports.push({ id: newId(), name, role, interfaceId: null, description: '' })
-    m.layout.height = Math.max(m.layout.height, leafHeight(portRows(m)))
+    const min = minSize(m, d.orientation)
+    m.layout.width = Math.max(m.layout.width, min.width)
+    m.layout.height = Math.max(m.layout.height, min.height)
     growAncestors(d, moduleId)
   })
 }

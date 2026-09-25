@@ -3,9 +3,9 @@ import { IDENTIFIER_RE, modulePath, nameError, newId, uniqueName } from '@/model
 import { deleteInterface, update, useProjectStore } from '@/store/project'
 import { select } from '@/store/ui'
 import { navigate } from '@/actions'
-import { CommitInput, IconButton, Row, Section, TextArea } from '@/components/fields'
+import { CommitInput, IconButton, Row, Section, Select, TextArea } from '@/components/fields'
 import { TypeEditor } from '@/components/TypeEditor'
-import type { Interface, Message } from '@/model/types'
+import { PARAM_DIRECTIONS, type Interface, type Message } from '@/model/types'
 import { FieldList } from './TypeInspector'
 
 function withInterface(id: string, fn: (i: Interface) => void): void {
@@ -97,8 +97,19 @@ export function InterfaceInspector({ id }: { id: string }): ReactNode {
             <FieldList
               fields={m.params}
               addLabel="Add parameter"
+              extra={{ direction: 'in' }}
+              column={(prm, idx) => (
+                <Select
+                  value={prm.direction}
+                  options={PARAM_DIRECTIONS}
+                  onChange={(v) => withMessage(m.id, (x) => void (x.params[idx]!.direction = v))}
+                />
+              )}
               onChange={(fn) => withMessage(m.id, (x) => fn(x.params))}
             />
+            {m.params.some((prm) => prm.direction !== 'in') && (
+              <small className="muted">out / inout parameters require a bidirectional link</small>
+            )}
             <h4>
               <label className="check">
                 <input

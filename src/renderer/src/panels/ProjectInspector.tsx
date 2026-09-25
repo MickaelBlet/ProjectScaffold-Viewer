@@ -20,8 +20,9 @@ export function ProjectInspector(): ReactNode {
           interfaces
         </p>
         <p className="muted">
-          Double-click the canvas to add a module. Drag from an <b>out</b> port (right) to an <b>in</b> port
-          (left) to create a link. Drop a module onto another to nest it.
+          Double-click the canvas to add a module. Drag from an <b>out</b> port (right, or bottom when
+          vertical) to an <b>in</b> port (left, or top) to create a link. Drop a module onto another to nest
+          it.
         </p>
       </Section>
     </>

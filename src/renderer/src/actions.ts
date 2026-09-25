@@ -1,23 +1,24 @@
 // Editing actions on the active document, shared by commands, menus and panels.
 import { align, distribute, sameSize, type AlignMode } from '@/model/align'
-import { arrange as arrangeProject, type ArrangeOptions } from '@/model/autoLayout'
+import { arrange as arrangeProject, arrangeOptions } from '@/model/autoLayout'
 import { copyItems, parseClip, pasteClip, type Clip } from '@/model/clipboard'
 import {
   absolutePosition,
   absoluteRect,
   boundsOf,
   childModules,
-  defaultLayout,
+  defaultSize,
   findView,
   LAYOUT_PAD,
-  leafHeight,
+  contentBottom,
+  contentTop,
   modulePath,
   newId,
   subtreeIds,
   uniqueName
 } from '@/model/project'
 import type { ProblemTarget } from '@/model/validate'
-import { GLOBAL_VIEW, type Id, type Project, type Rect } from '@/model/types'
+import { GLOBAL_VIEW, type Id, type Orientation, type Project, type Rect } from '@/model/types'
 import { activeDoc, patchDoc } from '@/store/documents'
 import {
   addModule,
@@ -193,7 +194,7 @@ export function addModuleAt(pos?: { x: number; y: number }, parentId: Id | null 
   const p = getProject()
   const c = pos ?? activeCanvas()?.center() ?? { x: 80, y: 80 }
   const origin = parentId ? absolutePosition(p, parentId) : { x: 0, y: 0 }
-  const size = defaultLayout(0, 0)
+  const size = defaultSize({ ports: [] }, p.orientation)
   const x = Math.round(c.x - origin.x - (pos ? 0 : size.width / 2))
   const y = Math.round(c.y - origin.y - (pos ? 0 : size.height / 2))
   const id = addModule(parentId, x, y)
@@ -284,7 +285,7 @@ export function groupSelection(): void {
     return showDialog('Cannot group', ['Only modules with the same parent can be grouped.'])
   const box = boundsOf(mods.map((m) => m.layout))
   const groupId = newId()
-  const top = leafHeight(0) + LAYOUT_PAD / 2
+  const top = contentTop({ ports: [] }, p.orientation) + LAYOUT_PAD / 2
   update((d) => {
     d.modules.push({
       id: groupId,
@@ -300,7 +301,7 @@ export function groupSelection(): void {
         x: box.x - LAYOUT_PAD,
         y: box.y - top,
         width: box.width + 2 * LAYOUT_PAD,
-        height: box.height + top + LAYOUT_PAD
+        height: box.height + top + contentBottom(p.orientation)
       }
     })
     for (const m of d.modules) {
@@ -323,27 +324,36 @@ export function groupSelection(): void {
 
 let arranging = false
 
-/** Arrange with ELK: the selected container's content, the focused view's root, or everything. */
-export async function arrangeLayout(scope: 'auto' | 'all' = 'auto', options?: ArrangeOptions): Promise<void> {
+/**
+ * Arrange with ELK: the selected container's content, the focused view's root, or everything.
+ * A new orientation moves the ports (top / bottom or left / right) and re-arranges everything.
+ */
+export async function arrangeLayout(
+  scope: 'auto' | 'all' = 'auto',
+  orientation?: Orientation
+): Promise<void> {
   if (arranging) return
   const p = getProject()
+  const target = orientation ?? p.orientation
   const sel = activeDoc().selection
   let scopeId: Id | null = viewParent()
   if (scope === 'auto' && sel?.kind === 'module' && childModules(p, sel.id).length) scopeId = sel.id
-  if (scope === 'all') scopeId = null
+  if (scope === 'all' || target !== p.orientation) scopeId = null
   arranging = true
   try {
-    const arranged = await arrangeProject(p, scopeId, options)
+    const arranged = await arrangeProject(p, scopeId, arrangeOptions(target))
     // Edits made meanwhile win.
     if (getProject() !== p) return
     update((d) => {
+      d.orientation = arranged.orientation
       for (const m of d.modules) {
         const r = arranged.modules.find((x) => x.id === m.id)?.layout
         if (r) m.layout = { ...r }
       }
     })
-    setStatus('info', `Arranged ${scopeId ? modulePath(p, scopeId) : 'all modules'}`)
-    requestAnimationFrame(() => activeCanvas()?.fit())
+    setStatus('info', `Arranged ${scopeId ? modulePath(p, scopeId) : 'all modules'} ${target}ly`)
+    // After React Flow has measured the new sizes.
+    setTimeout(() => activeCanvas()?.fit(), 120)
   } catch (e) {
     showDialog('Arrange failed', [String(e)])
   } finally {

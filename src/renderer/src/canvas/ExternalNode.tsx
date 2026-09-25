@@ -8,37 +8,31 @@ export interface ExternalPort {
   type: 'source' | 'target'
 }
 
-export type ExternalNodeData = { label: string; ports: ExternalPort[] }
+/** `side`: edge facing the view, where all the handles sit. */
+export type ExternalNodeData = { label: string; ports: ExternalPort[]; side: 'left' | 'right' }
 
 /** Stand-in for a module outside a drill-down view, holding the ports linked to the inside. */
 export const ExternalNode = memo(function ExternalNode({
   data
 }: NodeProps<Node<ExternalNodeData>>): ReactNode {
+  const handle = (p: ExternalPort, position: Position): ReactNode => (
+    <Handle
+      type={p.type}
+      position={position}
+      id={p.id}
+      className={`handle ${p.type === 'source' ? 'out' : 'in'}`}
+      isConnectable={false}
+    />
+  )
   return (
     <div className="external" title={`${data.label} (outside this view)`}>
       <div className="external-label">↗ {data.label}</div>
       {data.ports.map((p) => (
         <div className="port-row" key={p.id}>
-          <span className={`port ${p.type === 'source' ? 'out' : 'in'}`}>
-            {p.type === 'target' && (
-              <Handle
-                type="target"
-                position={Position.Left}
-                id={p.id}
-                className="handle in"
-                isConnectable={false}
-              />
-            )}
+          <span className={`port ${data.side} ${p.type === 'source' ? 'out' : 'in'}`}>
+            {data.side === 'left' && handle(p, Position.Left)}
             {p.name}
-            {p.type === 'source' && (
-              <Handle
-                type="source"
-                position={Position.Right}
-                id={p.id}
-                className="handle out"
-                isConnectable={false}
-              />
-            )}
+            {data.side === 'right' && handle(p, Position.Right)}
           </span>
         </div>
       ))}

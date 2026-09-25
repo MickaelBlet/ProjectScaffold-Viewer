@@ -1,10 +1,11 @@
 import { memo, useEffect, type CSSProperties, type ReactNode } from 'react'
 import { Handle, NodeResizer, Position, useUpdateNodeInternals, type NodeProps } from '@xyflow/react'
-import { leafHeight, nameError } from '@/model/project'
+import { minSize, nameError } from '@/model/project'
+import { defaultSide, portsOn, type PortPlacement } from './portSides'
 import { getProject, setModuleLayout, update, useProjectStore } from '@/store/project'
 import { useUiStore } from '@/store/ui'
 import { openModuleView } from '@/actions'
-import type { Port } from '@/model/types'
+import type { Id, Port } from '@/model/types'
 
 function RenameInput({
   id,
@@ -46,35 +47,70 @@ function RenameInput({
   )
 }
 
-export const ModuleNode = memo(function ModuleNode({ id, selected, draggable }: NodeProps): ReactNode {
+export const ModuleNode = memo(function ModuleNode({ id, selected, draggable, data }: NodeProps): ReactNode {
   const mod = useProjectStore((s) => s.project.modules.find((m) => m.id === id))
   const interfaces = useProjectStore((s) => s.project.interfaces)
   const hasChildren = useProjectStore((s) => s.project.modules.some((m) => m.parentId === id))
+  const orientation = useProjectStore((s) => s.project.orientation)
   const renaming = useUiStore((s) => s.renaming === id)
   const updateInternals = useUpdateNodeInternals()
-  const portsKey = mod?.ports.map((p) => `${p.id}:${p.role}`).join(',')
+  // Floating ports (see portSides.ts), else the orientation's default edges.
+  const floating = (data as { sides?: Record<Id, PortPlacement> }).sides
+  const placements: Record<Id, PortPlacement> =
+    floating ??
+    Object.fromEntries(
+      (mod?.ports ?? []).map((p) => [p.id, { side: defaultSide(p.role, orientation), order: null }])
+    )
+  const portsKey = mod?.ports.map((p) => `${p.id}:${p.role}:${placements[p.id]?.side}`).join(',')
   useEffect(() => updateInternals(id), [id, portsKey, updateInternals])
   if (!mod) return null
 
-  const ins = mod.ports.filter((p) => p.role === 'in')
-  const outs = mod.ports.filter((p) => p.role === 'out')
-  const rows = Math.max(ins.length, outs.length)
+  const [top, bottom, left, right] = (['top', 'bottom', 'left', 'right'] as const).map((side) =>
+    portsOn(mod.ports, placements, side)
+  )
+  const rows = Math.max(left!.length, right!.length)
+  const vertical = orientation === 'vertical'
+  // Containers keep both bands in vertical orientation: their content starts below them.
+  const topBand = top!.length > 0 || (!floating && vertical)
+  const bottomBand = bottom!.length > 0 || (!floating && vertical)
+  const min = minSize(mod, orientation)
   const ifaceName = (p: Port): string =>
     p.interfaceId ? (interfaces.find((i) => i.id === p.interfaceId)?.name ?? '?') : '—'
   const style = mod.color ? ({ '--module-color': mod.color } as CSSProperties) : undefined
 
+  const handle = (p: Port, position: Position): ReactNode => (
+    <Handle
+      type={p.role === 'in' ? 'target' : 'source'}
+      position={position}
+      id={p.id}
+      className={`handle ${p.role}`}
+    />
+  )
+  const band = (ports: Port[], side: 'top' | 'bottom'): ReactNode => (
+    <div className={`port-band ${side}`}>
+      {ports.map((p) => (
+        <span key={p.id} className={`vport ${p.role}`} title={`${p.role} ${p.name}: ${ifaceName(p)}`}>
+          {handle(p, side === 'top' ? Position.Top : Position.Bottom)}
+          {p.name}
+          <small>{ifaceName(p)}</small>
+        </span>
+      ))}
+    </div>
+  )
+
   return (
     <div
-      className={`module ${hasChildren ? 'container' : ''} ${selected ? 'selected' : ''} ${mod.color ? 'colored' : ''}`}
+      className={`module ${vertical ? 'vertical' : ''} ${hasChildren ? 'container' : ''} ${selected ? 'selected' : ''} ${mod.color ? 'colored' : ''}`}
       style={style}
       title={mod.description}
     >
       <NodeResizer
         isVisible={selected && draggable}
-        minWidth={140}
-        minHeight={leafHeight(rows)}
+        minWidth={min.width}
+        minHeight={min.height}
         onResizeEnd={(_, r) => setModuleLayout(id, { x: r.x, y: r.y, width: r.width, height: r.height })}
       />
+      {topBand && band(top!, 'top')}
       <div className="module-header" onDoubleClick={() => useUiStore.setState({ renaming: id })}>
         {renaming ? (
           <RenameInput id={id} name={mod.name} parentId={mod.parentId} />
@@ -95,30 +131,33 @@ export const ModuleNode = memo(function ModuleNode({ id, selected, draggable }: 
           </button>
         )}
       </div>
-      <div className="module-ports">
-        {Array.from({ length: rows }, (_, i) => {
-          const pin = ins[i]
-          const pout = outs[i]
-          return (
-            <div className="port-row" key={i}>
-              {pin && (
-                <span className="port in" title={`in ${pin.name}: ${ifaceName(pin)}`}>
-                  <Handle type="target" position={Position.Left} id={pin.id} className="handle in" />
-                  {pin.name}
-                  <small>{ifaceName(pin)}</small>
-                </span>
-              )}
-              {pout && (
-                <span className="port out" title={`out ${pout.name}: ${ifaceName(pout)}`}>
-                  <small>{ifaceName(pout)}</small>
-                  {pout.name}
-                  <Handle type="source" position={Position.Right} id={pout.id} className="handle out" />
-                </span>
-              )}
-            </div>
-          )
-        })}
-      </div>
+      {rows > 0 && (
+        <div className="module-ports">
+          {Array.from({ length: rows }, (_, i) => {
+            const pl = left![i]
+            const pr = right![i]
+            return (
+              <div className="port-row" key={i}>
+                {pl && (
+                  <span className={`port left ${pl.role}`} title={`${pl.role} ${pl.name}: ${ifaceName(pl)}`}>
+                    {handle(pl, Position.Left)}
+                    {pl.name}
+                    <small>{ifaceName(pl)}</small>
+                  </span>
+                )}
+                {pr && (
+                  <span className={`port right ${pr.role}`} title={`${pr.role} ${pr.name}: ${ifaceName(pr)}`}>
+                    <small>{ifaceName(pr)}</small>
+                    {pr.name}
+                    {handle(pr, Position.Right)}
+                  </span>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+      {bottomBand && band(bottom!, 'bottom')}
     </div>
   )
 })

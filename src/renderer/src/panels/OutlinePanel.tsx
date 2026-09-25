@@ -1,14 +1,6 @@
 // Module tree of the active document: select, reveal, hide in the focused view, drag to re-parent.
 import { useState, type ReactNode } from 'react'
-import {
-  absolutePosition,
-  childModules,
-  findView,
-  leafHeight,
-  LAYOUT_PAD,
-  portRows,
-  subtreeIds
-} from '@/model/project'
+import { absolutePosition, childModules, findView, contentTop, LAYOUT_PAD, subtreeIds } from '@/model/project'
 import type { Id, Module, Project } from '@/model/types'
 import { activeDoc, patchDoc, useDoc } from '@/store/documents'
 import { getProject, reparentModule, setHidden, useProjectStore } from '@/store/project'
@@ -25,7 +17,7 @@ const DRAG = 'application/x-module'
 function dropPosition(p: Project, id: Id, parentId: Id | null): { x: number; y: number } {
   if (!parentId) return absolutePosition(p, id)
   const parent = p.modules.find((m) => m.id === parentId)
-  const top = leafHeight(parent ? portRows(parent) : 0) + LAYOUT_PAD
+  const top = (parent ? contentTop(parent, p.orientation) : 0) + LAYOUT_PAD
   const bottom = Math.max(
     top,
     ...childModules(p, parentId)

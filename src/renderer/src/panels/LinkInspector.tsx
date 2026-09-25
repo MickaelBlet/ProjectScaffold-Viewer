@@ -3,7 +3,7 @@ import { findPort, IDENTIFIER_RE, modulePath } from '@/model/project'
 import { deleteLink, update, useProjectStore } from '@/store/project'
 import { select } from '@/store/ui'
 import { navigate } from '@/actions'
-import { CommitInput, NumberInput, Row, Section, Select, TextArea } from '@/components/fields'
+import { CommitInput, IconButton, NumberInput, Row, Section, Select, TextArea } from '@/components/fields'
 import { PERFORMANCE_CLASSES, TRANSPORTS, type Endpoint, type Link } from '@/model/types'
 
 function withLink(id: string, fn: (l: Link) => void): void {
@@ -18,10 +18,20 @@ export function LinkInspector({ id }: { id: string }): ReactNode {
   const link = project.links.find((l) => l.id === id)
   if (!link) return <p className="muted">Link deleted.</p>
   const c = link.constraints
-  const iface = (() => {
-    const port = findPort(project, link.from.moduleId, link.from.portId)
-    return project.interfaces.find((i) => i.id === port?.interfaceId)
-  })()
+  const fromPort = findPort(project, link.from.moduleId, link.from.portId)
+  const toPort = findPort(project, link.to.moduleId, link.to.portId)
+  const iface = project.interfaces.find((i) => i.id === fromPort?.interfaceId)
+  const mismatch = (fromPort?.interfaceId ?? null) !== (toPort?.interfaceId ?? null)
+  // The interface lives on the ports: set it on both ends.
+  const setInterface = (v: string): void =>
+    update((d) => {
+      const l = d.links.find((l) => l.id === id)
+      if (!l) return
+      for (const e of [l.from, l.to]) {
+        const p = findPort(d, e.moduleId, e.portId)
+        if (p) p.interfaceId = v || null
+      }
+    })
 
   const endpoint = (e: Endpoint): ReactNode => (
     <button
@@ -52,18 +62,21 @@ export function LinkInspector({ id }: { id: string }): ReactNode {
       <Row label="From">{endpoint(link.from)}</Row>
       <Row label="To">{endpoint(link.to)}</Row>
       <Row label="Interface">
-        {iface ? (
-          <button
-            type="button"
-            className="link-button"
-            onClick={() => select({ kind: 'interface', id: iface.id })}
-          >
-            {iface.name}
-          </button>
-        ) : (
-          <span className="muted">none</span>
+        <Select
+          value={fromPort?.interfaceId ?? ''}
+          options={[
+            { value: '', label: '— none —' },
+            ...project.interfaces.map((i) => ({ value: i.id, label: i.name }))
+          ]}
+          onChange={setInterface}
+        />
+        {iface && (
+          <IconButton title="Open interface" onClick={() => select({ kind: 'interface', id: iface.id })}>
+            ↗
+          </IconButton>
         )}
       </Row>
+      {mismatch && <p className="muted">Ends have different interfaces; picking one sets both ports.</p>}
       <TextArea value={link.description} onChange={(v) => withLink(id, (l) => void (l.description = v))} />
 
       <Section title="Direction">

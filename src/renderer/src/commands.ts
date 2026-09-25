@@ -27,7 +27,7 @@ import {
 } from './actions'
 import { closeDocument, exportProject, newProject, openProject, saveAll, saveProject } from './fileOps'
 import { activeDoc, cycleDoc, patchDoc, useDocs, activateDoc } from './store/documents'
-import { redo, undo } from './store/project'
+import { getProject, redo, undo } from './store/project'
 import { applyTheme, setSetting, useSettings, type Theme } from './store/settings'
 import { useUiStore, type MenuItem } from './store/ui'
 import { activeCanvas, openView, resetLayout, showTool, toggleTool, type ToolId } from './shell/controllers'
@@ -439,6 +439,22 @@ export const commands: Command[] = [
     run: () => void arrangeLayout('all')
   },
   {
+    id: 'arrange.horizontal',
+    title: 'Auto-arrange horizontally (ports left / right)',
+    category: 'Arrange',
+    keys: ['Ctrl+Alt+H'],
+    checked: () => getProject().orientation === 'horizontal',
+    run: () => void arrangeLayout('auto', 'horizontal')
+  },
+  {
+    id: 'arrange.vertical',
+    title: 'Auto-arrange vertically (ports top / bottom)',
+    category: 'Arrange',
+    keys: ['Ctrl+Alt+V'],
+    checked: () => getProject().orientation === 'vertical',
+    run: () => void arrangeLayout('auto', 'vertical')
+  },
+  {
     id: 'arrange.group',
     title: 'Group into a module',
     category: 'Arrange',
@@ -533,6 +549,14 @@ export const commands: Command[] = [
     keys: ['Ctrl+Shift+O'],
     global: true,
     run: tool('outline')
+  },
+  {
+    id: 'window.links',
+    title: 'Links',
+    category: 'Window',
+    keys: ['Ctrl+Shift+L'],
+    global: true,
+    run: tool('links')
   },
   {
     id: 'window.inspector',

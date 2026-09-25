@@ -65,3 +65,32 @@ describe('orientLinkEnds', () => {
     expect([source.side, target.side]).toEqual(['right', 'left'])
   })
 })
+
+describe('orientLinkEnds, vertical orientation', () => {
+  /** Module with its first out port (bottom) and first in port (top), each alone on its band. */
+  const vmod = (x: number, y: number) => ({
+    rect: { x, y, width: 200, height: 92 },
+    out: { x: x + 100, y: y + 92 },
+    in: { x: x + 100, y }
+  })
+  const vlink = (a: ReturnType<typeof vmod>, b: ReturnType<typeof vmod>) =>
+    orientLinkEnds({ rect: a.rect, handle: a.out }, { rect: b.rect, handle: b.in }, 'vertical')
+
+  it('keeps the port edges top to bottom', () => {
+    const { source, target } = vlink(vmod(0, 0), vmod(300, 300))
+    expect(source).toEqual({ x: 100, y: 92, side: 'bottom' })
+    expect(target).toEqual({ x: 400, y: 300, side: 'top' })
+  })
+
+  it('leaves from the facing edges bottom to top', () => {
+    const { source, target } = vlink(vmod(0, 400), vmod(300, 0))
+    expect([source.side, target.side]).toEqual(['top', 'bottom'])
+  })
+
+  it('links modules side by side straight across', () => {
+    const { source, target } = vlink(vmod(0, 0), vmod(400, 10))
+    expect([source.side, target.side]).toEqual(['right', 'left'])
+    expect(source.y).toBe(target.y)
+    expect([source.x, target.x]).toEqual([200, 400])
+  })
+})

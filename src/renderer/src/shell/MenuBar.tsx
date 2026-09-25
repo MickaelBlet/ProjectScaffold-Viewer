@@ -85,6 +85,8 @@ const MENUS: [Category, (string | '-')[]][] = [
     [
       'arrange.auto',
       'arrange.all',
+      'arrange.horizontal',
+      'arrange.vertical',
       '-',
       'arrange.group',
       '-',
@@ -108,6 +110,7 @@ const MENUS: [Category, (string | '-')[]][] = [
     [
       'window.explorer',
       'window.outline',
+      'window.links',
       'window.inspector',
       'window.problems',
       'window.search',

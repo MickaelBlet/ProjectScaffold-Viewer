@@ -8,7 +8,7 @@ import {
   type Format
 } from '@/model/serialize'
 import { hasErrors, validate } from '@/model/validate'
-import { arrange } from '@/model/autoLayout'
+import { arrange, arrangeOptions } from '@/model/autoLayout'
 import type { Project } from '@/model/types'
 import {
   activeDoc,
@@ -86,7 +86,7 @@ async function arrangeLoaded(docId: string): Promise<void> {
   const doc = findDoc(docId)
   if (!doc) return
   const before = doc.store.getState().project
-  const project = await arrange(before, null)
+  const project = await arrange(before, null, arrangeOptions(before.orientation))
   const now = findDoc(docId)
   if (!now || now.store.getState().project !== before) return
   now.store.setState({ project })

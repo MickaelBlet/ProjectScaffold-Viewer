@@ -26,11 +26,16 @@ function move<T>(list: T[], i: number, delta: number): void {
   ;[list[i], list[j]] = [list[j]!, list[i]!]
 }
 
-/** Editable list of named, typed fields (struct fields, message params). */
-export function FieldList(props: {
-  fields: Field[]
-  onChange: (fn: (fields: Field[]) => void) => void
+/**
+ * Editable list of named, typed fields (struct fields, message params). `extra` holds the
+ * non-Field properties of new entries; `column` renders an additional cell after the name.
+ */
+export function FieldList<F extends Field = Field>(props: {
+  fields: F[]
+  onChange: (fn: (fields: F[]) => void) => void
   addLabel: string
+  extra?: Omit<F, keyof Field>
+  column?: (f: F, i: number) => ReactNode
 }): ReactNode {
   const { fields, onChange } = props
   return (
@@ -46,6 +51,7 @@ export function FieldList(props: {
                   onCommit={(n) => onChange((fs) => void (fs[i]!.name = n))}
                 />
               </td>
+              {props.column && <td className="extra">{props.column(f, i)}</td>}
               <td className="wide">
                 <TypeEditor value={f.type} onChange={(t) => onChange((fs) => void (fs[i]!.type = t))} />
               </td>
@@ -79,6 +85,7 @@ export function FieldList(props: {
           onChange(
             (fs) =>
               void fs.push({
+                ...props.extra,
                 id: newId(),
                 name: uniqueName(
                   'field',
@@ -86,7 +93,7 @@ export function FieldList(props: {
                 ),
                 type: { kind: 'primitive', name: 'uint32' },
                 description: ''
-              })
+              } as F)
           )
         }
       >

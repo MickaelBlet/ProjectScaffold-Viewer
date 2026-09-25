@@ -14,7 +14,7 @@ import {
 import { useProjectStore } from '@/store/project'
 import { useSettings } from '@/store/settings'
 import { select } from '@/store/ui'
-import type { PerformanceClass } from '@/model/types'
+import type { Orientation, PerformanceClass } from '@/model/types'
 import { orientLinkEnds, type Side } from './linkEnds'
 
 export const PERF_COLORS: Record<PerformanceClass, string> = {
@@ -54,7 +54,8 @@ function endPoints(
   source: InternalNode | undefined,
   target: InternalNode | undefined,
   lookup: Lookup,
-  auto: boolean
+  auto: boolean,
+  orientation: Orientation
 ) {
   const base = {
     sourceX: props.sourceX,
@@ -68,18 +69,32 @@ function endPoints(
   if (!auto || !source || !target) return base
   // A container's port links to its content from the inside: keep the sides.
   if (isAncestor(lookup, source.id, target.id) || isAncestor(lookup, target.id, source.id)) return base
+  // Floating ports already sit on the facing edge (portSides.ts): the link starts at the port.
+  const floats = [source, target].map((n) => !!(n.data as { sides?: unknown }).sides)
+  if (floats[0] && floats[1]) return base
   const ends = orientLinkEnds(
     { rect: rectOf(source), handle: { x: props.sourceX, y: props.sourceY } },
-    { rect: rectOf(target), handle: { x: props.targetX, y: props.targetY } }
+    { rect: rectOf(target), handle: { x: props.targetX, y: props.targetY } },
+    orientation
   )
+  const from = floats[0]
+    ? { x: props.sourceX, y: props.sourceY, position: props.sourcePosition }
+    : { x: ends.source.x, y: ends.source.y, position: POSITION[ends.source.side] }
+  const to = floats[1]
+    ? { x: props.targetX, y: props.targetY, position: props.targetPosition }
+    : { x: ends.target.x, y: ends.target.y, position: POSITION[ends.target.side] }
   return {
-    sourceX: ends.source.x,
-    sourceY: ends.source.y,
-    sourcePosition: POSITION[ends.source.side],
-    targetX: ends.target.x,
-    targetY: ends.target.y,
-    targetPosition: POSITION[ends.target.side],
-    moved: [ends.source.side !== 'right', ends.target.side !== 'left']
+    sourceX: from.x,
+    sourceY: from.y,
+    sourcePosition: from.position,
+    targetX: to.x,
+    targetY: to.y,
+    targetPosition: to.position,
+    // Fixed ports (containers) whose link leaves from another edge get a dot there.
+    moved: [
+      !floats[0] && ends.source.side !== (orientation === 'vertical' ? 'bottom' : 'right'),
+      !floats[1] && ends.target.side !== (orientation === 'vertical' ? 'top' : 'left')
+    ]
   }
 }
 
@@ -90,7 +105,8 @@ export const LinkEdge = memo(function LinkEdge(props: EdgeProps): ReactNode {
   const target = useInternalNode(props.target)
   const store = useStoreApi()
   const lookup: Lookup = (id) => store.getState().nodeLookup.get(id)
-  const ends = endPoints(props, source, target, lookup, autoOrientLinks)
+  const orientation = useProjectStore((s) => s.project.orientation)
+  const ends = endPoints(props, source, target, lookup, autoOrientLinks, orientation)
   const [path, labelX, labelY] =
     edgeStyle === 'straight'
       ? getStraightPath(ends)

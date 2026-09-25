@@ -482,6 +482,9 @@ input.number {
 .grid.fields td:last-child {
   width: 78px;
 }
+.grid.fields td.extra {
+  width: 68px;
+}
 .grid td.nowrap {
   white-space: nowrap;
 }
@@ -673,7 +676,7 @@ ul.plain {
   color: var(--muted);
   font-size: 10px;
 }
-.port.out {
+.port.right {
   margin-left: auto;
 }
 .handle {
@@ -1336,6 +1339,13 @@ ul.plain {
 .results li:hover {
   background: var(--panel-2);
 }
+.results li.active {
+  background: var(--accent-soft);
+}
+.links-panel .count {
+  margin: 0 10px 4px;
+  font-size: 12px;
+}
 .results small {
   color: var(--muted);
 }
@@ -1443,4 +1453,48 @@ mark {
 }
 .editor-dock .dv-groupview {
   background: var(--bg);
+}
+
+/* Vertical orientation: in ports on the top edge, out ports on the bottom edge */
+.module.vertical {
+  position: relative;
+}
+.port-band.top + .module-header {
+  border-radius: 0;
+  border-top: 1px solid var(--border);
+}
+.port-band {
+  display: flex;
+  height: 24px;
+  font-size: 12px;
+}
+.port-band.bottom {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-top: 1px dashed var(--border);
+}
+.module.container .port-band.bottom {
+  border-top: none;
+}
+.vport {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.vport small {
+  color: var(--muted);
+  font-size: 10px;
+}
+.vport .handle {
+  overflow: visible;
 }

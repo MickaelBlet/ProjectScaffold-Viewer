@@ -5,26 +5,30 @@ import type { ElkExtendedEdge, ElkNode, ElkPort } from 'elkjs/lib/elk-api'
 import {
   boundsOf,
   childModules,
+  contentBottom,
+  contentTop,
+  defaultSize,
   growAncestors,
   LAYOUT_PAD,
-  leafHeight,
   MODULE_HEADER,
-  MODULE_WIDTH,
+  minSize,
   PORT_ROW,
-  portRows,
   subtreeIds
 } from './project'
-import type { Id, Module, Project, Rect } from './types'
-
-export type ArrangeDirection = 'RIGHT' | 'DOWN' | 'LEFT' | 'UP'
+import type { Id, Module, Orientation, Project, Rect } from './types'
 
 export interface ArrangeOptions {
-  direction: ArrangeDirection
+  /** `horizontal`: layers left to right, ports on the sides. `vertical`: top to bottom, ports on top / bottom. */
+  orientation: Orientation
   /** Space between modules. */
   spacing: number
 }
 
-export const DEFAULT_ARRANGE: ArrangeOptions = { direction: 'RIGHT', spacing: 70 }
+export const DEFAULT_ARRANGE: ArrangeOptions = { orientation: 'horizontal', spacing: 70 }
+
+export function arrangeOptions(orientation: Orientation): ArrangeOptions {
+  return { ...DEFAULT_ARRANGE, orientation }
+}
 
 let elk: InstanceType<typeof ELK> | null = null
 
@@ -42,8 +46,13 @@ export async function computeArrangement(
   if (scopeId) inGraph.delete(scopeId)
   const portOwner = new Map<Id, Id>()
 
+  const o = options.orientation
+  const vertical = o === 'vertical'
+  const direction = vertical ? 'DOWN' : 'RIGHT'
+  // Leaves get their default size when the ports move to other edges.
+  const reset = o !== p.orientation
   const padding = (m: Pick<Module, 'ports'>): string =>
-    `[top=${leafHeight(portRows(m)) + LAYOUT_PAD / 2},left=${LAYOUT_PAD},bottom=${LAYOUT_PAD},right=${LAYOUT_PAD}]`
+    `[top=${contentTop(m, o) + LAYOUT_PAD / 2},left=${LAYOUT_PAD},bottom=${contentBottom(o)},right=${LAYOUT_PAD}]`
 
   // Spacing applies to each container's own content.
   const spacing = {
@@ -58,10 +67,24 @@ export async function computeArrangement(
     const ins = m.ports.filter((pt) => pt.role === 'in')
     const outs = m.ports.filter((pt) => pt.role === 'out')
     const leaf = !children.length
-    const width = leaf ? m.layout.width : MODULE_WIDTH
-    const height = Math.max(leaf ? m.layout.height : 0, leafHeight(portRows(m)))
-    const port = (id: Id, i: number, side: 'WEST' | 'EAST'): ElkPort => {
+    const min = minSize(m, o)
+    const size = reset ? defaultSize(m, o) : m.layout
+    const width = leaf ? Math.max(size.width, min.width) : min.width
+    const height = leaf ? Math.max(size.height, min.height) : min.height
+    const port = (id: Id, i: number, role: 'in' | 'out'): ElkPort => {
       portOwner.set(id, m.id)
+      if (vertical) {
+        // Ports share their band evenly (see ModuleNode).
+        const n = role === 'in' ? ins.length : outs.length
+        return {
+          id,
+          width: 2,
+          height: 2,
+          ...(leaf ? { x: ((i + 0.5) * width) / n - 1, y: role === 'in' ? -1 : height - 1 } : {}),
+          layoutOptions: { 'elk.port.side': role === 'in' ? 'NORTH' : 'SOUTH', 'elk.port.index': String(i) }
+        }
+      }
+      const side = role === 'in' ? 'WEST' : 'EAST'
       return {
         id,
         width: 2,
@@ -78,17 +101,17 @@ export async function computeArrangement(
       width,
       height,
       children,
-      ports: [...ins.map((pt, i) => port(pt.id, i, 'WEST')), ...outs.map((pt, i) => port(pt.id, i, 'EAST'))],
+      ports: [...ins.map((pt, i) => port(pt.id, i, 'in')), ...outs.map((pt, i) => port(pt.id, i, 'out'))],
       layoutOptions: {
         'elk.portConstraints': leaf ? 'FIXED_POS' : 'FIXED_ORDER',
         ...(leaf
           ? {}
           : {
               ...spacing,
-              'elk.direction': options.direction,
+              'elk.direction': direction,
               'elk.padding': padding(m),
               'elk.nodeSize.constraints': 'MINIMUM_SIZE',
-              'elk.nodeSize.minimum': `(${MODULE_WIDTH}, ${height})`
+              'elk.nodeSize.minimum': `(${width}, ${height})`
             })
       }
     }
@@ -105,7 +128,7 @@ export async function computeArrangement(
     edges,
     layoutOptions: {
       'elk.algorithm': 'layered',
-      'elk.direction': options.direction,
+      'elk.direction': direction,
       'elk.hierarchyHandling': 'INCLUDE_CHILDREN',
       ...spacing,
       'elk.layered.nodePlacement.strategy': 'BRANDES_KOEPF',
@@ -119,7 +142,7 @@ export async function computeArrangement(
   const collect = (n: ElkNode): void => {
     for (const c of n.children ?? []) {
       if (inGraph.has(c.id))
-        rects.set(c.id, { x: c.x ?? 0, y: c.y ?? 0, width: c.width ?? MODULE_WIDTH, height: c.height ?? 0 })
+        rects.set(c.id, { x: c.x ?? 0, y: c.y ?? 0, width: c.width ?? 0, height: c.height ?? 0 })
       collect(c)
     }
   }
@@ -145,11 +168,17 @@ export async function arrange(
   options: ArrangeOptions = DEFAULT_ARRANGE
 ): Promise<Project> {
   const rects = await computeArrangement(p, scopeId, options)
-  return applyArrangement(p, rects, scopeId)
+  return applyArrangement(p, rects, scopeId, options.orientation)
 }
 
-export function applyArrangement(p: Project, rects: Map<Id, Rect>, scopeId: Id | null): Project {
+export function applyArrangement(
+  p: Project,
+  rects: Map<Id, Rect>,
+  scopeId: Id | null,
+  orientation: Orientation = p.orientation
+): Project {
   return produce(p, (d) => {
+    d.orientation = orientation
     for (const m of d.modules) {
       const r = rects.get(m.id)
       if (r)
