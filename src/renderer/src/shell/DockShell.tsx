@@ -9,7 +9,14 @@ import { ProblemsPanel, useProblems } from '@/panels/ProblemsPanel'
 import { SearchPanel } from '@/panels/SearchPanel'
 import { SettingsPanel } from '@/panels/SettingsPanel'
 import { EditorArea } from './EditorArea'
-import { EDITOR_AREA, loadOuterLayout, lockEditorArea, saveOuterLayout, setOuterApi } from './controllers'
+import {
+  EDITOR_AREA,
+  keepSizes,
+  loadOuterLayout,
+  lockEditorArea,
+  saveOuterLayout,
+  setOuterApi
+} from './controllers'
 import { dockTheme } from './theme'
 
 function tool(id: string, Content: () => ReactNode) {
@@ -56,6 +63,7 @@ export function DockShell(): ReactNode {
     setOuterApi(e.api)
     loadOuterLayout(e.api)
     e.api.onDidLayoutChange(saveOuterLayout)
+    keepSizes(e.api)
     // The editor area cannot go away.
     e.api.onDidRemovePanel((p) => {
       if (p.id !== EDITOR_AREA) return

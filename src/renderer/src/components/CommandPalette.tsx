@@ -5,17 +5,12 @@ import { fuzzyFilter } from '@/model/fuzzy'
 import { modulePath } from '@/model/project'
 import { GLOBAL_VIEW } from '@/model/types'
 import { getProject } from '@/store/project'
-import { useUiStore } from '@/store/ui'
+import { useUiStore, type PickEntry } from '@/store/ui'
 import { navigate, openModuleView } from '@/actions'
 import { openView } from '@/shell/controllers'
 
-interface Entry {
-  key: string
-  label: string
-  detail?: string
+interface Entry extends PickEntry {
   keys?: string
-  kind: string
-  run: () => void
 }
 
 const RECENT_KEY = 'project-scaffold:recent-commands'
@@ -121,10 +116,12 @@ export function CommandPalette(): ReactNode {
     }
   }, [palette])
 
-  const isCommands = query.startsWith('>')
+  const pickList = palette?.pick
+  const isCommands = !pickList && query.startsWith('>')
   const entries = useMemo(
-    () => (palette ? (isCommands ? commandEntries() : entityEntries()) : []),
-    [palette, isCommands]
+    (): Entry[] =>
+      !palette ? [] : pickList ? pickList.entries : isCommands ? commandEntries() : entityEntries(),
+    [palette, pickList, isCommands]
   )
   const results = useMemo(
     () => fuzzyFilter(isCommands ? query.slice(1) : query, entries, (e) => e.label).slice(0, 60),
@@ -150,7 +147,11 @@ export function CommandPalette(): ReactNode {
           value={query}
           spellCheck={false}
           placeholder={
-            isCommands ? 'Type a command' : 'Go to module, type, interface, link, view — ">" for commands'
+            pickList
+              ? pickList.placeholder
+              : isCommands
+                ? 'Type a command'
+                : 'Go to module, type, interface, link, view — ">" for commands'
           }
           onChange={(e) => {
             setQuery(e.target.value)

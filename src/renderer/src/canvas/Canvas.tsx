@@ -18,7 +18,17 @@ import {
   type Viewport
 } from '@xyflow/react'
 import { toPng, toSvg } from 'html-to-image'
-import { findPort, findView, modulePath, subtreeIds, visibleModuleIds } from '@/model/project'
+import {
+  allImported,
+  findImported,
+  findPort,
+  findView,
+  importedSize,
+  isImportedId,
+  modulePath,
+  subtreeIds,
+  visibleModuleIds
+} from '@/model/project'
 import { GLOBAL_VIEW, type Id, type Project, type View } from '@/model/types'
 import {
   addLink,
@@ -37,9 +47,12 @@ import { openContextMenu, select, setStatus, useUiStore } from '@/store/ui'
 import {
   addModuleAt,
   addNoteAt,
+  linkOtherProject,
   navigate,
+  openImportSource,
   openModuleView,
   paste,
+  refreshImports,
   selectionOf,
   showAllInView
 } from '@/actions'
@@ -50,9 +63,10 @@ import { ModuleNode } from './ModuleNode'
 import { floatingPortSides, neededHeight, type PortSides } from './portSides'
 import { NoteNode } from './NoteNode'
 import { ExternalNode, type ExternalNodeData, type ExternalPort } from './ExternalNode'
+import { ImportedNode } from './ImportedNode'
 import { LinkEdge, PERF_COLORS } from './LinkEdge'
 
-const nodeTypes = { module: ModuleNode, note: NoteNode, external: ExternalNode }
+const nodeTypes = { module: ModuleNode, note: NoteNode, external: ExternalNode, imported: ImportedNode }
 const edgeTypes = { link: LinkEdge }
 
 const EXTERNAL = 'external:'
@@ -77,6 +91,7 @@ function toNodes(p: Project, view: View, selected: Set<Id>, sides: PortSides | n
         width: n.layout.width,
         height: n.layout.height,
         selected: selected.has(n.id),
+        draggable: !n.locked,
         // Frames stay behind modules.
         zIndex: n.kind === 'frame' ? -1 : 500,
         data: {}
@@ -93,12 +108,23 @@ function toNodes(p: Project, view: View, selected: Set<Id>, sides: PortSides | n
       height: placements ? Math.max(m.layout.height, neededHeight(m.ports, placements)) : m.layout.height,
       parentId: isRoot ? undefined : (m.parentId ?? undefined),
       // The root of a drill-down view is the frame of the view.
-      draggable: !isRoot,
+      draggable: !isRoot && !m.locked,
       selected: selected.has(m.id),
       data: placements ? { sides: placements } : {}
     })
   }
   if (view.rootModuleId) nodes.push(...externalNodes(p, view, visible))
+  // Modules of other projects (global view only).
+  for (const m of allImported(p))
+    if (visible.has(m.id))
+      nodes.push({
+        id: m.id,
+        type: 'imported',
+        position: { ...m.position },
+        ...importedSize(m, p.orientation),
+        selected: selected.has(m.id),
+        data: {}
+      })
   return nodes
 }
 
@@ -340,7 +366,7 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
     const doc = activeDoc()
     const p = getProject()
     const onCanvas = (id: Id): boolean =>
-      p.modules.some((m) => m.id === id) || p.notes.some((n) => n.id === id)
+      p.modules.some((m) => m.id === id) || p.notes.some((n) => n.id === id) || !!findImported(p, id)
     // Explorer items leave the selection when the canvas one changes.
     const ids = new Set(doc.selectedIds.filter(onCanvas))
     let added: Id | null = null
@@ -409,6 +435,8 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
   const isValidConnection = useCallback((c: Connection | Edge): boolean => {
     if (!c.sourceHandle || !c.targetHandle || c.source === c.target) return false
     if (c.source.startsWith(EXTERNAL) || c.target.startsWith(EXTERNAL)) return false
+    // A link to another project needs one end here.
+    if (isImportedId(c.source) && isImportedId(c.target)) return false
     const p = getProject()
     const a = findPort(p, c.source, c.sourceHandle)
     const b = findPort(p, c.target, c.targetHandle)
@@ -457,7 +485,7 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
     (_, node, dragged) => {
       setGuides([])
       const p = getProject()
-      if (dragged.length > 1 || node.type === 'note') {
+      if (dragged.length > 1 || node.type === 'note' || node.type === 'imported') {
         // Several items: move them, keeping their parents.
         setLayouts(
           new Map(dragged.map((n) => [n.id, { x: Math.round(n.position.x), y: Math.round(n.position.y) }]))
@@ -499,6 +527,19 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
       ])
     }
     if (!activeDoc().selectedIds.includes(node.id)) select(selectionOf(getProject(), node.id))
+    if (node.type === 'imported') {
+      const imp = findImported(getProject(), node.id)?.imp
+      return openContextMenu(e, [
+        ...(imp
+          ? [
+              { label: 'Refresh from its project', run: () => refreshImports([imp.id]) },
+              { label: `Open ${imp.file}`, run: () => openImportSource(imp.file) }
+            ]
+          : []),
+        'separator',
+        item('edit.delete', 'Remove from this project')
+      ])
+    }
     const multiple = activeDoc().selectedIds.length > 1
     const at = screenToFlowPosition({ x: e.clientX, y: e.clientY })
     if (node.type === 'note') {
@@ -506,6 +547,7 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
         item('edit.cut'),
         item('edit.copy'),
         item('edit.duplicate'),
+        item('arrange.lock', 'Locked'),
         'separator',
         ...NOTE_COLORS.map(([label, color]) => ({
           label: `Color: ${label}`,
@@ -531,6 +573,7 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
       item('arrange.horizontal', 'Arrange content horizontally'),
       item('arrange.vertical', 'Arrange content vertically'),
       item('view.hide'),
+      item('arrange.lock', 'Locked'),
       'separator',
       item('edit.cut'),
       item('edit.copy'),
@@ -580,7 +623,8 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
         ? []
         : [
             { label: 'Add note here', run: () => addNoteAt('note', at) },
-            { label: 'Add frame here', run: () => addNoteAt('frame', at) }
+            { label: 'Add frame here', run: () => addNoteAt('frame', at) },
+            { label: 'Link to another project…', run: () => linkOtherProject(at) }
           ]),
       { label: 'Paste here', keys: keyLabel('Ctrl+V'), run: () => void paste(undefined, { at, parent }) },
       'separator',
@@ -621,6 +665,8 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
         }}
         onNodeDoubleClick={(_, n) => {
           if (n.id.startsWith(EXTERNAL)) navigate({ kind: 'module', id: n.id.slice(EXTERNAL.length) })
+          const imp = n.type === 'imported' ? findImported(getProject(), n.id)?.imp : undefined
+          if (imp) openImportSource(imp.file)
         }}
         onEdgeClick={(_, e) => select({ kind: 'link', id: e.id })}
         onPaneClick={() => select(null)}
@@ -674,6 +720,7 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
       item('arrange.distH'),
       item('arrange.distV'),
       item('arrange.sameSize'),
+      item('arrange.lock', 'Locked'),
       'separator',
       item('edit.cut'),
       item('edit.copy'),

@@ -91,8 +91,9 @@ export const ModuleNode = memo(function ModuleNode({ id, selected, draggable, da
       {ports.map((p) => (
         <span key={p.id} className={`vport ${p.role}`} title={`${p.role} ${p.name}: ${ifaceName(p)}`}>
           {handle(p, side === 'top' ? Position.Top : Position.Bottom)}
-          {p.name}
-          <small>{ifaceName(p)}</small>
+          <span className="vport-label">
+            {p.name} <small>{ifaceName(p)}</small>
+          </span>
         </span>
       ))}
     </div>
@@ -116,6 +117,11 @@ export const ModuleNode = memo(function ModuleNode({ id, selected, draggable, da
           <RenameInput id={id} name={mod.name} parentId={mod.parentId} />
         ) : (
           <span className="module-name">{mod.name}</span>
+        )}
+        {mod.locked && (
+          <span className="lock-badge" title="Locked (Ctrl+L to unlock)">
+            🔒
+          </span>
         )}
         {hasChildren && (
           <button

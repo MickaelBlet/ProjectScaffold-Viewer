@@ -51,7 +51,10 @@ const MENUS: [Category, (string | '-')[]][] = [
       'insert.outPort',
       '-',
       'insert.note',
-      'insert.frame'
+      'insert.frame',
+      '-',
+      'insert.imported',
+      'insert.refreshImports'
     ]
   ],
   [

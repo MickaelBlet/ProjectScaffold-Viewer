@@ -15,6 +15,8 @@ import {
   typeUsages,
   uniqueName
 } from '@/model/project'
+import { importModule, refreshImport, removeImported, type RefreshResult } from '@/model/imports'
+import { followInterfaceRenames } from '@/model/sync'
 import type { Endpoint, Id, Project, Rect, TypeDef } from '@/model/types'
 import { activeDoc, useDoc } from './documents'
 
@@ -34,7 +36,13 @@ export const history = () => projectStore().temporal.getState()
 export const getProject = (): Project => projectStore().getState().project
 
 export function update(fn: (draft: Project) => void): void {
-  projectStore().setState((s) => ({ project: produce(s.project, fn) }))
+  projectStore().setState((s) => ({
+    project: produce(s.project, (d) => {
+      fn(d)
+      // Imported ports reference interfaces by name.
+      followInterfaceRenames(s.project, d)
+    })
+  }))
 }
 
 export function replaceProject(project: Project): void {
@@ -93,9 +101,10 @@ export function deleteModule(id: Id): void {
   })
 }
 
-/** Delete modules (with their content) and notes in one undo step. */
+/** Delete modules (with their content), imported modules and notes in one undo step. */
 export function deleteItems(ids: Id[]): void {
   update((d) => {
+    removeImported(d, new Set(ids))
     const gone = new Set<Id>()
     for (const id of ids)
       if (d.modules.some((m) => m.id === id)) for (const s of subtreeIds(d, id)) gone.add(s)
@@ -114,6 +123,8 @@ export function setLayouts(layouts: Map<Id, Partial<Rect>>): void {
       if (m) Object.assign(m.layout, r)
       const n = d.notes.find((n) => n.id === id)
       if (n) Object.assign(n.layout, r)
+      const im = d.imports.flatMap((i) => i.modules).find((m) => m.id === id)
+      if (im) im.position = { x: r.x ?? im.position.x, y: r.y ?? im.position.y }
     }
     for (const id of layouts.keys()) growAncestors(d, id)
   })
@@ -180,8 +191,15 @@ export function deletePort(moduleId: Id, portId: Id): void {
 export function addLink(from: Endpoint, to: Endpoint): Id {
   const id = newId()
   update((d) => {
-    const a = d.modules.find((m) => m.id === from.moduleId)?.name ?? 'a'
-    const b = d.modules.find((m) => m.id === to.moduleId)?.name ?? 'b'
+    const moduleName = (e: Endpoint): string | undefined =>
+      d.modules.find((m) => m.id === e.moduleId)?.name ??
+      d.imports
+        .flatMap((i) => i.modules)
+        .find((m) => m.id === e.moduleId)
+        ?.path.split('.')
+        .pop()
+    const a = moduleName(from) ?? 'a'
+    const b = moduleName(to) ?? 'b'
     const name = uniqueName(
       `${a}_to_${b}`,
       d.links.map((l) => l.name)
@@ -194,6 +212,34 @@ export function addLink(from: Endpoint, to: Endpoint): Id {
 export function deleteLink(id: Id): void {
   update((d) => {
     d.links = d.links.filter((l) => l.id !== id)
+  })
+}
+
+// Imports
+
+/** Place a module of another project on the canvas; returns its id here (null if not found). */
+export function addImportedModule(
+  source: Project,
+  file: string,
+  moduleId: Id,
+  position: { x: number; y: number }
+): Id | null {
+  let id: Id | null = null
+  update((d) => void (id = importModule(d, source, file, moduleId, position)))
+  return id
+}
+
+/** Update an import from its project. */
+export function refreshImportFrom(importId: Id, source: Project): RefreshResult {
+  let result: RefreshResult = { missing: [], renamed: [] }
+  update((d) => void (result = refreshImport(d, importId, source)))
+  return result
+}
+
+export function renameImport(importId: Id, name: string): void {
+  update((d) => {
+    const i = d.imports.find((i) => i.id === importId)
+    if (i) i.name = name
   })
 }
 
@@ -308,6 +354,17 @@ export function updateNote(id: Id, fn: (n: Project['notes'][number]) => void): v
   update((d) => {
     const n = d.notes.find((n) => n.id === id)
     if (n) fn(n)
+  })
+}
+
+/** Lock or unlock the position and size of modules and notes. */
+export function setLocked(ids: Id[], locked: boolean): void {
+  update((d) => {
+    for (const e of [...d.modules, ...d.notes])
+      if (ids.includes(e.id)) {
+        if (locked) e.locked = true
+        else delete e.locked
+      }
   })
 }
 

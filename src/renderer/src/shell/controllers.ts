@@ -1,5 +1,11 @@
 // Handles on the mounted UI (dock layouts and canvases), for commands that run outside React.
-import type { DockviewApi } from 'dockview-react'
+import {
+  Orientation,
+  type Direction,
+  type DockviewApi,
+  type IDockviewGroupPanel,
+  type SerializedDockview
+} from 'dockview-react'
 import { findView } from '@/model/project'
 import { GLOBAL_VIEW, type Id, type Rect } from '@/model/types'
 import { activeDoc, patchDoc } from '@/store/documents'
@@ -48,6 +54,17 @@ export const TOOL_TITLES: Record<ToolId, string> = {
   settings: 'Settings'
 }
 
+/** Width of the side tools, height of the bottom ones, when first opened. */
+const TOOL_SIZES: Record<ToolId, number> = {
+  explorer: 250,
+  outline: 250,
+  links: 250,
+  inspector: 380,
+  settings: 380,
+  problems: 170,
+  search: 170
+}
+
 let outer: DockviewApi | null = null
 let editor: DockviewApi | null = null
 
@@ -66,7 +83,7 @@ export function buildDefaultLayout(api: DockviewApi): void {
     id: 'explorer',
     component: 'explorer',
     title: TOOL_TITLES.explorer,
-    initialWidth: 250,
+    initialWidth: TOOL_SIZES.explorer,
     position: { referencePanel: EDITOR_AREA, direction: 'left' }
   })
   api.addPanel({
@@ -86,14 +103,14 @@ export function buildDefaultLayout(api: DockviewApi): void {
     id: 'inspector',
     component: 'inspector',
     title: TOOL_TITLES.inspector,
-    initialWidth: 380,
+    initialWidth: TOOL_SIZES.inspector,
     position: { referencePanel: EDITOR_AREA, direction: 'right' }
   })
   api.addPanel({
     id: 'problems',
     component: 'problems',
     title: TOOL_TITLES.problems,
-    initialHeight: 170,
+    initialHeight: TOOL_SIZES.problems,
     position: { referencePanel: EDITOR_AREA, direction: 'below' }
   })
   api.addPanel({
@@ -137,8 +154,154 @@ export function loadOuterLayout(api: DockviewApi): void {
   buildDefaultLayout(api)
 }
 
+type GridNode = SerializedDockview['grid']['root']
+type GroupState = Extract<GridNode['data'], { id: string }>
+
+/** Dockview's default minimum group width and height. */
+const MIN_GROUP_SIZE = 100
+
+const leafIds = (node: GridNode): string[] =>
+  node.type === 'leaf' ? [(node.data as GroupState).id] : (node.data as GridNode[]).flatMap(leafIds)
+
+/** Children of the branch directly holding the group, with the branch orientation. */
+function findParent(
+  node: GridNode,
+  orientation: Orientation,
+  id: string
+): { children: GridNode[]; orientation: Orientation } | null {
+  if (node.type === 'leaf') return null
+  const children = node.data as GridNode[]
+  if (children.some((c) => c.type === 'leaf' && (c.data as GroupState).id === id))
+    return { children, orientation }
+  const inner = orientation === Orientation.HORIZONTAL ? Orientation.VERTICAL : Orientation.HORIZONTAL
+  for (const c of children) {
+    const found = findParent(c, inner, id)
+    if (found) return found
+  }
+  return null
+}
+
+type Size = { width: number; height: number }
+
+/** Size of each tool's group when last seen, to reopen it as it was. */
+const lastToolSizes = new Map<ToolId, Size>()
+/** Size asked by `showTool` for the group it is adding. */
+let requestedSize: Partial<Size> | null = null
+
+const isTool = (id: string): id is ToolId => id in TOOL_TITLES
+
+/**
+ * Dockview shares the space of an added or removed group equally between its siblings, which
+ * resizes the side bars. Take it from / give it to the sibling holding the editor area instead
+ * (else the previous one on removal), by pinning the other siblings to their former size for one
+ * layout pass.
+ */
+export function keepSizes(api: DockviewApi): void {
+  let before: { grid: SerializedDockview['grid']; editorGroup?: string; sizes: Map<string, Size> } | null =
+    null
+  api.onWillMutateLayout((e) => {
+    before = null
+    if (e.kind !== 'add' && e.kind !== 'remove') return
+    const sizes = new Map(api.groups.map((g) => [g.id, { width: g.width, height: g.height }]))
+    for (const p of api.panels) {
+      const size = sizes.get(p.group.id)
+      if (isTool(p.id) && size) lastToolSizes.set(p.id, size)
+    }
+    before = { grid: api.toJSON().grid, editorGroup: api.getPanel(EDITOR_AREA)?.group.id, sizes }
+  })
+  api.onDidMutateLayout(() => {
+    const requested = requestedSize
+    requestedSize = null
+    if (!before) return
+    const { grid, editorGroup, sizes } = before
+    before = null
+    const removed = leafIds(grid.root).filter((id) => !api.getGroup(id))
+    const added = api.groups.filter((g) => !sizes.has(g.id))
+    let found: { children: GridNode[]; orientation: Orientation } | null = null
+    let changed: string | undefined
+    if (removed.length === 1 && !added.length) {
+      changed = removed[0]
+      found = findParent(grid.root, grid.orientation, changed!)
+      // With a single sibling left, dockview collapses the branch and keeps the sizes itself.
+      if (found && found.children.length < 3) return
+    } else if (added.length === 1 && !removed.length) {
+      changed = added[0]!.id
+      const now = api.toJSON().grid
+      found = findParent(now.root, now.orientation, changed)
+    }
+    if (!found || !changed) return
+    const index = found.children.findIndex((c) => leafIds(c).includes(changed))
+    const rest = found.children.filter((_, i) => i !== index)
+    let grower = editorGroup ? rest.findIndex((c) => leafIds(c).includes(editorGroup)) : -1
+    // An added group splits its neighbour when away from the editor area.
+    if (grower < 0 && !removed.length) return
+    if (grower < 0) grower = Math.max(index - 1, 0)
+    const axis = found.orientation === Orientation.HORIZONTAL ? 'width' : 'height'
+    // A leaf, or the leaves of a cross branch, span the whole size of their sibling.
+    const pins: [IDockviewGroupPanel, number][] = []
+    for (const [i, c] of rest.entries()) {
+      if (i === grower) continue
+      const leaves = c.type === 'leaf' ? [c] : (c.data as GridNode[]).filter((n) => n.type === 'leaf')
+      for (const leaf of leaves) {
+        const id = (leaf.data as GroupState).id
+        const group = api.getGroup(id)
+        const size = sizes.get(id)?.[axis]
+        if (group && size) pins.push([group, size])
+      }
+    }
+    const group = api.getGroup(changed)
+    const size = requested?.[axis]
+    if (group && size) pins.push([group, size])
+    const constrain = (group: IDockviewGroupPanel, min: number, max: number): void =>
+      group.api.setConstraints(
+        axis === 'width'
+          ? { minimumWidth: min, maximumWidth: max }
+          : { minimumHeight: min, maximumHeight: max }
+      )
+    for (const [group, size] of pins) constrain(group, size, size)
+    for (const [group] of pins) constrain(group, MIN_GROUP_SIZE, Number.MAX_SAFE_INTEGER)
+  })
+}
+
 export function resetLayout(): void {
   if (outer) buildDefaultLayout(outer)
+}
+
+type Place = [ref: string, direction: Direction] | [ref: null, direction: Exclude<Direction, 'within'>]
+
+/** Where a closed tool goes back: beside the first open reference, else on an edge of the window. */
+const TOOL_PLACES: Record<ToolId, Place[]> = {
+  explorer: [
+    ['outline', 'above'],
+    ['links', 'above'],
+    [null, 'left']
+  ],
+  outline: [
+    ['links', 'within'],
+    ['explorer', 'below'],
+    [null, 'left']
+  ],
+  links: [
+    ['outline', 'within'],
+    ['explorer', 'below'],
+    [null, 'left']
+  ],
+  inspector: [
+    ['settings', 'within'],
+    [null, 'right']
+  ],
+  settings: [
+    ['inspector', 'within'],
+    [null, 'right']
+  ],
+  problems: [
+    ['search', 'within'],
+    [EDITOR_AREA, 'below']
+  ],
+  search: [
+    ['problems', 'within'],
+    [EDITOR_AREA, 'below']
+  ]
 }
 
 /** Show a tool panel, re-adding it where it belongs when it was closed. */
@@ -150,23 +313,20 @@ export function showTool(id: ToolId, focus = true): void {
     if (focus) focusPanel(id)
     return
   }
-  const beside: Record<ToolId, [string, 'left' | 'right' | 'below' | 'within']> = {
-    explorer: [EDITOR_AREA, 'left'],
-    outline: ['explorer', 'below'],
-    links: ['outline', 'within'],
-    inspector: [EDITOR_AREA, 'right'],
-    problems: [EDITOR_AREA, 'below'],
-    search: ['problems', 'within'],
-    settings: ['inspector', 'within']
+  const [ref, direction] = TOOL_PLACES[id].find(([ref]) => !ref || outer?.getPanel(ref)) ?? [null, 'right']
+  // Split an open neighbour, else take back the former size beside the editor area.
+  requestedSize = null
+  if (!ref || ref === EDITOR_AREA) {
+    const axis = direction === 'left' || direction === 'right' ? 'width' : 'height'
+    requestedSize = { [axis]: lastToolSizes.get(id)?.[axis] ?? TOOL_SIZES[id] }
   }
-  let [ref, direction] = beside[id]
-  if (!outer.getPanel(ref))
-    [ref, direction] = [EDITOR_AREA, id === 'problems' || id === 'search' ? 'below' : 'right']
   outer.addPanel({
     id,
     component: id,
     title: TOOL_TITLES[id],
-    position: { referencePanel: ref, direction: direction === 'within' ? 'within' : direction }
+    position: ref ? { referencePanel: ref, direction } : { direction },
+    initialWidth: requestedSize?.width,
+    initialHeight: requestedSize?.height
   })
   if (focus) focusPanel(id)
 }

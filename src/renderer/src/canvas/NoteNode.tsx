@@ -29,12 +29,12 @@ export const NoteNode = memo(function NoteNode({ id, selected }: NodeProps): Rea
   )
   return (
     <div
-      className={`note ${note.kind} ${selected ? 'selected' : ''}`}
+      className={`note ${note.kind} ${selected ? 'selected' : ''} ${note.locked ? 'locked' : ''}`}
       style={style}
       onDoubleClick={() => setEditing(true)}
     >
       <NodeResizer
-        isVisible={selected}
+        isVisible={selected && !note.locked}
         minWidth={80}
         minHeight={40}
         onResizeEnd={(_, r) =>
@@ -42,6 +42,11 @@ export const NoteNode = memo(function NoteNode({ id, selected }: NodeProps): Rea
         }
       />
       {note.kind === 'frame' ? <div className="frame-title">{text}</div> : text}
+      {note.locked && (
+        <span className="lock-badge" title="Locked (Ctrl+L to unlock)">
+          🔒
+        </span>
+      )}
     </div>
   )
 })

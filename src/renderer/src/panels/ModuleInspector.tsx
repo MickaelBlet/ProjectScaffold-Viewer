@@ -6,6 +6,7 @@ import {
   deleteModule,
   deletePort,
   reparentModule,
+  setLocked,
   setModuleColor,
   update,
   useProjectStore
@@ -162,6 +163,13 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
 
       <Section title="Color">
         <ColorPicker value={mod.color} onChange={(c) => setModuleColor([id], c)} />
+      </Section>
+
+      <Section title="Layout">
+        <label className="check">
+          <input type="checkbox" checked={!!mod.locked} onChange={(e) => setLocked([id], e.target.checked)} />
+          Locked (position and size)
+        </label>
       </Section>
 
       <Section title="Metadata">

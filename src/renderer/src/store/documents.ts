@@ -11,6 +11,7 @@ export type Selection =
   | { kind: 'type'; id: Id }
   | { kind: 'interface'; id: Id }
   | { kind: 'note'; id: Id }
+  | { kind: 'imported'; id: Id }
   | null
 
 export interface Viewport {
@@ -43,10 +44,17 @@ interface DocsState {
   activeId: Id
 }
 
+/** Called after any change to a document's project (see sync.ts). */
+export const projectListeners = new Set<(docId: Id, prev: Project, next: Project) => void>()
+
 export function createDoc(project: Project = emptyProject(), filePath: string | null = null): DocState {
   const id = newId()
   const store = createProjectStore(project)
   // Undo, delete...: the selection drops entities that no longer exist.
+  store.subscribe((state, prevState) => {
+    if (state.project !== prevState.project)
+      for (const listener of projectListeners) listener(id, prevState.project, state.project)
+  })
   store.subscribe(({ project: p }) => {
     const doc = findDoc(id)
     if (!doc) return
@@ -55,7 +63,8 @@ export function createDoc(project: Project = emptyProject(), filePath: string | 
       p.notes.some((n) => n.id === x) ||
       p.types.some((t) => t.id === x) ||
       p.interfaces.some((i) => i.id === x) ||
-      p.links.some((l) => l.id === x)
+      p.links.some((l) => l.id === x) ||
+      p.imports.some((i) => i.modules.some((m) => m.id === x))
     const selectedIds = doc.selectedIds.filter(exists)
     const selection =
       doc.selection && 'id' in doc.selection && !exists(doc.selection.id) ? null : doc.selection

@@ -118,6 +118,8 @@ export const LinkEdge = memo(function LinkEdge(props: EdgeProps): ReactNode {
   const color = PERF_COLORS[c.performance.class]
   return (
     <>
+      {/* Selection halo, under the link. */}
+      {props.selected && <path className="edge-halo" d={path} stroke={color} />}
       <BaseEdge
         id={props.id}
         path={path}
@@ -130,6 +132,8 @@ export const LinkEdge = memo(function LinkEdge(props: EdgeProps): ReactNode {
           strokeDasharray: c.remote.enabled ? '6 4' : undefined
         }}
       />
+      {/* Selection: dashes flowing along the link's direction. */}
+      {props.selected && <path className="edge-flow" d={path} />}
       {/* Attachment dots where an end left its port's side. */}
       {ends.moved[0] && (
         <circle className="attach" cx={ends.sourceX} cy={ends.sourceY} r={3.5} fill={color} />

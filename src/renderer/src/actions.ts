@@ -8,7 +8,9 @@ import {
   boundsOf,
   childModules,
   defaultSize,
+  findImported,
   findView,
+  isImportedId,
   LAYOUT_PAD,
   contentBottom,
   contentTop,
@@ -19,8 +21,9 @@ import {
 } from '@/model/project'
 import type { ProblemTarget } from '@/model/validate'
 import { GLOBAL_VIEW, type Id, type Orientation, type Project, type Rect } from '@/model/types'
-import { activeDoc, patchDoc } from '@/store/documents'
+import { activeDoc, activateDoc, patchDoc, useDocs } from '@/store/documents'
 import {
+  addImportedModule,
   addModule,
   addNote,
   addPort,
@@ -32,11 +35,15 @@ import {
   deleteType,
   getProject,
   growAncestors,
+  refreshImportFrom,
   setHidden,
   setLayouts,
+  setLocked,
   update
 } from '@/store/project'
-import { select, setStatus, showDialog, useUiStore, type Selection } from '@/store/ui'
+import { quickPick, select, setStatus, showDialog, useUiStore, type Selection } from '@/store/ui'
+import { fileName } from '@/fileOps'
+import { formatFromPath, LoadError, loadText } from '@/model/serialize'
 import { activeCanvas, openView, showTool } from '@/shell/controllers'
 
 // Selection
@@ -55,6 +62,7 @@ export function selectionOf(p: Project, id: Id): Selection {
   if (p.types.some((t) => t.id === id)) return { kind: 'type', id }
   if (p.interfaces.some((i) => i.id === id)) return { kind: 'interface', id }
   if (p.links.some((l) => l.id === id)) return { kind: 'link', id }
+  if (findImported(p, id)) return { kind: 'imported', id }
   return null
 }
 
@@ -75,7 +83,7 @@ export function selectAll(): void {
 /** Select an entity and bring it into view. */
 export function navigate(target: ProblemTarget): void {
   if (target.kind === 'project') return select({ kind: 'project' })
-  select(target)
+  select(target.kind === 'module' && isImportedId(target.id) ? { kind: 'imported', id: target.id } : target)
   if (target.kind === 'type' || target.kind === 'interface') return showTool('inspector', false)
   const p = getProject()
   const moduleId = target.kind === 'link' ? p.links.find((l) => l.id === target.id)?.from.moduleId : target.id
@@ -169,7 +177,9 @@ export function deleteSelection(): void {
     return select(null)
   }
   const blocked: string[] = []
-  const canvasIds = ids.filter((id) => p.modules.some((m) => m.id === id) || p.notes.some((n) => n.id === id))
+  const canvasIds = ids.filter(
+    (id) => p.modules.some((m) => m.id === id) || p.notes.some((n) => n.id === id) || !!findImported(p, id)
+  )
   if (canvasIds.length) deleteItems(canvasIds)
   for (const id of ids) {
     if (p.interfaces.some((i) => i.id === id)) deleteInterface(id)
@@ -219,9 +229,164 @@ export function addNoteAt(kind: 'note' | 'frame', pos?: { x: number; y: number }
   select({ kind: 'note', id })
 }
 
+// Links to other projects
+
+/** Another project to link to: an open document, or a file read without opening it. */
+interface OtherProject {
+  project: Project
+  file: string
+}
+
+function otherProjects(): { label: string; detail: string; get: () => Promise<OtherProject | null> }[] {
+  const { docs, activeId } = useDocs.getState()
+  const open = docs
+    .filter((d) => d.id !== activeId)
+    .map((d) => {
+      const project = d.store.getState().project
+      return {
+        label: d.filePath ? fileName(d.filePath) : `${project.name} (unsaved)`,
+        detail: `open · ${project.modules.length} modules`,
+        get: async (): Promise<OtherProject | null> => {
+          if (d.filePath) return { project, file: fileName(d.filePath) }
+          showDialog('Save the other project first', [
+            `"${project.name}" has no file yet: links to it need its file name.`
+          ])
+          return null
+        }
+      }
+    })
+  return [
+    ...open,
+    {
+      label: 'Open file…',
+      detail: 'read a project file',
+      get: async (): Promise<OtherProject | null> => {
+        const f = await window.api.openFile()
+        if (!f) return null
+        try {
+          return { project: loadText(f.content, formatFromPath(f.path)), file: fileName(f.path) }
+        } catch (e) {
+          showDialog(`Cannot read ${f.path}`, e instanceof LoadError ? e.problems : [String(e)])
+          return null
+        }
+      }
+    }
+  ]
+}
+
+/**
+ * Pick another project, then one of its modules: it is placed on the canvas (global view) and its
+ * ports can be linked to. Interfaces it uses that this project lacks are copied (matched by name).
+ */
+export function linkOtherProject(pos?: { x: number; y: number }): void {
+  const at = pos ?? activeCanvas()?.center() ?? { x: 80, y: 80 }
+  quickPick(
+    'Project to link to',
+    otherProjects().map((o, i) => ({
+      key: String(i),
+      label: o.label,
+      detail: o.detail,
+      kind: 'P',
+      run: () =>
+        void o.get().then((other) => {
+          if (!other) return
+          const src = other.project
+          if (!src.modules.length) return setStatus('error', `${other.file} has no modules`)
+          quickPick(
+            `Module of ${other.file} to link to`,
+            src.modules.map((m) => ({
+              key: m.id,
+              label: modulePath(src, m.id),
+              detail: m.ports.map((pt) => `${pt.role} ${pt.name}`).join(', ') || 'no ports',
+              kind: 'M',
+              run: () => {
+                if (activeDoc().activeViewId !== GLOBAL_VIEW) openView(GLOBAL_VIEW)
+                const id = addImportedModule(src, other.file, m.id, at)
+                if (id) select({ kind: 'imported', id })
+              }
+            }))
+          )
+        })
+    }))
+  )
+}
+
+/** Open documents holding the project of an import (same file name). */
+function importSource(file: string): Project | null {
+  const doc = useDocs
+    .getState()
+    .docs.find((d) => d.id !== activeDoc().id && d.filePath && fileName(d.filePath) === fileName(file))
+  return doc ? doc.store.getState().project : null
+}
+
+/** Read the ports of imported modules again from their projects, when these are open. */
+export function refreshImports(importIds?: Id[]): void {
+  const p = getProject()
+  const lines: string[] = []
+  let refreshed = 0
+  for (const imp of p.imports) {
+    if (importIds && !importIds.includes(imp.id)) continue
+    const source = importSource(imp.file)
+    if (!source) {
+      lines.push(`${imp.name}: open ${imp.file} in a tab to refresh it`)
+      continue
+    }
+    refreshed++
+    const { missing, renamed } = refreshImportFrom(imp.id, source)
+    for (const r of renamed) lines.push(`${imp.name}: ${r}`)
+    for (const path of missing) lines.push(`${imp.name}: module '${path}' no longer exists in ${imp.file}`)
+  }
+  if (lines.length) showDialog(`Refreshed ${refreshed} linked project${refreshed === 1 ? '' : 's'}`, lines)
+  else setStatus('info', `Refreshed ${refreshed} linked project${refreshed === 1 ? '' : 's'}`)
+}
+
+/** Show the project of an import in its tab when it is open. */
+export function openImportSource(file: string): void {
+  const doc = useDocs.getState().docs.find((d) => d.filePath && fileName(d.filePath) === fileName(file))
+  if (doc) activateDoc(doc.id)
+  else setStatus('info', `${file} is not open`)
+}
+
 export function startRename(): void {
   const sel = activeDoc().selection
   if (sel?.kind === 'module') useUiStore.setState({ renaming: sel.id })
+}
+
+// Locking
+
+/** Selected modules and notes. */
+function selectedCanvasItems(): (Project['modules'][number] | Project['notes'][number])[] {
+  const p = getProject()
+  return selectedIds().flatMap(
+    (id) => p.modules.find((m) => m.id === id) ?? p.notes.find((n) => n.id === id) ?? []
+  )
+}
+
+export function isLocked(id: Id): boolean {
+  const p = getProject()
+  return !!(p.modules.find((m) => m.id === id) ?? p.notes.find((n) => n.id === id))?.locked
+}
+
+export function hasCanvasSelection(): boolean {
+  return selectedCanvasItems().length > 0
+}
+
+/** True when every selected module / note is locked. */
+export function selectionLocked(): boolean {
+  const items = selectedCanvasItems()
+  return items.length > 0 && items.every((e) => e.locked)
+}
+
+/** Lock the selected modules and notes, or unlock them when all are locked. */
+export function toggleLockSelection(): void {
+  const items = selectedCanvasItems()
+  if (!items.length) return
+  const lock = !items.every((e) => e.locked)
+  setLocked(
+    items.map((e) => e.id),
+    lock
+  )
+  setStatus('info', `${lock ? 'Locked' : 'Unlocked'} ${items.length} item${items.length > 1 ? 's' : ''}`)
 }
 
 // Arrangement
@@ -243,6 +408,8 @@ function applyAbsolute(rects: Map<Id, Rect>): void {
   const p = getProject()
   const layouts = new Map<Id, Rect>()
   for (const [id, r] of rects) {
+    // Locked items stay put: they only serve as references.
+    if (isLocked(id)) continue
     const m = p.modules.find((m) => m.id === id)
     const origin = m?.parentId ? absolutePosition(p, m.parentId) : { x: 0, y: 0 }
     layouts.set(id, { ...r, x: Math.round(r.x - origin.x), y: Math.round(r.y - origin.y) })
@@ -269,8 +436,10 @@ export function nudgeSelection(dx: number, dy: number): void {
   const p = getProject()
   const layouts = new Map<Id, Partial<Rect>>()
   for (const id of selectedIds()) {
-    const r = p.modules.find((m) => m.id === id)?.layout ?? p.notes.find((n) => n.id === id)?.layout
-    if (r) layouts.set(id, { x: r.x + dx, y: r.y + dy })
+    const e = p.modules.find((m) => m.id === id) ?? p.notes.find((n) => n.id === id)
+    if (e && !e.locked) layouts.set(id, { x: e.layout.x + dx, y: e.layout.y + dy })
+    const im = findImported(p, id)?.module
+    if (im) layouts.set(id, { x: im.position.x + dx, y: im.position.y + dy })
   }
   if (layouts.size) setLayouts(layouts)
 }
@@ -348,7 +517,8 @@ export async function arrangeLayout(
       d.orientation = arranged.orientation
       for (const m of d.modules) {
         const r = arranged.modules.find((x) => x.id === m.id)?.layout
-        if (r) m.layout = { ...r }
+        // Locked modules keep their place; their size still follows their content.
+        if (r) m.layout = m.locked ? { ...r, x: m.layout.x, y: m.layout.y } : { ...r }
       }
     })
     setStatus('info', `Arranged ${scopeId ? modulePath(p, scopeId) : 'all modules'} ${target}ly`)

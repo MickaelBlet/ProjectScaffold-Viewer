@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { useDoc } from '@/store/documents'
-import { deleteItems, setModuleColor, updateNote, useProjectStore } from '@/store/project'
+import { deleteItems, setLocked, setModuleColor, updateNote, useProjectStore } from '@/store/project'
 import { select } from '@/store/ui'
 import { commandItem } from '@/commands'
 import { ColorPicker, Row, Section, Select, TextArea } from '@/components/fields'
@@ -10,6 +10,7 @@ import { ModuleInspector } from './ModuleInspector'
 import { LinkInspector } from './LinkInspector'
 import { TypeInspector } from './TypeInspector'
 import { InterfaceInspector } from './InterfaceInspector'
+import { ImportedInspector } from './ImportedInspector'
 
 function CommandButton({ id, label }: { id: string; label: string }): ReactNode {
   const c = commandItem(id)
@@ -74,6 +75,23 @@ function MultiInspector({ ids }: { ids: string[] }): ReactNode {
           />
         </Section>
       )}
+      {onCanvas > 0 && (
+        <Section title="Layout">
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={[...modules, ...notes].every((e) => e.locked)}
+              onChange={(e) =>
+                setLocked(
+                  [...modules, ...notes].map((x) => x.id),
+                  e.target.checked
+                )
+              }
+            />
+            Locked (position and size)
+          </label>
+        </Section>
+      )}
       <Section title="Items">
         <ul className="plain">
           {[
@@ -120,6 +138,16 @@ function NoteInspector({ id }: { id: string }): ReactNode {
           onChange={(c) => updateNote(id, (n) => (c ? void (n.color = c) : void delete n.color))}
         />
       </Section>
+      <Section title="Layout">
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={!!note.locked}
+            onChange={(e) => setLocked([id], e.target.checked)}
+          />
+          Locked (position and size)
+        </label>
+      </Section>
       <p className="muted">Notes and frames are editor annotations: they are saved but never exported.</p>
       <div className="actions">
         <button
@@ -140,7 +168,10 @@ function NoteInspector({ id }: { id: string }): ReactNode {
 export function Inspector(): ReactNode {
   const sel = useDoc((d) => d.selection)
   const selectedIds = useDoc((d) => d.selectedIds)
-  const openable = sel && sel.kind !== 'project' && sel.kind !== 'note' ? (sel.kind as EditorKind) : null
+  const openable =
+    sel && sel.kind !== 'project' && sel.kind !== 'note' && sel.kind !== 'imported'
+      ? (sel.kind as EditorKind)
+      : null
   return (
     <div className="inspector">
       {openable && sel && 'id' in sel && selectedIds.length <= 1 && (
@@ -165,6 +196,8 @@ export function Inspector(): ReactNode {
         <TypeInspector key={sel.id} id={sel.id} />
       ) : sel.kind === 'note' ? (
         <NoteInspector key={sel.id} id={sel.id} />
+      ) : sel.kind === 'imported' ? (
+        <ImportedInspector key={sel.id} id={sel.id} />
       ) : (
         <InterfaceInspector key={sel.id} id={sel.id} />
       )}

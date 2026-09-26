@@ -12,18 +12,23 @@ import {
   deleteSelection,
   distributeSelection,
   duplicateSelection,
+  hasCanvasSelection,
   exportImage,
   groupSelection,
   hideSelection,
+  linkOtherProject,
   newView,
   nudgeSelection,
   openModuleView,
   paste,
+  refreshImports,
   sameSizeSelection,
   selectAll,
   selectedIds,
+  selectionLocked,
   showAllInView,
-  startRename
+  startRename,
+  toggleLockSelection
 } from './actions'
 import { closeDocument, exportProject, newProject, openProject, saveAll, saveProject } from './fileOps'
 import { activeDoc, cycleDoc, patchDoc, useDocs, activateDoc } from './store/documents'
@@ -63,12 +68,12 @@ export function isEditable(el: Element | null): boolean {
 const hasSelection = (): boolean => selectedIds().length > 0
 const multi = (n: number) => (): boolean => selectedIds().length >= n
 const moduleSelected = (): boolean => activeDoc().selection?.kind === 'module'
+type Toggle = 'snapToGrid' | 'guides' | 'minimap' | 'edgeBadges' | 'autoOrientLinks' | 'forceAnimations'
 const setting =
-  <K extends 'snapToGrid' | 'guides' | 'minimap' | 'edgeBadges' | 'autoOrientLinks'>(key: K) =>
+  <K extends Toggle>(key: K) =>
   (): boolean =>
     useSettings.getState()[key]
-const toggle = (key: 'snapToGrid' | 'guides' | 'minimap' | 'edgeBadges' | 'autoOrientLinks') => (): void =>
-  setSetting(key, !useSettings.getState()[key])
+const toggle = (key: Toggle) => (): void => setSetting(key, !useSettings.getState()[key])
 const theme = (t: Theme) => (): void => {
   setSetting('theme', t)
   applyTheme(t)
@@ -290,6 +295,19 @@ export const commands: Command[] = [
   },
   { id: 'insert.note', title: 'Add note', category: 'Insert', run: () => addNoteAt('note') },
   { id: 'insert.frame', title: 'Add frame', category: 'Insert', run: () => addNoteAt('frame') },
+  {
+    id: 'insert.imported',
+    title: 'Link to another project…',
+    category: 'Insert',
+    run: () => linkOtherProject()
+  },
+  {
+    id: 'insert.refreshImports',
+    title: 'Refresh linked projects',
+    category: 'Insert',
+    enabled: () => getProject().imports.length > 0,
+    run: () => refreshImports()
+  },
 
   // View
   {
@@ -403,6 +421,13 @@ export const commands: Command[] = [
     run: toggle('autoOrientLinks')
   },
   {
+    id: 'view.forceAnimations',
+    title: 'Force animations',
+    category: 'View',
+    checked: setting('forceAnimations'),
+    run: toggle('forceAnimations')
+  },
+  {
     id: 'view.themeSystem',
     title: 'Theme: system',
     category: 'View',
@@ -461,6 +486,15 @@ export const commands: Command[] = [
     keys: ['Ctrl+G'],
     enabled: hasSelection,
     run: groupSelection
+  },
+  {
+    id: 'arrange.lock',
+    title: 'Lock position and size',
+    category: 'Arrange',
+    keys: ['Ctrl+L'],
+    enabled: hasCanvasSelection,
+    checked: selectionLocked,
+    run: toggleLockSelection
   },
   {
     id: 'arrange.left',

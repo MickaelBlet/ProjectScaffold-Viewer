@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { findPort, IDENTIFIER_RE, modulePath } from '@/model/project'
+import { findPort, IDENTIFIER_RE, isImportedId, modulePath } from '@/model/project'
 import { deleteLink, update, useProjectStore } from '@/store/project'
 import { select } from '@/store/ui'
 import { navigate } from '@/actions'
@@ -77,6 +77,11 @@ export function LinkInspector({ id }: { id: string }): ReactNode {
         )}
       </Row>
       {mismatch && <p className="muted">Ends have different interfaces; picking one sets both ports.</p>}
+      {(isImportedId(link.from.moduleId) || isImportedId(link.to.moduleId)) && (
+        <p className="muted">
+          The port of the other project keeps its interface: this project&apos;s interface of the same name.
+        </p>
+      )}
       <TextArea value={link.description} onChange={(v) => withLink(id, (l) => void (l.description = v))} />
 
       <Section title="Direction">

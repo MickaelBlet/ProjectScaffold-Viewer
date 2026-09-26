@@ -9,7 +9,7 @@ import { RecentMenu } from './components/RecentMenu'
 import { anyDirty, currentSession, docTitle, openProject, restoreSession } from './fileOps'
 import { installClipboard, installKeyboard, runCommand } from './commands'
 import { activeDoc, isDocDirty, useDocs } from './store/documents'
-import { applyTheme, useSettings } from './store/settings'
+import { applyForceAnimations, applyPortStyle, applyTheme, useSettings } from './store/settings'
 import { useProjectStore } from './store/project'
 import { useUiStore } from './store/ui'
 
@@ -56,10 +56,14 @@ export function App(): ReactNode {
   const docs = useDocs((s) => s.docs)
   const project = useProjectStore((s) => s.project)
   const theme = useSettings((s) => s.theme)
+  const forceAnimations = useSettings((s) => s.forceAnimations)
+  const portStyle = useSettings((s) => s.portStyle)
   // The session is only written once the startup documents are loaded, not to overwrite them.
   const [loaded, setLoaded] = useState(false)
 
   useEffect(() => applyTheme(theme), [theme])
+  useEffect(() => applyForceAnimations(forceAnimations), [forceAnimations])
+  useEffect(() => applyPortStyle(portStyle), [portStyle])
 
   useEffect(() => {
     void (async () => {

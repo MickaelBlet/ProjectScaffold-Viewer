@@ -5,6 +5,7 @@ import {
   setSetting,
   useSettings,
   type EdgeStyle,
+  type PortStyle,
   type Theme
 } from '@/store/settings'
 import { Row, Section, Select } from '@/components/fields'
@@ -46,6 +47,13 @@ export function SettingsPanel(): ReactNode {
             onChange={(v) => setSetting('edgeStyle', v)}
           />
         </Row>
+        <Row label="Port style">
+          <Select
+            value={s.portStyle}
+            options={['dots', 'arrows', 'hollow', 'shapes'] as PortStyle[]}
+            onChange={(v) => setSetting('portStyle', v)}
+          />
+        </Row>
         <Check
           label="Link badges (direction, ACK, class, transport)"
           value={s.edgeBadges}
@@ -58,6 +66,12 @@ export function SettingsPanel(): ReactNode {
           onChange={(v) => setSetting('autoOrientLinks', v)}
         />
         <Check label="Minimap" value={s.minimap} onChange={(v) => setSetting('minimap', v)} />
+        <Check
+          label="Force animations"
+          hint="Keep animations even when the system asks for reduced motion"
+          value={s.forceAnimations}
+          onChange={(v) => setSetting('forceAnimations', v)}
+        />
       </Section>
       <Section title="Editing">
         <Check label="Snap to grid" value={s.snapToGrid} onChange={(v) => setSetting('snapToGrid', v)} />

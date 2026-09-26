@@ -451,7 +451,6 @@ kbd {
 }
 .field {
   position: relative;
-  display: inline-flex;
   flex-direction: column;
   min-width: 0;
 }
@@ -477,7 +476,7 @@ input.number {
   table-layout: fixed;
 }
 .grid.fields td:first-child {
-  width: 34%;
+  width: 25%;
 }
 .grid.fields td:last-child {
   width: 78px;
@@ -657,6 +656,19 @@ ul.plain {
 .module-ports {
   padding-top: 6px;
 }
+.lock-badge {
+  font-size: 11px;
+  opacity: 0.7;
+  pointer-events: none;
+}
+.note.locked {
+  position: relative;
+}
+.note .lock-badge {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+}
 .port-row {
   position: relative;
   height: 24px;
@@ -690,6 +702,47 @@ ul.plain {
 .handle.out {
   background: var(--accent) !important;
 }
+/* Port style (Settings): shape tells in from out, not only color.
+   arrows: in points into the module, out points away from it.
+   hollow: in is a ring, out is filled. shapes: in is round, out is square. */
+:root[data-port-style='arrows'] .handle {
+  width: 12px !important;
+  height: 12px !important;
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+}
+:root[data-port-style='arrows'] .handle::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: var(--ok);
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
+:root[data-port-style='arrows'] .handle.out::before {
+  background: var(--accent);
+}
+/* Triangle points right by default; rotate it per side and role. */
+:root[data-port-style='arrows'] .handle.in.react-flow__handle-right::before,
+:root[data-port-style='arrows'] .handle.out.react-flow__handle-left::before {
+  transform: rotate(180deg);
+}
+:root[data-port-style='arrows'] .handle.in.react-flow__handle-top::before,
+:root[data-port-style='arrows'] .handle.out.react-flow__handle-bottom::before {
+  transform: rotate(90deg);
+}
+:root[data-port-style='arrows'] .handle.in.react-flow__handle-bottom::before,
+:root[data-port-style='arrows'] .handle.out.react-flow__handle-top::before {
+  transform: rotate(-90deg);
+}
+:root[data-port-style='hollow'] .handle.in {
+  background: var(--node-bg) !important;
+  border-color: var(--ok) !important;
+}
+:root[data-port-style='shapes'] .handle.out {
+  border-radius: 2px !important;
+}
 .edge-label {
   position: absolute;
   pointer-events: all;
@@ -709,6 +762,58 @@ ul.plain {
 }
 .edge-label.selected .badge {
   border-color: var(--accent);
+}
+.edge-label.selected {
+  border-radius: 10px;
+  animation: edge-label-pulse 1.4s ease-out infinite;
+}
+.edge-halo {
+  fill: none;
+  stroke-width: 12;
+  stroke-linecap: round;
+  pointer-events: none;
+  animation: edge-halo-pulse 1.4s ease-in-out infinite;
+}
+.edge-flow {
+  fill: none;
+  stroke: var(--panel);
+  stroke-width: 1.5;
+  stroke-dasharray: 3 9;
+  stroke-linecap: round;
+  pointer-events: none;
+  animation: edge-flow 0.6s linear infinite;
+}
+@keyframes edge-halo-pulse {
+  0%,
+  100% {
+    stroke-opacity: 0.15;
+  }
+  50% {
+    stroke-opacity: 0.4;
+  }
+}
+@keyframes edge-flow {
+  to {
+    stroke-dashoffset: -12;
+  }
+}
+@keyframes edge-label-pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 60%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 8px transparent;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-force-motion]) .edge-halo,
+  :root:not([data-force-motion]) .edge-flow,
+  :root:not([data-force-motion]) .edge-label.selected {
+    animation: none;
+  }
+  :root:not([data-force-motion]) .edge-halo {
+    stroke-opacity: 0.3;
+  }
 }
 .badge.ack {
   background: var(--ok);
@@ -1487,6 +1592,9 @@ mark {
   justify-content: center;
   gap: 4px;
   padding: 0 4px;
+}
+.vport-label {
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1495,6 +1603,22 @@ mark {
   color: var(--muted);
   font-size: 10px;
 }
-.vport .handle {
-  overflow: visible;
+/* Module of another project (Insert › Link to another project). */
+.module.imported {
+  border-style: dashed;
+  border-color: var(--muted);
+  background: var(--panel-2);
+}
+.module.imported.selected {
+  border-color: var(--accent);
+}
+.imported-project {
+  color: var(--muted);
+  font-weight: 500;
+}
+.module.imported .unknown small {
+  color: var(--danger);
+}
+.error-text {
+  color: var(--danger);
 }
