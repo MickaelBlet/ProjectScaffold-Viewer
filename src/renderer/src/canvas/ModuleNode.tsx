@@ -61,7 +61,10 @@ export const ModuleNode = memo(function ModuleNode({ id, selected, draggable, da
     Object.fromEntries(
       (mod?.ports ?? []).map((p) => [p.id, { side: defaultSide(p.role, orientation), order: null }])
     )
-  const portsKey = mod?.ports.map((p) => `${p.id}:${p.role}:${placements[p.id]?.side}`).join(',')
+  // Handles move when ports change edge or order.
+  const portsKey = (['top', 'bottom', 'left', 'right'] as const)
+    .map((side) => portsOn(mod?.ports ?? [], placements, side).map((p) => `${p.id}:${p.role}`).join(','))
+    .join('|')
   useEffect(() => updateInternals(id), [id, portsKey, updateInternals])
   if (!mod) return null
 
@@ -71,8 +74,11 @@ export const ModuleNode = memo(function ModuleNode({ id, selected, draggable, da
   const rows = Math.max(left!.length, right!.length)
   const vertical = orientation === 'vertical'
   // Containers keep both bands in vertical orientation: their content starts below them.
-  const topBand = top!.length > 0 || (!floating && vertical)
-  const bottomBand = bottom!.length > 0 || (!floating && vertical)
+  const topBand = top!.length > 0 || (vertical && (!floating || hasChildren))
+  const bottomBand = bottom!.length > 0 || (vertical && (!floating || hasChildren))
+  // Container ports moved off the orientation's edges go outside the frame, clear of the content.
+  const outsideBands = hasChildren && !vertical
+  const outsideRows = hasChildren && vertical
   const min = minSize(mod, orientation)
   const ifaceName = (p: Port): string =>
     p.interfaceId ? (interfaces.find((i) => i.id === p.interfaceId)?.name ?? '?') : '—'
@@ -87,7 +93,7 @@ export const ModuleNode = memo(function ModuleNode({ id, selected, draggable, da
     />
   )
   const band = (ports: Port[], side: 'top' | 'bottom'): ReactNode => (
-    <div className={`port-band ${side}`}>
+    <div className={`port-band ${side} ${outsideBands ? 'outside' : ''}`}>
       {ports.map((p) => (
         <span key={p.id} className={`vport ${p.role}`} title={`${p.role} ${p.name}: ${ifaceName(p)}`}>
           {handle(p, side === 'top' ? Position.Top : Position.Bottom)}
@@ -137,7 +143,25 @@ export const ModuleNode = memo(function ModuleNode({ id, selected, draggable, da
           </button>
         )}
       </div>
-      {rows > 0 && (
+      {outsideRows &&
+        (['left', 'right'] as const).map(
+          (side) =>
+            (side === 'left' ? left! : right!).length > 0 && (
+              <div key={side} className={`module-ports outside ${side}`}>
+                {(side === 'left' ? left! : right!).map((p) => (
+                  <div className="port-row" key={p.id}>
+                    <span className={`port ${p.role}`} title={`${p.role} ${p.name}: ${ifaceName(p)}`}>
+                      {side === 'right' && handle(p, Position.Right)}
+                      {p.name}
+                      <small>{ifaceName(p)}</small>
+                      {side === 'left' && handle(p, Position.Left)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )
+        )}
+      {!outsideRows && rows > 0 && (
         <div className="module-ports">
           {Array.from({ length: rows }, (_, i) => {
             const pl = left![i]

@@ -1,8 +1,8 @@
 // Where a link attaches to its modules when link ends are auto-oriented.
 import { MODULE_HEADER, PORT_ROW } from '@/model/project'
-import type { Orientation, Rect } from '@/model/types'
+import type { Orientation, Rect, Side } from '@/model/types'
 
-export type Side = 'left' | 'right' | 'top' | 'bottom'
+export type { Side }
 
 export interface LinkEnd {
   x: number

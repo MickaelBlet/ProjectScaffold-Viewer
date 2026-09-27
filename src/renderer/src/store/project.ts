@@ -5,8 +5,10 @@ import {
   defaultConstraints,
   defaultSize,
   globalTypeNames,
+  findImported,
   growAncestors,
   LAYOUT_PAD,
+  linkOrigin,
   contentTop,
   minSize,
   newId,
@@ -17,8 +19,10 @@ import {
 } from '@/model/project'
 import { importModule, refreshImport, removeImported, type RefreshResult } from '@/model/imports'
 import { followInterfaceRenames } from '@/model/sync'
-import type { Endpoint, Id, Project, Rect, TypeDef } from '@/model/types'
+import { snapChanges } from '@/model/grid'
+import type { Endpoint, Id, LinkRoute, Project, Rect, TypeDef } from '@/model/types'
 import { activeDoc, useDoc } from './documents'
+import { useSettings } from './settings'
 
 export { growAncestors }
 import type { ProjectState } from './projectStore'
@@ -36,13 +40,16 @@ export const history = () => projectStore().temporal.getState()
 export const getProject = (): Project => projectStore().getState().project
 
 export function update(fn: (draft: Project) => void): void {
-  projectStore().setState((s) => ({
-    project: produce(s.project, (d) => {
+  projectStore().setState((s) => {
+    const project = produce(s.project, (d) => {
       fn(d)
       // Imported ports reference interfaces by name.
       followInterfaceRenames(s.project, d)
     })
-  }))
+    // Whatever an edit moves or resizes lands on the grid.
+    const { snapToGrid, gridSize } = useSettings.getState()
+    return { project: snapToGrid ? snapChanges(s.project, project, gridSize) : project }
+  })
 }
 
 export function replaceProject(project: Project): void {
@@ -118,6 +125,7 @@ export function deleteItems(ids: Id[]): void {
 /** Set several module and note rects in one undo step. */
 export function setLayouts(layouts: Map<Id, Partial<Rect>>): void {
   update((d) => {
+    shiftBends(d, layouts)
     for (const [id, r] of layouts) {
       const m = d.modules.find((m) => m.id === id)
       if (m) Object.assign(m.layout, r)
@@ -128,6 +136,33 @@ export function setLayouts(layouts: Map<Id, Partial<Rect>>): void {
     }
     for (const id of layouts.keys()) growAncestors(d, id)
   })
+}
+
+/** Bend points of the links whose both ends move by the same offset, outside a moving module, move with them. */
+function shiftBends(d: Project, layouts: Map<Id, Partial<Rect>>): void {
+  const offset = new Map<Id, { x: number; y: number }>()
+  for (const [id, r] of layouts) {
+    const at = d.modules.find((m) => m.id === id)?.layout ?? findImported(d, id)?.module.position
+    if (at) offset.set(id, { x: (r.x ?? at.x) - at.x, y: (r.y ?? at.y) - at.y })
+  }
+  /** Offset of a module moved with itself or an ancestor. */
+  const moved = (id: Id | null): { x: number; y: number } | undefined => {
+    for (let cur = id; cur; cur = d.modules.find((m) => m.id === cur)?.parentId ?? null) {
+      const o = offset.get(cur)
+      if (o) return o
+    }
+    return undefined
+  }
+  for (const l of d.links) {
+    if (!l.route?.points.length || moved(linkOrigin(d, l))) continue
+    const a = moved(l.from.moduleId)
+    const b = moved(l.to.moduleId)
+    if (!a || !b || a.x !== b.x || a.y !== b.y) continue
+    for (const pt of l.route.points) {
+      pt.x += a.x
+      pt.y += a.y
+    }
+  }
 }
 
 export function setModuleLayout(id: Id, layout: Partial<Rect>): void {
@@ -383,5 +418,22 @@ export function reverseLink(id: Id): void {
     const l = d.links.find((l) => l.id === id)
     if (!l) return
     ;[l.from, l.to] = [l.to, l.from]
+    if (l.route) {
+      const { from, to } = l.route
+      l.route = { ...clean({ from: to, to: from }), points: l.route.points.reverse() }
+    }
+  })
+}
+
+const clean = <T extends object>(o: T): T =>
+  Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as T
+
+/** Set or clear (undefined, or nothing left) the hand-set shape of a link. */
+export function setLinkRoute(id: Id, route: LinkRoute | undefined): void {
+  update((d) => {
+    const l = d.links.find((l) => l.id === id)
+    if (!l) return
+    if (route && (route.points.length || route.from || route.to)) l.route = clean(route)
+    else delete l.route
   })
 }

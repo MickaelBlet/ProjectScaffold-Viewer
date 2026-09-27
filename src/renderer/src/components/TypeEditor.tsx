@@ -18,13 +18,23 @@ function useTypeNames(): {
   }, [types])
 }
 
-/** Type reference editor: a text expression with completion, plus an optional structured tree. */
-export function TypeEditor(props: { value: TypeRef; onChange: (t: TypeRef) => void }): ReactNode {
+/**
+ * Type reference editor: a text expression with completion, plus an optional structured tree.
+ * When `onToggleTree` is given the tree toggle is controlled and the caller renders `TypeTree`
+ * itself (e.g. on a full-width row below a narrow table cell).
+ */
+export function TypeEditor(props: {
+  value: TypeRef
+  onChange: (t: TypeRef) => void
+  tree?: boolean
+  onToggleTree?: () => void
+}): ReactNode {
   const { nameOf, idOf, names } = useTypeNames()
   const text = printTypeRef(props.value, nameOf)
   const [draft, setDraft] = useState(text)
   const [error, setError] = useState<string | null>(null)
-  const [tree, setTree] = useState(false)
+  const [ownTree, setOwnTree] = useState(false)
+  const tree = props.onToggleTree ? !!props.tree : ownTree
   const [suggest, setSuggest] = useState<{ items: string[]; index: number } | null>(null)
   const input = useRef<HTMLInputElement>(null)
   useEffect(() => {
@@ -133,17 +143,21 @@ export function TypeEditor(props: { value: TypeRef; onChange: (t: TypeRef) => vo
           className={`icon ${tree ? 'active' : ''}`}
           title="Structured editor"
           aria-label="Structured editor"
-          onClick={() => setTree(!tree)}
+          onClick={() => (props.onToggleTree ? props.onToggleTree() : setOwnTree(!ownTree))}
         >
           ⋮
         </button>
       </div>
-      {tree && <TypeTree value={props.value} onChange={props.onChange} />}
+      {tree && !props.onToggleTree && <TypeTree value={props.value} onChange={props.onChange} />}
     </div>
   )
 }
 
-function TypeTree(props: { value: TypeRef; onChange: (t: TypeRef) => void; label?: string }): ReactNode {
+export function TypeTree(props: {
+  value: TypeRef
+  onChange: (t: TypeRef) => void
+  label?: string
+}): ReactNode {
   const types = useProjectStore((s) => s.project.types)
   const t = props.value
   const selected = t.kind === 'primitive' ? t.name : t.kind === 'ref' ? `ref:${t.id}` : t.kind

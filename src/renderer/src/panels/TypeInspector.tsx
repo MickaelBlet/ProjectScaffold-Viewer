@@ -1,10 +1,10 @@
-import { useState, type ReactNode } from 'react'
+import { Fragment, useState, type ReactNode } from 'react'
 import { nameError, newId, typeUsageTargets, uniqueName } from '@/model/project'
 import { deleteType, update, useProjectStore } from '@/store/project'
 import { select } from '@/store/ui'
 import { navigate } from '@/actions'
 import { CommitInput, IconButton, NumberInput, Row, Section, Select, TextArea } from '@/components/fields'
-import { TypeEditor } from '@/components/TypeEditor'
+import { TypeEditor, TypeTree } from '@/components/TypeEditor'
 import { INT_PRIMITIVES, type Field, type TypeDef } from '@/model/types'
 import { IDENTIFIER_RE } from '@/model/project'
 
@@ -38,43 +38,64 @@ export function FieldList<F extends Field = Field>(props: {
   column?: (f: F, i: number) => ReactNode
 }): ReactNode {
   const { fields, onChange } = props
+  const [trees, setTrees] = useState<ReadonlySet<string>>(new Set())
+  const toggleTree = (id: string): void =>
+    setTrees((s) => {
+      const n = new Set(s)
+      if (!n.delete(id)) n.add(id)
+      return n
+    })
   return (
     <>
       <table className="grid fields">
         <tbody>
           {fields.map((f, i) => (
-            <tr key={f.id}>
-              <td>
-                <CommitInput
-                  value={f.name}
-                  validate={identifier}
-                  onCommit={(n) => onChange((fs) => void (fs[i]!.name = n))}
-                />
-              </td>
-              {props.column && <td className="extra">{props.column(f, i)}</td>}
-              <td className="wide">
-                <TypeEditor value={f.type} onChange={(t) => onChange((fs) => void (fs[i]!.type = t))} />
-              </td>
-              <td className="nowrap">
-                <IconButton
-                  title="Move up"
-                  disabled={i === 0}
-                  onClick={() => onChange((fs) => move(fs, i, -1))}
-                >
-                  ↑
-                </IconButton>
-                <IconButton
-                  title="Move down"
-                  disabled={i === fields.length - 1}
-                  onClick={() => onChange((fs) => move(fs, i, 1))}
-                >
-                  ↓
-                </IconButton>
-                <IconButton title="Remove" danger onClick={() => onChange((fs) => void fs.splice(i, 1))}>
-                  ×
-                </IconButton>
-              </td>
-            </tr>
+            <Fragment key={f.id}>
+              <tr>
+                <td>
+                  <CommitInput
+                    value={f.name}
+                    validate={identifier}
+                    onCommit={(n) => onChange((fs) => void (fs[i]!.name = n))}
+                  />
+                </td>
+                {props.column && <td className="extra">{props.column(f, i)}</td>}
+                <td className="wide">
+                  <TypeEditor
+                    value={f.type}
+                    onChange={(t) => onChange((fs) => void (fs[i]!.type = t))}
+                    tree={trees.has(f.id)}
+                    onToggleTree={() => toggleTree(f.id)}
+                  />
+                </td>
+                <td className="nowrap">
+                  <IconButton
+                    title="Move up"
+                    disabled={i === 0}
+                    onClick={() => onChange((fs) => move(fs, i, -1))}
+                  >
+                    ↑
+                  </IconButton>
+                  <IconButton
+                    title="Move down"
+                    disabled={i === fields.length - 1}
+                    onClick={() => onChange((fs) => move(fs, i, 1))}
+                  >
+                    ↓
+                  </IconButton>
+                  <IconButton title="Remove" danger onClick={() => onChange((fs) => void fs.splice(i, 1))}>
+                    ×
+                  </IconButton>
+                </td>
+              </tr>
+              {trees.has(f.id) && (
+                <tr className="type-tree-row">
+                  <td colSpan={props.column ? 4 : 3}>
+                    <TypeTree value={f.type} onChange={(t) => onChange((fs) => void (fs[i]!.type = t))} />
+                  </td>
+                </tr>
+              )}
+            </Fragment>
           ))}
         </tbody>
       </table>

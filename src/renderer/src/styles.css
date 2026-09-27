@@ -583,10 +583,27 @@ ul.plain {
   gap: 4px;
   align-items: center;
 }
+.type-tree-node select {
+  flex: 1;
+  min-width: 0;
+}
+.type-tree-node input.number {
+  width: 64px;
+  flex: none;
+}
 .type-tree-label {
   color: var(--muted);
   font-size: 11px;
   min-width: 42px;
+}
+.grid.fields .type-tree-row > td {
+  padding-top: 0;
+}
+.grid.fields .type-tree-row > td:last-child {
+  width: auto;
+}
+.grid.fields .type-tree-row .type-tree {
+  margin: 0 0 4px 4px;
 }
 
 /* Canvas nodes */
@@ -705,14 +722,14 @@ ul.plain {
 /* Port style (Settings): shape tells in from out, not only color.
    arrows: in points into the module, out points away from it.
    hollow: in is a ring, out is filled. shapes: in is round, out is square. */
-:root[data-port-style='arrows'] .handle {
+:root[data-port-style='arrows'] .react-flow__handle.handle {
   width: 12px !important;
   height: 12px !important;
   border: none !important;
   border-radius: 0 !important;
   background: transparent !important;
 }
-:root[data-port-style='arrows'] .handle::before {
+:root[data-port-style='arrows'] .react-flow__handle.handle::before {
   content: '';
   position: absolute;
   inset: 0;
@@ -720,27 +737,27 @@ ul.plain {
   background: var(--ok);
   clip-path: polygon(0 0, 100% 50%, 0 100%);
 }
-:root[data-port-style='arrows'] .handle.out::before {
+:root[data-port-style='arrows'] .react-flow__handle.handle.out::before {
   background: var(--accent);
 }
 /* Triangle points right by default; rotate it per side and role. */
-:root[data-port-style='arrows'] .handle.in.react-flow__handle-right::before,
-:root[data-port-style='arrows'] .handle.out.react-flow__handle-left::before {
+:root[data-port-style='arrows'] .react-flow__handle.handle.in.react-flow__handle-right::before,
+:root[data-port-style='arrows'] .react-flow__handle.handle.out.react-flow__handle-left::before {
   transform: rotate(180deg);
 }
-:root[data-port-style='arrows'] .handle.in.react-flow__handle-top::before,
-:root[data-port-style='arrows'] .handle.out.react-flow__handle-bottom::before {
+:root[data-port-style='arrows'] .react-flow__handle.handle.in.react-flow__handle-top::before,
+:root[data-port-style='arrows'] .react-flow__handle.handle.out.react-flow__handle-bottom::before {
   transform: rotate(90deg);
 }
-:root[data-port-style='arrows'] .handle.in.react-flow__handle-bottom::before,
-:root[data-port-style='arrows'] .handle.out.react-flow__handle-top::before {
+:root[data-port-style='arrows'] .react-flow__handle.handle.in.react-flow__handle-bottom::before,
+:root[data-port-style='arrows'] .react-flow__handle.handle.out.react-flow__handle-top::before {
   transform: rotate(-90deg);
 }
-:root[data-port-style='hollow'] .handle.in {
+:root[data-port-style='hollow'] .react-flow__handle.handle.in {
   background: var(--node-bg) !important;
   border-color: var(--ok) !important;
 }
-:root[data-port-style='shapes'] .handle.out {
+:root[data-port-style='shapes'] .react-flow__handle.handle.out {
   border-radius: 2px !important;
 }
 .edge-label {
@@ -750,6 +767,37 @@ ul.plain {
   gap: 3px;
   cursor: pointer;
   z-index: 1001;
+}
+/* Hand-set link shape (selected link): drag the line to bend it, the handles to move bends and ends. */
+.route-grab {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 12;
+  pointer-events: stroke;
+  cursor: copy;
+}
+.route-handle {
+  position: absolute;
+  pointer-events: all;
+  z-index: 1002;
+  width: 10px;
+  height: 10px;
+  box-sizing: border-box;
+  border: 1.5px solid var(--accent);
+  background: var(--panel);
+  cursor: move;
+  user-select: none;
+  touch-action: none;
+}
+.route-handle.bend {
+  border-radius: 50%;
+  background: var(--accent);
+}
+.route-handle.end {
+  cursor: crosshair;
+}
+.route-handle.end.set {
+  background: var(--accent);
 }
 .badge {
   font-size: 10px;
@@ -1027,6 +1075,19 @@ ul.plain {
   overflow: hidden;
   text-overflow: ellipsis;
   border-bottom: 1px dashed var(--border);
+}
+/* Vertical orientation: the ports on a band facing the view. */
+.external.vertical {
+  display: flex;
+  flex-direction: column;
+}
+.external.vertical .port-band.bottom {
+  position: static;
+  margin-top: auto;
+}
+.external.vertical .port-band.top + .external-label {
+  border-bottom: none;
+  border-top: 1px dashed var(--border);
 }
 .edge-label.compact {
   padding: 4px;
@@ -1582,6 +1643,55 @@ mark {
 }
 .module.container .port-band.bottom {
   border-top: none;
+}
+/* Container ports moved to another edge: outside the frame, the handle on its edge. */
+.module.container {
+  position: relative;
+}
+.port-band.outside {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border: none;
+}
+.port-band.outside.top {
+  top: auto;
+  bottom: 100%;
+}
+.port-band.outside.bottom {
+  top: 100%;
+  bottom: auto;
+}
+.port-band.outside.top .react-flow__handle {
+  top: auto;
+  bottom: 0;
+  transform: translate(-50%, 50%);
+}
+.port-band.outside.bottom .react-flow__handle {
+  top: 0;
+  bottom: auto;
+  transform: translate(-50%, -50%);
+}
+.module-ports.outside {
+  position: absolute;
+  top: 24px;
+  padding-top: 0;
+}
+.module-ports.outside.left {
+  right: 100%;
+}
+.module-ports.outside.right {
+  left: 100%;
+}
+.module-ports.outside.left .react-flow__handle {
+  left: auto;
+  right: 0;
+  transform: translate(50%, -50%);
+}
+.module-ports.outside.right .react-flow__handle {
+  right: auto;
+  left: 0;
+  transform: translate(-50%, -50%);
 }
 .vport {
   position: relative;

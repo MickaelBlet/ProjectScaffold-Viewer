@@ -17,8 +17,8 @@ export interface CanvasController {
   fit(ids?: Id[]): void
   /** Flow position of the middle of the visible area. */
   center(): { x: number; y: number }
-  /** Pan to a module or note without changing the zoom much. */
-  reveal(id: Id): void
+  /** Pan to modules / notes without changing the zoom much, zooming out if they do not fit. */
+  reveal(ids: Id[]): void
   zoomBy(factor: number): void
   zoomTo(zoom: number): void
   exportImage(format: 'png' | 'svg'): Promise<void>

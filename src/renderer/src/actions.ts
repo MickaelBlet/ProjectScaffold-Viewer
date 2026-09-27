@@ -1,7 +1,7 @@
 // Editing actions on the active document, shared by commands, menus and panels.
 import { align, distribute, sameSize, type AlignMode } from '@/model/align'
 import { arrange as arrangeProject, arrangeOptions } from '@/model/autoLayout'
-import { copyItems, parseClip, pasteClip, type Clip } from '@/model/clipboard'
+import { copyItems, copyProject, parseClip, pasteClip, type Clip } from '@/model/clipboard'
 import {
   absolutePosition,
   absoluteRect,
@@ -86,16 +86,30 @@ export function navigate(target: ProblemTarget): void {
   select(target.kind === 'module' && isImportedId(target.id) ? { kind: 'imported', id: target.id } : target)
   if (target.kind === 'type' || target.kind === 'interface') return showTool('inspector', false)
   const p = getProject()
-  const moduleId = target.kind === 'link' ? p.links.find((l) => l.id === target.id)?.from.moduleId : target.id
-  if (!moduleId) return
-  // Show the module in a view that contains it.
-  const view = findView(p, activeDoc().activeViewId)
-  if (view.rootModuleId && !subtreeIds(p, view.rootModuleId).has(moduleId)) openView(GLOBAL_VIEW)
+  const link = target.kind === 'link' ? p.links.find((l) => l.id === target.id) : undefined
+  const ids = link ? [link.from.moduleId, link.to.moduleId] : [target.id]
+  // Show the module (a link: at least one end) in a view that contains it.
+  let view = findView(p, activeDoc().activeViewId)
+  const root = view.rootModuleId
+  if (root && !ids.some((id) => subtreeIds(p, root).has(id))) {
+    openView(GLOBAL_VIEW)
+    view = findView(p, GLOBAL_VIEW)
+  }
   if (view.hidden.length) {
-    const hiddenAncestors = view.hidden.filter((h) => subtreeIds(p, h).has(moduleId))
+    const hiddenAncestors = view.hidden.filter((h) => ids.some((id) => subtreeIds(p, h).has(id)))
     if (hiddenAncestors.length) setHidden(view.id, hiddenAncestors, false)
   }
-  requestAnimationFrame(() => activeCanvas()?.reveal(moduleId))
+  revealWhenDrawn(ids)
+}
+
+/** Reveal once the canvas shows the nodes (a view just opened or unhidden needs a few frames). */
+function revealWhenDrawn(ids: Id[], tries = 10): void {
+  requestAnimationFrame(() => {
+    const canvas = activeCanvas()
+    if (canvas && ids.some((id) => canvas.nodeRect(id))) return canvas.reveal(ids)
+    if (tries > 0) revealWhenDrawn(ids, tries - 1)
+    else canvas?.reveal(ids)
+  })
 }
 
 // Clipboard
@@ -237,7 +251,9 @@ interface OtherProject {
   file: string
 }
 
-function otherProjects(): { label: string; detail: string; get: () => Promise<OtherProject | null> }[] {
+function otherProjects(
+  needFile = true
+): { label: string; detail: string; get: () => Promise<OtherProject | null> }[] {
   const { docs, activeId } = useDocs.getState()
   const open = docs
     .filter((d) => d.id !== activeId)
@@ -247,7 +263,7 @@ function otherProjects(): { label: string; detail: string; get: () => Promise<Ot
         label: d.filePath ? fileName(d.filePath) : `${project.name} (unsaved)`,
         detail: `open · ${project.modules.length} modules`,
         get: async (): Promise<OtherProject | null> => {
-          if (d.filePath) return { project, file: fileName(d.filePath) }
+          if (d.filePath || !needFile) return { project, file: d.filePath ? fileName(d.filePath) : project.name }
           showDialog('Save the other project first', [
             `"${project.name}" has no file yet: links to it need its file name.`
           ])
@@ -306,6 +322,54 @@ export function linkOtherProject(pos?: { x: number; y: number }): void {
               }
             }))
           )
+        })
+    }))
+  )
+}
+
+/** Where imported content goes: the selected module, else the focused view's module. */
+function importParent(): Id | null {
+  const sel = activeDoc().selection
+  return sel?.kind === 'module' ? sel.id : viewParent()
+}
+
+/**
+ * Pick another project and copy its content into `parent` (a module, or the top level): its
+ * modules with their links, its notes (top level only), and the types and interfaces this project
+ * lacks (the others are matched by name). Nothing ties the copy to that project afterwards.
+ */
+export function importProjectContent(parent: Id | null = importParent(), pos?: { x: number; y: number }): void {
+  quickPick(
+    'Project to import',
+    otherProjects(false).map((o, i) => ({
+      key: String(i),
+      label: o.label,
+      detail: o.detail,
+      kind: 'P',
+      run: () =>
+        void o.get().then((other) => {
+          if (!other) return
+          const p = getProject()
+          const clip = copyProject(other.project, p, !parent)
+          if (!clip) return setStatus('error', `${other.file} is empty`)
+          let at = pos ?? activeCanvas()?.center() ?? { x: 80, y: 80 }
+          if (!pos && parent) {
+            // Below the module's current content, like a new submodule.
+            const m = p.modules.find((x) => x.id === parent)!
+            const origin = absolutePosition(p, parent)
+            const top = contentTop(m, p.orientation) + LAYOUT_PAD
+            const bottom = Math.max(
+              top,
+              ...childModules(p, parent).map((c) => c.layout.y + c.layout.height + LAYOUT_PAD)
+            )
+            at = { x: origin.x + LAYOUT_PAD, y: origin.y + bottom }
+          }
+          let pasted: Id[] = []
+          update((d) => void (pasted = pasteClip(d, clip, { parent, at })))
+          selectMany(pasted)
+          const modules = Object.keys(clip.rootParents).length
+          const defs = clip.types.length + clip.interfaces.length
+          setStatus('info', `Imported ${modules} modules, ${defs} types and interfaces from ${other.file}`)
         })
     }))
   )
@@ -519,6 +583,14 @@ export async function arrangeLayout(
         const r = arranged.modules.find((x) => x.id === m.id)?.layout
         // Locked modules keep their place; their size still follows their content.
         if (r) m.layout = m.locked ? { ...r, x: m.layout.x, y: m.layout.y } : { ...r }
+      }
+      // Hand-set bends do not fit the new layout; attachments do not fit a new orientation.
+      const moved = scopeId ? subtreeIds(p, scopeId) : null
+      for (const l of d.links) {
+        if (!l.route || (moved && !moved.has(l.from.moduleId) && !moved.has(l.to.moduleId))) continue
+        if (target !== p.orientation) delete l.route
+        else if (l.route.from || l.route.to) l.route.points = []
+        else delete l.route
       }
     })
     setStatus('info', `Arranged ${scopeId ? modulePath(p, scopeId) : 'all modules'} ${target}ly`)

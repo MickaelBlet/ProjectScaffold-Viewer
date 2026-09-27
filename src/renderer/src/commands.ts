@@ -16,6 +16,7 @@ import {
   exportImage,
   groupSelection,
   hideSelection,
+  importProjectContent,
   linkOtherProject,
   newView,
   nudgeSelection,
@@ -68,6 +69,12 @@ export function isEditable(el: Element | null): boolean {
 const hasSelection = (): boolean => selectedIds().length > 0
 const multi = (n: number) => (): boolean => selectedIds().length >= n
 const moduleSelected = (): boolean => activeDoc().selection?.kind === 'module'
+/** Arrow keys move by a grid cell (five when far) on the grid, else by 2px (20px). */
+function nudgeStep(far: boolean): number {
+  const { snapToGrid, gridSize } = useSettings.getState()
+  return snapToGrid ? gridSize * (far ? 5 : 1) : far ? 20 : 2
+}
+
 type Toggle = 'snapToGrid' | 'guides' | 'minimap' | 'edgeBadges' | 'autoOrientLinks' | 'forceAnimations'
 const setting =
   <K extends Toggle>(key: K) =>
@@ -248,7 +255,7 @@ export const commands: Command[] = [
       category: 'Edit' as const,
       keys: [`Arrow${dir}`],
       hidden: true,
-      run: () => nudgeSelection(dx * 2, dy * 2)
+      run: () => nudgeSelection(dx * nudgeStep(false), dy * nudgeStep(false))
     },
     {
       id: `edit.nudge${dir}Far`,
@@ -256,7 +263,7 @@ export const commands: Command[] = [
       category: 'Edit' as const,
       keys: [`Shift+Arrow${dir}`],
       hidden: true,
-      run: () => nudgeSelection(dx * 20, dy * 20)
+      run: () => nudgeSelection(dx * nudgeStep(true), dy * nudgeStep(true))
     }
   ]),
 
@@ -300,6 +307,12 @@ export const commands: Command[] = [
     title: 'Link to another project…',
     category: 'Insert',
     run: () => linkOtherProject()
+  },
+  {
+    id: 'insert.projectContent',
+    title: 'Import another project…',
+    category: 'Insert',
+    run: () => importProjectContent()
   },
   {
     id: 'insert.refreshImports',

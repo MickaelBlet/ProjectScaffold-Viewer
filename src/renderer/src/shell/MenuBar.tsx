@@ -53,6 +53,7 @@ const MENUS: [Category, (string | '-')[]][] = [
       'insert.note',
       'insert.frame',
       '-',
+      'insert.projectContent',
       'insert.imported',
       'insert.refreshImports'
     ]

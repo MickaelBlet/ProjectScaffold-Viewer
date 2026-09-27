@@ -27,6 +27,10 @@ function singleFile(): Plugin {
             () => `<style>${String(file.source)}</style>`
           )
           delete bundle[name]
+        } else if (file.type === 'asset' && name.endsWith('.svg')) {
+          const uri = `data:image/svg+xml,${encodeURIComponent(String(file.source))}`
+          source = source.replace(new RegExp(`href="[^"]*${name}"`), () => `href="${uri}"`)
+          delete bundle[name]
         }
       }
       // Inline scripts need 'unsafe-inline'; the page still loads nothing external.

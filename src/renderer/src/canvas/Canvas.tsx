@@ -6,7 +6,6 @@ import {
   MiniMap,
   ReactFlow,
   ViewportPortal,
-  getNodesBounds,
   getViewportForBounds,
   useNodesState,
   useReactFlow,
@@ -19,12 +18,14 @@ import {
 } from '@xyflow/react'
 import { toPng, toSvg } from 'html-to-image'
 import {
+  absoluteRect,
   allImported,
   findImported,
   findPort,
   findView,
   importedSize,
   isImportedId,
+  minSize,
   modulePath,
   subtreeIds,
   visibleModuleIds
@@ -37,6 +38,7 @@ import {
   reparentModule,
   reverseLink,
   setLayouts,
+  setLinkRoute,
   update,
   updateNote,
   useProjectStore
@@ -47,6 +49,7 @@ import { openContextMenu, select, setStatus, useUiStore } from '@/store/ui'
 import {
   addModuleAt,
   addNoteAt,
+  importProjectContent,
   linkOtherProject,
   navigate,
   openImportSource,
@@ -60,8 +63,16 @@ import { commandItem as item, keyLabel } from '@/commands'
 import { fileName } from '@/fileOps'
 import { openView, registerCanvas } from '@/shell/controllers'
 import { ModuleNode } from './ModuleNode'
-import { floatingPortSides, neededHeight, type PortSides } from './portSides'
+import {
+  floatingPortSides,
+  neededHeight,
+  portPoints,
+  STAND_IN_HEADER,
+  type PortSides,
+  type StandIn
+} from './portSides'
 import { NoteNode } from './NoteNode'
+import { ceilToGrid, NOTE_MIN, snapRect, snapValue } from '@/model/grid'
 import { ExternalNode, type ExternalNodeData, type ExternalPort } from './ExternalNode'
 import { ImportedNode } from './ImportedNode'
 import { LinkEdge, PERF_COLORS } from './LinkEdge'
@@ -79,7 +90,16 @@ interface Guide {
 }
 
 /** React Flow nodes of a view: its modules (parents first), notes and outside stand-ins. */
-function toNodes(p: Project, view: View, selected: Set<Id>, sides: PortSides | null): Node[] {
+function toNodes(
+  p: Project,
+  view: View,
+  selected: Set<Id>,
+  sides: PortSides | null,
+  externals: Node<ExternalNodeData>[],
+  grid: number | null
+): Node[] {
+  // On the grid, sizes grown for their ports stay multiples of it.
+  const fit = (v: number): number => (grid ? ceilToGrid(v, grid) : v)
   const visible = visibleModuleIds(p, view)
   const nodes: Node[] = []
   if (!view.rootModuleId)
@@ -96,16 +116,19 @@ function toNodes(p: Project, view: View, selected: Set<Id>, sides: PortSides | n
         zIndex: n.kind === 'frame' ? -1 : 500,
         data: {}
       })
+  const parents = new Set(p.modules.flatMap((m) => m.parentId ?? []))
   for (const m of p.modules) {
     if (!visible.has(m.id)) continue
     const isRoot = m.id === view.rootModuleId
     const placements = sides?.get(m.id)
+    // Containers draw the ports moved to another edge outside their frame: their size stays.
+    const grow = placements && !parents.has(m.id)
     nodes.push({
       id: m.id,
       type: 'module',
       position: { x: m.layout.x, y: m.layout.y },
       width: m.layout.width,
-      height: placements ? Math.max(m.layout.height, neededHeight(m.ports, placements)) : m.layout.height,
+      height: grow ? Math.max(m.layout.height, fit(neededHeight(m.ports, placements))) : m.layout.height,
       parentId: isRoot ? undefined : (m.parentId ?? undefined),
       // The root of a drill-down view is the frame of the view.
       draggable: !isRoot && !m.locked,
@@ -113,60 +136,111 @@ function toNodes(p: Project, view: View, selected: Set<Id>, sides: PortSides | n
       data: placements ? { sides: placements } : {}
     })
   }
-  if (view.rootModuleId) nodes.push(...externalNodes(p, view, visible))
+  nodes.push(...externals)
   // Modules of other projects (global view only).
-  for (const m of allImported(p))
-    if (visible.has(m.id))
-      nodes.push({
-        id: m.id,
-        type: 'imported',
-        position: { ...m.position },
-        ...importedSize(m, p.orientation),
-        selected: selected.has(m.id),
-        data: {}
-      })
+  for (const m of allImported(p)) {
+    if (!visible.has(m.id)) continue
+    const placements = sides?.get(m.id)
+    const size = importedSize(m, p.orientation)
+    nodes.push({
+      id: m.id,
+      type: 'imported',
+      position: { ...m.position },
+      width: fit(size.width),
+      height: fit(placements ? Math.max(size.height, neededHeight(m.ports, placements)) : size.height),
+      selected: selected.has(m.id),
+      data: placements ? { sides: placements } : {}
+    })
+  }
   return nodes
 }
 
-/** Stand-ins for the modules outside a drill-down view linked to its content. */
-function externalNodes(p: Project, view: View, visible: Set<Id>): Node<ExternalNodeData>[] {
+/**
+ * Stand-ins for the modules outside a drill-down view linked to its content. Given where the
+ * inside ports are drawn, stand-ins and their ports follow the order of the ports they link to.
+ */
+function externalNodes(
+  p: Project,
+  view: View,
+  visible: Set<Id>,
+  inside: Map<Id, { x: number; y: number }> | null
+): Node<ExternalNodeData>[] {
   const root = p.modules.find((m) => m.id === view.rootModuleId)
   if (!root) return []
   const outside = new Map<Id, ExternalPort[]>()
-  const add = (moduleId: Id, portId: Id, type: 'source' | 'target'): void => {
+  /** Inside ports linked to each outside port. */
+  const partners = new Map<Id, Id[]>()
+  const add = (moduleId: Id, portId: Id, type: 'source' | 'target', partner: Id): void => {
     const port = findPort(p, moduleId, portId)
     if (!port) return
     const list = outside.get(moduleId) ?? []
     if (!list.some((x) => x.id === portId)) list.push({ id: portId, name: port.name, type })
     outside.set(moduleId, list)
+    partners.set(portId, [...(partners.get(portId) ?? []), partner])
   }
   for (const l of p.links) {
     const fromIn = visible.has(l.from.moduleId)
     const toIn = visible.has(l.to.moduleId)
-    if (fromIn && !toIn) add(l.to.moduleId, l.to.portId, 'target')
-    if (!fromIn && toIn) add(l.from.moduleId, l.from.portId, 'source')
+    if (fromIn && !toIn) add(l.to.moduleId, l.to.portId, 'target', l.from.portId)
+    if (!fromIn && toIn) add(l.from.moduleId, l.from.portId, 'source', l.to.portId)
   }
   const r = root.layout
-  let left = r.y
-  let right = r.y
-  return [...outside].map(([moduleId, ports]) => {
-    // Senders on the left of the view, receivers on the right.
+  const vertical = p.orientation === 'vertical'
+  let groups = [...outside]
+  if (inside) {
+    const mean = (xs: number[]): number => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : Infinity)
+    const key = (portId: Id): number =>
+      mean((partners.get(portId) ?? []).flatMap((id) => inside.get(id)?.[vertical ? 'x' : 'y'] ?? []))
+    groups = groups
+      .map(([id, ports]) => [id, [...ports].sort((a, b) => key(a.id) - key(b.id))] as const)
+      .map(([id, ports]) => ({ id, ports, at: mean(ports.map((pt) => key(pt.id)).filter(Number.isFinite)) }))
+      .sort((a, b) => a.at - b.at)
+      .map(({ id, ports }) => [id, ports])
+  }
+  // Next free place along the edge of the view, for senders and receivers.
+  let before = vertical ? r.x : r.y
+  let after = before
+  return groups.map(([moduleId, ports]) => {
+    // Senders on the in side of the view (left, or above), receivers on the out side.
     const sender = ports.every((pt) => pt.type === 'source')
-    const height = 34 + ports.length * 24
-    const y = sender ? left : right
-    if (sender) left += height + 20
-    else right += height + 20
+    const width = vertical ? Math.max(180, ports.length * 120) : 180
+    const height = vertical ? 58 : STAND_IN_HEADER + ports.length * 24
+    const along = sender ? before : after
+    if (sender) before += (vertical ? width : height) + 20
+    else after += (vertical ? width : height) + 20
+    const position = vertical
+      ? { x: along, y: sender ? r.y - height - 80 : r.y + r.height + 80 }
+      : { x: sender ? r.x - width - 80 : r.x + r.width + 80, y: along }
+    const side = vertical ? (sender ? 'bottom' : 'top') : sender ? 'right' : 'left'
     return {
       id: EXTERNAL + moduleId,
       type: 'external',
-      position: { x: sender ? r.x - 260 : r.x + r.width + 80, y },
-      width: 180,
+      position,
+      width,
       height,
       draggable: false,
       selectable: false,
-      data: { label: modulePath(p, moduleId), ports, side: sender ? 'right' : 'left' }
+      data: { label: modulePath(p, moduleId), ports, side }
     }
   })
+}
+
+/** Outside modules at their stand-in, in the absolute coordinates of the project. */
+function standIns(p: Project, view: View, externals: Node<ExternalNodeData>[]): Map<Id, StandIn> {
+  const root = p.modules.find((m) => m.id === view.rootModuleId)
+  const out = new Map<Id, StandIn>()
+  if (!root) return out
+  // The root of the view is drawn at its layout, not at its absolute place.
+  const abs = absoluteRect(p, root.id)
+  const dx = abs.x - root.layout.x
+  const dy = abs.y - root.layout.y
+  for (const n of externals)
+    out.set(n.id.slice(EXTERNAL.length), {
+      rect: { x: n.position.x + dx, y: n.position.y + dy, width: n.width ?? 0, height: n.height ?? 0 },
+      side: n.data.side,
+      ports: n.data.ports.map((pt) => pt.id)
+    })
+  return out
 }
 
 function toEdges(p: Project, visible: Set<Id>, drill: boolean, selectedLink: Id | null): Edge[] {
@@ -256,16 +330,29 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
   const visible = useMemo(() => visibleModuleIds(project, view), [project, view])
   const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds])
   const selectedLink = selection?.kind === 'link' ? selection.id : null
+  const colors = useMemo(() => {
+    const m = new Map<Id, string>()
+    for (const x of [...project.modules, ...project.notes]) if (x.color) m.set(x.id, x.color)
+    return m
+  }, [project])
 
   const [nodes, setNodes, onNodesChangeBase] = useNodesState<Node>([])
-  // Ports follow their links when link ends are auto-oriented.
-  const sides = useMemo(
-    () => (settings.autoOrientLinks ? floatingPortSides(project, visible) : null),
-    [project, visible, settings.autoOrientLinks]
-  )
+  // Ports follow their links when link ends are auto-oriented; outside stand-ins follow the ports
+  // they link to, and the ports follow them back.
+  const { sides, externals } = useMemo(() => {
+    const auto = settings.autoOrientLinks
+    let externals = externalNodes(project, view, visible, null)
+    let sides = auto ? floatingPortSides(project, visible, standIns(project, view, externals)) : null
+    if (externals.length) {
+      externals = externalNodes(project, view, visible, portPoints(project, visible, sides))
+      if (auto) sides = floatingPortSides(project, visible, standIns(project, view, externals))
+    }
+    return { sides, externals }
+  }, [project, view, visible, settings.autoOrientLinks])
+  const grid = settings.snapToGrid ? settings.gridSize : null
   useEffect(
-    () => setNodes(toNodes(project, view, selectedSet, sides)),
-    [project, view, selectedSet, sides, setNodes]
+    () => setNodes(toNodes(project, view, selectedSet, sides, externals, grid)),
+    [project, view, selectedSet, sides, externals, grid, setNodes]
   )
   const edges = useMemo(
     () => toEdges(project, visible, !!view.rootModuleId, selectedLink),
@@ -274,6 +361,21 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
 
   const absolute = useCallback(
     (id: string) => getInternalNode(id)?.internals.positionAbsolute ?? { x: 0, y: 0 },
+    [getInternalNode]
+  )
+
+  /** Absolute rect of a node; `measured` is lost while nodes are rebuilt, the given size is not. */
+  const nodeRect = useCallback(
+    (id: string) => {
+      const n = getInternalNode(id)
+      return n
+        ? {
+            ...n.internals.positionAbsolute,
+            width: n.measured.width ?? n.width ?? 0,
+            height: n.measured.height ?? n.height ?? 0
+          }
+        : null
+    },
     [getInternalNode]
   )
 
@@ -293,31 +395,30 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
           const r = container.current?.getBoundingClientRect()
           return r ? screenToFlowPosition({ x: r.x + r.width / 2, y: r.y + r.height / 2 }) : { x: 80, y: 80 }
         },
-        reveal: (id) => {
-          const n = getInternalNode(id)
-          if (!n) return
-          const { x, y } = n.internals.positionAbsolute
-          void flow.setCenter(x + (n.measured.width ?? 0) / 2, y + (n.measured.height ?? 0) / 2, {
-            zoom: Math.max(flow.getZoom(), 0.8),
+        reveal: (ids) => {
+          // A module outside a drill-down view shows as its stand-in.
+          const rects = ids.map((id) => nodeRect(id) ?? nodeRect(EXTERNAL + id)).filter((r) => !!r)
+          if (!rects.length) return
+          const x = Math.min(...rects.map((r) => r.x))
+          const y = Math.min(...rects.map((r) => r.y))
+          const width = Math.max(...rects.map((r) => r.x + r.width)) - x
+          const height = Math.max(...rects.map((r) => r.y + r.height)) - y
+          const box = container.current?.getBoundingClientRect()
+          // Keep the zoom unless the target does not fit.
+          const fit = box ? Math.min((box.width * 0.85) / width, (box.height * 0.85) / height) : Infinity
+          void flow.setCenter(x + width / 2, y + height / 2, {
+            zoom: Math.max(Math.min(Math.max(flow.getZoom(), 0.8), fit), 0.1),
             duration: 250
           })
         },
         zoomBy: (f) => void flow.zoomTo(flow.getZoom() * f, { duration: 150 }),
         zoomTo: (z) => void flow.zoomTo(z, { duration: 150 }),
-        nodeRect: (id) => {
-          const n = getInternalNode(id)
-          return n
-            ? {
-                ...n.internals.positionAbsolute,
-                width: n.measured.width ?? 0,
-                height: n.measured.height ?? 0
-              }
-            : null
-        },
+        nodeRect,
         exportImage: async (format) => {
           const el = container.current?.querySelector<HTMLElement>('.react-flow__viewport')
           if (!el) return
-          const bounds = getNodesBounds(flow.getNodes())
+          // The hook resolves the absolute position of nested modules.
+          const bounds = flow.getNodesBounds(flow.getNodes())
           const width = Math.min(8000, Math.max(200, bounds.width + 80))
           const height = Math.min(8000, Math.max(200, bounds.height + 80))
           const vp = getViewportForBounds(bounds, width, height, 0.1, 2, 0.05)
@@ -343,7 +444,7 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
           setStatus('info', `Exported ${a.download}`)
         }
       }),
-    [viewId, view.name, flow, fitView, screenToFlowPosition, getInternalNode]
+    [viewId, view.name, flow, fitView, screenToFlowPosition, nodeRect]
   )
 
   useEffect(() => {
@@ -386,12 +487,61 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
     })
   }, [])
 
+  /** Smallest size of a resizable node. */
+  const minOf = useCallback((id: string) => {
+    const p = getProject()
+    const m = p.modules.find((m) => m.id === id)
+    return m ? minSize(m, p.orientation) : NOTE_MIN
+  }, [])
+
+  /** Grid: every dragged node lands on it, a resized node keeps both edges on it. */
+  const snapToGrid = useCallback(
+    (changes: NodeChange<Node>[], grid: number): void => {
+      const originOf = (id: string): { x: number; y: number } => {
+        const parentId = flow.getNode(id)?.parentId
+        return parentId ? absolute(parentId) : { x: 0, y: 0 }
+      }
+      for (const c of [...changes]) {
+        if (c.type === 'position' && c.dragging && c.position) {
+          const o = originOf(c.id)
+          c.position = {
+            x: snapValue(o.x + c.position.x, grid) - o.x,
+            y: snapValue(o.y + c.position.y, grid) - o.y
+          }
+        }
+        if (c.type !== 'dimensions' || c.resizing === undefined || !c.dimensions) continue
+        const node = flow.getNode(c.id)
+        if (!node) continue
+        const move = changes.find(
+          (x): x is Extract<NodeChange<Node>, { type: 'position' }> =>
+            x.type === 'position' && x.id === c.id && !!x.position
+        )
+        const o = originOf(c.id)
+        const at = move?.position ?? node.position
+        // Resizing from the left (top) moves the node: the other edge stays.
+        const r = snapRect({ x: o.x + at.x, y: o.y + at.y, ...c.dimensions }, grid, minOf(c.id), {
+          right: at.x !== node.position.x,
+          bottom: at.y !== node.position.y
+        })
+        c.dimensions = { width: r.width, height: r.height }
+        const position = { x: r.x - o.x, y: r.y - o.y }
+        if (move) move.position = position
+        else if (c.resizing && (position.x !== node.position.x || position.y !== node.position.y))
+          changes.push({ id: c.id, type: 'position', position })
+      }
+    },
+    [flow, absolute, minOf]
+  )
+
   // Alignment guides: snap a dragged node to its siblings' edges and centers.
   const onNodesChange = useCallback(
     (changes: NodeChange<Node>[]): void => {
       applySelect(changes)
+      const { snapToGrid: onGrid, gridSize, guides: showGuides } = useSettings.getState()
+      const grid = onGrid ? gridSize : null
+      if (grid) snapToGrid(changes, grid)
       const moving = changes.filter((c) => c.type === 'position' && c.dragging && c.position)
-      if (moving.length !== 1 || !useSettings.getState().guides) {
+      if (moving.length !== 1 || !showGuides) {
         if (guides.length) setGuides([])
         return onNodesChangeBase(changes)
       }
@@ -406,6 +556,9 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
         .getNodes()
         .filter((n) => n.id !== change.id && n.parentId === node?.parentId && n.type !== 'external')
       const found: Guide[] = []
+      // On the grid, a guide only shows an alignment: it never pulls the node off the grid.
+      const offGrid = (delta: number): boolean =>
+        !!grid && Math.abs(delta / grid - Math.round(delta / grid)) > 1e-6
       const snapAxis = (axis: 'x' | 'y', size: number): void => {
         const mine = [pos[axis], pos[axis] + size / 2, pos[axis] + size]
         let best: { delta: number; at: number } | null = null
@@ -415,6 +568,7 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
           for (const theirs of [s.position[axis], s.position[axis] + ss / 2, s.position[axis] + ss])
             for (const m of mine) {
               const delta = theirs - m
+              if (offGrid(delta)) continue
               if (Math.abs(delta) <= threshold && (!best || Math.abs(delta) < Math.abs(best.delta)))
                 best = { delta, at: theirs }
             }
@@ -429,7 +583,7 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
       setGuides(found)
       onNodesChangeBase(changes)
     },
-    [flow, guides.length, onNodesChangeBase, absolute, applySelect]
+    [flow, guides.length, onNodesChangeBase, absolute, applySelect, snapToGrid]
   )
 
   const isValidConnection = useCallback((c: Connection | Edge): boolean => {
@@ -578,6 +732,7 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
       item('edit.cut'),
       item('edit.copy'),
       { label: 'Paste into', run: () => void paste(undefined, { at, parent: node.id }) },
+      { label: 'Import another project into…', run: () => importProjectContent(node.id) },
       item('edit.duplicate'),
       'separator',
       item('edit.delete')
@@ -608,6 +763,9 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
         checked: getProject().links.find((l) => l.id === edge.id)?.constraints.ack.required,
         run: toggle((l) => void (l.constraints.ack.required = !l.constraints.ack.required))
       },
+      ...(getProject().links.find((l) => l.id === edge.id)?.route
+        ? [{ label: 'Reset shape', run: () => setLinkRoute(edge.id, undefined) }]
+        : []),
       'separator',
       { label: 'Delete link', danger: true, keys: 'Delete', run: () => (deleteLink(edge.id), select(null)) }
     ])
@@ -623,9 +781,12 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
         ? []
         : [
             { label: 'Add note here', run: () => addNoteAt('note', at) },
-            { label: 'Add frame here', run: () => addNoteAt('frame', at) },
-            { label: 'Link to another project…', run: () => linkOtherProject(at) }
+            { label: 'Add frame here', run: () => addNoteAt('frame', at) }
           ]),
+      'separator',
+      { label: 'Link to another project…', run: () => linkOtherProject(at) },
+      { label: 'Import another project here…', run: () => importProjectContent(parent, at) },
+      'separator',
       { label: 'Paste here', keys: keyLabel('Ctrl+V'), run: () => void paste(undefined, { at, parent }) },
       'separator',
       item('arrange.horizontal', view.rootModuleId ? 'Arrange view horizontally' : 'Arrange horizontally'),
@@ -640,14 +801,7 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
   }
 
   return (
-    <div
-      className="canvas"
-      ref={container}
-      onPointerDownCapture={focusView}
-      onDoubleClick={(e) => {
-        if ((e.target as HTMLElement).classList.contains('react-flow__pane')) paneMenu(e)
-      }}
-    >
+    <div className="canvas" ref={container} onPointerDownCapture={focusView}>
       <Breadcrumbs view={view} />
       <ReactFlow
         nodes={nodes}
@@ -683,7 +837,6 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
         multiSelectionKeyCode={['Control', 'Meta']}
         // Fixed stacking: edges (1000) and their badges (1001) stay above modules even when selected.
         zIndexMode="manual"
-        zoomOnDoubleClick={false}
         snapToGrid={settings.snapToGrid}
         snapGrid={[settings.gridSize, settings.gridSize]}
         colorMode={settings.theme}
@@ -693,7 +846,7 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
       >
         <Background gap={settings.gridSize} />
         <Controls />
-        {settings.minimap && <MiniMap pannable zoomable />}
+        {settings.minimap && <MiniMap pannable zoomable nodeColor={(n) => colors.get(n.id) ?? ''} />}
         <ViewportPortal>
           {guides.map((g, i) =>
             g.x !== undefined ? (
