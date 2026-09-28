@@ -3,7 +3,6 @@ import {
   Background,
   ConnectionMode,
   Controls,
-  MarkerType,
   MiniMap,
   ReactFlow,
   ViewportPortal,
@@ -18,22 +17,19 @@ import {
   type OnNodeDrag,
   type Viewport
 } from '@xyflow/react'
+import { useShallow } from 'zustand/react/shallow'
 import { toPng, toSvg } from 'html-to-image'
 import {
-  absoluteRect,
-  allImported,
   findImported,
-  findPort,
   findView,
-  importedSize,
   isImportedId,
   minSize,
-  modulePath,
   orderLinkEnds,
   subtreeIds,
   visibleModuleIds
 } from '@/model/project'
-import { GLOBAL_VIEW, type Id, type PortRole, type Project, type View } from '@/model/types'
+import { NOTE_MIN, snapRect, snapValue } from '@/model/grid'
+import { GLOBAL_VIEW, type Id, type Project, type View } from '@/model/types'
 import {
   connect,
   deleteLink,
@@ -65,29 +61,29 @@ import {
 import { commandItem as item, keyLabel } from '@/commands'
 import { fileName } from '@/fileOps'
 import { openView, registerCanvas } from '@/shell/controllers'
-import { MODULE_HANDLE, ModuleNode } from './ModuleNode'
-import {
-  floatingPortSides,
-  freePorts,
-  neededHeight,
-  portAnchors,
-  portPoints,
-  type PortPlacement,
-  STAND_IN_HEADER,
-  type PortSides,
-  type StandIn
-} from './portSides'
+import { EXTERNAL } from './constants'
+import { endOf, externalNodes, linkEnds, standIns, toEdges, toNodes } from './flowGraph'
+import { floatingPortSides, portPoints } from './portSides'
+import { ModuleNode } from './ModuleNode'
 import { NoteNode } from './NoteNode'
-import { ceilToGrid, NOTE_MIN, snapRect, snapValue } from '@/model/grid'
-import { ExternalNode, type ExternalNodeData, type ExternalPort } from './ExternalNode'
+import { ExternalNode } from './ExternalNode'
 import { ImportedNode } from './ImportedNode'
-import { LinkEdge, PERF_COLORS } from './LinkEdge'
+import { LinkEdge } from './LinkEdge'
 
 const nodeTypes = { module: ModuleNode, note: NoteNode, external: ExternalNode, imported: ImportedNode }
 const edgeTypes = { link: LinkEdge }
 
-const EXTERNAL = 'external:'
 const GUIDE_PX = 6
+
+const NOTE_COLORS: [string, string | undefined][] = [
+  ['default', undefined],
+  ['yellow', '#f5d76e'],
+  ['green', '#7ed6a5'],
+  ['blue', '#7fb3f5'],
+  ['pink', '#f5a3c7'],
+  ['purple', '#b9a3f5'],
+  ['grey', '#b8bec9']
+]
 
 interface Guide {
   /** Vertical line at x, or horizontal line at y (absolute flow coordinates). */
@@ -122,230 +118,6 @@ function followFrame(changes: NodeChange<Node>[], drag: FrameDrag | null): void 
   const dy = c.position.y - drag.from.y
   for (const [id, at] of drag.nodes)
     changes.push({ id, type: 'position', position: { x: at.x + dx, y: at.y + dy } })
-}
-
-/** React Flow nodes of a view: its modules (parents first), notes and outside stand-ins. */
-function toNodes(
-  p: Project,
-  view: View,
-  selected: Set<Id>,
-  sides: PortSides | null,
-  externals: Node<ExternalNodeData>[],
-  grid: number | null
-): Node[] {
-  // On the grid, sizes grown for their ports stay multiples of it.
-  const fit = (v: number): number => (grid ? ceilToGrid(v, grid) : v)
-  const visible = visibleModuleIds(p, view)
-  const nodes: Node[] = []
-  if (!view.rootModuleId)
-    for (const n of p.notes)
-      nodes.push({
-        id: n.id,
-        type: 'note',
-        position: { x: n.layout.x, y: n.layout.y },
-        width: n.layout.width,
-        height: n.layout.height,
-        selected: selected.has(n.id),
-        draggable: !n.locked,
-        // Frames stay behind modules.
-        zIndex: n.kind === 'frame' ? -1 : 500,
-        data: {}
-      })
-  const parents = new Set(p.modules.flatMap((m) => m.parentId ?? []))
-  // Ports at a hand-set link attachment are drawn there, out of their edge's rows.
-  const anchors = portAnchors(p, sides)
-  const portData = (ports: { id: Id }[], placements: Record<Id, PortPlacement> | undefined) => ({
-    ...(placements && { sides: placements }),
-    anchors: Object.fromEntries(
-      ports.flatMap((pt) => (anchors.has(pt.id) ? [[pt.id, anchors.get(pt.id)!]] : []))
-    )
-  })
-  for (const m of p.modules) {
-    if (!visible.has(m.id)) continue
-    const isRoot = m.id === view.rootModuleId
-    const placements = sides?.get(m.id)
-    // Containers draw the ports moved to another edge outside their frame: their size stays.
-    const grow = placements && !parents.has(m.id)
-    nodes.push({
-      id: m.id,
-      type: 'module',
-      position: { x: m.layout.x, y: m.layout.y },
-      width: m.layout.width,
-      height: grow
-        ? Math.max(m.layout.height, fit(neededHeight(freePorts(m.ports, anchors), placements)))
-        : m.layout.height,
-      parentId: isRoot ? undefined : (m.parentId ?? undefined),
-      // The root of a drill-down view is the frame of the view.
-      draggable: !isRoot && !m.locked,
-      selected: selected.has(m.id),
-      data: portData(m.ports, placements)
-    })
-  }
-  nodes.push(...externals)
-  // Modules of other projects (global view only).
-  for (const m of allImported(p)) {
-    if (!visible.has(m.id)) continue
-    const placements = sides?.get(m.id)
-    const size = importedSize(m, p.orientation)
-    nodes.push({
-      id: m.id,
-      type: 'imported',
-      position: { ...m.position },
-      width: fit(size.width),
-      height: fit(
-        placements
-          ? Math.max(size.height, neededHeight(freePorts(m.ports, anchors), placements))
-          : size.height
-      ),
-      selected: selected.has(m.id),
-      data: portData(m.ports, placements)
-    })
-  }
-  return nodes
-}
-
-/**
- * Stand-ins for the modules outside a drill-down view linked to its content. Given where the
- * inside ports are drawn, stand-ins and their ports follow the order of the ports they link to.
- */
-function externalNodes(
-  p: Project,
-  view: View,
-  visible: Set<Id>,
-  inside: Map<Id, { x: number; y: number }> | null
-): Node<ExternalNodeData>[] {
-  const root = p.modules.find((m) => m.id === view.rootModuleId)
-  if (!root) return []
-  const outside = new Map<Id, ExternalPort[]>()
-  /** Inside ports linked to each outside port. */
-  const partners = new Map<Id, Id[]>()
-  const add = (moduleId: Id, portId: Id, type: 'source' | 'target', partner: Id): void => {
-    const port = findPort(p, moduleId, portId)
-    if (!port) return
-    const list = outside.get(moduleId) ?? []
-    if (!list.some((x) => x.id === portId)) list.push({ id: portId, name: port.name, type })
-    outside.set(moduleId, list)
-    partners.set(portId, [...(partners.get(portId) ?? []), partner])
-  }
-  for (const l of p.links) {
-    const fromIn = visible.has(l.from.moduleId)
-    const toIn = visible.has(l.to.moduleId)
-    if (fromIn && !toIn) add(l.to.moduleId, l.to.portId, 'target', l.from.portId)
-    if (!fromIn && toIn) add(l.from.moduleId, l.from.portId, 'source', l.to.portId)
-  }
-  const r = root.layout
-  const vertical = p.orientation === 'vertical'
-  let groups = [...outside]
-  if (inside) {
-    const mean = (xs: number[]): number => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : Infinity)
-    const key = (portId: Id): number =>
-      mean((partners.get(portId) ?? []).flatMap((id) => inside.get(id)?.[vertical ? 'x' : 'y'] ?? []))
-    groups = groups
-      .map(([id, ports]) => [id, [...ports].sort((a, b) => key(a.id) - key(b.id))] as const)
-      .map(([id, ports]) => ({ id, ports, at: mean(ports.map((pt) => key(pt.id)).filter(Number.isFinite)) }))
-      .sort((a, b) => a.at - b.at)
-      .map(({ id, ports }) => [id, ports])
-  }
-  // Next free place along the edge of the view, for senders and receivers.
-  let before = vertical ? r.x : r.y
-  let after = before
-  return groups.map(([moduleId, ports]) => {
-    // Senders on the in side of the view (left, or above), receivers on the out side.
-    const sender = ports.every((pt) => pt.type === 'source')
-    const width = vertical ? Math.max(180, ports.length * 120) : 180
-    const height = vertical ? 58 : STAND_IN_HEADER + ports.length * 24
-    const along = sender ? before : after
-    if (sender) before += (vertical ? width : height) + 20
-    else after += (vertical ? width : height) + 20
-    const position = vertical
-      ? { x: along, y: sender ? r.y - height - 80 : r.y + r.height + 80 }
-      : { x: sender ? r.x - width - 80 : r.x + r.width + 80, y: along }
-    const side = vertical ? (sender ? 'bottom' : 'top') : sender ? 'right' : 'left'
-    return {
-      id: EXTERNAL + moduleId,
-      type: 'external',
-      position,
-      width,
-      height,
-      draggable: false,
-      selectable: false,
-      data: { label: modulePath(p, moduleId), ports, side }
-    }
-  })
-}
-
-/** Outside modules at their stand-in, in the absolute coordinates of the project. */
-function standIns(p: Project, view: View, externals: Node<ExternalNodeData>[]): Map<Id, StandIn> {
-  const root = p.modules.find((m) => m.id === view.rootModuleId)
-  const out = new Map<Id, StandIn>()
-  if (!root) return out
-  // The root of the view is drawn at its layout, not at its absolute place.
-  const abs = absoluteRect(p, root.id)
-  const dx = abs.x - root.layout.x
-  const dy = abs.y - root.layout.y
-  for (const n of externals)
-    out.set(n.id.slice(EXTERNAL.length), {
-      rect: { x: n.position.x + dx, y: n.position.y + dy, width: n.width ?? 0, height: n.height ?? 0 },
-      side: n.data.side,
-      ports: n.data.ports.map((pt) => pt.id)
-    })
-  return out
-}
-
-function toEdges(p: Project, visible: Set<Id>, drill: boolean, selectedLink: Id | null): Edge[] {
-  const end = (moduleId: Id): string | null =>
-    visible.has(moduleId) ? moduleId : drill ? EXTERNAL + moduleId : null
-  return p.links.flatMap((l) => {
-    const source = end(l.from.moduleId)
-    const target = end(l.to.moduleId)
-    if (!source || !target || (source.startsWith(EXTERNAL) && target.startsWith(EXTERNAL))) return []
-    const color = PERF_COLORS[l.constraints.performance.class]
-    const marker = { type: MarkerType.ArrowClosed, color, width: 16, height: 16 }
-    return [
-      {
-        id: l.id,
-        type: 'link',
-        source,
-        sourceHandle: l.from.portId,
-        target,
-        targetHandle: l.to.portId,
-        selected: l.id === selectedLink,
-        markerEnd: marker,
-        markerStart: l.constraints.direction === 'bidirectional' ? marker : undefined,
-        zIndex: 1000
-      }
-    ]
-  })
-}
-
-interface ConnectEnd {
-  moduleId: Id
-  /** null: the module's own handle, linked through a new port. */
-  portId: Id | null
-  role: PortRole | null
-}
-
-function endOf(p: Project, moduleId: Id, handle: string): ConnectEnd {
-  if (handle === MODULE_HANDLE) return { moduleId, portId: null, role: null }
-  return { moduleId, portId: handle, role: findPort(p, moduleId, handle)?.role ?? null }
-}
-
-/**
- * Ends of a connection drawn between two handles, in link order, or null when their ports cannot
- * be linked (roles, interfaces). Handles are dragged either way: the roles give the direction.
- */
-function linkEnds(c: Connection | Edge): [ConnectEnd, ConnectEnd] | null {
-  if (!c.sourceHandle || !c.targetHandle) return null
-  const p = getProject()
-  const a = endOf(p, c.source, c.sourceHandle)
-  const b = endOf(p, c.target, c.targetHandle)
-  // Module to module: drop on the module instead (onConnectEnd).
-  if (!a.portId && !b.portId) return null
-  if ((a.portId && !a.role) || (b.portId && !b.role)) return null
-  const ends = orderLinkEnds(p, a, b)
-  if (!ends) return null
-  const [x, y] = ends.map((e) => (e.portId ? findPort(p, e.moduleId, e.portId) : null))
-  return !x?.interfaceId || !y?.interfaceId || x.interfaceId === y.interfaceId ? ends : null
 }
 
 const sameIds = (a: Id[], b: Id[]): boolean => a.length === b.length && a.every((x, i) => x === b[i])
@@ -398,8 +170,17 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
   const selection = useDoc((d) => d.selection)
   const selectedIds = useDoc((d) => d.selectedIds)
   const viewEpoch = useDoc((d) => d.viewEpoch)
-  const savedViewport = useRef(activeDoc().viewports[viewId])
-  const settings = useSettings()
+  // Viewport of this view when last shown, read once.
+  const [savedViewport] = useState(() => activeDoc().viewports[viewId])
+  const settings = useSettings(
+    useShallow((s) => ({
+      autoOrientLinks: s.autoOrientLinks,
+      snapToGrid: s.snapToGrid,
+      gridSize: s.gridSize,
+      theme: s.theme,
+      minimap: s.minimap
+    }))
+  )
   const flow = useReactFlow()
   const { screenToFlowPosition, getInternalNode, fitView } = flow
   const container = useRef<HTMLDivElement>(null)
@@ -528,10 +309,10 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
   )
 
   useEffect(() => {
-    if (viewEpoch <= 1 && savedViewport.current) return
+    if (viewEpoch <= 1 && savedViewport) return
     const t = setTimeout(() => void fitView({ padding: 0.15, duration: 200 }), 50)
     return () => clearTimeout(t)
-  }, [viewEpoch, fitView])
+  }, [viewEpoch, savedViewport, fitView])
 
   const focusView = (): void => {
     if (activeDoc().activeViewId !== viewId) patchDoc({ activeViewId: viewId })
@@ -673,11 +454,11 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
     if (c.source.startsWith(EXTERNAL) || c.target.startsWith(EXTERNAL)) return false
     // A link to another project needs one end here.
     if (isImportedId(c.source) && isImportedId(c.target)) return false
-    return !!linkEnds(c)
+    return !!linkEnds(getProject(), c)
   }, [])
 
   const onConnect = useCallback((c: Connection): void => {
-    const ends = linkEnds(c)
+    const ends = linkEnds(getProject(), c)
     if (!ends) return
     const [from, to] = ends
     const id = connect(from, to)
@@ -921,6 +702,30 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
     ])
   }
 
+  const selectionMenu = (e: React.MouseEvent): void => {
+    e.preventDefault()
+    openContextMenu(e, [
+      item('arrange.group'),
+      item('arrange.left'),
+      item('arrange.hcenter'),
+      item('arrange.right'),
+      item('arrange.top'),
+      item('arrange.vcenter'),
+      item('arrange.bottom'),
+      item('arrange.distH'),
+      item('arrange.distV'),
+      item('arrange.sameSize'),
+      item('arrange.lock', 'Locked'),
+      'separator',
+      item('edit.cut'),
+      item('edit.copy'),
+      item('edit.duplicate'),
+      item('view.hide'),
+      'separator',
+      item('edit.delete')
+    ])
+  }
+
   return (
     <div className="canvas" ref={container} onPointerDownCapture={focusView}>
       <Breadcrumbs view={view} />
@@ -949,7 +754,7 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
         onNodeContextMenu={nodeMenu}
         onEdgeContextMenu={edgeMenu}
         onPaneContextMenu={paneMenu}
-        onSelectionContextMenu={(e) => paneMenuForSelection(e)}
+        onSelectionContextMenu={selectionMenu}
         onConnect={onConnect}
         onConnectEnd={onConnectEnd}
         isValidConnection={isValidConnection}
@@ -966,8 +771,8 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
         snapGrid={[settings.gridSize, settings.gridSize]}
         colorMode={settings.theme}
         minZoom={0.1}
-        defaultViewport={savedViewport.current}
-        fitView={!savedViewport.current}
+        defaultViewport={savedViewport}
+        fitView={!savedViewport}
         proOptions={{ hideAttribution: true }}
       >
         <Background gap={settings.gridSize} />
@@ -985,38 +790,4 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
       </ReactFlow>
     </div>
   )
-
-  function paneMenuForSelection(e: React.MouseEvent): void {
-    e.preventDefault()
-    openContextMenu(e, [
-      item('arrange.group'),
-      item('arrange.left'),
-      item('arrange.hcenter'),
-      item('arrange.right'),
-      item('arrange.top'),
-      item('arrange.vcenter'),
-      item('arrange.bottom'),
-      item('arrange.distH'),
-      item('arrange.distV'),
-      item('arrange.sameSize'),
-      item('arrange.lock', 'Locked'),
-      'separator',
-      item('edit.cut'),
-      item('edit.copy'),
-      item('edit.duplicate'),
-      item('view.hide'),
-      'separator',
-      item('edit.delete')
-    ])
-  }
 }
-
-export const NOTE_COLORS: [string, string | undefined][] = [
-  ['default', undefined],
-  ['yellow', '#f5d76e'],
-  ['green', '#7ed6a5'],
-  ['blue', '#7fb3f5'],
-  ['pink', '#f5a3c7'],
-  ['purple', '#b9a3f5'],
-  ['grey', '#b8bec9']
-]

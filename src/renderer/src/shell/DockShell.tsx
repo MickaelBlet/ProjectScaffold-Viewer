@@ -42,18 +42,22 @@ function ProblemsTitle({ api }: IDockviewPanelProps): ReactNode {
 
 const ProblemsTool = tool('problems', ProblemsPanel)
 
-const components = {
-  editorArea: () => <EditorArea />,
-  explorer: tool('explorer', ExplorerPanel),
-  outline: tool('outline', OutlinePanel),
-  links: tool('links', LinksPanel),
-  inspector: tool('inspector', Inspector),
-  problems: (props: IDockviewPanelProps) => (
+function ProblemsToolPanel(props: IDockviewPanelProps): ReactNode {
+  return (
     <>
       <ProblemsTitle {...props} />
       <ProblemsTool />
     </>
-  ),
+  )
+}
+
+const components = {
+  editorArea: EditorArea,
+  explorer: tool('explorer', ExplorerPanel),
+  outline: tool('outline', OutlinePanel),
+  links: tool('links', LinksPanel),
+  inspector: tool('inspector', Inspector),
+  problems: ProblemsToolPanel,
   search: tool('search', SearchPanel),
   settings: tool('settings', SettingsPanel)
 }

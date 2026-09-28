@@ -3,7 +3,7 @@ import { absolutePosition, childModules, modulePath, nameError } from '@/model/p
 import {
   addPort,
   addSubmodule,
-  deleteModule,
+  deleteItems,
   deletePort,
   reparentModule,
   setLocked,
@@ -204,7 +204,7 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
           type="button"
           className="danger"
           onClick={() => {
-            deleteModule(id)
+            deleteItems([id])
             select(null)
           }}
         >

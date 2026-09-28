@@ -1,6 +1,7 @@
 import { produce } from 'immer'
 import { useStore } from 'zustand'
 import {
+  belowContent,
   childModules,
   defaultConstraints,
   defaultSize,
@@ -11,7 +12,6 @@ import {
   LAYOUT_PAD,
   linkOrigin,
   linkRoles,
-  contentTop,
   minSize,
   newId,
   nextModuleColor,
@@ -25,10 +25,8 @@ import { followInterfaceRenames } from '@/model/sync'
 import { snapChanges } from '@/model/grid'
 import type { Endpoint, Id, LinkRoute, PortRole, Project, Rect, Side, TypeDef } from '@/model/types'
 import { activeDoc, useDoc } from './documents'
-import { useSettings } from './settings'
-
-export { growAncestors }
 import type { ProjectState } from './projectStore'
+import { useSettings } from './settings'
 
 // The functions below act on the active document; each document keeps its own undo history.
 
@@ -70,8 +68,6 @@ export function redo(): void {
 
 // Modules
 
-const PAD = LAYOUT_PAD
-
 export function addModule(parentId: Id | null, x: number, y: number): Id {
   const id = newId()
   update((d) => {
@@ -96,20 +92,7 @@ export function addModule(parentId: Id | null, x: number, y: number): Id {
 
 /** Add a child module below the parent's ports and existing children. */
 export function addSubmodule(parentId: Id): Id {
-  const p = getProject()
-  const parent = p.modules.find((m) => m.id === parentId)
-  const top = (parent ? contentTop(p.orientation) : 0) + PAD
-  const bottom = Math.max(top, ...childModules(p, parentId).map((c) => c.layout.y + c.layout.height + PAD))
-  return addModule(parentId, PAD, bottom)
-}
-
-export function deleteModule(id: Id): void {
-  update((d) => {
-    const ids = subtreeIds(d, id)
-    d.modules = d.modules.filter((m) => !ids.has(m.id))
-    d.links = d.links.filter((l) => !ids.has(l.from.moduleId) && !ids.has(l.to.moduleId))
-    pruneViews(d)
-  })
+  return addModule(parentId, LAYOUT_PAD, belowContent(getProject(), parentId))
 }
 
 /** Delete modules (with their content), imported modules and notes in one undo step. */

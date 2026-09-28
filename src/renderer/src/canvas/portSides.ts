@@ -190,7 +190,8 @@ export function floatingPortSides(
       const anchor = end === l.from ? l.route?.from : l.route?.to
       if (
         !anchor &&
-        (!(visible.has(other.moduleId) || standIns.has(other.moduleId)) || nested(end.moduleId, other.moduleId))
+        (!(visible.has(other.moduleId) || standIns.has(other.moduleId)) ||
+          nested(end.moduleId, other.moduleId))
       )
         continue
       const side = anchor?.side ?? facingSide(rect(end.moduleId), rect(other.moduleId), p.orientation)

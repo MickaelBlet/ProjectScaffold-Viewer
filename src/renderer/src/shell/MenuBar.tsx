@@ -5,9 +5,9 @@ import { fileName, openRecentProject } from '@/fileOps'
 import { useDoc } from '@/store/documents'
 import { useUiStore, type MenuItem } from '@/store/ui'
 
-/** Menus built from the command registry; separators between groups of related commands.
- *  'recent' is the recent documents submenu. */
-const MENUS: [Category, (string | '-')[]][] = [
+/** Menus built from the command registry: command ids, '-' for a separator between groups of
+ *  related commands, 'recent' for the recent documents submenu. */
+const MENUS: [Category, string[]][] = [
   [
     'File',
     [
@@ -135,21 +135,20 @@ const MENUS: [Category, (string | '-')[]][] = [
 
 // Every listed command must exist.
 for (const [, ids] of MENUS)
-  for (const id of ids) if (id !== '-' && id !== 'recent' && !commands.some((c) => c.id === id)) throw new Error(id)
+  for (const id of ids)
+    if (id !== '-' && id !== 'recent' && !commands.some((c) => c.id === id)) throw new Error(id)
 
 function recentItem(recent: string[], filePath: string | null): MenuItem {
   return {
     label: 'Open Recent',
     disabled: !recent.length,
     submenu: [
-      ...recent.map(
-        (path): MenuItem => ({
-          label: fileName(path),
-          title: path,
-          checked: path === filePath,
-          run: () => void openRecentProject(path)
-        })
-      ),
+      ...recent.map((path): MenuItem => ({
+        label: fileName(path),
+        title: path,
+        checked: path === filePath,
+        run: () => void openRecentProject(path)
+      })),
       'separator',
       { label: 'Clear Recent', run: () => void window.api.clearRecent() }
     ]
@@ -192,9 +191,8 @@ export function MenuBar(): ReactNode {
           {open === cat && (
             <div className="dropdown-menu context-menu" role="menu">
               <MenuList
-                items={ids.map(
-                  (id): MenuItem =>
-                    id === '-' ? 'separator' : id === 'recent' ? recentItem(recent, filePath) : commandItem(id)
+                items={ids.map((id): MenuItem =>
+                  id === '-' ? 'separator' : id === 'recent' ? recentItem(recent, filePath) : commandItem(id)
                 )}
                 onDone={() => setOpen(null)}
               />

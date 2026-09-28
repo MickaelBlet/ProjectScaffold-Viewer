@@ -1,6 +1,7 @@
 import { memo, useEffect, type ReactNode } from 'react'
-import { Handle, Position, useUpdateNodeInternals, type Node, type NodeProps } from '@xyflow/react'
+import { Handle, useUpdateNodeInternals, type Node, type NodeProps } from '@xyflow/react'
 import { Icon } from '@/components/Icon'
+import { POSITION } from './constants'
 
 export interface ExternalPort {
   id: string
@@ -14,13 +15,6 @@ export type ExternalNodeData = {
   label: string
   ports: ExternalPort[]
   side: 'left' | 'right' | 'top' | 'bottom'
-}
-
-const POSITION = {
-  left: Position.Left,
-  right: Position.Right,
-  top: Position.Top,
-  bottom: Position.Bottom
 }
 
 /** Stand-in for a module outside a drill-down view, holding the ports linked to the inside. */

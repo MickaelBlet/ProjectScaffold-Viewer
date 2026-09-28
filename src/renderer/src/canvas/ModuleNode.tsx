@@ -1,16 +1,15 @@
-import { memo, useEffect, type CSSProperties, type ReactNode } from 'react'
-import { Handle, NodeResizer, Position, useUpdateNodeInternals, type NodeProps } from '@xyflow/react'
+import { memo, type CSSProperties, type ReactNode } from 'react'
+import { Handle, NodeResizer, Position, type Node, type NodeProps } from '@xyflow/react'
 import { minSize, nameError } from '@/model/project'
-import { defaultSide, portsOn, type PortPlacement } from './portSides'
 import { getProject, setLocked, setModuleLayout, update, useProjectStore } from '@/store/project'
 import { useUiStore } from '@/store/ui'
 import { openModuleView } from '@/actions'
-import type { Id, LinkAnchor, Port, Side } from '@/model/types'
-import { anchorStyle, inward, PortPoint } from './PortPoint'
+import type { LinkAnchor, Port, Side } from '@/model/types'
 import { Icon } from '@/components/Icon'
-
-/** Handle of a module itself: dragged to another module, links them through new ports. */
-export const MODULE_HANDLE = 'module'
+import { MODULE_HANDLE } from './constants'
+import type { PortNodeData } from './flowGraph'
+import { anchorStyle, inward, PortPoint } from './PortPoint'
+import { usePortLayout } from './usePortLayout'
 
 function RenameInput({
   id,
@@ -52,43 +51,30 @@ function RenameInput({
   )
 }
 
-export const ModuleNode = memo(function ModuleNode({ id, selected, draggable, data }: NodeProps): ReactNode {
+export const ModuleNode = memo(function ModuleNode({
+  id,
+  selected,
+  draggable,
+  data
+}: NodeProps<Node<PortNodeData>>): ReactNode {
   const mod = useProjectStore((s) => s.project.modules.find((m) => m.id === id))
   const interfaces = useProjectStore((s) => s.project.interfaces)
   const hasChildren = useProjectStore((s) => s.project.modules.some((m) => m.parentId === id))
   const orientation = useProjectStore((s) => s.project.orientation)
   const renaming = useUiStore((s) => s.renaming === id)
-  const updateInternals = useUpdateNodeInternals()
-  // Floating ports (see portSides.ts), else the orientation's default edges.
-  const floating = (data as { sides?: Record<Id, PortPlacement> }).sides
-  const placements: Record<Id, PortPlacement> =
-    floating ??
-    Object.fromEntries(
-      (mod?.ports ?? []).map((p) => [p.id, { side: defaultSide(p.role, orientation), order: null }])
-    )
-  // Ports at a hand-set link attachment (see portAnchors), out of their edge's rows.
-  const anchors = (data as { anchors?: Record<Id, LinkAnchor> }).anchors ?? {}
-  const free = (mod?.ports ?? []).filter((p) => !anchors[p.id])
-  // Handles move when ports change edge, order or attachment.
-  const portsKey = [
-    ...(['top', 'bottom', 'left', 'right'] as const).map((side) =>
-      portsOn(free, placements, side)
-        .map((p) => `${p.id}:${p.role}`)
-        .join(',')
-    ),
-    ...Object.entries(anchors).map(([p, a]) => `${p}:${a.side}:${a.at}`)
-  ].join('|')
-  useEffect(() => updateInternals(id), [id, portsKey, updateInternals])
+  const { floating, anchors, top, bottom, left, right } = usePortLayout(
+    id,
+    mod?.ports ?? [],
+    data,
+    orientation
+  )
   if (!mod) return null
 
-  const [top, bottom, left, right] = (['top', 'bottom', 'left', 'right'] as const).map((side) =>
-    portsOn(free, placements, side)
-  )
-  const rows = Math.max(left!.length, right!.length)
+  const rows = Math.max(left.length, right.length)
   const vertical = orientation === 'vertical'
   // Containers keep both bands in vertical orientation: their content starts below them.
-  const topBand = top!.length > 0 || (vertical && (!floating || hasChildren))
-  const bottomBand = bottom!.length > 0 || (vertical && (!floating || hasChildren))
+  const topBand = top.length > 0 || (vertical && (!floating || hasChildren))
+  const bottomBand = bottom.length > 0 || (vertical && (!floating || hasChildren))
   // Container ports moved off the orientation's edges go outside the frame, clear of the content.
   const outsideBands = hasChildren && !vertical
   const min = minSize(mod, orientation)
@@ -132,7 +118,7 @@ export const ModuleNode = memo(function ModuleNode({ id, selected, draggable, da
         minHeight={min.height}
         onResizeEnd={(_, r) => setModuleLayout(id, { x: r.x, y: r.y, width: r.width, height: r.height })}
       />
-      {topBand && band(top!, 'top')}
+      {topBand && band(top, 'top')}
       <div className="module-header" onDoubleClick={() => useUiStore.setState({ renaming: id })}>
         {renaming ? (
           <RenameInput id={id} name={mod.name} parentId={mod.parentId} />
@@ -175,8 +161,8 @@ export const ModuleNode = memo(function ModuleNode({ id, selected, draggable, da
         // A container's side ports are centered on its frame, over its content.
         <div className={`module-ports ${hasChildren ? 'framed' : ''}`}>
           {Array.from({ length: rows }, (_, i) => {
-            const pl = left![i]
-            const pr = right![i]
+            const pl = left[i]
+            const pr = right[i]
             return (
               <div className="port-row" key={i}>
                 {pl && point(pl, 'left')}
@@ -186,7 +172,7 @@ export const ModuleNode = memo(function ModuleNode({ id, selected, draggable, da
           })}
         </div>
       )}
-      {bottomBand && band(bottom!, 'bottom')}
+      {bottomBand && band(bottom, 'bottom')}
       {mod.ports.map((p) => {
         const a = anchors[p.id]
         // Past top / bottom attachments the name goes outside, clear of the header.

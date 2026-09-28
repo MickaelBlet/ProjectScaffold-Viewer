@@ -192,10 +192,8 @@ function NoteInspector({ id }: { id: string }): ReactNode {
 export function Inspector(): ReactNode {
   const sel = useDoc((d) => d.selection)
   const selectedIds = useDoc((d) => d.selectedIds)
-  const openable =
-    sel && sel.kind !== 'project' && sel.kind !== 'note' && sel.kind !== 'imported'
-      ? (sel.kind as EditorKind)
-      : null
+  const openable: EditorKind | null =
+    sel && sel.kind !== 'project' && sel.kind !== 'note' && sel.kind !== 'imported' ? sel.kind : null
   return (
     <div className="inspector">
       {openable && sel && 'id' in sel && selectedIds.length <= 1 && (

@@ -24,6 +24,8 @@ function createWindow() {
     if (/^https?:/.test(url)) shell.openExternal(url)
     return { action: 'deny' }
   })
+  // The page never navigates away from the app: links go through the handler above.
+  win.webContents.on('will-navigate', (e) => e.preventDefault())
   // The page blocks unloading while documents are unsaved: ask instead of ignoring the close.
   win.webContents.on('will-prevent-unload', (e) => {
     const choice = dialog.showMessageBoxSync(win, {
@@ -47,7 +49,9 @@ const sender = (e) => BrowserWindow.fromWebContents(e.sender)
 ipcMain.on('window:minimize', (e) => sender(e)?.minimize())
 ipcMain.on('window:toggleMaximize', (e) => {
   const win = sender(e)
-  if (win) win.isMaximized() ? win.unmaximize() : win.maximize()
+  if (!win) return
+  if (win.isMaximized()) win.unmaximize()
+  else win.maximize()
 })
 ipcMain.on('window:close', (e) => sender(e)?.close())
 ipcMain.handle('window:isMaximized', (e) => sender(e)?.isMaximized() ?? false)

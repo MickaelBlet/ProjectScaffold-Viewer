@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useMemo, useRef, useState, type ReactNode } from 'react'
 import { useProjectStore } from '@/store/project'
 import { openContextMenu } from '@/store/ui'
 import { navigate } from '@/actions'
 import { parseTypeRef, printTypeRef, TypeExprError } from '@/model/typeExpr'
 import { CONTAINERS, PRIMITIVES, type Primitive, type TypeRef } from '@/model/types'
 import { Icon } from './Icon'
+import { useDraft } from './useDraft'
 
 const DEFAULT: TypeRef = { kind: 'primitive', name: 'uint8' }
 
@@ -43,17 +44,15 @@ export function TypeEditor(props: {
 }): ReactNode {
   const { nameOf, idOf, names } = useTypeNames()
   const text = printTypeRef(props.value, nameOf)
-  const [draft, setDraft] = useState(text)
-  const [error, setError] = useState<string | null>(null)
+  const [draft, setDraft] = useDraft(text)
+  // Parse error of a draft of `text`: gone once the value changes.
+  const [failure, setFailure] = useState<{ text: string; message: string } | null>(null)
+  const error = failure?.text === text ? failure.message : null
+  const setError = (message: string | null): void => setFailure(message === null ? null : { text, message })
   const [ownTree, setOwnTree] = useState(false)
   const tree = props.onToggleTree ? !!props.tree : ownTree
   const [suggest, setSuggest] = useState<{ items: string[]; index: number } | null>(null)
   const input = useRef<HTMLInputElement>(null)
-  useEffect(() => {
-    setDraft(text)
-    setError(null)
-  }, [text])
-
   const refs = refIds(props.value).filter((id) => nameOf(id) !== undefined)
   const candidates = useMemo(() => [...PRIMITIVES, ...names, ...CONTAINERS.map((c) => `${c}<`)], [names])
 

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { findPort, IDENTIFIER_RE, isImportedId, modulePath } from '@/model/project'
-import { deleteLink, update, useProjectStore } from '@/store/project'
+import { deleteLink, reverseLink, update, useProjectStore } from '@/store/project'
 import { select } from '@/store/ui'
 import { navigate } from '@/actions'
 import { CommitInput, IconButton, NumberInput, Row, Section, Select, TextArea } from '@/components/fields'
@@ -192,15 +192,7 @@ export function LinkInspector({ id }: { id: string }): ReactNode {
       </Section>
 
       <div className="actions">
-        <button
-          type="button"
-          onClick={() =>
-            withLink(id, (l) => {
-              ;[l.from, l.to] = [l.to, l.from]
-            })
-          }
-          title="Swap endpoints"
-        >
+        <button type="button" onClick={() => reverseLink(id)} title="Swap endpoints">
           Swap ends
         </button>
         <button

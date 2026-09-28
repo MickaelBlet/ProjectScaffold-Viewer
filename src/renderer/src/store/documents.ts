@@ -131,7 +131,9 @@ export function patchDoc(
       if (d.id !== id) return d
       const p = typeof patch === 'function' ? patch(d) : patch
       const next = { ...d, ...p }
-      return 'selection' in p && !sameSelection(p.selection ?? null, d.selection) ? recordSelection(next) : next
+      return 'selection' in p && !sameSelection(p.selection ?? null, d.selection)
+        ? recordSelection(next)
+        : next
     })
   }))
 }

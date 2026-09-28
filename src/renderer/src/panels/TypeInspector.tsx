@@ -1,12 +1,11 @@
 import { Fragment, useState, type ReactNode } from 'react'
-import { nameError, newId, typeUsageTargets, uniqueName } from '@/model/project'
+import { IDENTIFIER_RE, nameError, newId, typeUsageTargets, uniqueName } from '@/model/project'
 import { deleteType, update, useProjectStore } from '@/store/project'
 import { select } from '@/store/ui'
 import { navigate } from '@/actions'
 import { CommitInput, IconButton, NumberInput, Row, Section, Select, TextArea } from '@/components/fields'
 import { TypeEditor, TypeTree } from '@/components/TypeEditor'
 import { INT_PRIMITIVES, type Field, type TypeDef } from '@/model/types'
-import { IDENTIFIER_RE } from '@/model/project'
 import { Icon } from '@/components/Icon'
 
 function withType<K extends TypeDef['kind']>(

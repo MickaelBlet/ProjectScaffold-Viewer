@@ -145,7 +145,7 @@ export function loadOuterLayout(api: DockviewApi): void {
   try {
     const saved = localStorage.getItem(LAYOUT_KEY)
     if (saved) {
-      api.fromJSON(JSON.parse(saved))
+      api.fromJSON(JSON.parse(saved) as SerializedDockview)
       if (api.getPanel(EDITOR_AREA)) return lockEditorArea(api)
     }
   } catch {

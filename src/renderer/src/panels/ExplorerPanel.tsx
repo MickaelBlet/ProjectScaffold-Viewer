@@ -4,12 +4,19 @@ import { useState, type MouseEvent, type ReactNode } from 'react'
 import { findPort, findView, modulePath } from '@/model/project'
 import { GLOBAL_VIEW, type Id } from '@/model/types'
 import { activeDoc, patchDoc, useDoc } from '@/store/documents'
-import { addInterface, addType, addView, deleteView, renameView, useProjectStore } from '@/store/project'
-import { openContextMenu, select, type Selection } from '@/store/ui'
+import {
+  addInterface,
+  addType,
+  addView,
+  deleteView,
+  getProject,
+  renameView,
+  useProjectStore
+} from '@/store/project'
+import { openContextMenu, select } from '@/store/ui'
 import { commandItem } from '@/commands'
 import { addModuleAt, navigate, newView, selectionOf } from '@/actions'
 import { openEditor, openView } from '@/shell/controllers'
-import { getProject } from '@/store/project'
 import { Icon } from '@/components/Icon'
 
 const KIND_BADGE = { struct: 'S', enum: 'E', alias: 'A' } as const
@@ -61,7 +68,7 @@ function clickItem(e: MouseEvent, id: Id, list: Id[]): void {
   const sel = selectionOf(getProject(), id)
   // Modules and links are also brought into view on the canvas.
   if (sel?.kind === 'module' || sel?.kind === 'link') return navigate(sel)
-  select(sel as Selection)
+  select(sel)
 }
 
 function entityMenu(e: MouseEvent, kind: 'type' | 'interface' | 'module' | 'link', id: Id): void {

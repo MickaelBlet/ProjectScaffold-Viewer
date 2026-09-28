@@ -6,7 +6,7 @@ import { modulePath } from '@/model/project'
 import { GLOBAL_VIEW } from '@/model/types'
 import { getProject } from '@/store/project'
 import { useUiStore, type PickEntry } from '@/store/ui'
-import { navigate, openModuleView } from '@/actions'
+import { navigate } from '@/actions'
 import { openView } from '@/shell/controllers'
 import { Icon } from './Icon'
 
@@ -94,7 +94,7 @@ function entityEntries(): Entry[] {
       label: v.name,
       detail: 'view',
       kind: 'V',
-      run: () => (v.rootModuleId && !p.views.includes(v) ? openModuleView(v.rootModuleId) : openView(v.id))
+      run: () => openView(v.id)
     }))
   ]
 }
@@ -109,13 +109,15 @@ export function CommandPalette(): ReactNode {
   const [query, setQuery] = useState('')
   const [active, setActive] = useState(0)
   const list = useRef<HTMLUListElement>(null)
-
-  useEffect(() => {
+  // Each opening (or quick pick replacing the list) starts from its own query.
+  const [shown, setShown] = useState(palette)
+  if (palette !== shown) {
+    setShown(palette)
     if (palette) {
       setQuery(palette.query)
       setActive(0)
     }
-  }, [palette])
+  }
 
   const pickList = palette?.pick
   const isCommands = !pickList && query.startsWith('>')

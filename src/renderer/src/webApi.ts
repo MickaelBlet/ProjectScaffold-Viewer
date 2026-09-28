@@ -136,7 +136,7 @@ function withStore<T>(mode: IDBTransactionMode, run: (store: IDBObjectStore) => 
   return new Promise((done, fail) => {
     const open = indexedDB.open(DB_NAME, 1)
     open.onupgradeneeded = () => open.result.createObjectStore(STORE)
-    open.onerror = () => fail(open.error)
+    open.onerror = () => fail(open.error ?? new Error('Cannot open IndexedDB'))
     open.onsuccess = () => {
       const db = open.result
       let req: IDBRequest<T>
@@ -145,10 +145,10 @@ function withStore<T>(mode: IDBTransactionMode, run: (store: IDBObjectStore) => 
         req = run(db.transaction(STORE, mode).objectStore(STORE))
       } catch (e) {
         db.close()
-        return fail(e)
+        return fail(e instanceof Error ? e : new Error(String(e)))
       }
       req.onsuccess = () => done(req.result)
-      req.onerror = () => fail(req.error)
+      req.onerror = () => fail(req.error ?? new Error('IndexedDB request failed'))
       req.transaction?.addEventListener('complete', () => db.close())
     }
   })
@@ -156,7 +156,10 @@ function withStore<T>(mode: IDBTransactionMode, run: (store: IDBObjectStore) => 
 
 async function loadRecent(): Promise<RecentEntry[]> {
   try {
-    const list = await withStore<RecentEntry[] | undefined>('readonly', (s) => s.get('list'))
+    const list = await withStore<RecentEntry[] | undefined>(
+      'readonly',
+      (s) => s.get('list') as IDBRequest<RecentEntry[] | undefined>
+    )
     return Array.isArray(list) ? list : []
   } catch {
     return []
@@ -254,9 +257,6 @@ async function loadSession(): Promise<Session | null> {
 }
 
 let dirty = false
-window.addEventListener('beforeunload', (e) => {
-  if (dirty) e.preventDefault()
-})
 
 const webApi: Api = {
   openFile,
@@ -289,4 +289,7 @@ const webApi: Api = {
 
 export function installWebApi(): void {
   window.api = webApi
+  window.addEventListener('beforeunload', (e) => {
+    if (dirty) e.preventDefault()
+  })
 }

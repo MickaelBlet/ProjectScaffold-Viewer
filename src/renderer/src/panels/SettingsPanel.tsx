@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react'
 import {
-  applyTheme,
   DEFAULT_SETTINGS,
   setSetting,
   useSettings,
@@ -34,10 +33,7 @@ export function SettingsPanel(): ReactNode {
           <Select
             value={s.theme}
             options={['system', 'light', 'dark'] as Theme[]}
-            onChange={(t) => {
-              setSetting('theme', t)
-              applyTheme(t)
-            }}
+            onChange={(t) => setSetting('theme', t)}
           />
         </Row>
         <Row label="Link style">
@@ -100,13 +96,7 @@ export function SettingsPanel(): ReactNode {
         <button type="button" onClick={resetLayout}>
           Reset panel layout
         </button>
-        <button
-          type="button"
-          onClick={() => {
-            useSettings.setState({ ...DEFAULT_SETTINGS })
-            applyTheme(DEFAULT_SETTINGS.theme)
-          }}
-        >
+        <button type="button" onClick={() => useSettings.setState({ ...DEFAULT_SETTINGS })}>
           Restore defaults
         </button>
       </div>

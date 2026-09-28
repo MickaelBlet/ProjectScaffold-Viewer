@@ -1,6 +1,7 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { PALETTE } from '@/model/project'
 import { Icon, type IconName } from './Icon'
+import { useDraft } from './useDraft'
 
 /** Text input that keeps a local draft and commits on blur / Enter, rejecting invalid values. */
 export function CommitInput(props: {
@@ -13,8 +14,7 @@ export function CommitInput(props: {
   list?: string
 }): ReactNode {
   const { value, onCommit, validate } = props
-  const [draft, setDraft] = useState(value)
-  useEffect(() => setDraft(value), [value])
+  const [draft, setDraft] = useDraft(value)
   const error = draft !== value && validate ? validate(draft) : null
   const commit = (): void => {
     if (draft === value) return
@@ -65,8 +65,8 @@ export function NumberInput(props: {
   min?: number
   placeholder?: string
 }): ReactNode {
-  const [draft, setDraft] = useState(props.value === undefined ? '' : String(props.value))
-  useEffect(() => setDraft(props.value === undefined ? '' : String(props.value)), [props.value])
+  const text = props.value === undefined ? '' : String(props.value)
+  const [draft, setDraft] = useDraft(text)
   const parse = (s: string): number | undefined | null => {
     if (s.trim() === '') return undefined
     const n = Number(s)
@@ -86,7 +86,7 @@ export function NumberInput(props: {
         const n = parse(e.target.value)
         if (n !== null) props.onChange(n)
       }}
-      onBlur={() => parsed === null && setDraft(props.value === undefined ? '' : String(props.value))}
+      onBlur={() => parsed === null && setDraft(text)}
     />
   )
 }

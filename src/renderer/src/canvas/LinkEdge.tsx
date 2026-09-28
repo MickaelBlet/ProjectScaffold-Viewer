@@ -12,12 +12,14 @@ import {
   type EdgeProps,
   type InternalNode
 } from '@xyflow/react'
+import { useShallow } from 'zustand/react/shallow'
 import { linkOrigin } from '@/model/project'
 import { setLinkRoute, useProjectStore } from '@/store/project'
 import { useSettings } from '@/store/settings'
 import { openContextMenu, select } from '@/store/ui'
-import type { LinkRoute, Orientation, PerformanceClass } from '@/model/types'
-import { orientLinkEnds, type Side } from './linkEnds'
+import type { LinkRoute, Orientation } from '@/model/types'
+import { EXTERNAL, OPPOSITE, PERF_COLORS, POSITION, SIDE } from './constants'
+import { orientLinkEnds } from './linkEnds'
 import {
   anchorPoint,
   insertIndex,
@@ -29,13 +31,6 @@ import {
 } from './linkRoute'
 import { Icon } from '@/components/Icon'
 
-export const PERF_COLORS: Record<PerformanceClass, string> = {
-  realtime: 'var(--perf-realtime)',
-  low: 'var(--perf-low)',
-  normal: 'var(--perf-normal)',
-  bulk: 'var(--perf-bulk)'
-}
-
 type Lookup = (id: string) => InternalNode | undefined
 
 function isAncestor(lookup: Lookup, ancestor: string, id: string): boolean {
@@ -45,22 +40,6 @@ function isAncestor(lookup: Lookup, ancestor: string, id: string): boolean {
     cur = lookup(cur)?.parentId
   }
   return false
-}
-
-const SIDE: Record<Position, Side> = {
-  [Position.Left]: 'left',
-  [Position.Right]: 'right',
-  [Position.Top]: 'top',
-  [Position.Bottom]: 'bottom'
-}
-
-const OPPOSITE: Record<Side, Side> = { left: 'right', right: 'left', top: 'bottom', bottom: 'top' }
-
-const POSITION: Record<Side, Position> = {
-  left: Position.Left,
-  right: Position.Right,
-  top: Position.Top,
-  bottom: Position.Bottom
 }
 
 const rectOf = (n: InternalNode) => ({
@@ -155,7 +134,6 @@ function portEnds(
   }
 }
 
-const EXTERNAL = 'external:'
 /** Screen pixels within which a dragged point lines up with its neighbours. */
 const ALIGN_PX = 6
 
@@ -181,7 +159,15 @@ export const LinkEdge = memo(function LinkEdge(props: EdgeProps): ReactNode {
     const l = s.project.links.find((l) => l.id === props.id)
     return l ? linkOrigin(s.project, l) : null
   })
-  const { edgeStyle, edgeBadges, autoOrientLinks, snapToGrid, gridSize } = useSettings()
+  const { edgeStyle, edgeBadges, autoOrientLinks, snapToGrid, gridSize } = useSettings(
+    useShallow((s) => ({
+      edgeStyle: s.edgeStyle,
+      edgeBadges: s.edgeBadges,
+      autoOrientLinks: s.autoOrientLinks,
+      snapToGrid: s.snapToGrid,
+      gridSize: s.gridSize
+    }))
+  )
   const source = useInternalNode(props.source)
   const target = useInternalNode(props.target)
   const store = useStoreApi()

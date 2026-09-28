@@ -35,7 +35,7 @@ import {
 import { closeDocument, exportProject, newProject, openProject, saveAll, saveProject } from './fileOps'
 import { activeDoc, cycleDoc, patchDoc, useDocs, activateDoc } from './store/documents'
 import { getProject, redo, undo } from './store/project'
-import { applyTheme, setSetting, useSettings, type Theme } from './store/settings'
+import { setSetting, useSettings, type Theme } from './store/settings'
 import { useUiStore, type ActionItem } from './store/ui'
 import { activeCanvas, openView, resetLayout, showTool, toggleTool, type ToolId } from './shell/controllers'
 import { GLOBAL_VIEW } from './model/types'
@@ -82,10 +82,7 @@ const setting =
   (): boolean =>
     useSettings.getState()[key]
 const toggle = (key: Toggle) => (): void => setSetting(key, !useSettings.getState()[key])
-const theme = (t: Theme) => (): void => {
-  setSetting('theme', t)
-  applyTheme(t)
-}
+const theme = (t: Theme) => (): void => setSetting('theme', t)
 const tool = (id: ToolId) => (): void => showTool(id)
 
 const docCommands: Command[] = Array.from({ length: 9 }, (_, i) => ({

@@ -5,11 +5,13 @@ import { copyItems, copyProject, parseClip, pasteClip, type Clip } from '@/model
 import {
   absolutePosition,
   absoluteRect,
+  belowContent,
   boundsOf,
   childModules,
   defaultSize,
   findImported,
   findView,
+  growAncestors,
   isImportedId,
   LAYOUT_PAD,
   contentBottom,
@@ -34,7 +36,6 @@ import {
   deleteLink,
   deleteType,
   getProject,
-  growAncestors,
   refreshImportFrom,
   setHidden,
   setLayouts,
@@ -282,13 +283,13 @@ function otherProjects(
       return {
         label: d.filePath ? fileName(d.filePath) : `${project.name} (unsaved)`,
         detail: `open · ${project.modules.length} modules`,
-        get: async (): Promise<OtherProject | null> => {
+        get: (): Promise<OtherProject | null> => {
           if (d.filePath || !needFile)
-            return { project, file: d.filePath ? fileName(d.filePath) : project.name }
+            return Promise.resolve({ project, file: d.filePath ? fileName(d.filePath) : project.name })
           showDialog('Save the other project first', [
             `"${project.name}" has no file yet: links to it need its file name.`
           ])
-          return null
+          return Promise.resolve(null)
         }
       }
     })
@@ -380,12 +381,7 @@ export function importProjectContent(
           if (!pos && parent) {
             // Below the module's current content, like a new submodule.
             const origin = absolutePosition(p, parent)
-            const top = contentTop(p.orientation) + LAYOUT_PAD
-            const bottom = Math.max(
-              top,
-              ...childModules(p, parent).map((c) => c.layout.y + c.layout.height + LAYOUT_PAD)
-            )
-            at = { x: origin.x + LAYOUT_PAD, y: origin.y + bottom }
+            at = { x: origin.x + LAYOUT_PAD, y: origin.y + belowContent(p, parent) }
           }
           let pasted: Id[] = []
           update((d) => void (pasted = pasteClip(d, clip, { parent, at })))
@@ -635,8 +631,8 @@ export async function arrangeLayout(
 /** Open the content of the selected module in its own view tab. */
 export function openModuleView(moduleId?: Id, split = false): void {
   const p = getProject()
-  const id =
-    moduleId ?? (activeDoc().selection?.kind === 'module' ? (activeDoc().selection as { id: Id }).id : null)
+  const sel = activeDoc().selection
+  const id = moduleId ?? (sel?.kind === 'module' ? sel.id : null)
   if (!id) return
   const existing = p.views.find((v) => v.rootModuleId === id && !v.hidden.length)
   const viewId = existing?.id ?? addView(p.modules.find((m) => m.id === id)?.name ?? 'View', id)

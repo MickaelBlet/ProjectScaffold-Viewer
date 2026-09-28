@@ -45,4 +45,8 @@ function carryRenames(docId: Id, prev: Project, next: Project): void {
   else if (updated.length) setStatus('info', `Renamed in linked documents: ${updated.join(', ')}`)
 }
 
-projectListeners.add(carryRenames)
+/** Carry renames to the linked documents from now on. */
+export function installRenameSync(): () => void {
+  projectListeners.add(carryRenames)
+  return () => void projectListeners.delete(carryRenames)
+}

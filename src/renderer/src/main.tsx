@@ -4,10 +4,11 @@ import '@xyflow/react/dist/style.css'
 import 'dockview-react/dist/styles/dockview.css'
 import './styles.css'
 import { App } from './App'
-import './store/sync'
+import { installRenameSync } from './store/sync'
 import { installWebApi } from './webApi'
 
 installWebApi()
+installRenameSync()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

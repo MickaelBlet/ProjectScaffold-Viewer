@@ -108,7 +108,14 @@ export function App(): ReactNode {
         <svg className="brand" viewBox="0 0 32 32" role="img" aria-label="ProjectScaffold">
           <title>ProjectScaffold</title>
           <rect width="32" height="32" rx="7" fill="#3b6fe0" />
-          <path d="M15 10h7v8" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          <path
+            d="M15 10h7v8"
+            fill="none"
+            stroke="#fff"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
           <rect x="5" y="5" width="10" height="10" rx="2" fill="#fff" />
           <rect x="17" y="17" width="10" height="10" rx="2" fill="#fff" />
           <circle cx="15" cy="10" r="2" fill="#3b6fe0" stroke="#fff" strokeWidth="1.5" />

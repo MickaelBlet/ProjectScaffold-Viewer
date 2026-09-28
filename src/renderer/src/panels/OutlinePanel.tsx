@@ -1,15 +1,20 @@
 // Module tree of the active document: select, reveal, hide in the focused view, drag to re-parent.
 import { useState, type ReactNode } from 'react'
-import { absolutePosition, childModules, findView, contentTop, LAYOUT_PAD, subtreeIds } from '@/model/project'
-import type { Id, Module, Project } from '@/model/types'
+import {
+  absolutePosition,
+  belowContent,
+  childModules,
+  findView,
+  LAYOUT_PAD,
+  subtreeIds
+} from '@/model/project'
+import { GLOBAL_VIEW, type Id, type Module, type Project } from '@/model/types'
 import { activeDoc, patchDoc, useDoc } from '@/store/documents'
-import { getProject, reparentModule, setHidden, useProjectStore } from '@/store/project'
+import { addView, getProject, reparentModule, setHidden, useProjectStore } from '@/store/project'
 import { openContextMenu } from '@/store/ui'
 import { commandItem } from '@/commands'
 import { navigate, openModuleView } from '@/actions'
-import { addView } from '@/store/project'
 import { openView } from '@/shell/controllers'
-import { GLOBAL_VIEW } from '@/model/types'
 import { Icon } from '@/components/Icon'
 
 const DRAG = 'application/x-module'
@@ -17,22 +22,14 @@ const DRAG = 'application/x-module'
 /** Where a module dropped into `parentId` goes: below the existing content. */
 function dropPosition(p: Project, id: Id, parentId: Id | null): { x: number; y: number } {
   if (!parentId) return absolutePosition(p, id)
-  const parent = p.modules.find((m) => m.id === parentId)
-  const top = (parent ? contentTop(p.orientation) : 0) + LAYOUT_PAD
-  const bottom = Math.max(
-    top,
-    ...childModules(p, parentId)
-      .filter((c) => c.id !== id)
-      .map((c) => c.layout.y + c.layout.height + LAYOUT_PAD)
-  )
-  return { x: LAYOUT_PAD, y: bottom }
+  return { x: LAYOUT_PAD, y: belowContent(p, parentId, id) }
 }
 
 function canDrop(p: Project, dragged: Id, target: Id | null): boolean {
   return dragged !== target && !(target && subtreeIds(p, dragged).has(target))
 }
 
-function Node(props: { m: Module; depth: number; filter: string; hidden: Set<Id> }): ReactNode {
+function TreeNode(props: { m: Module; depth: number; filter: string; hidden: Set<Id> }): ReactNode {
   const { m, depth, filter, hidden } = props
   const project = useProjectStore((s) => s.project)
   const selectedIds = useDoc((d) => d.selectedIds)
@@ -131,7 +128,7 @@ function Node(props: { m: Module; depth: number; filter: string; hidden: Set<Id>
       {(open || filter) && children.length > 0 && (
         <ul>
           {children.map((c) => (
-            <Node key={c.id} m={c} depth={depth + 1} filter={filter} hidden={hidden} />
+            <TreeNode key={c.id} m={c} depth={depth + 1} filter={filter} hidden={hidden} />
           ))}
         </ul>
       )}
@@ -176,9 +173,9 @@ export function OutlinePanel(): ReactNode {
       </div>
       <ul className="tree">
         {roots.map((m) => (
-          <Node key={m.id} m={m} depth={0} filter={filter.trim().toLowerCase()} hidden={hidden} />
+          <TreeNode key={m.id} m={m} depth={0} filter={filter.trim().toLowerCase()} hidden={hidden} />
         ))}
-        {!roots.length && <li className="empty muted">No modules. Double-click the canvas to add one.</li>}
+        {!roots.length && <li className="empty muted">No modules. Right-click the canvas to add one.</li>}
       </ul>
       <p className="hint muted">Drag onto a module to nest, onto empty space to move to the top level.</p>
     </div>

@@ -1,17 +1,9 @@
 import { useState, type CSSProperties, type ReactNode } from 'react'
-import { Handle, Position } from '@xyflow/react'
+import { Handle } from '@xyflow/react'
 import type { Id, LinkAnchor, PortRole, Side } from '@/model/types'
 import { setPortLabel } from '@/store/project'
 import { Icon } from '@/components/Icon'
-
-const POSITION = {
-  left: Position.Left,
-  right: Position.Right,
-  top: Position.Top,
-  bottom: Position.Bottom
-} as const
-
-const OPPOSITE: Record<Side, Side> = { left: 'right', right: 'left', top: 'bottom', bottom: 'top' }
+import { OPPOSITE, POSITION } from './constants'
 
 /** Direction pointing into a module from its `edge`. */
 export const inward = (edge: Side): Side => OPPOSITE[edge]

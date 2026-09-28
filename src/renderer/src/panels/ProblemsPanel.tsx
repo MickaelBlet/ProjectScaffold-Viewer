@@ -1,12 +1,18 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { validate, type Problem } from '@/model/validate'
+import type { Project } from '@/model/types'
 import { useProjectStore } from '@/store/project'
 import { navigate } from '@/actions'
 import { Icon } from '@/components/Icon'
 
+const validated = new WeakMap<Project, Problem[]>()
+
+/** Problems of the active document, validated once per project version. */
 export function useProblems(): Problem[] {
   const project = useProjectStore((s) => s.project)
-  return useMemo(() => validate(project), [project])
+  let problems = validated.get(project)
+  if (!problems) validated.set(project, (problems = validate(project)))
+  return problems
 }
 
 export function ProblemsPanel(): ReactNode {

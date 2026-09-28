@@ -3,7 +3,6 @@ import { commands, keyLabel, type Category } from '@/commands'
 import { useUiStore } from '@/store/ui'
 
 const EXTRA: [string, string][] = [
-  ['Double-click canvas', 'Add module'],
   ['Double-click module name', 'Rename'],
   ['Shift + drag', 'Box selection'],
   ['Ctrl + click', 'Add to selection'],
