@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react'
-import { findPort, IDENTIFIER_RE, isImportedId, modulePath } from '@/model/project'
+import { useState, type ReactNode } from 'react'
+import { findPort, IDENTIFIER_RE, isImportedId, modulePath, transportError } from '@/model/project'
 import { deleteLink, reverseLink, update, useProjectStore } from '@/store/project'
 import { select } from '@/store/ui'
 import { navigate } from '@/actions'
@@ -11,6 +11,79 @@ function withLink(id: string, fn: (l: Link) => void): void {
     const l = d.links.find((l) => l.id === id)
     if (l) fn(l)
   })
+}
+
+const NEW_TRANSPORT = '\0new'
+
+/** Set the transport of a link, declaring it in the project when it is new. */
+function setTransport(id: string, transport: string | undefined): void {
+  update((d) => {
+    const l = d.links.find((l) => l.id === id)
+    if (!l) return
+    l.constraints.remote.transport = transport
+    if (transport && !transportError(d, transport)) d.transports.push(transport)
+  })
+}
+
+/** Transport select, with an entry to declare a new transport inline. */
+function TransportField({ id, value }: { id: string; value: string | undefined }): ReactNode {
+  const project = useProjectStore((s) => s.project)
+  const [adding, setAdding] = useState(false)
+  const [draft, setDraft] = useState('')
+  const transports = [...TRANSPORTS, ...project.transports]
+  const declared = !value || transports.includes(value)
+
+  if (adding) {
+    const error = draft ? transportError(project, draft) : null
+    const close = (): void => {
+      setAdding(false)
+      setDraft('')
+    }
+    const commit = (): void => {
+      if (draft && !error) setTransport(id, draft)
+      close()
+    }
+    return (
+      <span className="field">
+        <input
+          className={error ? 'invalid' : ''}
+          value={draft}
+          placeholder="New transport"
+          autoFocus
+          spellCheck={false}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') commit()
+            if (e.key === 'Escape') close()
+          }}
+        />
+        {error && <span className="field-error">{error}</span>}
+      </span>
+    )
+  }
+  return (
+    <>
+      <Select
+        value={value ?? ''}
+        options={[
+          { value: '', label: '—' },
+          ...transports.map((t) => ({ value: t, label: t })),
+          // keep an undeclared value loaded from file selectable
+          ...(declared ? [] : [{ value, label: `${value} (undeclared)` }]),
+          { value: NEW_TRANSPORT, label: 'New transport…' }
+        ]}
+        onChange={(v) => (v === NEW_TRANSPORT ? setAdding(true) : setTransport(id, v || undefined))}
+      />
+      {!declared && (
+        <IconButton
+          icon="plus"
+          title="Declare this transport in the project"
+          onClick={() => update((d) => void d.transports.push(value))}
+        />
+      )}
+    </>
+  )
 }
 
 export function LinkInspector({ id }: { id: string }): ReactNode {
@@ -175,18 +248,7 @@ export function LinkInspector({ id }: { id: string }): ReactNode {
         </label>
         {c.remote.enabled && (
           <Row label="Transport">
-            <Select
-              value={c.remote.transport ?? ''}
-              options={[
-                { value: '', label: '—' },
-                ...TRANSPORTS.map((t) => ({ value: t, label: t })),
-                // keep a custom value loaded from file selectable
-                ...(c.remote.transport && !(TRANSPORTS as readonly string[]).includes(c.remote.transport)
-                  ? [{ value: c.remote.transport, label: c.remote.transport }]
-                  : [])
-              ]}
-              onChange={(v) => withLink(id, (l) => void (l.constraints.remote.transport = v || undefined))}
-            />
+            <TransportField id={id} value={c.remote.transport} />
           </Row>
         )}
       </Section>

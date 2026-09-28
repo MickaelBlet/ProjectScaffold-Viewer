@@ -17,6 +17,9 @@
   --perf-low: #d98b00;
   --perf-normal: #7a8496;
   --perf-bulk: #3b8fd1;
+  --syn-key: #2757c7;
+  --syn-string: #2b7a3f;
+  --syn-literal: #b0480b;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
@@ -35,6 +38,9 @@
     --node-bg: #222733;
     --node-container: rgba(111, 155, 255, 0.07);
     --perf-normal: #9aa3b5;
+    --syn-key: #82aaff;
+    --syn-string: #9ccc7a;
+    --syn-literal: #f0a45d;
     color-scheme: dark;
   }
 }
@@ -53,6 +59,9 @@
   --node-bg: #222733;
   --node-container: rgba(111, 155, 255, 0.07);
   --perf-normal: #9aa3b5;
+  --syn-key: #82aaff;
+  --syn-string: #9ccc7a;
+  --syn-literal: #f0a45d;
   color-scheme: dark;
 }
 
@@ -246,6 +255,212 @@ button.link-button:hover {
   max-width: 720px;
   background: var(--panel);
 }
+.source-editor {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--panel);
+}
+.source-editor header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+.source-editor header .spacer {
+  flex: 1;
+}
+.source-editor header > * {
+  white-space: nowrap;
+}
+.source-editor .source-state.error {
+  color: var(--danger);
+}
+.source-editor .source-stale {
+  margin: 0;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: var(--warning);
+  border-bottom: 1px solid var(--border);
+}
+.source-code {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  background: var(--panel);
+}
+/* The text field (transparent text, visible caret and selection) over its colored copy: both
+   must lay out the text exactly alike. */
+.source-code {
+  --gutter: 4ch;
+  font:
+    12px/1.5 ui-monospace,
+    'SF Mono',
+    Consolas,
+    monospace;
+}
+.source-code pre,
+.source-code textarea {
+  position: absolute;
+  inset: 0 0 0 var(--gutter);
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  padding: 8px 10px;
+  overflow: auto;
+  font:
+    12px/1.5 ui-monospace,
+    'SF Mono',
+    Consolas,
+    monospace;
+  letter-spacing: normal;
+  tab-size: 2;
+  white-space: pre;
+  overflow-wrap: normal;
+}
+.source-code pre > div {
+  width: max-content;
+  min-width: 100%;
+}
+.source-code pre > div.error {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+}
+.source-gutter {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--gutter);
+  overflow: hidden;
+  /* Beyond the text: scrolls as far as the text field, whose last line is above its scrollbar. */
+  padding: 8px 1ch 40px 0;
+  text-align: right;
+  color: var(--muted);
+  opacity: 0.7;
+  background: var(--panel-2);
+  border-right: 1px solid var(--border);
+  user-select: none;
+}
+.source-gutter > div.error {
+  color: var(--danger);
+  font-weight: 700;
+  opacity: 1;
+}
+.source-code .completion {
+  position: absolute;
+  z-index: 10;
+  min-width: 160px;
+  max-width: 420px;
+  max-height: 220px;
+  overflow: auto;
+  margin: 0;
+  padding: 2px;
+  list-style: none;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.2);
+}
+.source-code .completion li {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.source-code .completion li.active {
+  background: var(--accent-soft);
+}
+.source-code .completion small {
+  margin-left: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--muted);
+  font-family: system-ui, sans-serif;
+}
+.source-code pre {
+  color: var(--text);
+  /* Scrolled by the text field; it has the same scrollbars, hidden under the text field's. */
+  pointer-events: none;
+}
+.source-code textarea {
+  resize: none;
+  background: transparent;
+  color: transparent;
+  caret-color: var(--text);
+}
+.source-code textarea:focus {
+  outline: none;
+}
+.source-code textarea::selection {
+  color: transparent;
+  /* Translucent: the colored text shows through from below. */
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
+}
+.source-code .ws,
+.source-code .guide {
+  position: relative;
+}
+.source-code.show-ws .ws::after {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--border);
+}
+.source-code.show-ws .ws-space::after {
+  content: '·';
+}
+.source-code.show-ws .ws-tab::after {
+  content: '→';
+  justify-content: flex-start;
+}
+/* Padded to the line height: the guides of consecutive lines join. */
+.source-code .guide {
+  padding-block: 3px;
+  background: linear-gradient(var(--border), var(--border)) left / 1px 100% no-repeat;
+}
+.tok-key {
+  color: var(--syn-key);
+}
+.tok-string {
+  color: var(--syn-string);
+}
+.tok-number,
+.tok-literal {
+  color: var(--syn-literal);
+}
+.tok-comment {
+  color: var(--muted);
+  font-style: italic;
+}
+.tok-punct {
+  color: var(--muted);
+}
+.source-problems .link {
+  margin-right: 6px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.source-problems {
+  margin: 0;
+  padding: 4px 8px 4px 26px;
+  max-height: 30%;
+  overflow: auto;
+  font-size: 12px;
+  color: var(--danger);
+  border-top: 1px solid var(--border);
+}
 .statusbar {
   display: flex;
   align-items: center;
@@ -317,7 +532,6 @@ kbd {
   align-items: center;
   gap: 4px;
   padding: 4px 8px;
-  cursor: pointer;
   user-select: none;
   font-size: 11px;
   font-weight: 700;
@@ -327,6 +541,26 @@ kbd {
 }
 .explorer-section > header small {
   font-weight: normal;
+}
+/* Section toggle: the header's look, as a button. */
+.explorer-toggle {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  text-align: left;
+}
+.explorer-toggle:hover:not(:disabled) {
+  border-color: transparent;
+  color: var(--text);
 }
 .explorer-actions {
   margin-left: auto;
@@ -396,6 +630,9 @@ kbd {
 }
 .kind-badge.alias {
   background: #2e9e8f;
+}
+.kind-badge.primitive {
+  background: #7a7f2a;
 }
 .kind-badge.interface {
   background: #d98b00;
@@ -1240,8 +1477,12 @@ ul.plain {
   background: var(--panel-2);
   border-bottom: 1px solid var(--border);
   overflow-x: auto;
-  scrollbar-width: thin;
+  overflow-y: hidden;
+  scrollbar-width: none;
   flex-shrink: 0;
+}
+.doc-tabs::-webkit-scrollbar {
+  display: none;
 }
 .doc-tab {
   display: flex;
@@ -1612,6 +1853,18 @@ ul.plain {
   gap: 4px;
 }
 
+/* About */
+.modal.about {
+  text-align: center;
+  min-width: 320px;
+}
+.modal.about p {
+  margin: 0 0 8px;
+}
+.modal.about .muted {
+  color: var(--muted);
+}
+
 /* Outline & search */
 .tree {
   list-style: none;
@@ -1970,4 +2223,19 @@ mark {
 }
 .error-text {
   color: var(--danger);
+}
+
+/* Keyboard focus on list, tree and tab items (see listKeys.ts). */
+:is(.entity-list, .results, .problems ul) > li[data-item]:focus-visible,
+.doc-tab:focus-visible,
+.explorer-toggle:focus-visible,
+.tree [data-item]:focus-visible > .tree-row {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.tree [data-item]:focus-visible {
+  outline: none;
+}
+.tree [data-item]:focus-visible > .tree-row .eye {
+  opacity: 1;
 }

@@ -1,7 +1,7 @@
 // Every link of the project at a glance: filter, select, open.
 import { useMemo, useState, type ReactNode } from 'react'
-import { findPort, modulePath } from '@/model/project'
-import type { Endpoint, Project } from '@/model/types'
+import { endpointLabel, findPort, modulePaths } from '@/model/project'
+import type { Project } from '@/model/types'
 import { useDoc } from '@/store/documents'
 import { useProjectStore } from '@/store/project'
 import { openContextMenu } from '@/store/ui'
@@ -9,6 +9,7 @@ import { commandItem } from '@/commands'
 import { navigate } from '@/actions'
 import { openEditor } from '@/shell/controllers'
 import { Icon } from '@/components/Icon'
+import { onListKeyDown, tabStop } from '@/components/listKeys'
 
 interface Row {
   id: string
@@ -19,18 +20,16 @@ interface Row {
   bidirectional: boolean
 }
 
-const endpoint = (p: Project, e: Endpoint): string =>
-  `${modulePath(p, e.moduleId)}:${findPort(p, e.moduleId, e.portId)?.name ?? '?'}`
-
-function rows(p: Project): Row[] {
+function rows(p: Pick<Project, 'links' | 'modules' | 'imports' | 'interfaces'>): Row[] {
+  const paths = modulePaths(p)
   return p.links
     .map((l) => {
       const port = findPort(p, l.from.moduleId, l.from.portId)
       return {
         id: l.id,
         name: l.name,
-        from: endpoint(p, l.from),
-        to: endpoint(p, l.to),
+        from: endpointLabel(p, paths, l.from),
+        to: endpointLabel(p, paths, l.to),
         iface: p.interfaces.find((i) => i.id === port?.interfaceId)?.name ?? '',
         bidirectional: l.constraints.direction === 'bidirectional'
       }
@@ -39,15 +38,26 @@ function rows(p: Project): Row[] {
 }
 
 export function LinksPanel(): ReactNode {
-  const project = useProjectStore((s) => s.project)
+  const links = useProjectStore((s) => s.project.links)
+  const modules = useProjectStore((s) => s.project.modules)
+  const imports = useProjectStore((s) => s.project.imports)
+  const interfaces = useProjectStore((s) => s.project.interfaces)
   const selection = useDoc((d) => d.selection)
   const [filter, setFilter] = useState('')
-  const all = useMemo(() => rows(project), [project])
+  // Rebuilt when links, modules or interfaces change, not on every edit.
+  const all = useMemo(
+    () => rows({ links, modules, imports, interfaces }),
+    [links, modules, imports, interfaces]
+  )
   const f = filter.trim().toLowerCase()
   const shown = f
     ? all.filter((r) => [r.name, r.from, r.to, r.iface].some((s) => s.toLowerCase().includes(f)))
     : all
   const selectedId = selection?.kind === 'link' ? selection.id : null
+  const stop = tabStop(
+    shown.map((r) => r.id),
+    (id) => id === selectedId
+  )
 
   return (
     <div className="links-panel">
@@ -56,6 +66,7 @@ export function LinksPanel(): ReactNode {
           data-autofocus
           type="search"
           placeholder="Filter links, modules, ports, interfaces"
+          aria-label="Filter links"
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
         />
@@ -65,10 +76,14 @@ export function LinksPanel(): ReactNode {
           {shown.length} / {all.length} links
         </p>
       )}
-      <ul className="results">
+      <ul className="results" role="listbox" aria-label="Links" onKeyDown={onListKeyDown}>
         {shown.map((r) => (
           <li
             key={r.id}
+            data-item
+            role="option"
+            aria-selected={r.id === selectedId}
+            tabIndex={r.id === stop ? 0 : -1}
             className={r.id === selectedId ? 'active' : ''}
             onClick={() => navigate({ kind: 'link', id: r.id })}
             onDoubleClick={() => openEditor('link', r.id)}
@@ -90,7 +105,11 @@ export function LinksPanel(): ReactNode {
             </span>
           </li>
         ))}
-        {!all.length && <li className="empty muted">No links. Drag from a port to another to add one.</li>}
+        {!all.length && (
+          <li className="empty muted" role="presentation">
+            No links. Drag from a port to another to add one.
+          </li>
+        )}
       </ul>
     </div>
   )

@@ -4,6 +4,8 @@ import {
   LoadError,
   loadText,
   parseText,
+  reloadText,
+  sameContent,
   saveText,
   type Format
 } from '@/model/serialize'
@@ -157,6 +159,47 @@ export async function restoreSession(session: Session): Promise<boolean> {
   useDocs.setState({ docs, activeId: (active ?? docs[0]!).id })
   if (docs.some((d) => !d.savedProject)) setStatus('info', 'Restored unsaved changes')
   return true
+}
+
+let checking = false
+
+/** Reload the documents whose file was changed by another program. */
+export async function checkDiskChanges(): Promise<void> {
+  if (checking) return
+  checking = true
+  try {
+    for (const { id, filePath } of useDocs.getState().docs) {
+      if (!filePath) continue
+      const content = await window.api.changedOnDisk(filePath)
+      const doc = findDoc(id)
+      if (content !== null && doc?.filePath === filePath) reloadFromDisk(doc, content)
+    }
+  } finally {
+    checking = false
+  }
+}
+
+/** Replace a document's project with its file's new content, in one undo step. */
+function reloadFromDisk(doc: DocState, content: string): void {
+  const name = docTitle(doc)
+  const current = doc.store.getState().project
+  let project: Project
+  try {
+    project = reloadText(content, formatFromPath(doc.filePath!), current)
+  } catch (e) {
+    const problems = e instanceof LoadError ? e.problems : [String(e)]
+    setStatus('error', `${name} changed on disk but cannot be read: ${problems[0] ?? ''}`)
+    return
+  }
+  if (sameContent(project, current)) {
+    patchDoc({ savedProject: current }, doc.id)
+    return
+  }
+  if (isDocDirty(doc) && !window.confirm(`${name} changed on disk. Reload it and lose your unsaved changes?`))
+    return
+  doc.store.setState({ project })
+  patchDoc({ savedProject: project }, doc.id)
+  setStatus('info', `Reloaded ${name}: changed on disk`)
 }
 
 /** Save the active project file (export format + editor layout). */

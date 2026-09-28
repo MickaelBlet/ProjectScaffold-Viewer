@@ -1,5 +1,6 @@
 // Single self-contained HTML file (dist-web/index.html) that works
 // from file:// or any static host.
+import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
@@ -39,10 +40,13 @@ function singleFile(): Plugin {
   }
 }
 
+const pkg = JSON.parse(readFileSync(resolve('package.json'), 'utf8')) as { version: string }
+
 export default defineConfig({
   root: resolve('src/renderer'),
   base: './',
   resolve: { alias: { '@': resolve('src/renderer/src') } },
+  define: { __APP_VERSION__: JSON.stringify(pkg.version) },
   plugins: [react(), singleFile()],
   build: {
     outDir: resolve('dist-web'),

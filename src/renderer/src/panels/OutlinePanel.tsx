@@ -1,13 +1,7 @@
 // Module tree of the active document: select, reveal, hide in the focused view, drag to re-parent.
-import { useState, type ReactNode } from 'react'
-import {
-  absolutePosition,
-  belowContent,
-  childModules,
-  findView,
-  LAYOUT_PAD,
-  subtreeIds
-} from '@/model/project'
+// Keyboard: arrows move (Left / Right collapse and expand), Enter selects.
+import { useMemo, useState, type KeyboardEvent, type ReactNode, type SyntheticEvent } from 'react'
+import { absolutePosition, belowContent, findView, LAYOUT_PAD, subtreeIds } from '@/model/project'
 import { GLOBAL_VIEW, type Id, type Module, type Project } from '@/model/types'
 import { activeDoc, patchDoc, useDoc } from '@/store/documents'
 import { addView, getProject, reparentModule, setHidden, useProjectStore } from '@/store/project'
@@ -16,6 +10,7 @@ import { commandItem } from '@/commands'
 import { navigate, openModuleView } from '@/actions'
 import { openView } from '@/shell/controllers'
 import { Icon } from '@/components/Icon'
+import { onListKeyDown, tabStop } from '@/components/listKeys'
 
 const DRAG = 'application/x-module'
 
@@ -29,32 +24,104 @@ function canDrop(p: Project, dragged: Id, target: Id | null): boolean {
   return dragged !== target && !(target && subtreeIds(p, dragged).has(target))
 }
 
-function TreeNode(props: { m: Module; depth: number; filter: string; hidden: Set<Id> }): ReactNode {
-  const { m, depth, filter, hidden } = props
-  const project = useProjectStore((s) => s.project)
-  const selectedIds = useDoc((d) => d.selectedIds)
-  const viewId = useDoc((d) => d.activeViewId)
-  const [open, setOpen] = useState(true)
-  const [over, setOver] = useState(false)
-  const children = childModules(project, m.id)
-  const matches = (x: Module): boolean =>
-    x.name.toLowerCase().includes(filter) || childModules(project, x.id).some(matches)
-  if (filter && !matches(m)) return null
-  const isHidden = hidden.has(m.id)
+/** Hide or show a module in the focused view (a stored copy of the global view is made first). */
+function toggleHidden(id: Id, hidden: boolean): void {
+  let viewId = activeDoc().activeViewId
+  if (viewId === GLOBAL_VIEW) {
+    viewId = addView('Filtered', null)
+    openView(viewId)
+  }
+  setHidden(viewId, [id], !hidden)
+}
 
-  const toggleHidden = (): void => {
-    let id = viewId
-    if (id === GLOBAL_VIEW) {
-      id = addView('Filtered', null)
-      openView(id)
-    }
-    setHidden(id, [m.id], !isHidden)
+/** Modules by parent (null: top level), in project order. */
+function childrenByParent(modules: Module[]): Map<Id | null, Module[]> {
+  const map = new Map<Id | null, Module[]>()
+  for (const m of modules) map.set(m.parentId, [...(map.get(m.parentId) ?? []), m])
+  return map
+}
+
+/** Modules whose name contains `filter`, with their ancestors. */
+function matching(children: Map<Id | null, Module[]>, filter: string): Set<Id> {
+  const shown = new Set<Id>()
+  const visit = (m: Module): boolean => {
+    const inside = (children.get(m.id) ?? []).map(visit).some(Boolean)
+    const match = inside || m.name.toLowerCase().includes(filter)
+    if (match) shown.add(m.id)
+    return match
+  }
+  for (const m of children.get(null) ?? []) visit(m)
+  return shown
+}
+
+interface TreeState {
+  children: Map<Id | null, Module[]>
+  /** Modules shown under the filter; null without filter. */
+  shown: Set<Id> | null
+  collapsed: ReadonlySet<Id>
+  setOpen: (id: Id, open: boolean) => void
+  hidden: Set<Id>
+  selected: Set<Id>
+  tabStop: Id | undefined
+}
+
+/** Events of the item itself, not of the items nested in it. */
+const own = (e: SyntheticEvent): boolean => (e.target as Element).closest('[data-item]') === e.currentTarget
+
+function TreeNode({ m, depth, tree }: { m: Module; depth: number; tree: TreeState }): ReactNode {
+  const [over, setOver] = useState(false)
+  if (tree.shown && !tree.shown.has(m.id)) return null
+  const children = tree.children.get(m.id) ?? []
+  const open = !!tree.shown || !tree.collapsed.has(m.id)
+  const isHidden = tree.hidden.has(m.id)
+  const selected = tree.selected.has(m.id)
+
+  const onKeyDown = (e: KeyboardEvent<HTMLLIElement>): void => {
+    if (!own(e) || (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft')) return
+    e.preventDefault()
+    if (e.key === 'ArrowRight' && children.length && !open) tree.setOpen(m.id, true)
+    else if (e.key === 'ArrowLeft' && children.length && open && !tree.shown) tree.setOpen(m.id, false)
+    else if (e.key === 'ArrowLeft')
+      e.currentTarget.parentElement?.closest<HTMLElement>('[data-item]')?.focus()
   }
 
   return (
-    <li>
+    <li
+      data-item
+      role="treeitem"
+      aria-level={depth + 1}
+      aria-selected={selected}
+      aria-expanded={children.length ? open : undefined}
+      tabIndex={m.id === tree.tabStop ? 0 : -1}
+      onKeyDown={onKeyDown}
+      onClick={(e) => {
+        if (!own(e)) return
+        if (e.ctrlKey || e.metaKey) {
+          const ids = activeDoc().selectedIds
+          patchDoc({ selectedIds: ids.includes(m.id) ? ids.filter((x) => x !== m.id) : [...ids, m.id] })
+        } else navigate({ kind: 'module', id: m.id })
+      }}
+      onDoubleClick={(e) => own(e) && children.length && openModuleView(m.id)}
+      onContextMenu={(e) => {
+        if (!own(e)) return
+        e.preventDefault()
+        if (!activeDoc().selectedIds.includes(m.id)) navigate({ kind: 'module', id: m.id })
+        openContextMenu(e, [
+          commandItem('view.openModule'),
+          commandItem('view.openModuleSplit'),
+          { label: isHidden ? 'Show in view' : 'Hide in view', run: () => toggleHidden(m.id, isHidden) },
+          'separator',
+          commandItem('edit.rename'),
+          commandItem('insert.submodule'),
+          commandItem('edit.copy'),
+          commandItem('edit.duplicate'),
+          'separator',
+          commandItem('edit.delete')
+        ])
+      }}
+    >
       <div
-        className={`tree-row ${selectedIds.includes(m.id) ? 'active' : ''} ${isHidden ? 'is-hidden' : ''} ${over ? 'drop' : ''}`}
+        className={`tree-row ${selected ? 'active' : ''} ${isHidden ? 'is-hidden' : ''} ${over ? 'drop' : ''}`}
         style={{ paddingLeft: 6 + depth * 14 }}
         draggable
         onDragStart={(e) => e.dataTransfer.setData(DRAG, m.id)}
@@ -75,38 +142,16 @@ function TreeNode(props: { m: Module; depth: number; filter: string; hidden: Set
           const pos = dropPosition(p, id, m.id)
           reparentModule(id, m.id, pos.x, pos.y)
         }}
-        onClick={(e) => {
-          if (e.ctrlKey || e.metaKey) {
-            const ids = activeDoc().selectedIds
-            patchDoc({ selectedIds: ids.includes(m.id) ? ids.filter((x) => x !== m.id) : [...ids, m.id] })
-          } else navigate({ kind: 'module', id: m.id })
-        }}
-        onDoubleClick={() => children.length && openModuleView(m.id)}
-        onContextMenu={(e) => {
-          e.preventDefault()
-          if (!activeDoc().selectedIds.includes(m.id)) navigate({ kind: 'module', id: m.id })
-          openContextMenu(e, [
-            commandItem('view.openModule'),
-            commandItem('view.openModuleSplit'),
-            { label: isHidden ? 'Show in view' : 'Hide in view', run: toggleHidden },
-            'separator',
-            commandItem('edit.rename'),
-            commandItem('insert.submodule'),
-            commandItem('edit.copy'),
-            commandItem('edit.duplicate'),
-            'separator',
-            commandItem('edit.delete')
-          ])
-        }}
       >
         <span
           className="chevron"
+          aria-hidden
           onClick={(e) => {
             e.stopPropagation()
-            setOpen(!open)
+            tree.setOpen(m.id, !open)
           }}
         >
-          {children.length > 0 && <Icon name={open || filter ? 'chevron-down' : 'chevron-right'} />}
+          {children.length > 0 && <Icon name={open ? 'chevron-down' : 'chevron-right'} />}
         </span>
         <span className="kind-badge mod" style={m.color ? { background: m.color } : undefined}>
           M
@@ -116,19 +161,21 @@ function TreeNode(props: { m: Module; depth: number; filter: string; hidden: Set
         <button
           type="button"
           className="icon eye"
+          tabIndex={-1}
           title={isHidden ? 'Show in view' : 'Hide in view'}
+          aria-label={`${isHidden ? 'Show' : 'Hide'} ${m.name} in view`}
           onClick={(e) => {
             e.stopPropagation()
-            toggleHidden()
+            toggleHidden(m.id, isHidden)
           }}
         >
           <Icon name={isHidden ? 'eye-off' : 'eye'} />
         </button>
       </div>
-      {(open || filter) && children.length > 0 && (
-        <ul>
+      {open && children.length > 0 && (
+        <ul role="group">
           {children.map((c) => (
-            <TreeNode key={c.id} m={c} depth={depth + 1} filter={filter} hidden={hidden} />
+            <TreeNode key={c.id} m={c} depth={depth + 1} tree={tree} />
           ))}
         </ul>
       )}
@@ -137,13 +184,48 @@ function TreeNode(props: { m: Module; depth: number; filter: string; hidden: Set
 }
 
 export function OutlinePanel(): ReactNode {
-  const project = useProjectStore((s) => s.project)
+  const modules = useProjectStore((s) => s.project.modules)
+  const views = useProjectStore((s) => s.project.views)
   const viewId = useDoc((d) => d.activeViewId)
+  const selectedIds = useDoc((d) => d.selectedIds)
   const [filter, setFilter] = useState('')
+  const [collapsed, setCollapsed] = useState<ReadonlySet<Id>>(new Set())
   const [over, setOver] = useState(false)
-  const view = findView(project, viewId)
-  const hidden = new Set(view.hidden)
-  const roots = childModules(project, null)
+  const f = filter.trim().toLowerCase()
+  const children = useMemo(() => childrenByParent(modules), [modules])
+  const shown = useMemo(() => (f ? matching(children, f) : null), [children, f])
+  const hiddenIds = findView({ views }, viewId).hidden
+  const hidden = useMemo(() => new Set(hiddenIds), [hiddenIds])
+  const selected = useMemo(() => new Set(selectedIds), [selectedIds])
+  const roots = children.get(null) ?? []
+
+  // Items in display order, for the one in the tab order.
+  const visible: Id[] = []
+  const walk = (list: Module[]): void => {
+    for (const m of list) {
+      if (shown && !shown.has(m.id)) continue
+      visible.push(m.id)
+      if (shown || !collapsed.has(m.id)) walk(children.get(m.id) ?? [])
+    }
+  }
+  walk(roots)
+
+  const tree: TreeState = {
+    children,
+    shown,
+    collapsed,
+    setOpen: (id, open) =>
+      setCollapsed((s) => {
+        const next = new Set(s)
+        if (open) next.delete(id)
+        else next.add(id)
+        return next
+      }),
+    hidden,
+    selected,
+    tabStop: tabStop(visible, (id) => selected.has(id))
+  }
+
   return (
     <div
       className={`outline ${over ? 'drop' : ''}`}
@@ -167,15 +249,20 @@ export function OutlinePanel(): ReactNode {
           data-autofocus
           type="search"
           placeholder="Filter modules"
+          aria-label="Filter modules"
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
         />
       </div>
-      <ul className="tree">
+      <ul className="tree" role="tree" aria-label="Modules" aria-multiselectable onKeyDown={onListKeyDown}>
         {roots.map((m) => (
-          <TreeNode key={m.id} m={m} depth={0} filter={filter.trim().toLowerCase()} hidden={hidden} />
+          <TreeNode key={m.id} m={m} depth={0} tree={tree} />
         ))}
-        {!roots.length && <li className="empty muted">No modules. Right-click the canvas to add one.</li>}
+        {!roots.length && (
+          <li className="empty muted" role="presentation">
+            No modules. Right-click the canvas to add one.
+          </li>
+        )}
       </ul>
       <p className="hint muted">Drag onto a module to nest, onto empty space to move to the top level.</p>
     </div>

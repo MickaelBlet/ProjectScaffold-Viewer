@@ -107,6 +107,13 @@ export function buildDefaultLayout(api: DockviewApi): void {
     position: { referencePanel: EDITOR_AREA, direction: 'right' }
   })
   api.addPanel({
+    id: 'settings',
+    component: 'settings',
+    title: TOOL_TITLES.settings,
+    inactive: true,
+    position: { referencePanel: 'inspector', direction: 'within' }
+  })
+  api.addPanel({
     id: 'problems',
     component: 'problems',
     title: TOOL_TITLES.problems,
@@ -375,6 +382,26 @@ export function openView(viewId: Id = GLOBAL_VIEW, options: { split?: boolean } 
 
 export function closeView(viewId: Id): void {
   editor?.getPanel(viewPanelId(viewId))?.api.close()
+}
+
+export const SOURCE_PANEL = 'source'
+
+/** Open the project as file text, beside the focused view by default. */
+export function openSource(options: { split?: boolean } = { split: true }): void {
+  if (!editor) return
+  const existing = editor.getPanel(SOURCE_PANEL)
+  if (existing) return existing.api.setActive()
+  const active = editor.activePanel
+  editor.addPanel({
+    id: SOURCE_PANEL,
+    component: 'source',
+    tabComponent: 'entity',
+    title: 'Source',
+    params: { kind: 'source' },
+    position: active
+      ? { referencePanel: active.id, direction: options.split ? 'right' : 'within' }
+      : undefined
+  })
 }
 
 /** Open an entity editor as a tab of the editor area. */

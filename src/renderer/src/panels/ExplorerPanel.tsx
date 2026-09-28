@@ -1,8 +1,8 @@
 // Views, types, interfaces, modules and links of the active document. Click selects (Ctrl / Shift for several),
-// double-click opens an editor tab, right click for more.
-import { useState, type MouseEvent, type ReactNode } from 'react'
-import { findPort, findView, modulePath } from '@/model/project'
-import { GLOBAL_VIEW, type Id } from '@/model/types'
+// double-click opens an editor tab, right click for more. Arrows move between items, Enter selects.
+import { useId, useMemo, useState, type MouseEvent, type ReactNode } from 'react'
+import { endpointLabel, findView, modulePaths } from '@/model/project'
+import { GLOBAL_VIEW, type Id, type View } from '@/model/types'
 import { activeDoc, patchDoc, useDoc } from '@/store/documents'
 import {
   addInterface,
@@ -18,8 +18,9 @@ import { commandItem } from '@/commands'
 import { addModuleAt, navigate, newView, selectionOf } from '@/actions'
 import { openEditor, openView } from '@/shell/controllers'
 import { Icon } from '@/components/Icon'
+import { onListKeyDown, tabStop } from '@/components/listKeys'
 
-const KIND_BADGE = { struct: 'S', enum: 'E', alias: 'A' } as const
+const KIND_BADGE = { struct: 'S', enum: 'E', alias: 'A', primitive: 'P' } as const
 
 function Section(props: {
   title: string
@@ -28,20 +29,77 @@ function Section(props: {
   children: ReactNode
 }): ReactNode {
   const [open, setOpen] = useState(true)
+  const body = useId()
   return (
     <section className={`explorer-section ${open ? 'open' : ''}`}>
-      <header onClick={() => setOpen(!open)}>
-        <span className="chevron">
-          <Icon name={open ? 'chevron-down' : 'chevron-right'} />
-        </span>
-        <span className="explorer-title">{props.title}</span>
-        {props.count !== undefined && <small>{props.count}</small>}
-        <span className="explorer-actions" onClick={(e) => e.stopPropagation()}>
-          {props.actions}
-        </span>
+      <header>
+        <button
+          type="button"
+          className="explorer-toggle"
+          aria-expanded={open}
+          aria-controls={body}
+          onClick={() => setOpen(!open)}
+        >
+          <span className="chevron">
+            <Icon name={open ? 'chevron-down' : 'chevron-right'} />
+          </span>
+          <span className="explorer-title">{props.title}</span>
+          {props.count !== undefined && <small>{props.count}</small>}
+        </button>
+        <span className="explorer-actions">{props.actions}</span>
       </header>
-      {open && props.children}
+      {open && <div id={body}>{props.children}</div>}
     </section>
+  )
+}
+
+/** Selectable entities of one kind: arrows move, Enter / Space select as a click does. */
+function EntityList(props: { label: string; multiselectable?: boolean; children: ReactNode }): ReactNode {
+  return (
+    <ul
+      className="entity-list"
+      role="listbox"
+      aria-label={props.label}
+      aria-multiselectable={props.multiselectable}
+      onKeyDown={onListKeyDown}
+    >
+      {props.children}
+    </ul>
+  )
+}
+
+function Item(props: {
+  selected: boolean
+  tabStop: boolean
+  className?: string
+  title?: string
+  onClick: (e: MouseEvent) => void
+  onDoubleClick?: () => void
+  onContextMenu: (e: MouseEvent) => void
+  children: ReactNode
+}): ReactNode {
+  return (
+    <li
+      data-item
+      role="option"
+      aria-selected={props.selected}
+      tabIndex={props.tabStop ? 0 : -1}
+      className={props.className}
+      title={props.title}
+      onClick={props.onClick}
+      onDoubleClick={props.onDoubleClick}
+      onContextMenu={props.onContextMenu}
+    >
+      {props.children}
+    </li>
+  )
+}
+
+function Empty({ children }: { children: ReactNode }): ReactNode {
+  return (
+    <li className="empty" role="presentation">
+      {children}
+    </li>
   )
 }
 
@@ -87,34 +145,86 @@ function entityMenu(e: MouseEvent, kind: 'type' | 'interface' | 'module' | 'link
   ])
 }
 
+function viewMenu(e: MouseEvent, v: View): void {
+  e.preventDefault()
+  const stored = v.id !== GLOBAL_VIEW
+  openContextMenu(e, [
+    { label: 'Open', run: () => openView(v.id) },
+    { label: 'Open to the side', run: () => openView(v.id, { split: true }) },
+    {
+      label: 'Rename…',
+      disabled: !stored,
+      run: () => {
+        const name = window.prompt('View name', v.name)
+        if (name?.trim()) renameView(v.id, name.trim())
+      }
+    },
+    {
+      label: 'Duplicate',
+      run: () => {
+        const src = findView(getProject(), v.id)
+        openView(addView(`${src.name} copy`, src.rootModuleId))
+      }
+    },
+    'separator',
+    { label: 'Delete', danger: true, disabled: !stored, run: () => deleteView(v.id) }
+  ])
+}
+
+const GLOBAL: View = { id: GLOBAL_VIEW, name: 'Global', rootModuleId: null, hidden: [] }
+
 export function ExplorerPanel(): ReactNode {
   const types = useProjectStore((s) => s.project.types)
   const interfaces = useProjectStore((s) => s.project.interfaces)
   const views = useProjectStore((s) => s.project.views)
-  const project = useProjectStore((s) => s.project)
-  const { modules, links } = project
+  const modules = useProjectStore((s) => s.project.modules)
+  const links = useProjectStore((s) => s.project.links)
+  const imports = useProjectStore((s) => s.project.imports)
   const selectedIds = useDoc((d) => d.selectedIds)
   const activeViewId = useDoc((d) => d.activeViewId)
   const [filter, setFilter] = useState('')
   const f = filter.trim().toLowerCase()
   const match = (name: string): boolean => !f || name.toLowerCase().includes(f)
+  const isSelected = (id: Id): boolean => selectedIds.includes(id)
+
+  // Paths and link ends change with modules and links only, not with every edit.
+  const paths = useMemo(() => modulePaths({ modules, imports }), [modules, imports])
+  const allModules = useMemo(
+    () =>
+      modules
+        .map((m) => ({ m, path: paths.get(m.id) ?? m.name }))
+        .sort((a, b) => a.path.localeCompare(b.path)),
+    [modules, paths]
+  )
+  const allLinks = useMemo(
+    () =>
+      links
+        .map((l) => ({
+          l,
+          from: endpointLabel({ modules, imports }, paths, l.from),
+          to: endpointLabel({ modules, imports }, paths, l.to)
+        }))
+        .sort((a, b) => a.l.name.localeCompare(b.l.name)),
+    [links, modules, imports, paths]
+  )
+
+  const shownViews = [GLOBAL, ...views].filter((v) => match(v.name))
   const shownTypes = types.filter((t) => match(t.name))
   const shownInterfaces = interfaces.filter((i) => match(i.name))
+  const shownModules = allModules.filter((x) => match(x.path))
+  const shownLinks = allLinks.filter((x) => match(x.l.name) || match(x.from) || match(x.to))
   const typeIds = shownTypes.map((t) => t.id)
   const interfaceIds = shownInterfaces.map((i) => i.id)
-  const shownModules = modules
-    .map((m) => ({ m, path: modulePath(project, m.id) }))
-    .filter((x) => match(x.path))
-    .sort((a, b) => a.path.localeCompare(b.path))
   const moduleIds = shownModules.map((x) => x.m.id)
-  const endpoint = (e: (typeof links)[number]['from']): string =>
-    `${modulePath(project, e.moduleId)}:${findPort(project, e.moduleId, e.portId)?.name ?? '?'}`
-  const shownLinks = links
-    .map((l) => ({ l, from: endpoint(l.from), to: endpoint(l.to) }))
-    .filter((x) => match(x.l.name) || match(x.from) || match(x.to))
-    .sort((a, b) => a.l.name.localeCompare(b.l.name))
   const linkIds = shownLinks.map((x) => x.l.id)
-  const allViews = [{ id: GLOBAL_VIEW, name: 'Global', rootModuleId: null, hidden: [] }, ...views]
+  const viewStop = tabStop(
+    shownViews.map((v) => v.id),
+    (id) => id === activeViewId
+  )
+  const typeStop = tabStop(typeIds, isSelected)
+  const interfaceStop = tabStop(interfaceIds, isSelected)
+  const moduleStop = tabStop(moduleIds, isSelected)
+  const linkStop = tabStop(linkIds, isSelected)
 
   return (
     <div className="explorer">
@@ -123,6 +233,7 @@ export function ExplorerPanel(): ReactNode {
           data-autofocus
           type="search"
           placeholder="Filter"
+          aria-label="Filter the explorer"
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
         />
@@ -130,67 +241,43 @@ export function ExplorerPanel(): ReactNode {
 
       <Section
         title="Views"
-        count={allViews.length}
+        count={views.length + 1}
         actions={
           <button type="button" className="icon" title="New view" onClick={newView}>
             <Icon name="plus" />
           </button>
         }
       >
-        <ul className="entity-list">
-          {allViews
-            .filter((v) => match(v.name))
-            .map((v) => {
-              const root = modules.find((m) => m.id === v.rootModuleId)
-              return (
-                <li
-                  key={v.id}
-                  className={v.id === activeViewId ? 'current' : ''}
-                  onClick={() => openView(v.id)}
-                  onContextMenu={(e) => {
-                    e.preventDefault()
-                    const stored = v.id !== GLOBAL_VIEW
-                    openContextMenu(e, [
-                      { label: 'Open', run: () => openView(v.id) },
-                      { label: 'Open to the side', run: () => openView(v.id, { split: true }) },
-                      {
-                        label: 'Rename…',
-                        disabled: !stored,
-                        run: () => {
-                          const name = window.prompt('View name', v.name)
-                          if (name?.trim()) renameView(v.id, name.trim())
-                        }
-                      },
-                      {
-                        label: 'Duplicate',
-                        run: () => {
-                          const src = findView(getProject(), v.id)
-                          openView(addView(`${src.name} copy`, src.rootModuleId))
-                        }
-                      },
-                      'separator',
-                      { label: 'Delete', danger: true, disabled: !stored, run: () => deleteView(v.id) }
-                    ])
-                  }}
-                >
-                  <span className={`kind-badge view ${root ? 'drill' : ''}`}>
-                    {root ? <Icon name="expand" /> : 'V'}
-                  </span>
-                  {v.name}
-                  <small>
-                    {root ? root.name : ''}
-                    {v.hidden.length ? ` −${v.hidden.length}` : ''}
-                  </small>
-                </li>
-              )
-            })}
-        </ul>
+        <EntityList label="Views">
+          {shownViews.map((v) => {
+            const root = modules.find((m) => m.id === v.rootModuleId)
+            return (
+              <Item
+                key={v.id}
+                selected={v.id === activeViewId}
+                tabStop={v.id === viewStop}
+                className={v.id === activeViewId ? 'current' : ''}
+                onClick={() => openView(v.id)}
+                onContextMenu={(e) => viewMenu(e, v)}
+              >
+                <span className={`kind-badge view ${root ? 'drill' : ''}`}>
+                  {root ? <Icon name="expand" /> : 'V'}
+                </span>
+                {v.name}
+                <small>
+                  {root ? root.name : ''}
+                  {v.hidden.length ? ` −${v.hidden.length}` : ''}
+                </small>
+              </Item>
+            )
+          })}
+        </EntityList>
       </Section>
 
       <Section
         title="Types"
         count={types.length}
-        actions={(['struct', 'enum', 'alias'] as const).map((k) => (
+        actions={(['struct', 'enum', 'alias', 'primitive'] as const).map((k) => (
           <button
             key={k}
             type="button"
@@ -203,11 +290,13 @@ export function ExplorerPanel(): ReactNode {
           </button>
         ))}
       >
-        <ul className="entity-list">
+        <EntityList label="Types" multiselectable>
           {shownTypes.map((t) => (
-            <li
+            <Item
               key={t.id}
-              className={selectedIds.includes(t.id) ? 'active' : ''}
+              selected={isSelected(t.id)}
+              tabStop={t.id === typeStop}
+              className={isSelected(t.id) ? 'active' : ''}
               onClick={(e) => clickItem(e, t.id, typeIds)}
               onDoubleClick={() => openEditor('type', t.id)}
               onContextMenu={(e) => entityMenu(e, 'type', t.id)}
@@ -216,10 +305,10 @@ export function ExplorerPanel(): ReactNode {
                 {KIND_BADGE[t.kind]}
               </span>
               {t.name}
-            </li>
+            </Item>
           ))}
-          {!shownTypes.length && <li className="empty">{f ? 'No match' : 'No types yet'}</li>}
-        </ul>
+          {!shownTypes.length && <Empty>{f ? 'No match' : 'No types yet'}</Empty>}
+        </EntityList>
       </Section>
 
       <Section
@@ -236,11 +325,13 @@ export function ExplorerPanel(): ReactNode {
           </button>
         }
       >
-        <ul className="entity-list">
+        <EntityList label="Interfaces" multiselectable>
           {shownInterfaces.map((i) => (
-            <li
+            <Item
               key={i.id}
-              className={selectedIds.includes(i.id) ? 'active' : ''}
+              selected={isSelected(i.id)}
+              tabStop={i.id === interfaceStop}
+              className={isSelected(i.id) ? 'active' : ''}
               onClick={(e) => clickItem(e, i.id, interfaceIds)}
               onDoubleClick={() => openEditor('interface', i.id)}
               onContextMenu={(e) => entityMenu(e, 'interface', i.id)}
@@ -248,10 +339,10 @@ export function ExplorerPanel(): ReactNode {
               <span className="kind-badge interface">I</span>
               {i.name}
               <small>{i.messages.length} msg</small>
-            </li>
+            </Item>
           ))}
-          {!shownInterfaces.length && <li className="empty">{f ? 'No match' : 'No interfaces yet'}</li>}
-        </ul>
+          {!shownInterfaces.length && <Empty>{f ? 'No match' : 'No interfaces yet'}</Empty>}
+        </EntityList>
       </Section>
 
       <Section
@@ -263,11 +354,13 @@ export function ExplorerPanel(): ReactNode {
           </button>
         }
       >
-        <ul className="entity-list">
+        <EntityList label="Modules" multiselectable>
           {shownModules.map(({ m, path }) => (
-            <li
+            <Item
               key={m.id}
-              className={selectedIds.includes(m.id) ? 'active' : ''}
+              selected={isSelected(m.id)}
+              tabStop={m.id === moduleStop}
+              className={isSelected(m.id) ? 'active' : ''}
               title={path}
               onClick={(e) => clickItem(e, m.id, moduleIds)}
               onDoubleClick={() => openEditor('module', m.id)}
@@ -276,18 +369,20 @@ export function ExplorerPanel(): ReactNode {
               <span className="kind-badge mod">M</span>
               {m.name}
               <small>{path.slice(0, -m.name.length - 1)}</small>
-            </li>
+            </Item>
           ))}
-          {!shownModules.length && <li className="empty">{f ? 'No match' : 'No modules yet'}</li>}
-        </ul>
+          {!shownModules.length && <Empty>{f ? 'No match' : 'No modules yet'}</Empty>}
+        </EntityList>
       </Section>
 
       <Section title="Links" count={links.length}>
-        <ul className="entity-list">
+        <EntityList label="Links" multiselectable>
           {shownLinks.map(({ l, from, to }) => (
-            <li
+            <Item
               key={l.id}
-              className={selectedIds.includes(l.id) ? 'active' : ''}
+              selected={isSelected(l.id)}
+              tabStop={l.id === linkStop}
+              className={isSelected(l.id) ? 'active' : ''}
               title={`${from} → ${to}`}
               onClick={(e) => clickItem(e, l.id, linkIds)}
               onDoubleClick={() => openEditor('link', l.id)}
@@ -300,10 +395,10 @@ export function ExplorerPanel(): ReactNode {
                   name={l.constraints.direction === 'bidirectional' ? 'arrow-left-right' : 'arrow-right'}
                 />
               </small>
-            </li>
+            </Item>
           ))}
-          {!shownLinks.length && <li className="empty">{f ? 'No match' : 'No links yet'}</li>}
-        </ul>
+          {!shownLinks.length && <Empty>{f ? 'No match' : 'No links yet'}</Empty>}
+        </EntityList>
       </Section>
     </div>
   )

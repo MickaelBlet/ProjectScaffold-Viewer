@@ -7,6 +7,7 @@ import {
   ReactFlow,
   ViewportPortal,
   getViewportForBounds,
+  useEdgesState,
   useNodesState,
   useReactFlow,
   type Connection,
@@ -63,6 +64,7 @@ import { fileName } from '@/fileOps'
 import { openView, registerCanvas } from '@/shell/controllers'
 import { EXTERNAL } from './constants'
 import { endOf, externalNodes, linkEnds, standIns, toEdges, toNodes } from './flowGraph'
+import { reuseUnchanged } from './reuseUnchanged'
 import { floatingPortSides, portPoints } from './portSides'
 import { ModuleNode } from './ModuleNode'
 import { NoteNode } from './NoteNode'
@@ -211,13 +213,17 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
     return { sides, externals }
   }, [project, view, visible, settings.autoOrientLinks])
   const grid = settings.snapToGrid ? settings.gridSize : null
+  // Nodes and links are rebuilt on every edit; only those that changed get new objects (and render again).
   useEffect(
-    () => setNodes(toNodes(project, view, selectedSet, sides, externals, grid)),
+    () =>
+      setNodes((prev) => reuseUnchanged(prev, toNodes(project, view, selectedSet, sides, externals, grid))),
     [project, view, selectedSet, sides, externals, grid, setNodes]
   )
-  const edges = useMemo(
-    () => toEdges(project, visible, !!view.rootModuleId, selectedLink),
-    [project, visible, view.rootModuleId, selectedLink]
+  const [edges, setEdges] = useEdgesState<Edge>([])
+  useEffect(
+    () =>
+      setEdges((prev) => reuseUnchanged(prev, toEdges(project, visible, !!view.rootModuleId, selectedLink))),
+    [project, visible, view.rootModuleId, selectedLink, setEdges]
   )
 
   const absolute = useCallback(

@@ -81,8 +81,8 @@ export function selectAll(): void {
   selectMany([...childModules(p, scope).map((m) => m.id), ...(scope ? [] : p.notes.map((n) => n.id))])
 }
 
-/** Select an entity and bring it into view. */
-export function navigate(target: ProblemTarget): void {
+/** Select an entity and bring it into view (zoomed on it with `zoom`). */
+export function navigate(target: ProblemTarget, { zoom = false }: { zoom?: boolean } = {}): void {
   if (target.kind === 'project') return select({ kind: 'project' })
   select(target.kind === 'module' && isImportedId(target.id) ? { kind: 'imported', id: target.id } : target)
   if (target.kind === 'type' || target.kind === 'interface') return showTool('inspector', false)
@@ -100,14 +100,14 @@ export function navigate(target: ProblemTarget): void {
     const hiddenAncestors = view.hidden.filter((h) => ids.some((id) => subtreeIds(p, h).has(id)))
     if (hiddenAncestors.length) setHidden(view.id, hiddenAncestors, false)
   }
-  revealWhenDrawn(ids)
+  revealWhenDrawn(ids, zoom)
 }
 
 /** Select a note and show it (notes are drawn in the global view only). */
-export function navigateToNote(id: Id): void {
+export function navigateToNote(id: Id, { zoom = false }: { zoom?: boolean } = {}): void {
   select({ kind: 'note', id })
   if (findView(getProject(), activeDoc().activeViewId).rootModuleId) openView(GLOBAL_VIEW)
-  revealWhenDrawn([id])
+  revealWhenDrawn([id], zoom)
 }
 
 /** Go back (-1) or forward (1) through the selection history, showing each entity. */
@@ -124,12 +124,13 @@ export function travelSelection(delta: -1 | 1): void {
 }
 
 /** Reveal once the canvas shows the nodes (a view just opened or unhidden needs a few frames). */
-function revealWhenDrawn(ids: Id[], tries = 10): void {
+function revealWhenDrawn(ids: Id[], zoom = false, tries = 10): void {
   requestAnimationFrame(() => {
     const canvas = activeCanvas()
-    if (canvas && ids.some((id) => canvas.nodeRect(id))) return canvas.reveal(ids)
-    if (tries > 0) revealWhenDrawn(ids, tries - 1)
-    else canvas?.reveal(ids)
+    const show = (): void => (zoom ? canvas?.fit(ids) : canvas?.reveal(ids))
+    if (canvas && ids.some((id) => canvas.nodeRect(id))) return show()
+    if (tries > 0) revealWhenDrawn(ids, zoom, tries - 1)
+    else show()
   })
 }
 

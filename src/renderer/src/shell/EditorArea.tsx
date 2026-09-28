@@ -13,7 +13,8 @@ import { ReactFlowProvider } from '@xyflow/react'
 import { Canvas } from '@/canvas/Canvas'
 import { findView } from '@/model/project'
 import { GLOBAL_VIEW, type Id, type Project } from '@/model/types'
-import { findDoc, patchDoc, useDocs } from '@/store/documents'
+import { formatFromPath } from '@/model/serialize'
+import { findDoc, patchDoc, useDoc, useDocs } from '@/store/documents'
 import { deleteView, renameView, useProjectStore } from '@/store/project'
 import { openContextMenu } from '@/store/ui'
 import { newView } from '@/actions'
@@ -21,6 +22,7 @@ import { TypeInspector } from '@/panels/TypeInspector'
 import { InterfaceInspector } from '@/panels/InterfaceInspector'
 import { ModuleInspector } from '@/panels/ModuleInspector'
 import { LinkInspector } from '@/panels/LinkInspector'
+import { SourcePanel } from '@/panels/SourcePanel'
 import { DocTabs } from './DocTabs'
 import { closeView, editorApi, openView, setEditorApi, type EditorKind } from './controllers'
 import { dockTheme } from './theme'
@@ -79,7 +81,19 @@ function EntityPanel(props: IDockviewPanelProps<{ kind: EditorKind; id: Id }>): 
   )
 }
 
-const KIND_ICON: Record<string, string> = { type: 'T', interface: 'I', module: 'M', link: 'L' }
+function SourceEditor({ api }: IDockviewPanelProps): ReactNode {
+  const format = useDoc((d) => (d.filePath ? formatFromPath(d.filePath) : 'yaml'))
+  useEffect(() => api.setTitle(format.toUpperCase()), [format, api])
+  return <SourcePanel format={format} />
+}
+
+const KIND_ICON: Record<EditorKind | 'source', string> = {
+  type: 'T',
+  interface: 'I',
+  module: 'M',
+  link: 'L',
+  source: '{}'
+}
 
 function ViewTab(props: IDockviewPanelHeaderProps<{ viewId: Id }>): ReactNode {
   const { viewId } = props.params
@@ -110,7 +124,7 @@ function ViewTab(props: IDockviewPanelHeaderProps<{ viewId: Id }>): ReactNode {
   )
 }
 
-function EntityTab(props: IDockviewPanelHeaderProps<{ kind: EditorKind; id: Id }>): ReactNode {
+function EntityTab(props: IDockviewPanelHeaderProps<{ kind: EditorKind | 'source' }>): ReactNode {
   return (
     <DockviewDefaultTab
       {...props}
@@ -143,7 +157,7 @@ function Watermark(): ReactNode {
   )
 }
 
-const components = { canvas: CanvasPanel, entity: EntityPanel }
+const components = { canvas: CanvasPanel, entity: EntityPanel, source: SourceEditor }
 const tabComponents = { view: ViewTab, entity: EntityTab }
 
 /** Editor tabs of one document, restored from and saved to its state. */

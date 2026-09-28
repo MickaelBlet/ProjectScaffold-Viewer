@@ -33,6 +33,8 @@ const TYPES: Record<SaveRequest['format'], PickerType> = {
 const fs = window as unknown as FsAccessWindow
 /** Handles of files opened or saved in this session, by name, so Save can rewrite them. */
 const handles = new Map<string, FileHandle>()
+/** Modification time of each file as last read or written here, by name. */
+const stamps = new Map<string, number>()
 
 function isAbort(e: unknown): boolean {
   return e instanceof DOMException && e.name === 'AbortError'
@@ -63,6 +65,30 @@ async function write(handle: FileHandle, content: string): Promise<void> {
   const w = await handle.createWritable()
   await w.write(content)
   await w.close()
+  stamps.set(handle.name, (await handle.getFile()).lastModified)
+}
+
+/** Reads a file through its handle, noting when it was last modified. */
+async function read(handle: FileHandle): Promise<string> {
+  const file = await handle.getFile()
+  stamps.set(handle.name, file.lastModified)
+  return file.text()
+}
+
+async function changedOnDisk(path: string): Promise<string | null> {
+  const handle = handles.get(path)
+  const known = stamps.get(path)
+  // Only files read here with access granted: never ask for permission while polling.
+  if (!handle || known === undefined) return null
+  try {
+    const file = await handle.getFile()
+    if (file.lastModified === known) return null
+    stamps.set(path, file.lastModified)
+    return await file.text()
+  } catch {
+    // Moved, deleted or access revoked.
+    return null
+  }
 }
 
 async function openFile(): Promise<OpenResult | null> {
@@ -73,7 +99,7 @@ async function openFile(): Promise<OpenResult | null> {
       })
       if (!handle) return null
       handles.set(handle.name, handle)
-      const content = await (await handle.getFile()).text()
+      const content = await read(handle)
       await remember({ name: handle.name, content, handle })
       return { path: handle.name, content }
     } catch (e) {
@@ -204,7 +230,7 @@ async function readRecent(entry: RecentEntry, ask: boolean, touch = true): Promi
     try {
       const opts = { mode: 'readwrite' } as const
       const perm = ask ? await handle.requestPermission?.(opts) : await handle.queryPermission?.(opts)
-      if (perm === 'granted') content = await (await handle.getFile()).text()
+      if (perm === 'granted') content = await read(handle)
     } catch {
       // File moved or deleted: keep the stored content.
     }
@@ -265,6 +291,7 @@ const webApi: Api = {
     return last ? readRecent(last, false) : null
   },
   saveFile,
+  changedOnDisk,
   writesFiles: !!fs.showSaveFilePicker,
   recentFiles: async () => (await loadRecent()).map((e) => e.name),
   openRecent: async (path) => {

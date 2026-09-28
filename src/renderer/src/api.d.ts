@@ -44,6 +44,11 @@ export interface Api {
   onRecentChange(cb: (files: string[]) => void): () => void
   /** Resolves to the written path, or null when cancelled. */
   saveFile(req: SaveRequest): Promise<string | null>
+  /**
+   * Content of a document's file when it changed since it was last read or written here (edited
+   * in another program); null otherwise, and when the file cannot be watched.
+   */
+  changedOnDisk(path: string): Promise<string | null>
   /** False when saving downloads a copy instead of writing the file (Firefox, Safari). */
   writesFiles: boolean
   setDirty(dirty: boolean): void

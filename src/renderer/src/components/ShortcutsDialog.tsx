@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useId, type ReactNode } from 'react'
 import { commands, keyLabel, type Category } from '@/commands'
 import { useUiStore } from '@/store/ui'
 
@@ -13,13 +13,20 @@ const EXTRA: [string, string][] = [
 
 export function ShortcutsDialog(): ReactNode {
   const open = useUiStore((s) => s.shortcutsOpen)
+  const titleId = useId()
   if (!open) return null
   const close = (): void => useUiStore.setState({ shortcutsOpen: false })
   const categories = [...new Set(commands.map((c) => c.category))] as Category[]
   return (
     <div className="modal-backdrop" onClick={close} onKeyDown={(e) => e.key === 'Escape' && close()}>
-      <div className="modal shortcuts" role="dialog" onClick={(e) => e.stopPropagation()}>
-        <h3>Keyboard shortcuts</h3>
+      <div
+        className="modal shortcuts"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 id={titleId}>Keyboard shortcuts</h3>
         <div className="shortcut-columns">
           {categories.map((cat) => {
             const list = commands.filter((c) => c.category === cat && c.keys?.length && !c.hidden)

@@ -2,6 +2,7 @@ import { useDeferredValue, useMemo, useState, type ReactNode } from 'react'
 import { searchProject } from '@/model/search'
 import { useProjectStore } from '@/store/project'
 import { navigate } from '@/actions'
+import { onListKeyDown } from '@/components/listKeys'
 
 function Mark({ text, query }: { text: string; query: string }): ReactNode {
   const i = text.toLowerCase().indexOf(query.toLowerCase())
@@ -27,14 +28,26 @@ export function SearchPanel(): ReactNode {
           data-autofocus
           type="search"
           placeholder="Search names, descriptions, metadata"
+          aria-label="Search the project"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
       </div>
-      {deferred && <p className="muted count">{hits.length} results</p>}
-      <ul className="results">
+      {deferred && (
+        <p className="muted count" role="status">
+          {hits.length} results
+        </p>
+      )}
+      <ul className="results" role="listbox" aria-label="Search results" onKeyDown={onListKeyDown}>
         {hits.map((h, i) => (
-          <li key={i} onClick={() => navigate(h.target)}>
+          <li
+            key={i}
+            data-item
+            role="option"
+            aria-selected={false}
+            tabIndex={i === 0 ? 0 : -1}
+            onClick={() => navigate(h.target)}
+          >
             <span className={`kind-badge ${h.target.kind === 'module' ? 'mod' : h.target.kind}`}>
               {h.target.kind[0]!.toUpperCase()}
             </span>

@@ -5,7 +5,7 @@ import { ExplorerPanel } from '@/panels/ExplorerPanel'
 import { OutlinePanel } from '@/panels/OutlinePanel'
 import { LinksPanel } from '@/panels/LinksPanel'
 import { Inspector } from '@/panels/Inspector'
-import { ProblemsPanel, useProblems } from '@/panels/ProblemsPanel'
+import { ProblemsPanel, useProblemCounts } from '@/panels/ProblemsPanel'
 import { SearchPanel } from '@/panels/SearchPanel'
 import { SettingsPanel } from '@/panels/SettingsPanel'
 import { EditorArea } from './EditorArea'
@@ -31,11 +31,10 @@ function tool(id: string, Content: () => ReactNode) {
 
 /** Keeps the Problems tab title up to date with the counts. */
 function ProblemsTitle({ api }: IDockviewPanelProps): ReactNode {
-  const problems = useProblems()
-  const errors = problems.filter((p) => p.severity === 'error').length
+  const { errors, warnings } = useProblemCounts()
   useEffect(
-    () => api.setTitle(problems.length ? `Problems (${errors}✖ ${problems.length - errors}⚠)` : 'Problems'),
-    [api, problems.length, errors]
+    () => api.setTitle(errors + warnings ? `Problems (${errors}✖ ${warnings}⚠)` : 'Problems'),
+    [api, errors, warnings]
   )
   return null
 }

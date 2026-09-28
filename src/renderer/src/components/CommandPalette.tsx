@@ -1,8 +1,8 @@
 // Ctrl+Shift+P: commands ('>' prefix). Ctrl+P: go to a module, type, interface, link or view.
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import { commands, keyLabel, runCommand } from '@/commands'
 import { fuzzyFilter } from '@/model/fuzzy'
-import { modulePath } from '@/model/project'
+import { modulePaths } from '@/model/project'
 import { GLOBAL_VIEW } from '@/model/types'
 import { getProject } from '@/store/project'
 import { useUiStore, type PickEntry } from '@/store/ui'
@@ -59,10 +59,11 @@ function commandEntries(): Entry[] {
 
 function entityEntries(): Entry[] {
   const p = getProject()
+  const paths = modulePaths(p)
   return [
     ...p.modules.map((m) => ({
       key: m.id,
-      label: modulePath(p, m.id),
+      label: paths.get(m.id) ?? m.name,
       detail: `module · ${m.ports.length} ports`,
       kind: 'M',
       run: () => navigate({ kind: 'module', id: m.id })
@@ -109,6 +110,8 @@ export function CommandPalette(): ReactNode {
   const [query, setQuery] = useState('')
   const [active, setActive] = useState(0)
   const list = useRef<HTMLUListElement>(null)
+  const listId = useId()
+  const optionId = (i: number): string => `${listId}-${i}`
   // Each opening (or quick pick replacing the list) starts from its own query.
   const [shown, setShown] = useState(palette)
   if (palette !== shown) {
@@ -142,20 +145,32 @@ export function CommandPalette(): ReactNode {
     e?.run()
   }
 
+  const placeholder = pickList
+    ? pickList.placeholder
+    : isCommands
+      ? 'Type a command'
+      : 'Go to module, type, interface, link, view — ">" for commands'
+
   return (
     <div className="palette-backdrop" onMouseDown={close}>
-      <div className="palette" onMouseDown={(e) => e.stopPropagation()}>
+      <div
+        className="palette"
+        role="dialog"
+        aria-modal="true"
+        aria-label={placeholder}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
         <input
           autoFocus
+          role="combobox"
+          aria-label={placeholder}
+          aria-expanded="true"
+          aria-controls={listId}
+          aria-autocomplete="list"
+          aria-activedescendant={results[active] ? optionId(active) : undefined}
           value={query}
           spellCheck={false}
-          placeholder={
-            pickList
-              ? pickList.placeholder
-              : isCommands
-                ? 'Type a command'
-                : 'Go to module, type, interface, link, view — ">" for commands'
-          }
+          placeholder={placeholder}
           onChange={(e) => {
             setQuery(e.target.value)
             setActive(0)
@@ -169,10 +184,13 @@ export function CommandPalette(): ReactNode {
             e.preventDefault()
           }}
         />
-        <ul ref={list}>
+        <ul ref={list} id={listId} role="listbox">
           {results.map(({ item, match }, i) => (
             <li
               key={item.key}
+              id={optionId(i)}
+              role="option"
+              aria-selected={i === active}
               className={i === active ? 'active' : ''}
               onMouseMove={() => setActive(i)}
               onClick={() => pick(item)}
@@ -185,7 +203,11 @@ export function CommandPalette(): ReactNode {
               {item.keys && <kbd>{item.keys}</kbd>}
             </li>
           ))}
-          {!results.length && <li className="empty">No match</li>}
+          {!results.length && (
+            <li className="empty" role="presentation">
+              No match
+            </li>
+          )}
         </ul>
       </div>
     </div>

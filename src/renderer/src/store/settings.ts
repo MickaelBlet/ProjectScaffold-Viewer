@@ -23,6 +23,10 @@ export interface Settings {
   autoLayoutOnOpen: boolean
   /** Keep animations even when the system asks for reduced motion. */
   forceAnimations: boolean
+  /** Dots and arrows for the indentation, trailing spaces and tabs of the project text. */
+  sourceWhitespace: boolean
+  /** The element under the caret of the project text is selected and zoomed to. */
+  sourceFollow: boolean
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -31,12 +35,14 @@ export const DEFAULT_SETTINGS: Settings = {
   gridSize: 20,
   guides: true,
   edgeStyle: 'bezier',
-  portStyle: 'arrows',
+  portStyle: 'hollow',
   minimap: true,
   edgeBadges: true,
   autoOrientLinks: true,
   autoLayoutOnOpen: true,
-  forceAnimations: false
+  forceAnimations: false,
+  sourceWhitespace: true,
+  sourceFollow: true
 }
 
 export const useSettings = create<Settings>()(

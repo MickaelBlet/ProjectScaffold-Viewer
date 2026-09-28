@@ -135,6 +135,15 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
                   />
                 </td>
                 <td>
+                  {pt.interfaceId && (
+                    <IconButton
+                      icon="arrow-up-right"
+                      title="Open interface"
+                      onClick={() => navigate({ kind: 'interface', id: pt.interfaceId! })}
+                    />
+                  )}
+                </td>
+                <td>
                   <IconButton icon="x" title="Delete port" danger onClick={() => deletePort(id, pt.id)} />
                 </td>
               </tr>

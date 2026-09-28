@@ -219,6 +219,8 @@ export function TypeInspector({ id }: { id: string }): ReactNode {
         </Section>
       )}
 
+      {t.kind === 'primitive' && <p className="muted">Opaque type: generators map it to a native type.</p>}
+
       {t.kind === 'alias' && (
         <Section title="Aliased type">
           <TypeEditor value={t.type} onChange={(nt) => withType<'alias'>(id, (x) => void (x.type = nt))} />

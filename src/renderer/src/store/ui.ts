@@ -35,6 +35,7 @@ interface UiState {
   /** Command palette: '>' prefix lists commands, otherwise entities; or a quick pick of `pick`. */
   palette: { query: string; pick?: { placeholder: string; entries: PickEntry[] } } | null
   shortcutsOpen: boolean
+  aboutOpen: boolean
   /** Module whose name is being edited on the canvas. */
   renaming: Id | null
   /** Zoom of the focused canvas, for the status bar. */
@@ -48,6 +49,7 @@ export const useUiStore = create<UiState>(() => ({
   contextMenu: null,
   palette: null,
   shortcutsOpen: false,
+  aboutOpen: false,
   renaming: null,
   zoom: 1
 }))

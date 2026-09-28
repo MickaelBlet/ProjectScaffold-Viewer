@@ -1,12 +1,13 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useId, useState, type ReactNode } from 'react'
 import { DockShell } from './shell/DockShell'
 import { MenuBar } from './shell/MenuBar'
 import { ResizeEdges, WindowControls } from './shell/WindowFrame'
 import { StatusBar } from './shell/StatusBar'
 import { ContextMenu } from './components/ContextMenu'
 import { CommandPalette } from './components/CommandPalette'
+import { AboutDialog } from './components/AboutDialog'
 import { ShortcutsDialog } from './components/ShortcutsDialog'
-import { anyDirty, currentSession, docTitle, openProject, restoreSession } from './fileOps'
+import { anyDirty, checkDiskChanges, currentSession, docTitle, openProject, restoreSession } from './fileOps'
 import { installClipboard, installKeyboard, runCommand } from './commands'
 import { activeDoc, isDocDirty, useDocs } from './store/documents'
 import { applyForceAnimations, applyPortStyle, applyTheme, useSettings } from './store/settings'
@@ -14,20 +15,31 @@ import { useProjectStore } from './store/project'
 import { useUiStore } from './store/ui'
 import { Icon } from '@/components/Icon'
 
+/** How often open files are checked for changes made by other programs. */
+const DISK_CHECK_MS = 2000
+
 function Dialog(): ReactNode {
   const dialog = useUiStore((s) => s.dialog)
+  const titleId = useId()
   if (!dialog) return null
   const close = (): void => useUiStore.setState({ dialog: null })
   return (
     <div className="modal-backdrop" onClick={close}>
-      <div className="modal" role="alertdialog" onClick={(e) => e.stopPropagation()}>
-        <h3>{dialog.title}</h3>
+      <div
+        className="modal"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.key === 'Escape' && close()}
+      >
+        <h3 id={titleId}>{dialog.title}</h3>
         <ul>
           {dialog.lines.map((l, i) => (
             <li key={i}>{l}</li>
           ))}
         </ul>
-        <button type="button" autoFocus onClick={close} onKeyDown={(e) => e.key === 'Escape' && close()}>
+        <button type="button" autoFocus onClick={close}>
           Close
         </button>
       </div>
@@ -82,6 +94,19 @@ export function App(): ReactNode {
       installClipboard()
     ]
     return () => off.forEach((f) => f())
+  }, [])
+
+  // Files edited in another program are reloaded.
+  useEffect(() => {
+    const check = (): void => {
+      if (document.visibilityState === 'visible') void checkDiskChanges()
+    }
+    const timer = setInterval(check, DISK_CHECK_MS)
+    window.addEventListener('focus', check)
+    return () => {
+      clearInterval(timer)
+      window.removeEventListener('focus', check)
+    }
   }, [])
 
   // Title and unload warning follow the documents.
@@ -159,6 +184,7 @@ export function App(): ReactNode {
       <ContextMenu />
       <CommandPalette />
       <ShortcutsDialog />
+      <AboutDialog />
       <Dialog />
       <ResizeEdges />
     </div>

@@ -310,11 +310,12 @@ export function addType(kind: TypeDef['kind']): Id {
     const base = {
       id,
       description: '',
-      name: uniqueName(kind === 'struct' ? 'Struct' : kind === 'enum' ? 'Enum' : 'Alias', globalTypeNames(d))
+      name: uniqueName(kind[0]!.toUpperCase() + kind.slice(1), globalTypeNames(d))
     }
     if (kind === 'struct') d.types.push({ ...base, kind, fields: [] })
     else if (kind === 'enum') d.types.push({ ...base, kind, underlying: 'uint8', values: [] })
-    else d.types.push({ ...base, kind, type: { kind: 'primitive', name: 'uint32' } })
+    else if (kind === 'alias') d.types.push({ ...base, kind, type: { kind: 'primitive', name: 'uint32' } })
+    else d.types.push({ ...base, kind })
   })
   return id
 }

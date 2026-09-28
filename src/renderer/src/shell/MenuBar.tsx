@@ -69,6 +69,7 @@ const MENUS: [Category, string[]][] = [
       'view.openModule',
       'view.openModuleSplit',
       'view.new',
+      'view.source',
       '-',
       'view.hide',
       'view.showAll',
@@ -130,7 +131,7 @@ const MENUS: [Category, string[]][] = [
       'window.resetLayout'
     ]
   ],
-  ['Help', ['help.shortcuts', 'view.palette']]
+  ['Help', ['help.shortcuts', 'view.palette', 'help.about']]
 ]
 
 // Every listed command must exist.
@@ -183,13 +184,16 @@ export function MenuBar(): ReactNode {
           <button
             type="button"
             className={`menubar-item ${open === cat ? 'open' : ''}`}
+            role="menuitem"
+            aria-haspopup="menu"
+            aria-expanded={open === cat}
             onClick={() => setOpen(open === cat ? null : cat)}
             onMouseEnter={() => open && setOpen(cat)}
           >
             {cat}
           </button>
           {open === cat && (
-            <div className="dropdown-menu context-menu" role="menu">
+            <div className="dropdown-menu context-menu" role="menu" aria-label={cat}>
               <MenuList
                 items={ids.map((id): MenuItem =>
                   id === '-' ? 'separator' : id === 'recent' ? recentItem(recent, filePath) : commandItem(id)

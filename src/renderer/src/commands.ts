@@ -37,7 +37,15 @@ import { activeDoc, cycleDoc, patchDoc, useDocs, activateDoc } from './store/doc
 import { getProject, redo, undo } from './store/project'
 import { setSetting, useSettings, type Theme } from './store/settings'
 import { useUiStore, type ActionItem } from './store/ui'
-import { activeCanvas, openView, resetLayout, showTool, toggleTool, type ToolId } from './shell/controllers'
+import {
+  activeCanvas,
+  openSource,
+  openView,
+  resetLayout,
+  showTool,
+  toggleTool,
+  type ToolId
+} from './shell/controllers'
 import { GLOBAL_VIEW } from './model/types'
 
 export type Category = 'File' | 'Edit' | 'Insert' | 'View' | 'Arrange' | 'Window' | 'Help'
@@ -410,6 +418,13 @@ export const commands: Command[] = [
   },
   { id: 'view.new', title: 'New view', category: 'View', run: newView },
   {
+    id: 'view.source',
+    title: 'Edit as text (YAML)',
+    category: 'View',
+    keys: ['Alt+U'],
+    run: () => openSource()
+  },
+  {
     id: 'view.hide',
     title: 'Hide selection in view',
     category: 'View',
@@ -675,6 +690,12 @@ export const commands: Command[] = [
     category: 'Help',
     keys: ['?'],
     run: () => useUiStore.setState({ shortcutsOpen: true })
+  },
+  {
+    id: 'help.about',
+    title: 'About ProjectScaffold',
+    category: 'Help',
+    run: () => useUiStore.setState({ aboutOpen: true })
   }
 ]
 
@@ -725,7 +746,7 @@ export function installKeyboard(): () => void {
   const byKey = new Map<string, Command>()
   for (const c of commands) for (const k of c.keys ?? []) byKey.set(k, c)
   const listener = (e: KeyboardEvent): void => {
-    if (e.isComposing) return
+    if (e.isComposing || e.defaultPrevented) return
     const c = byKey.get(keyOf(e))
     if (!c) return
     // Clipboard shortcuts go through the copy / cut / paste events.
@@ -733,7 +754,7 @@ export function installKeyboard(): () => void {
     if (!c.global && isEditable(document.activeElement)) return
     // Modal UI (palette, menus) handles its own keys.
     const ui = useUiStore.getState()
-    if ((ui.palette || ui.contextMenu || ui.shortcutsOpen || ui.dialog) && !c.global) return
+    if ((ui.palette || ui.contextMenu || ui.shortcutsOpen || ui.aboutOpen || ui.dialog) && !c.global) return
     if (!(c.enabled?.() ?? true)) return
     e.preventDefault()
     c.run()
