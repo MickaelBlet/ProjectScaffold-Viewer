@@ -1,15 +1,19 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { commandItem, commands, type Category } from '@/commands'
 import { MenuList } from '@/components/ContextMenu'
-import type { MenuItem } from '@/store/ui'
+import { fileName, openRecentProject } from '@/fileOps'
+import { useDoc } from '@/store/documents'
+import { useUiStore, type MenuItem } from '@/store/ui'
 
-/** Menus built from the command registry; separators between groups of related commands. */
+/** Menus built from the command registry; separators between groups of related commands.
+ *  'recent' is the recent documents submenu. */
 const MENUS: [Category, (string | '-')[]][] = [
   [
     'File',
     [
       'file.new',
       'file.open',
+      'recent',
       '-',
       'file.save',
       'file.saveAs',
@@ -131,10 +135,31 @@ const MENUS: [Category, (string | '-')[]][] = [
 
 // Every listed command must exist.
 for (const [, ids] of MENUS)
-  for (const id of ids) if (id !== '-' && !commands.some((c) => c.id === id)) throw new Error(id)
+  for (const id of ids) if (id !== '-' && id !== 'recent' && !commands.some((c) => c.id === id)) throw new Error(id)
+
+function recentItem(recent: string[], filePath: string | null): MenuItem {
+  return {
+    label: 'Open Recent',
+    disabled: !recent.length,
+    submenu: [
+      ...recent.map(
+        (path): MenuItem => ({
+          label: fileName(path),
+          title: path,
+          checked: path === filePath,
+          run: () => void openRecentProject(path)
+        })
+      ),
+      'separator',
+      { label: 'Clear Recent', run: () => void window.api.clearRecent() }
+    ]
+  }
+}
 
 export function MenuBar(): ReactNode {
   const [open, setOpen] = useState<Category | null>(null)
+  const recent = useUiStore((s) => s.recent)
+  const filePath = useDoc((d) => d.filePath)
   const ref = useRef<HTMLDivElement>(null)
   useEffect(() => {
     if (!open) return
@@ -167,7 +192,10 @@ export function MenuBar(): ReactNode {
           {open === cat && (
             <div className="dropdown-menu context-menu" role="menu">
               <MenuList
-                items={ids.map((id): MenuItem => (id === '-' ? 'separator' : commandItem(id)))}
+                items={ids.map(
+                  (id): MenuItem =>
+                    id === '-' ? 'separator' : id === 'recent' ? recentItem(recent, filePath) : commandItem(id)
+                )}
                 onDone={() => setOpen(null)}
               />
             </div>

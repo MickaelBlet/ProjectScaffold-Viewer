@@ -2,10 +2,15 @@ import { memo, useEffect, type CSSProperties, type ReactNode } from 'react'
 import { Handle, NodeResizer, Position, useUpdateNodeInternals, type NodeProps } from '@xyflow/react'
 import { minSize, nameError } from '@/model/project'
 import { defaultSide, portsOn, type PortPlacement } from './portSides'
-import { getProject, setModuleLayout, update, useProjectStore } from '@/store/project'
+import { getProject, setLocked, setModuleLayout, update, useProjectStore } from '@/store/project'
 import { useUiStore } from '@/store/ui'
 import { openModuleView } from '@/actions'
-import type { Id, Port } from '@/model/types'
+import type { Id, LinkAnchor, Port, Side } from '@/model/types'
+import { anchorStyle, inward, PortPoint } from './PortPoint'
+import { Icon } from '@/components/Icon'
+
+/** Handle of a module itself: dragged to another module, links them through new ports. */
+export const MODULE_HANDLE = 'module'
 
 function RenameInput({
   id,
@@ -61,15 +66,23 @@ export const ModuleNode = memo(function ModuleNode({ id, selected, draggable, da
     Object.fromEntries(
       (mod?.ports ?? []).map((p) => [p.id, { side: defaultSide(p.role, orientation), order: null }])
     )
-  // Handles move when ports change edge or order.
-  const portsKey = (['top', 'bottom', 'left', 'right'] as const)
-    .map((side) => portsOn(mod?.ports ?? [], placements, side).map((p) => `${p.id}:${p.role}`).join(','))
-    .join('|')
+  // Ports at a hand-set link attachment (see portAnchors), out of their edge's rows.
+  const anchors = (data as { anchors?: Record<Id, LinkAnchor> }).anchors ?? {}
+  const free = (mod?.ports ?? []).filter((p) => !anchors[p.id])
+  // Handles move when ports change edge, order or attachment.
+  const portsKey = [
+    ...(['top', 'bottom', 'left', 'right'] as const).map((side) =>
+      portsOn(free, placements, side)
+        .map((p) => `${p.id}:${p.role}`)
+        .join(',')
+    ),
+    ...Object.entries(anchors).map(([p, a]) => `${p}:${a.side}:${a.at}`)
+  ].join('|')
   useEffect(() => updateInternals(id), [id, portsKey, updateInternals])
   if (!mod) return null
 
   const [top, bottom, left, right] = (['top', 'bottom', 'left', 'right'] as const).map((side) =>
-    portsOn(mod.ports, placements, side)
+    portsOn(free, placements, side)
   )
   const rows = Math.max(left!.length, right!.length)
   const vertical = orientation === 'vertical'
@@ -78,28 +91,30 @@ export const ModuleNode = memo(function ModuleNode({ id, selected, draggable, da
   const bottomBand = bottom!.length > 0 || (vertical && (!floating || hasChildren))
   // Container ports moved off the orientation's edges go outside the frame, clear of the content.
   const outsideBands = hasChildren && !vertical
-  const outsideRows = hasChildren && vertical
   const min = minSize(mod, orientation)
-  const ifaceName = (p: Port): string =>
-    p.interfaceId ? (interfaces.find((i) => i.id === p.interfaceId)?.name ?? '?') : '—'
+  const ifaceName = (p: Port): string | undefined =>
+    p.interfaceId ? (interfaces.find((i) => i.id === p.interfaceId)?.name ?? '?') : undefined
+  const title = (p: Port): string => `${p.role} ${p.name}: ${ifaceName(p) ?? 'no interface'}`
   const style = mod.color ? ({ '--module-color': mod.color } as CSSProperties) : undefined
 
-  const handle = (p: Port, position: Position): ReactNode => (
-    <Handle
-      type={p.role === 'in' ? 'target' : 'source'}
-      position={position}
-      id={p.id}
-      className={`handle ${p.role}`}
+  const point = (p: Port, edge: Side, fallback = inward(edge), anchor?: LinkAnchor): ReactNode => (
+    <PortPoint
+      key={p.id}
+      moduleId={id}
+      port={p}
+      iface={ifaceName(p)}
+      title={title(p)}
+      edge={edge}
+      fallback={fallback}
+      className={anchor ? 'anchored' : ''}
+      style={anchor && anchorStyle(anchor)}
     />
   )
   const band = (ports: Port[], side: 'top' | 'bottom'): ReactNode => (
     <div className={`port-band ${side} ${outsideBands ? 'outside' : ''}`}>
       {ports.map((p) => (
-        <span key={p.id} className={`vport ${p.role}`} title={`${p.role} ${p.name}: ${ifaceName(p)}`}>
-          {handle(p, side === 'top' ? Position.Top : Position.Bottom)}
-          <span className="vport-label">
-            {p.name} <small>{ifaceName(p)}</small>
-          </span>
+        <span key={p.id} className="vport">
+          {point(p, side, outsideBands ? side : inward(side))}
         </span>
       ))}
     </div>
@@ -124,70 +139,59 @@ export const ModuleNode = memo(function ModuleNode({ id, selected, draggable, da
         ) : (
           <span className="module-name">{mod.name}</span>
         )}
-        {mod.locked && (
-          <span className="lock-badge" title="Locked (Ctrl+L to unlock)">
-            🔒
-          </span>
-        )}
-        {hasChildren && (
-          <button
-            type="button"
-            className="module-open nodrag"
-            title="Open in its own view (Alt+Enter)"
-            onClick={(e) => {
-              e.stopPropagation()
-              openModuleView(id)
-            }}
-          >
-            ⤢
-          </button>
-        )}
+        <Handle
+          type="source"
+          position={vertical ? Position.Bottom : Position.Right}
+          id={MODULE_HANDLE}
+          className="module-connect"
+          title="Drag to another module or port to link them"
+        >
+          <Icon name="arrow-right" />
+        </Handle>
+        <button
+          type="button"
+          className={`module-open module-lock nodrag ${mod.locked ? 'locked' : ''}`}
+          title={mod.locked ? 'Unlock position and size (Ctrl+L)' : 'Lock position and size (Ctrl+L)'}
+          onClick={(e) => {
+            e.stopPropagation()
+            setLocked([id], !mod.locked)
+          }}
+        >
+          <Icon name={mod.locked ? 'lock' : 'unlock'} />
+        </button>
+        <button
+          type="button"
+          className="module-open nodrag"
+          title="Open in its own view (Alt+Enter)"
+          onClick={(e) => {
+            e.stopPropagation()
+            openModuleView(id)
+          }}
+        >
+          <Icon name="expand" />
+        </button>
       </div>
-      {outsideRows &&
-        (['left', 'right'] as const).map(
-          (side) =>
-            (side === 'left' ? left! : right!).length > 0 && (
-              <div key={side} className={`module-ports outside ${side}`}>
-                {(side === 'left' ? left! : right!).map((p) => (
-                  <div className="port-row" key={p.id}>
-                    <span className={`port ${p.role}`} title={`${p.role} ${p.name}: ${ifaceName(p)}`}>
-                      {side === 'right' && handle(p, Position.Right)}
-                      {p.name}
-                      <small>{ifaceName(p)}</small>
-                      {side === 'left' && handle(p, Position.Left)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )
-        )}
-      {!outsideRows && rows > 0 && (
-        <div className="module-ports">
+      {rows > 0 && (
+        // A container's side ports are centered on its frame, over its content.
+        <div className={`module-ports ${hasChildren ? 'framed' : ''}`}>
           {Array.from({ length: rows }, (_, i) => {
             const pl = left![i]
             const pr = right![i]
             return (
               <div className="port-row" key={i}>
-                {pl && (
-                  <span className={`port left ${pl.role}`} title={`${pl.role} ${pl.name}: ${ifaceName(pl)}`}>
-                    {handle(pl, Position.Left)}
-                    {pl.name}
-                    <small>{ifaceName(pl)}</small>
-                  </span>
-                )}
-                {pr && (
-                  <span className={`port right ${pr.role}`} title={`${pr.role} ${pr.name}: ${ifaceName(pr)}`}>
-                    <small>{ifaceName(pr)}</small>
-                    {pr.name}
-                    {handle(pr, Position.Right)}
-                  </span>
-                )}
+                {pl && point(pl, 'left')}
+                {pr && point(pr, 'right')}
               </div>
             )
           })}
         </div>
       )}
       {bottomBand && band(bottom!, 'bottom')}
+      {mod.ports.map((p) => {
+        const a = anchors[p.id]
+        // Past top / bottom attachments the name goes outside, clear of the header.
+        return a && point(p, a.side, a.side === 'left' || a.side === 'right' ? inward(a.side) : a.side, a)
+      })}
     </div>
   )
 })

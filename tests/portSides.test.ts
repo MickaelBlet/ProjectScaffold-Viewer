@@ -100,6 +100,22 @@ describe('floatingPortSides', () => {
     })
   })
 
+  it('moves ports linked to their container to a hand-set attachment', () => {
+    const p = produce(project(0, 300), (d) => {
+      d.modules.push(mod('C', 10, 90, [port('c_in', 'in')], 'B'))
+      d.links.push({
+        id: 'l3',
+        name: 'l3',
+        description: '',
+        from: { moduleId: 'B', portId: 'b_in' },
+        to: { moduleId: 'C', portId: 'c_in' },
+        constraints: defaultConstraints(),
+        route: { points: [], to: { side: 'bottom', at: 0.5 } }
+      })
+    })
+    expect(floatingPortSides(p, all(p)).get('C')).toMatchObject({ c_in: { side: 'bottom' } })
+  })
+
   it('leaves hidden ends alone', () => {
     const hidden = floatingPortSides(project(0, 300), new Set(['A']))
     expect(hidden.get('A')).toMatchObject({ a_in: { side: 'left' }, a_out: { side: 'right' } })

@@ -3,6 +3,7 @@ import { useStore } from 'zustand'
 import { activateDoc, moveDoc, useDocs, type DocState } from '@/store/documents'
 import { closeDocument, closeOtherDocuments, docTitle, newProject } from '@/fileOps'
 import { openContextMenu } from '@/store/ui'
+import { Icon } from '@/components/Icon'
 
 function DocTab({ doc, active, index }: { doc: DocState; active: boolean; index: number }): ReactNode {
   const project = useStore(doc.store, (s) => s.project)
@@ -50,8 +51,8 @@ function DocTab({ doc, active, index }: { doc: DocState; active: boolean; index:
         onMouseDown={(e) => e.stopPropagation()}
         onClick={() => closeDocument(doc.id)}
       >
-        <span className="dot">●</span>
-        <span className="x">×</span>
+        <Icon name="dot" />
+        <Icon name="x" />
       </button>
     </div>
   )
@@ -66,7 +67,7 @@ export function DocTabs(): ReactNode {
         <DocTab key={d.id} doc={d} index={i} active={d.id === activeId} />
       ))}
       <button type="button" className="doc-new" title="New project (Alt+N)" onClick={newProject}>
-        +
+        <Icon name="plus" />
       </button>
     </div>
   )

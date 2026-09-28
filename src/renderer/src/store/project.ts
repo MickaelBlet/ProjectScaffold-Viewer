@@ -6,12 +6,15 @@ import {
   defaultSize,
   globalTypeNames,
   findImported,
+  findPort,
   growAncestors,
   LAYOUT_PAD,
   linkOrigin,
+  linkRoles,
   contentTop,
   minSize,
   newId,
+  nextModuleColor,
   pruneViews,
   subtreeIds,
   typeUsages,
@@ -20,7 +23,7 @@ import {
 import { importModule, refreshImport, removeImported, type RefreshResult } from '@/model/imports'
 import { followInterfaceRenames } from '@/model/sync'
 import { snapChanges } from '@/model/grid'
-import type { Endpoint, Id, LinkRoute, Project, Rect, TypeDef } from '@/model/types'
+import type { Endpoint, Id, LinkRoute, PortRole, Project, Rect, Side, TypeDef } from '@/model/types'
 import { activeDoc, useDoc } from './documents'
 import { useSettings } from './settings'
 
@@ -81,6 +84,7 @@ export function addModule(parentId: Id | null, x: number, y: number): Id {
       name,
       description: '',
       parentId,
+      color: nextModuleColor(d),
       metadata: {},
       ports: [],
       layout: { x, y, ...defaultSize({ ports: [] }, d.orientation) }
@@ -94,7 +98,7 @@ export function addModule(parentId: Id | null, x: number, y: number): Id {
 export function addSubmodule(parentId: Id): Id {
   const p = getProject()
   const parent = p.modules.find((m) => m.id === parentId)
-  const top = (parent ? contentTop(parent, p.orientation) : 0) + PAD
+  const top = (parent ? contentTop(p.orientation) : 0) + PAD
   const bottom = Math.max(top, ...childModules(p, parentId).map((c) => c.layout.y + c.layout.height + PAD))
   return addModule(parentId, PAD, bottom)
 }
@@ -196,20 +200,25 @@ export function reparentModule(id: Id, parentId: Id | null, x: number, y: number
 
 // Ports
 
-export function addPort(moduleId: Id, role: 'in' | 'out'): void {
-  update((d) => {
-    const m = d.modules.find((m) => m.id === moduleId)
-    if (!m) return
-    const name = uniqueName(
-      role,
-      m.ports.map((p) => p.name)
-    )
-    m.ports.push({ id: newId(), name, role, interfaceId: null, description: '' })
-    const min = minSize(m, d.orientation)
-    m.layout.width = Math.max(m.layout.width, min.width)
-    m.layout.height = Math.max(m.layout.height, min.height)
-    growAncestors(d, moduleId)
-  })
+export function addPort(moduleId: Id, role: PortRole): void {
+  update((d) => void pushPort(d, moduleId, role, null))
+}
+
+/** New port on a module, which grows to fit it; returns its id (null if the module is gone). */
+function pushPort(d: Project, moduleId: Id, role: PortRole, interfaceId: Id | null): Id | null {
+  const m = d.modules.find((m) => m.id === moduleId)
+  if (!m) return null
+  const id = newId()
+  const name = uniqueName(
+    role,
+    m.ports.map((p) => p.name)
+  )
+  m.ports.push({ id, name, role, interfaceId, description: '' })
+  const min = minSize(m, d.orientation)
+  m.layout.width = Math.max(m.layout.width, min.width)
+  m.layout.height = Math.max(m.layout.height, min.height)
+  growAncestors(d, moduleId)
+  return id
 }
 
 export function deletePort(moduleId: Id, portId: Id): void {
@@ -225,23 +234,55 @@ export function deletePort(moduleId: Id, portId: Id): void {
 
 export function addLink(from: Endpoint, to: Endpoint): Id {
   const id = newId()
+  update((d) => pushLink(d, id, from, to))
+  return id
+}
+
+/** Link end: a port, or a module that gets a new port for the link (null `portId`). */
+export interface LinkEnd {
+  moduleId: Id
+  portId: Id | null
+}
+
+/**
+ * Link two ends, adding the missing ports (`out` at `from`, `in` at `to`) and propagating the
+ * interface to an untyped end; returns the link id (null if a module is gone).
+ */
+export function connect(from: LinkEnd, to: LinkEnd): Id | null {
+  let id: Id | null = null
   update((d) => {
-    const moduleName = (e: Endpoint): string | undefined =>
-      d.modules.find((m) => m.id === e.moduleId)?.name ??
-      d.imports
-        .flatMap((i) => i.modules)
-        .find((m) => m.id === e.moduleId)
-        ?.path.split('.')
-        .pop()
-    const a = moduleName(from) ?? 'a'
-    const b = moduleName(to) ?? 'b'
-    const name = uniqueName(
-      `${a}_to_${b}`,
-      d.links.map((l) => l.name)
-    )
-    d.links.push({ id, name, description: '', from, to, constraints: defaultConstraints() })
+    const iface = (e: LinkEnd): Id | null =>
+      (e.portId && findPort(d, e.moduleId, e.portId)?.interfaceId) || null
+    const shared = iface(from) ?? iface(to)
+    const [fromRole, toRole] = linkRoles(d, from.moduleId, to.moduleId)
+    const fromPort = from.portId ?? pushPort(d, from.moduleId, fromRole, shared)
+    const toPort = to.portId ?? pushPort(d, to.moduleId, toRole, shared)
+    if (!fromPort || !toPort) return
+    const a = findPort(d, from.moduleId, fromPort)
+    const b = findPort(d, to.moduleId, toPort)
+    if (a && b && !a.interfaceId) a.interfaceId = b.interfaceId
+    if (a && b && !b.interfaceId) b.interfaceId = a.interfaceId
+    id = newId()
+    pushLink(d, id, { moduleId: from.moduleId, portId: fromPort }, { moduleId: to.moduleId, portId: toPort })
   })
   return id
+}
+
+function pushLink(d: Project, id: Id, from: Endpoint, to: Endpoint): void {
+  const moduleName = (e: Endpoint): string | undefined =>
+    d.modules.find((m) => m.id === e.moduleId)?.name ??
+    d.imports
+      .flatMap((i) => i.modules)
+      .find((m) => m.id === e.moduleId)
+      ?.path.split('.')
+      .pop()
+  const a = moduleName(from) ?? 'a'
+  const b = moduleName(to) ?? 'b'
+  const name = uniqueName(
+    `${a}_to_${b}`,
+    d.links.map((l) => l.name)
+  )
+  d.links.push({ id, name, description: '', from, to, constraints: defaultConstraints() })
 }
 
 export function deleteLink(id: Id): void {
@@ -427,6 +468,17 @@ export function reverseLink(id: Id): void {
 
 const clean = <T extends object>(o: T): T =>
   Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as T
+
+/** Set or clear (undefined: the default) where a port's name is drawn around its handle. */
+export function setPortLabel(moduleId: Id, portId: Id, label: Side | undefined): void {
+  update((d) => {
+    const m = d.modules.find((m) => m.id === moduleId) ?? findImported(d, moduleId)?.module
+    const pt = m?.ports.find((pt) => pt.id === portId)
+    if (!pt) return
+    if (label) pt.label = label
+    else delete pt.label
+  })
+}
 
 /** Set or clear (undefined, or nothing left) the hand-set shape of a link. */
 export function setLinkRoute(id: Id, route: LinkRoute | undefined): void {

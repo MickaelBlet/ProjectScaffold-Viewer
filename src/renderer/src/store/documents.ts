@@ -37,6 +37,10 @@ export interface DocState {
   layout: unknown
   /** Bumped to re-fit the canvases (after loading). */
   viewEpoch: number
+  /** Past inspector selections (Alt+Left / Alt+Right), oldest first. */
+  selectionHistory: NonNullable<Selection>[]
+  /** Position of the current selection in `selectionHistory`. */
+  historyIndex: number
 }
 
 interface DocsState {
@@ -81,7 +85,9 @@ export function createDoc(project: Project = emptyProject(), filePath: string | 
     activeViewId: GLOBAL_VIEW,
     viewports: {},
     layout: null,
-    viewEpoch: 1
+    viewEpoch: 1,
+    selectionHistory: [],
+    historyIndex: -1
   }
 }
 
@@ -101,13 +107,59 @@ export function findDoc(id: Id): DocState | undefined {
   return useDocs.getState().docs.find((d) => d.id === id)
 }
 
+const HISTORY_MAX = 100
+let travelling = false
+
+const sameSelection = (a: Selection, b: Selection): boolean =>
+  a?.kind === b?.kind && (a && 'id' in a ? a.id : null) === (b && 'id' in b ? b.id : null)
+
+/** Record a single selection (not a clear or a multi-selection being built) in the history. */
+function recordSelection(d: DocState): DocState {
+  const s = d.selection
+  if (travelling || !s || d.selectedIds.length > 1) return d
+  if (sameSelection(s, d.selectionHistory[d.historyIndex] ?? null)) return d
+  const selectionHistory = [...d.selectionHistory.slice(0, d.historyIndex + 1), s].slice(-HISTORY_MAX)
+  return { ...d, selectionHistory, historyIndex: selectionHistory.length - 1 }
+}
+
 export function patchDoc(
   patch: Partial<DocState> | ((d: DocState) => Partial<DocState>),
   id: Id = useDocs.getState().activeId
 ): void {
   useDocs.setState((s) => ({
-    docs: s.docs.map((d) => (d.id === id ? { ...d, ...(typeof patch === 'function' ? patch(d) : patch) } : d))
+    docs: s.docs.map((d) => {
+      if (d.id !== id) return d
+      const p = typeof patch === 'function' ? patch(d) : patch
+      const next = { ...d, ...p }
+      return 'selection' in p && !sameSelection(p.selection ?? null, d.selection) ? recordSelection(next) : next
+    })
   }))
+}
+
+/**
+ * Step `delta` entries through the selection history of the active document, skipping entities
+ * that no longer exist. `apply` shows the entry; it does not record a new one.
+ */
+export function travelSelection(
+  delta: -1 | 1,
+  exists: (s: NonNullable<Selection>) => boolean,
+  apply: (s: NonNullable<Selection>) => void
+): boolean {
+  const d = activeDoc()
+  // Back from a cleared or unrecorded selection returns to the last recorded one first.
+  const away = !sameSelection(d.selection, d.selectionHistory[d.historyIndex] ?? null)
+  let i = d.historyIndex + (away && delta < 0 ? 0 : delta)
+  while (i >= 0 && i < d.selectionHistory.length && !exists(d.selectionHistory[i]!)) i += delta
+  const target = d.selectionHistory[i]
+  if (!target) return false
+  patchDoc({ historyIndex: i })
+  travelling = true
+  try {
+    apply(target)
+  } finally {
+    travelling = false
+  }
+  return true
 }
 
 export function isDocDirty(d: DocState): boolean {

@@ -2,6 +2,7 @@ import { useMemo, useState, type ReactNode } from 'react'
 import { validate, type Problem } from '@/model/validate'
 import { useProjectStore } from '@/store/project'
 import { navigate } from '@/actions'
+import { Icon } from '@/components/Icon'
 
 export function useProblems(): Problem[] {
   const project = useProjectStore((s) => s.project)
@@ -26,7 +27,7 @@ export function ProblemsPanel(): ReactNode {
           title="Show errors"
           onClick={() => setShow((s) => ({ ...s, error: !s.error }))}
         >
-          ✖ {errors}
+          <Icon name="error" /> {errors}
         </button>
         <button
           type="button"
@@ -34,7 +35,7 @@ export function ProblemsPanel(): ReactNode {
           title="Show warnings"
           onClick={() => setShow((s) => ({ ...s, warning: !s.warning }))}
         >
-          ⚠ {warnings}
+          <Icon name="warning" /> {warnings}
         </button>
         <input
           type="search"
@@ -47,7 +48,9 @@ export function ProblemsPanel(): ReactNode {
       <ul>
         {shown.map((p, i) => (
           <li key={i} className={p.severity} onClick={() => navigate(p.target)}>
-            <span className="sev">{p.severity === 'error' ? '✖' : '⚠'}</span>
+            <span className="sev">
+              <Icon name={p.severity} />
+            </span>
             {p.message}
           </li>
         ))}

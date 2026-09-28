@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   Background,
+  ConnectionMode,
   Controls,
   MarkerType,
   MiniMap,
@@ -13,6 +14,7 @@ import {
   type Edge,
   type Node,
   type NodeChange,
+  type OnConnectEnd,
   type OnNodeDrag,
   type Viewport
 } from '@xyflow/react'
@@ -27,12 +29,13 @@ import {
   isImportedId,
   minSize,
   modulePath,
+  orderLinkEnds,
   subtreeIds,
   visibleModuleIds
 } from '@/model/project'
-import { GLOBAL_VIEW, type Id, type Project, type View } from '@/model/types'
+import { GLOBAL_VIEW, type Id, type PortRole, type Project, type View } from '@/model/types'
 import {
-  addLink,
+  connect,
   deleteLink,
   getProject,
   reparentModule,
@@ -62,11 +65,14 @@ import {
 import { commandItem as item, keyLabel } from '@/commands'
 import { fileName } from '@/fileOps'
 import { openView, registerCanvas } from '@/shell/controllers'
-import { ModuleNode } from './ModuleNode'
+import { MODULE_HANDLE, ModuleNode } from './ModuleNode'
 import {
   floatingPortSides,
+  freePorts,
   neededHeight,
+  portAnchors,
   portPoints,
+  type PortPlacement,
   STAND_IN_HEADER,
   type PortSides,
   type StandIn
@@ -87,6 +93,35 @@ interface Guide {
   /** Vertical line at x, or horizontal line at y (absolute flow coordinates). */
   x?: number
   y?: number
+}
+
+type Point = { x: number; y: number }
+
+/** Nodes inside the dragged frames, with their positions when the drag started. */
+interface FrameDrag {
+  /** Dragged node whose moves give the offset. */
+  id: string
+  from: Point
+  nodes: Map<string, Point>
+}
+
+type Box = Point & { width: number; height: number }
+
+const within = (r: Box, f: Box): boolean =>
+  r.x >= f.x && r.y >= f.y && r.x + r.width <= f.x + f.width && r.y + r.height <= f.y + f.height
+
+/** Nodes inside a dragged frame follow it. */
+function followFrame(changes: NodeChange<Node>[], drag: FrameDrag | null): void {
+  if (!drag) return
+  const c = changes.find(
+    (x): x is Extract<NodeChange<Node>, { type: 'position' }> =>
+      x.type === 'position' && x.id === drag.id && !!x.position
+  )
+  if (!c?.position) return
+  const dx = c.position.x - drag.from.x
+  const dy = c.position.y - drag.from.y
+  for (const [id, at] of drag.nodes)
+    changes.push({ id, type: 'position', position: { x: at.x + dx, y: at.y + dy } })
 }
 
 /** React Flow nodes of a view: its modules (parents first), notes and outside stand-ins. */
@@ -117,6 +152,14 @@ function toNodes(
         data: {}
       })
   const parents = new Set(p.modules.flatMap((m) => m.parentId ?? []))
+  // Ports at a hand-set link attachment are drawn there, out of their edge's rows.
+  const anchors = portAnchors(p, sides)
+  const portData = (ports: { id: Id }[], placements: Record<Id, PortPlacement> | undefined) => ({
+    ...(placements && { sides: placements }),
+    anchors: Object.fromEntries(
+      ports.flatMap((pt) => (anchors.has(pt.id) ? [[pt.id, anchors.get(pt.id)!]] : []))
+    )
+  })
   for (const m of p.modules) {
     if (!visible.has(m.id)) continue
     const isRoot = m.id === view.rootModuleId
@@ -128,12 +171,14 @@ function toNodes(
       type: 'module',
       position: { x: m.layout.x, y: m.layout.y },
       width: m.layout.width,
-      height: grow ? Math.max(m.layout.height, fit(neededHeight(m.ports, placements))) : m.layout.height,
+      height: grow
+        ? Math.max(m.layout.height, fit(neededHeight(freePorts(m.ports, anchors), placements)))
+        : m.layout.height,
       parentId: isRoot ? undefined : (m.parentId ?? undefined),
       // The root of a drill-down view is the frame of the view.
       draggable: !isRoot && !m.locked,
       selected: selected.has(m.id),
-      data: placements ? { sides: placements } : {}
+      data: portData(m.ports, placements)
     })
   }
   nodes.push(...externals)
@@ -147,9 +192,13 @@ function toNodes(
       type: 'imported',
       position: { ...m.position },
       width: fit(size.width),
-      height: fit(placements ? Math.max(size.height, neededHeight(m.ports, placements)) : size.height),
+      height: fit(
+        placements
+          ? Math.max(size.height, neededHeight(freePorts(m.ports, anchors), placements))
+          : size.height
+      ),
       selected: selected.has(m.id),
-      data: placements ? { sides: placements } : {}
+      data: portData(m.ports, placements)
     })
   }
   return nodes
@@ -269,6 +318,36 @@ function toEdges(p: Project, visible: Set<Id>, drill: boolean, selectedLink: Id 
   })
 }
 
+interface ConnectEnd {
+  moduleId: Id
+  /** null: the module's own handle, linked through a new port. */
+  portId: Id | null
+  role: PortRole | null
+}
+
+function endOf(p: Project, moduleId: Id, handle: string): ConnectEnd {
+  if (handle === MODULE_HANDLE) return { moduleId, portId: null, role: null }
+  return { moduleId, portId: handle, role: findPort(p, moduleId, handle)?.role ?? null }
+}
+
+/**
+ * Ends of a connection drawn between two handles, in link order, or null when their ports cannot
+ * be linked (roles, interfaces). Handles are dragged either way: the roles give the direction.
+ */
+function linkEnds(c: Connection | Edge): [ConnectEnd, ConnectEnd] | null {
+  if (!c.sourceHandle || !c.targetHandle) return null
+  const p = getProject()
+  const a = endOf(p, c.source, c.sourceHandle)
+  const b = endOf(p, c.target, c.targetHandle)
+  // Module to module: drop on the module instead (onConnectEnd).
+  if (!a.portId && !b.portId) return null
+  if ((a.portId && !a.role) || (b.portId && !b.role)) return null
+  const ends = orderLinkEnds(p, a, b)
+  if (!ends) return null
+  const [x, y] = ends.map((e) => (e.portId ? findPort(p, e.moduleId, e.portId) : null))
+  return !x?.interfaceId || !y?.interfaceId || x.interfaceId === y.interfaceId ? ends : null
+}
+
 const sameIds = (a: Id[], b: Id[]): boolean => a.length === b.length && a.every((x, i) => x === b[i])
 
 function Breadcrumbs({ view }: { view: View }): ReactNode {
@@ -337,6 +416,7 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
   }, [project])
 
   const [nodes, setNodes, onNodesChangeBase] = useNodesState<Node>([])
+  const frameDrag = useRef<FrameDrag | null>(null)
   // Ports follow their links when link ends are auto-oriented; outside stand-ins follow the ports
   // they link to, and the ports follow them back.
   const { sides, externals } = useMemo(() => {
@@ -543,6 +623,7 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
       const moving = changes.filter((c) => c.type === 'position' && c.dragging && c.position)
       if (moving.length !== 1 || !showGuides) {
         if (guides.length) setGuides([])
+        followFrame(changes, frameDrag.current)
         return onNodesChangeBase(changes)
       }
       const change = moving[0] as Extract<NodeChange<Node>, { type: 'position' }>
@@ -581,6 +662,7 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
       snapAxis('x', w)
       snapAxis('y', h)
       setGuides(found)
+      followFrame(changes, frameDrag.current)
       onNodesChangeBase(changes)
     },
     [flow, guides.length, onNodesChangeBase, absolute, applySelect, snapToGrid]
@@ -591,25 +673,15 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
     if (c.source.startsWith(EXTERNAL) || c.target.startsWith(EXTERNAL)) return false
     // A link to another project needs one end here.
     if (isImportedId(c.source) && isImportedId(c.target)) return false
-    const p = getProject()
-    const a = findPort(p, c.source, c.sourceHandle)
-    const b = findPort(p, c.target, c.targetHandle)
-    if (!a || !b) return false
-    return !a.interfaceId || !b.interfaceId || a.interfaceId === b.interfaceId
+    return !!linkEnds(c)
   }, [])
 
   const onConnect = useCallback((c: Connection): void => {
-    if (!c.sourceHandle || !c.targetHandle) return
-    const from = { moduleId: c.source, portId: c.sourceHandle }
-    const to = { moduleId: c.target, portId: c.targetHandle }
-    // Propagate the interface to an untyped end.
-    update((d) => {
-      const a = findPort(d, from.moduleId, from.portId)
-      const b = findPort(d, to.moduleId, to.portId)
-      if (a && b && !a.interfaceId) a.interfaceId = b.interfaceId
-      if (a && b && !b.interfaceId) b.interfaceId = a.interfaceId
-    })
-    select({ kind: 'link', id: addLink(from, to) })
+    const ends = linkEnds(c)
+    if (!ends) return
+    const [from, to] = ends
+    const id = connect(from, to)
+    if (id) select({ kind: 'link', id })
   }, [])
 
   /** Deepest visible module under a flow point (excluding `exclude`'s subtree). */
@@ -635,14 +707,63 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
     [flow, absolute]
   )
 
+  // Dropped on a module rather than a port: link to a new port there.
+  const onConnectEnd: OnConnectEnd = useCallback(
+    (e, state) => {
+      const origin = state.fromHandle
+      if (state.isValid || !origin?.id || origin.nodeId.startsWith(EXTERNAL)) return
+      const { clientX, clientY } = 'changedTouches' in e ? e.changedTouches[0]! : e
+      const target = moduleAt(flow.screenToFlowPosition({ x: clientX, y: clientY }))
+      if (!target || target === origin.nodeId) return
+      const ends = orderLinkEnds(getProject(), endOf(getProject(), origin.nodeId, origin.id), {
+        moduleId: target,
+        portId: null,
+        role: null
+      })
+      if (!ends) return
+      const id = connect(ends[0], ends[1])
+      if (id) select({ kind: 'link', id })
+    },
+    [flow, moduleAt]
+  )
+
+  // A dragged frame carries the top-level nodes lying fully inside it.
+  const onNodeDragStart: OnNodeDrag = useCallback(
+    (_, node, dragged) => {
+      frameDrag.current = null
+      const notes = getProject().notes
+      const frames = dragged
+        .filter((n) => notes.find((x) => x.id === n.id)?.kind === 'frame')
+        .map((n) => nodeRect(n.id))
+        .filter((r) => !!r)
+      if (!frames.length) return
+      const moving = new Set(dragged.map((n) => n.id))
+      const nodes = new Map<string, Point>()
+      for (const n of flow.getNodes()) {
+        if (moving.has(n.id) || n.parentId || n.draggable === false || n.type === 'external') continue
+        const r = nodeRect(n.id)
+        if (r && frames.some((f) => within(r, f))) nodes.set(n.id, { ...n.position })
+      }
+      if (nodes.size) frameDrag.current = { id: node.id, from: { ...node.position }, nodes }
+    },
+    [flow, nodeRect]
+  )
+
   const onNodeDragStop: OnNodeDrag = useCallback(
     (_, node, dragged) => {
       setGuides([])
       const p = getProject()
+      const carried = [...(frameDrag.current?.nodes.keys() ?? [])].flatMap((id) => flow.getNode(id) ?? [])
+      frameDrag.current = null
       if (dragged.length > 1 || node.type === 'note' || node.type === 'imported') {
         // Several items: move them, keeping their parents.
         setLayouts(
-          new Map(dragged.map((n) => [n.id, { x: Math.round(n.position.x), y: Math.round(n.position.y) }]))
+          new Map(
+            [...dragged, ...carried].map((n) => [
+              n.id,
+              { x: Math.round(n.position.x), y: Math.round(n.position.y) }
+            ])
+          )
         )
         return
       }
@@ -664,7 +785,7 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
         setLayouts(new Map([[node.id, { x: Math.round(node.position.x), y: Math.round(node.position.y) }]]))
       }
     },
-    [absolute, moduleAt, view.rootModuleId]
+    [flow, absolute, moduleAt, view.rootModuleId]
   )
 
   const onMoveEnd = useCallback(
@@ -809,6 +930,7 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
+        onNodeDragStart={onNodeDragStart}
         onNodeDragStop={onNodeDragStop}
         onNodeClick={(e, n) => {
           if (n.id.startsWith(EXTERNAL) || e.shiftKey || e.ctrlKey || e.metaKey) return
@@ -829,7 +951,10 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
         onPaneContextMenu={paneMenu}
         onSelectionContextMenu={(e) => paneMenuForSelection(e)}
         onConnect={onConnect}
+        onConnectEnd={onConnectEnd}
         isValidConnection={isValidConnection}
+        // Links go either way between ports (see linkEnds), into a container from its in ports.
+        connectionMode={ConnectionMode.Loose}
         onMove={(_, vp) => useUiStore.setState({ zoom: vp.zoom })}
         onMoveEnd={onMoveEnd}
         deleteKeyCode={null}
@@ -843,6 +968,7 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
         minZoom={0.1}
         defaultViewport={savedViewport.current}
         fitView={!savedViewport.current}
+        proOptions={{ hideAttribution: true }}
       >
         <Background gap={settings.gridSize} />
         <Controls />

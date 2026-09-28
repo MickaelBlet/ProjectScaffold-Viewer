@@ -8,6 +8,7 @@ import { openContextMenu } from '@/store/ui'
 import { commandItem } from '@/commands'
 import { navigate } from '@/actions'
 import { openEditor } from '@/shell/controllers'
+import { Icon } from '@/components/Icon'
 
 interface Row {
   id: string
@@ -85,7 +86,7 @@ export function LinksPanel(): ReactNode {
             <span className="result-label">{r.name}</span>
             {r.iface && <small>{r.iface}</small>}
             <span className="result-text">
-              {r.from} {r.bidirectional ? '↔' : '→'} {r.to}
+              {r.from} <Icon name={r.bidirectional ? 'arrow-left-right' : 'arrow-right'} /> {r.to}
             </span>
           </li>
         ))}

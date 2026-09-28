@@ -1,0 +1,24 @@
+# Portable desktop builds: scripts/build_electron.sh -> dist-electron/
+appId: com.mickaelblet.projectscaffold
+productName: ProjectScaffold
+artifactName: ${productName}-${version}-${os}-${arch}.${ext}
+directories:
+  output: dist-electron
+# The web build is self-contained: no runtime node_modules.
+files:
+  - electron/**
+  - dist-web/**
+  - '!**/node_modules/**'
+icon: electron/icon.png
+linux:
+  target:
+    - { target: AppImage, arch: x64 }
+    - { target: tar.gz, arch: x64 }
+  category: Development
+  syncDesktopName: true
+win:
+  target:
+    - { target: portable, arch: x64 }
+    - { target: zip, arch: x64 }
+portable:
+  artifactName: ${productName}-${version}-portable.${ext}

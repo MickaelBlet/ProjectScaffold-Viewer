@@ -1,17 +1,18 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { DockShell } from './shell/DockShell'
 import { MenuBar } from './shell/MenuBar'
+import { ResizeEdges, WindowControls } from './shell/WindowFrame'
 import { StatusBar } from './shell/StatusBar'
 import { ContextMenu } from './components/ContextMenu'
 import { CommandPalette } from './components/CommandPalette'
 import { ShortcutsDialog } from './components/ShortcutsDialog'
-import { RecentMenu } from './components/RecentMenu'
 import { anyDirty, currentSession, docTitle, openProject, restoreSession } from './fileOps'
 import { installClipboard, installKeyboard, runCommand } from './commands'
 import { activeDoc, isDocDirty, useDocs } from './store/documents'
 import { applyForceAnimations, applyPortStyle, applyTheme, useSettings } from './store/settings'
 import { useProjectStore } from './store/project'
 import { useUiStore } from './store/ui'
+import { Icon } from '@/components/Icon'
 
 function Dialog(): ReactNode {
   const dialog = useUiStore((s) => s.dialog)
@@ -104,29 +105,29 @@ export function App(): ReactNode {
   return (
     <div className="app">
       <header className="toolbar">
-        <strong className="brand">ProjectScaffold</strong>
+        <svg className="brand" viewBox="0 0 32 32" role="img" aria-label="ProjectScaffold">
+          <title>ProjectScaffold</title>
+          <rect width="32" height="32" rx="7" fill="#3b6fe0" />
+          <path d="M15 10h7v8" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          <rect x="5" y="5" width="10" height="10" rx="2" fill="#fff" />
+          <rect x="17" y="17" width="10" height="10" rx="2" fill="#fff" />
+          <circle cx="15" cy="10" r="2" fill="#3b6fe0" stroke="#fff" strokeWidth="1.5" />
+          <circle cx="22" cy="17" r="2" fill="#3b6fe0" stroke="#fff" strokeWidth="1.5" />
+        </svg>
         <MenuBar />
         <span className="sep" />
-        <ToolbarButton command="file.open" title="Open (Ctrl+O)">
-          Open…
-        </ToolbarButton>
-        <RecentMenu />
-        <ToolbarButton command="file.save" title="Save (Ctrl+S)">
-          Save
-        </ToolbarButton>
-        <span className="sep" />
         <ToolbarButton command="insert.module" title="Add module (Ctrl+M)">
-          + Module
+          <Icon name="plus" /> Module
         </ToolbarButton>
         <ToolbarButton command="arrange.auto" title="Auto-arrange (Ctrl+Alt+L)">
-          ⊞ Arrange
+          <Icon name="arrange" /> Arrange
         </ToolbarButton>
         <span className="sep" />
         <ToolbarButton command="edit.undo" title="Undo (Ctrl+Z)">
-          ↶
+          <Icon name="undo" />
         </ToolbarButton>
         <ToolbarButton command="edit.redo" title="Redo (Ctrl+Y)">
-          ↷
+          <Icon name="redo" />
         </ToolbarButton>
         <span className="spacer" />
         <button
@@ -144,6 +145,7 @@ export function App(): ReactNode {
         <ToolbarButton command="file.exportJson" title="Export JSON (Ctrl+Shift+E)" className="primary">
           Export JSON
         </ToolbarButton>
+        <WindowControls />
       </header>
       <DockShell />
       <StatusBar />
@@ -151,6 +153,7 @@ export function App(): ReactNode {
       <CommandPalette />
       <ShortcutsDialog />
       <Dialog />
+      <ResizeEdges />
     </div>
   )
 }

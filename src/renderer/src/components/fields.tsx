@@ -1,4 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import { PALETTE } from '@/model/project'
+import { Icon, type IconName } from './Icon'
 
 /** Text input that keeps a local draft and commits on blur / Enter, rejecting invalid values. */
 export function CommitInput(props: {
@@ -132,7 +134,7 @@ export function Section(props: { title: string; actions?: ReactNode; children: R
 export function IconButton(props: {
   title: string
   onClick: () => void
-  children: ReactNode
+  icon: IconName
   danger?: boolean
   disabled?: boolean
 }): ReactNode {
@@ -145,7 +147,7 @@ export function IconButton(props: {
       disabled={props.disabled}
       onClick={props.onClick}
     >
-      {props.children}
+      <Icon name={props.icon} />
     </button>
   )
 }
@@ -174,9 +176,12 @@ export function MetadataEditor(props: {
             }
           />
           <input value={v} onChange={(e) => props.onChange((m) => void (m[k] = e.target.value))} />
-          <IconButton title="Remove entry" danger onClick={() => props.onChange((m) => void delete m[k])}>
-            ×
-          </IconButton>
+          <IconButton
+            icon="x"
+            title="Remove entry"
+            danger
+            onClick={() => props.onChange((m) => void delete m[k])}
+          />
         </div>
       ))}
       <button
@@ -190,24 +195,11 @@ export function MetadataEditor(props: {
           })
         }
       >
-        + Add entry
+        <Icon name="plus" /> Add entry
       </button>
     </div>
   )
 }
-
-export const PALETTE = [
-  '#e0513b',
-  '#d98b00',
-  '#d6c21f',
-  '#2e9e5b',
-  '#2e9e8f',
-  '#3b8fd1',
-  '#3b6fe0',
-  '#8a4fd1',
-  '#d14f9e',
-  '#7a8496'
-]
 
 /** Swatches plus a free color; `undefined` is no color. */
 export function ColorPicker(props: {

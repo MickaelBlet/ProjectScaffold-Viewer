@@ -1,4 +1,5 @@
 :root {
+  --icon-size: 14px;
   --bg: #f6f7f9;
   --panel: #ffffff;
   --panel-2: #f0f2f5;
@@ -126,6 +127,28 @@ button.primary {
 button.danger {
   color: var(--danger);
 }
+/* Icons (components/Icon.tsx): one size everywhere */
+.ico {
+  flex: none;
+  width: var(--icon-size);
+  height: var(--icon-size);
+  vertical-align: -0.2em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.ico-dot {
+  fill: currentColor;
+  stroke: none;
+}
+button:has(> .ico) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
 button.icon {
   padding: 0 6px;
   min-width: 24px;
@@ -170,8 +193,10 @@ button.link-button:hover {
   min-width: 0;
 }
 .toolbar .brand {
+  flex: none;
+  width: 20px;
+  height: 20px;
   margin-right: 4px;
-  white-space: nowrap;
 }
 .toolbar .sep {
   width: 1px;
@@ -308,14 +333,18 @@ kbd {
   display: flex;
   gap: 2px;
 }
+/* Icon buttons beside inputs / selects: as tall as them. */
+:is(.grid, .metadata, .row-value, .row-inline, .card-header, .section-actions) button:has(> .ico) {
+  min-height: calc(1lh + 8px);
+}
 .explorer-actions button.icon {
   font-size: 11px;
   padding: 0 4px;
   color: var(--text);
 }
 .chevron {
-  display: inline-block;
-  width: 12px;
+  display: inline-flex;
+  width: var(--icon-size);
   color: var(--muted);
 }
 .entity-list {
@@ -608,6 +637,7 @@ ul.plain {
 
 /* Canvas nodes */
 .module {
+  position: relative;
   width: 100%;
   height: 100%;
   background: var(--node-bg);
@@ -660,9 +690,7 @@ ul.plain {
   padding: 1px 4px;
 }
 .module-open {
-  padding: 0 5px;
-  line-height: 18px;
-  font-size: 12px;
+  padding: 2px 3px;
   background: transparent;
   border-color: transparent;
   color: var(--muted);
@@ -670,11 +698,62 @@ ul.plain {
 .module-open:hover {
   color: var(--accent);
 }
+/* The module's own link handle, a header button rather than a dot on the border. */
+.module-header .react-flow__handle.module-connect {
+  position: static;
+  display: flex;
+  width: auto;
+  height: auto;
+  min-width: 0;
+  min-height: 0;
+  padding: 2px 3px;
+  transform: none;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  color: var(--muted);
+  opacity: 0.35;
+}
+.module-header .react-flow__handle.module-connect:hover {
+  color: var(--accent);
+  opacity: 0.8;
+}
+.module-header .react-flow__handle.module-connect .ico {
+  pointer-events: none;
+}
+.module-lock {
+  opacity: 0.35;
+}
+.module-lock.locked,
+.module-lock:hover {
+  opacity: 0.8;
+}
 .module-ports {
   padding-top: 6px;
 }
+/* Leaves: side ports centered between the header (and top band) and the bottom band. */
+.module:not(.container) {
+  display: flex;
+  flex-direction: column;
+}
+.module:not(.container) > .module-header,
+.module:not(.container) > .port-band {
+  flex-shrink: 0;
+}
+.module:not(.container) > .module-ports {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding-top: 0;
+}
+.module:not(.container) > .port-band.bottom {
+  position: static;
+  margin-top: auto;
+}
 .lock-badge {
-  font-size: 11px;
+  display: inline-flex;
+  color: var(--muted);
   opacity: 0.7;
   pointer-events: none;
 }
@@ -715,6 +794,13 @@ ul.plain {
 }
 .handle.in {
   background: var(--ok) !important;
+}
+/* Inward twin of a port's handle (see PortPoint): only an end for links, never shown. */
+.react-flow__handle.inner-handle {
+  width: 10px;
+  height: 10px;
+  opacity: 0;
+  pointer-events: none;
 }
 .handle.out {
   background: var(--accent) !important;
@@ -800,6 +886,9 @@ ul.plain {
   background: var(--accent);
 }
 .badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   font-size: 10px;
   padding: 1px 5px;
   border-radius: 8px;
@@ -975,13 +1064,6 @@ ul.plain {
   border: 1px solid var(--border);
   border-radius: 6px;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
-}
-.dropdown-title {
-  padding: 4px 8px;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  color: var(--muted);
 }
 .dropdown-menu button {
   display: flex;
@@ -1209,28 +1291,27 @@ ul.plain {
 .doc-close:hover {
   background: var(--panel-2);
 }
-.doc-close .dot {
+.doc-close .ico-dot {
   display: none;
-  font-size: 10px;
 }
-.doc-close .x {
+.doc-close .ico-x {
   visibility: hidden;
 }
-.doc-tab.active .doc-close .x,
-.doc-tab:hover .doc-close .x {
+.doc-tab.active .doc-close .ico-x,
+.doc-tab:hover .doc-close .ico-x {
   visibility: visible;
 }
-.doc-close.dirty .dot {
-  display: inline;
+.doc-close.dirty .ico-dot {
+  display: block;
 }
-.doc-close.dirty .x {
+.doc-close.dirty .ico-x {
   display: none;
 }
-.doc-close.dirty:hover .dot {
+.doc-close.dirty:hover .ico-dot {
   display: none;
 }
-.doc-close.dirty:hover .x {
-  display: inline;
+.doc-close.dirty:hover .ico-x {
+  display: block;
   visibility: visible;
 }
 .doc-new {
@@ -1248,18 +1329,114 @@ ul.plain {
   gap: 6px;
   color: var(--muted);
 }
-.view-tab.drill .dv-default-tab-content::before,
+/* Same outlines as the view / expand icons of components/Icon.tsx */
 .view-tab .dv-default-tab-content::before {
-  content: '◇ ';
-  color: var(--ok);
+  content: '';
+  display: inline-block;
+  width: var(--icon-size);
+  height: var(--icon-size);
+  margin-right: 4px;
+  vertical-align: -0.2em;
+  background: var(--ok);
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 2.5 13.5 8 8 13.5 2.5 8z'/%3E%3C/svg%3E")
+    center / contain no-repeat;
 }
 .view-tab.drill .dv-default-tab-content::before {
-  content: '⤢ ';
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 3h4v4M13 3 9 7M7 13H3V9M3 13l4-4'/%3E%3C/svg%3E");
 }
 .entity-tab .dv-default-tab-content::before {
   content: attr(data-kind) ' ';
   font-weight: 700;
   color: var(--accent);
+}
+
+/* Frameless desktop window (Electron): data-frame is 'frameless' or 'maximized' */
+:root[data-frame='frameless'] .app {
+  border: 1px solid var(--border);
+}
+:root[data-frame] .toolbar {
+  -webkit-app-region: drag;
+  user-select: none;
+}
+:root[data-frame] .toolbar button,
+:root[data-frame] .toolbar .menubar,
+:root[data-frame] .toolbar .context-menu {
+  -webkit-app-region: no-drag;
+}
+.window-controls {
+  display: flex;
+  align-self: stretch;
+  margin: -4px -10px -4px 4px;
+}
+.window-controls button {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: none;
+  color: var(--text);
+}
+.window-controls button:hover {
+  background: var(--panel-2);
+}
+.window-controls button.close:hover {
+  background: #e81123;
+  color: #fff;
+}
+.resize-edge {
+  position: fixed;
+  z-index: 2000;
+}
+.resize-edge.n,
+.resize-edge.s {
+  left: 8px;
+  right: 8px;
+  height: 4px;
+  cursor: ns-resize;
+}
+.resize-edge.e,
+.resize-edge.w {
+  top: 8px;
+  bottom: 8px;
+  width: 4px;
+  cursor: ew-resize;
+}
+.resize-edge.ne,
+.resize-edge.nw,
+.resize-edge.se,
+.resize-edge.sw {
+  width: 8px;
+  height: 8px;
+}
+.resize-edge.n,
+.resize-edge.ne,
+.resize-edge.nw {
+  top: 0;
+}
+.resize-edge.s,
+.resize-edge.se,
+.resize-edge.sw {
+  bottom: 0;
+}
+.resize-edge.e,
+.resize-edge.ne,
+.resize-edge.se {
+  right: 0;
+}
+.resize-edge.w,
+.resize-edge.nw,
+.resize-edge.sw {
+  left: 0;
+}
+.resize-edge.ne,
+.resize-edge.sw {
+  cursor: nesw-resize;
+}
+.resize-edge.nw,
+.resize-edge.se {
+  cursor: nwse-resize;
 }
 
 /* Menus */
@@ -1312,6 +1489,7 @@ ul.plain {
   white-space: nowrap;
 }
 .menu-item:hover:not(:disabled),
+.menu-item.open,
 .menu-item:focus-visible {
   background: var(--accent-soft);
   outline: none;
@@ -1320,11 +1498,16 @@ ul.plain {
   color: var(--danger);
 }
 .menu-check {
-  width: 12px;
+  display: inline-flex;
+  width: var(--icon-size);
   color: var(--accent);
 }
 .menu-label {
   flex: 1;
+}
+.menu-arrow {
+  display: inline-flex;
+  color: var(--muted);
 }
 
 /* Command palette */
@@ -1384,6 +1567,8 @@ ul.plain {
   cursor: default;
 }
 .palette-kind {
+  display: inline-flex;
+  justify-content: center;
   width: 18px;
   text-align: center;
   font-size: 11px;
@@ -1662,36 +1847,86 @@ mark {
   top: 100%;
   bottom: auto;
 }
-.port-band.outside.top .react-flow__handle {
-  top: auto;
-  bottom: 0;
-  transform: translate(-50%, 50%);
+.port-band.outside.top .port-point {
+  top: 100%;
 }
-.port-band.outside.bottom .react-flow__handle {
+.port-band.outside.bottom .port-point {
   top: 0;
-  bottom: auto;
-  transform: translate(-50%, -50%);
 }
-.module-ports.outside {
+.module-ports.framed {
   position: absolute;
-  top: 24px;
-  padding-top: 0;
-}
-.module-ports.outside.left {
-  right: 100%;
-}
-.module-ports.outside.right {
-  left: 100%;
-}
-.module-ports.outside.left .react-flow__handle {
-  left: auto;
-  right: 0;
-  transform: translate(50%, -50%);
-}
-.module-ports.outside.right .react-flow__handle {
-  right: auto;
   left: 0;
-  transform: translate(-50%, -50%);
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  padding-top: 0;
+  pointer-events: none;
+}
+/* Ports of modules: a point on the border holding the handle (in its row, band or at a hand-set
+   link attachment), the name on one side of it, dragged around it. */
+.port-point {
+  position: absolute;
+  width: 0;
+  height: 0;
+  font-size: 12px;
+}
+.port-point.at-left {
+  left: 0;
+  top: 50%;
+}
+.port-point.at-right {
+  left: 100%;
+  top: 50%;
+}
+.port-point.at-top {
+  top: 0;
+  left: 50%;
+}
+.port-point.at-bottom {
+  top: 100%;
+  left: 50%;
+}
+.port-label {
+  position: absolute;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  white-space: nowrap;
+  line-height: 16px;
+  cursor: grab;
+  pointer-events: auto;
+}
+.port-label.dragging {
+  cursor: grabbing;
+  opacity: 0.7;
+}
+.port-label.label-right {
+  left: 10px;
+  top: 0;
+  transform: translateY(-50%);
+}
+.port-label.label-left {
+  right: 10px;
+  top: 0;
+  transform: translateY(-50%);
+  flex-direction: row-reverse;
+}
+.port-label.label-top {
+  bottom: 6px;
+  left: 0;
+  transform: translateX(-50%);
+}
+.port-label.label-bottom {
+  top: 6px;
+  left: 0;
+  transform: translateX(-50%);
+}
+.port-label small {
+  color: var(--muted);
+  font-size: 10px;
+}
+.port-label small.no-iface {
+  color: var(--warning);
 }
 .vport {
   position: relative;
@@ -1728,6 +1963,10 @@ mark {
 }
 .module.imported .unknown small {
   color: var(--danger);
+}
+.port small.no-iface,
+.vport small.no-iface {
+  color: var(--warning);
 }
 .error-text {
   color: var(--danger);

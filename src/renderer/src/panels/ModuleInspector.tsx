@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { absolutePosition, modulePath, nameError } from '@/model/project'
+import { absolutePosition, childModules, modulePath, nameError } from '@/model/project'
 import {
   addPort,
   addSubmodule,
@@ -24,6 +24,7 @@ import {
   TextArea
 } from '@/components/fields'
 import type { Module, Project } from '@/model/types'
+import { Icon } from '@/components/Icon'
 
 function withModule(id: string, fn: (m: Module, d: Project) => void): void {
   update((d) => {
@@ -38,6 +39,7 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
   if (!mod) return <p className="muted">Module deleted.</p>
   const links = project.links.filter((l) => l.from.moduleId === id || l.to.moduleId === id)
   const parent = mod.parentId ? modulePath(project, mod.parentId) : null
+  const children = childModules(project, id)
   const interfaceOptions = [
     { value: '', label: '— none —' },
     ...project.interfaces.map((i) => ({ value: i.id, label: i.name }))
@@ -66,14 +68,13 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
               {parent}
             </button>
             <IconButton
+              icon="level-up"
               title="Move to top level"
               onClick={() => {
                 const abs = absolutePosition(project, id)
                 reparentModule(id, null, abs.x, abs.y)
               }}
-            >
-              ⇱
-            </IconButton>
+            />
           </span>
         ) : (
           <span className="muted">top level</span>
@@ -86,10 +87,10 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
         actions={
           <>
             <button type="button" onClick={() => addPort(id, 'in')}>
-              + in
+              <Icon name="plus" /> in
             </button>
             <button type="button" onClick={() => addPort(id, 'out')}>
-              + out
+              <Icon name="plus" /> out
             </button>
           </>
         }
@@ -134,15 +135,37 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
                   />
                 </td>
                 <td>
-                  <IconButton title="Delete port" danger onClick={() => deletePort(id, pt.id)}>
-                    ×
-                  </IconButton>
+                  <IconButton icon="x" title="Delete port" danger onClick={() => deletePort(id, pt.id)} />
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
         {!mod.ports.length && <p className="muted">No ports. Links connect ports.</p>}
+      </Section>
+
+      <Section
+        title={`Submodules (${children.length})`}
+        actions={
+          <button type="button" onClick={() => select({ kind: 'module', id: addSubmodule(id) })}>
+            <Icon name="plus" /> add
+          </button>
+        }
+      >
+        <ul className="plain">
+          {children.map((c) => (
+            <li key={c.id}>
+              <button
+                type="button"
+                className="link-button"
+                onClick={() => navigate({ kind: 'module', id: c.id })}
+              >
+                {c.name}
+              </button>
+            </li>
+          ))}
+        </ul>
+        {!children.length && <p className="muted">No submodules.</p>}
       </Section>
 
       <Section title={`Links (${links.length})`}>
@@ -177,9 +200,6 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
       </Section>
 
       <div className="actions">
-        <button type="button" onClick={() => select({ kind: 'module', id: addSubmodule(id) })}>
-          + Submodule
-        </button>
         <button
           type="button"
           className="danger"

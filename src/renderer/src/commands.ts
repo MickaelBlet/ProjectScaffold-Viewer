@@ -29,13 +29,14 @@ import {
   selectionLocked,
   showAllInView,
   startRename,
-  toggleLockSelection
+  toggleLockSelection,
+  travelSelection
 } from './actions'
 import { closeDocument, exportProject, newProject, openProject, saveAll, saveProject } from './fileOps'
 import { activeDoc, cycleDoc, patchDoc, useDocs, activateDoc } from './store/documents'
 import { getProject, redo, undo } from './store/project'
 import { applyTheme, setSetting, useSettings, type Theme } from './store/settings'
-import { useUiStore, type MenuItem } from './store/ui'
+import { useUiStore, type ActionItem } from './store/ui'
 import { activeCanvas, openView, resetLayout, showTool, toggleTool, type ToolId } from './shell/controllers'
 import { GLOBAL_VIEW } from './model/types'
 
@@ -338,6 +339,20 @@ export const commands: Command[] = [
     keys: ['Ctrl+P'],
     global: true,
     run: () => useUiStore.setState({ palette: { query: '' } })
+  },
+  {
+    id: 'view.back',
+    title: 'Previous selection',
+    category: 'View',
+    keys: ['Alt+ArrowLeft'],
+    run: () => travelSelection(-1)
+  },
+  {
+    id: 'view.forward',
+    title: 'Next selection',
+    category: 'View',
+    keys: ['Alt+ArrowRight'],
+    run: () => travelSelection(1)
   },
   {
     id: 'view.fit',
@@ -680,7 +695,7 @@ export function runCommand(id: string): void {
 }
 
 /** Menu entry running a command. */
-export function commandItem(id: string, label?: string): MenuItem {
+export function commandItem(id: string, label?: string): ActionItem {
   const c = getCommand(id)
   return {
     label: label ?? c.title,

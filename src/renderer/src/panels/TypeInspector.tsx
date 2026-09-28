@@ -7,6 +7,7 @@ import { CommitInput, IconButton, NumberInput, Row, Section, Select, TextArea } 
 import { TypeEditor, TypeTree } from '@/components/TypeEditor'
 import { INT_PRIMITIVES, type Field, type TypeDef } from '@/model/types'
 import { IDENTIFIER_RE } from '@/model/project'
+import { Icon } from '@/components/Icon'
 
 function withType<K extends TypeDef['kind']>(
   id: string,
@@ -70,22 +71,23 @@ export function FieldList<F extends Field = Field>(props: {
                 </td>
                 <td className="nowrap">
                   <IconButton
+                    icon="arrow-up"
                     title="Move up"
                     disabled={i === 0}
                     onClick={() => onChange((fs) => move(fs, i, -1))}
-                  >
-                    ↑
-                  </IconButton>
+                  />
                   <IconButton
+                    icon="arrow-down"
                     title="Move down"
                     disabled={i === fields.length - 1}
                     onClick={() => onChange((fs) => move(fs, i, 1))}
-                  >
-                    ↓
-                  </IconButton>
-                  <IconButton title="Remove" danger onClick={() => onChange((fs) => void fs.splice(i, 1))}>
-                    ×
-                  </IconButton>
+                  />
+                  <IconButton
+                    icon="x"
+                    title="Remove"
+                    danger
+                    onClick={() => onChange((fs) => void fs.splice(i, 1))}
+                  />
                 </td>
               </tr>
               {trees.has(f.id) && (
@@ -186,12 +188,11 @@ export function TypeInspector({ id }: { id: string }): ReactNode {
                   </td>
                   <td>
                     <IconButton
+                      icon="x"
                       title="Remove"
                       danger
                       onClick={() => withType<'enum'>(id, (x) => void x.values.splice(i, 1))}
-                    >
-                      ×
-                    </IconButton>
+                    />
                   </td>
                 </tr>
               ))}
@@ -214,7 +215,7 @@ export function TypeInspector({ id }: { id: string }): ReactNode {
               })
             }
           >
-            + Add value
+            <Icon name="plus" /> Add value
           </button>
         </Section>
       )}

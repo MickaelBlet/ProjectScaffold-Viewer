@@ -1,15 +1,16 @@
-// Views, types and interfaces of the active document. Click selects (Ctrl / Shift for several),
+// Views, types, interfaces, modules and links of the active document. Click selects (Ctrl / Shift for several),
 // double-click opens an editor tab, right click for more.
 import { useState, type MouseEvent, type ReactNode } from 'react'
-import { findView } from '@/model/project'
+import { findPort, findView, modulePath } from '@/model/project'
 import { GLOBAL_VIEW, type Id } from '@/model/types'
 import { activeDoc, patchDoc, useDoc } from '@/store/documents'
 import { addInterface, addType, addView, deleteView, renameView, useProjectStore } from '@/store/project'
 import { openContextMenu, select, type Selection } from '@/store/ui'
 import { commandItem } from '@/commands'
-import { newView, selectionOf } from '@/actions'
+import { addModuleAt, navigate, newView, selectionOf } from '@/actions'
 import { openEditor, openView } from '@/shell/controllers'
 import { getProject } from '@/store/project'
+import { Icon } from '@/components/Icon'
 
 const KIND_BADGE = { struct: 'S', enum: 'E', alias: 'A' } as const
 
@@ -23,7 +24,9 @@ function Section(props: {
   return (
     <section className={`explorer-section ${open ? 'open' : ''}`}>
       <header onClick={() => setOpen(!open)}>
-        <span className="chevron">{open ? '▾' : '▸'}</span>
+        <span className="chevron">
+          <Icon name={open ? 'chevron-down' : 'chevron-right'} />
+        </span>
         <span className="explorer-title">{props.title}</span>
         {props.count !== undefined && <small>{props.count}</small>}
         <span className="explorer-actions" onClick={(e) => e.stopPropagation()}>
@@ -55,10 +58,13 @@ function clickItem(e: MouseEvent, id: Id, list: Id[]): void {
       return patchDoc({ selectedIds: ids })
     }
   }
-  select(selectionOf(getProject(), id) as Selection)
+  const sel = selectionOf(getProject(), id)
+  // Modules and links are also brought into view on the canvas.
+  if (sel?.kind === 'module' || sel?.kind === 'link') return navigate(sel)
+  select(sel as Selection)
 }
 
-function entityMenu(e: MouseEvent, kind: 'type' | 'interface', id: Id): void {
+function entityMenu(e: MouseEvent, kind: 'type' | 'interface' | 'module' | 'link', id: Id): void {
   e.preventDefault()
   if (!activeDoc().selectedIds.includes(id)) select({ kind, id })
   openContextMenu(e, [
@@ -78,7 +84,8 @@ export function ExplorerPanel(): ReactNode {
   const types = useProjectStore((s) => s.project.types)
   const interfaces = useProjectStore((s) => s.project.interfaces)
   const views = useProjectStore((s) => s.project.views)
-  const modules = useProjectStore((s) => s.project.modules)
+  const project = useProjectStore((s) => s.project)
+  const { modules, links } = project
   const selectedIds = useDoc((d) => d.selectedIds)
   const activeViewId = useDoc((d) => d.activeViewId)
   const [filter, setFilter] = useState('')
@@ -88,6 +95,18 @@ export function ExplorerPanel(): ReactNode {
   const shownInterfaces = interfaces.filter((i) => match(i.name))
   const typeIds = shownTypes.map((t) => t.id)
   const interfaceIds = shownInterfaces.map((i) => i.id)
+  const shownModules = modules
+    .map((m) => ({ m, path: modulePath(project, m.id) }))
+    .filter((x) => match(x.path))
+    .sort((a, b) => a.path.localeCompare(b.path))
+  const moduleIds = shownModules.map((x) => x.m.id)
+  const endpoint = (e: (typeof links)[number]['from']): string =>
+    `${modulePath(project, e.moduleId)}:${findPort(project, e.moduleId, e.portId)?.name ?? '?'}`
+  const shownLinks = links
+    .map((l) => ({ l, from: endpoint(l.from), to: endpoint(l.to) }))
+    .filter((x) => match(x.l.name) || match(x.from) || match(x.to))
+    .sort((a, b) => a.l.name.localeCompare(b.l.name))
+  const linkIds = shownLinks.map((x) => x.l.id)
   const allViews = [{ id: GLOBAL_VIEW, name: 'Global', rootModuleId: null, hidden: [] }, ...views]
 
   return (
@@ -107,7 +126,7 @@ export function ExplorerPanel(): ReactNode {
         count={allViews.length}
         actions={
           <button type="button" className="icon" title="New view" onClick={newView}>
-            +
+            <Icon name="plus" />
           </button>
         }
       >
@@ -147,7 +166,9 @@ export function ExplorerPanel(): ReactNode {
                     ])
                   }}
                 >
-                  <span className={`kind-badge view ${root ? 'drill' : ''}`}>{root ? '⤢' : 'V'}</span>
+                  <span className={`kind-badge view ${root ? 'drill' : ''}`}>
+                    {root ? <Icon name="expand" /> : 'V'}
+                  </span>
                   {v.name}
                   <small>
                     {root ? root.name : ''}
@@ -170,7 +191,8 @@ export function ExplorerPanel(): ReactNode {
             title={`New ${k}`}
             onClick={() => select({ kind: 'type', id: addType(k) })}
           >
-            +{KIND_BADGE[k]}
+            <Icon name="plus" />
+            {KIND_BADGE[k]}
           </button>
         ))}
       >
@@ -203,7 +225,7 @@ export function ExplorerPanel(): ReactNode {
             title="New interface"
             onClick={() => select({ kind: 'interface', id: addInterface() })}
           >
-            +
+            <Icon name="plus" />
           </button>
         }
       >
@@ -222,6 +244,58 @@ export function ExplorerPanel(): ReactNode {
             </li>
           ))}
           {!shownInterfaces.length && <li className="empty">{f ? 'No match' : 'No interfaces yet'}</li>}
+        </ul>
+      </Section>
+
+      <Section
+        title="Modules"
+        count={modules.length}
+        actions={
+          <button type="button" className="icon" title="New module" onClick={() => addModuleAt()}>
+            <Icon name="plus" />
+          </button>
+        }
+      >
+        <ul className="entity-list">
+          {shownModules.map(({ m, path }) => (
+            <li
+              key={m.id}
+              className={selectedIds.includes(m.id) ? 'active' : ''}
+              title={path}
+              onClick={(e) => clickItem(e, m.id, moduleIds)}
+              onDoubleClick={() => openEditor('module', m.id)}
+              onContextMenu={(e) => entityMenu(e, 'module', m.id)}
+            >
+              <span className="kind-badge mod">M</span>
+              {m.name}
+              <small>{path.slice(0, -m.name.length - 1)}</small>
+            </li>
+          ))}
+          {!shownModules.length && <li className="empty">{f ? 'No match' : 'No modules yet'}</li>}
+        </ul>
+      </Section>
+
+      <Section title="Links" count={links.length}>
+        <ul className="entity-list">
+          {shownLinks.map(({ l, from, to }) => (
+            <li
+              key={l.id}
+              className={selectedIds.includes(l.id) ? 'active' : ''}
+              title={`${from} → ${to}`}
+              onClick={(e) => clickItem(e, l.id, linkIds)}
+              onDoubleClick={() => openEditor('link', l.id)}
+              onContextMenu={(e) => entityMenu(e, 'link', l.id)}
+            >
+              <span className="kind-badge link">L</span>
+              {l.name}
+              <small>
+                <Icon
+                  name={l.constraints.direction === 'bidirectional' ? 'arrow-left-right' : 'arrow-right'}
+                />
+              </small>
+            </li>
+          ))}
+          {!shownLinks.length && <li className="empty">{f ? 'No match' : 'No links yet'}</li>}
         </ul>
       </Section>
     </div>

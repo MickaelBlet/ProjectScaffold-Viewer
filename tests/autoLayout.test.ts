@@ -66,6 +66,17 @@ describe('autoLayout, vertical', () => {
     expect(byName('Logger').y).toBeGreaterThan(byName('Sensor').y + byName('Sensor').height)
   })
 
+  it('centers each layer on its container axis', async () => {
+    const p = await arrange(example, null, { orientation: 'vertical', spacing: 70 })
+    const byName = (n: string) => p.modules.find((m) => m.name === n)!.layout
+    const center = (r: Rect): number => r.x + r.width / 2
+    const [sensor, logger, controller] = ['Sensor', 'Logger', 'Controller'].map(byName)
+    const row =
+      Math.min(logger!.x, controller!.x) +
+      Math.max(logger!.x + logger!.width, controller!.x + controller!.width)
+    expect(center(sensor!)).toBeCloseTo(row / 2, 0)
+  })
+
   it('arranges horizontally again', async () => {
     const v = await arrange(example, null, { orientation: 'vertical', spacing: 70 })
     const h = await arrange(v, null, { orientation: 'horizontal', spacing: 70 })

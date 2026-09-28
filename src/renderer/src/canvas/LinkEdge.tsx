@@ -27,6 +27,7 @@ import {
   type Point,
   type Route
 } from './linkRoute'
+import { Icon } from '@/components/Icon'
 
 export const PERF_COLORS: Record<PerformanceClass, string> = {
   realtime: 'var(--perf-realtime)',
@@ -52,6 +53,8 @@ const SIDE: Record<Position, Side> = {
   [Position.Top]: 'top',
   [Position.Bottom]: 'bottom'
 }
+
+const OPPOSITE: Record<Side, Side> = { left: 'right', right: 'left', top: 'bottom', bottom: 'top' }
 
 const POSITION: Record<Side, Position> = {
   left: Position.Left,
@@ -81,12 +84,25 @@ function endPoints(
     node && anchor && node.type !== 'external' ? anchorPoint(rectOf(node), anchor) : null
   const from = anchored(source, route?.from)
   const to = anchored(target, route?.to)
-  return {
+  // Ports are drawn at their attachment (portAnchors) unless another link's attachment took them.
+  const atPort = (p: Point, x: number, y: number): boolean => Math.hypot(p.x - x, p.y - y) < 8
+  const out = {
     ...ends,
     ...(from && { sourceX: from.x, sourceY: from.y, sourcePosition: POSITION[route!.from!.side] }),
     ...(to && { targetX: to.x, targetY: to.y, targetPosition: POSITION[route!.to!.side] }),
-    moved: [!!from || ends.moved[0]!, !!to || ends.moved[1]!]
+    moved: [
+      from ? !atPort(from, props.sourceX, props.sourceY) : ends.moved[0]!,
+      to ? !atPort(to, props.targetX, props.targetY) : ends.moved[1]!
+    ]
   }
+  // A container's end of a link to its content leaves inwards, from the edge it sits on.
+  const inwards = (node: InternalNode, x: number, y: number): Position =>
+    POSITION[OPPOSITE[nearestAnchor(rectOf(node), { x, y }).side]]
+  if (source && target && isAncestor(lookup, source.id, target.id))
+    out.sourcePosition = inwards(source, out.sourceX, out.sourceY)
+  if (source && target && isAncestor(lookup, target.id, source.id))
+    out.targetPosition = inwards(target, out.targetX, out.targetY)
+  return out
 }
 
 function portEnds(
@@ -285,13 +301,17 @@ export const LinkEdge = memo(function LinkEdge(props: EdgeProps): ReactNode {
         path={path}
         markerEnd={props.markerEnd}
         markerStart={props.markerStart}
-        interactionWidth={16}
+        interactionWidth={0}
         style={{
           stroke: color,
           strokeWidth: props.selected ? 3 : 2,
           strokeDasharray: c.remote.enabled ? '6 4' : undefined
         }}
       />
+      {/* Hit area of the line, naming the link on hover. */}
+      <path className="react-flow__edge-interaction" d={path} fill="none" strokeOpacity={0} strokeWidth={16}>
+        <title>{link.name}</title>
+      </path>
       {/* Selection: dashes flowing along the link's direction. */}
       {props.selected && <path className="edge-flow" d={path} />}
       {/* Selected link: drag its line to bend it there. */}
@@ -301,7 +321,9 @@ export const LinkEdge = memo(function LinkEdge(props: EdgeProps): ReactNode {
           d={path}
           onPointerDown={grabLine}
           onClick={(e) => e.detail === 2 && addBend(e)}
-        />
+        >
+          <title>{link.name}</title>
+        </path>
       )}
       {/* Attachment dots where an end left its port's side. */}
       {ends.moved[0] && (
@@ -351,7 +373,9 @@ export const LinkEdge = memo(function LinkEdge(props: EdgeProps): ReactNode {
         >
           {edgeBadges ? (
             <>
-              <span className="badge dir">{c.direction === 'bidirectional' ? '⇄' : '→'}</span>
+              <span className="badge dir">
+                <Icon name={c.direction === 'bidirectional' ? 'arrow-left-right' : 'arrow-right'} />
+              </span>
               {c.ack.required && (
                 <span className="badge ack">ACK{c.ack.timeoutMs ? ` ${c.ack.timeoutMs}ms` : ''}</span>
               )}
@@ -360,7 +384,11 @@ export const LinkEdge = memo(function LinkEdge(props: EdgeProps): ReactNode {
                   {c.performance.class}
                 </span>
               )}
-              {c.remote.enabled && <span className="badge remote">⇢ {c.remote.transport || 'remote'}</span>}
+              {c.remote.enabled && (
+                <span className="badge remote">
+                  <Icon name="globe" /> {c.remote.transport || 'remote'}
+                </span>
+              )}
             </>
           ) : (
             <span className="edge-dot" style={{ background: color }} />

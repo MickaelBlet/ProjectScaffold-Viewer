@@ -1,0 +1,18 @@
+# syntax=docker/dockerfile:1
+# Portable Electron builds for Linux x64 (AppImage, tar.gz) and Windows x64 (portable .exe, zip).
+# Wine is needed to stamp the Windows icon and version info. Usage: scripts/build_electron.sh
+
+FROM electronuserland/builder:24-wine AS build
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN --mount=type=cache,target=/root/.npm npm ci
+COPY . .
+RUN --mount=type=cache,target=/root/.cache/electron \
+    --mount=type=cache,target=/root/.cache/electron-builder \
+    npm run electron:build \
+    && mkdir -p /out/linux /out/windows \
+    && cp dist-electron/*.AppImage dist-electron/*-linux-*.tar.gz /out/linux/ \
+    && cp dist-electron/*-portable.exe dist-electron/*-win-*.zip /out/windows/
+
+FROM scratch AS export
+COPY --from=build /out /

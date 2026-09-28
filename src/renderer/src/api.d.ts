@@ -44,6 +44,8 @@ export interface Api {
   onRecentChange(cb: (files: string[]) => void): () => void
   /** Resolves to the written path, or null when cancelled. */
   saveFile(req: SaveRequest): Promise<string | null>
+  /** False when saving downloads a copy instead of writing the file (Firefox, Safari). */
+  writesFiles: boolean
   setDirty(dirty: boolean): void
   /** Stores the open documents. */
   saveSession(session: Session): void
@@ -51,8 +53,25 @@ export interface Api {
   loadSession(): Promise<Session | null>
 }
 
+/** Window edge or corner a resize starts from. */
+export type ResizeEdge = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw'
+
+/** Frameless desktop window (Electron): the page draws the window buttons and resize edges. */
+export interface Desktop {
+  minimize(): void
+  toggleMaximize(): void
+  close(): void
+  isMaximized(): Promise<boolean>
+  onMaximizedChange(cb: (maximized: boolean) => void): () => void
+  resizeStart(): void
+  /** Pointer offset in screen pixels since resizeStart. */
+  resize(edge: ResizeEdge, dx: number, dy: number): void
+}
+
 declare global {
   interface Window {
     api: Api
+    /** Only in the desktop app. */
+    desktop?: Desktop
   }
 }

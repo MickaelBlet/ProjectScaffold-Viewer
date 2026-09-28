@@ -10,6 +10,7 @@ import { navigate, openModuleView } from '@/actions'
 import { addView } from '@/store/project'
 import { openView } from '@/shell/controllers'
 import { GLOBAL_VIEW } from '@/model/types'
+import { Icon } from '@/components/Icon'
 
 const DRAG = 'application/x-module'
 
@@ -17,7 +18,7 @@ const DRAG = 'application/x-module'
 function dropPosition(p: Project, id: Id, parentId: Id | null): { x: number; y: number } {
   if (!parentId) return absolutePosition(p, id)
   const parent = p.modules.find((m) => m.id === parentId)
-  const top = (parent ? contentTop(parent, p.orientation) : 0) + LAYOUT_PAD
+  const top = (parent ? contentTop(p.orientation) : 0) + LAYOUT_PAD
   const bottom = Math.max(
     top,
     ...childModules(p, parentId)
@@ -108,7 +109,7 @@ function Node(props: { m: Module; depth: number; filter: string; hidden: Set<Id>
             setOpen(!open)
           }}
         >
-          {children.length ? (open || filter ? '▾' : '▸') : ''}
+          {children.length > 0 && <Icon name={open || filter ? 'chevron-down' : 'chevron-right'} />}
         </span>
         <span className="kind-badge mod" style={m.color ? { background: m.color } : undefined}>
           M
@@ -124,7 +125,7 @@ function Node(props: { m: Module; depth: number; filter: string; hidden: Set<Id>
             toggleHidden()
           }}
         >
-          {isHidden ? '◌' : '◉'}
+          <Icon name={isHidden ? 'eye-off' : 'eye'} />
         </button>
       </div>
       {(open || filter) && children.length > 0 && (

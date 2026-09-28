@@ -1,20 +1,28 @@
+import type { ReactNode } from 'react'
 import { create } from 'zustand'
 import type { Id } from '@/model/types'
 import { patchDoc, useDoc, type Selection } from './documents'
 
 export type { Selection } from './documents'
 
-export type MenuItem =
-  | { label: string; run: () => void; keys?: string; disabled?: boolean; danger?: boolean; checked?: boolean }
-  | 'separator'
+export interface ActionItem {
+  label: string
+  run: () => void
+  keys?: string
+  disabled?: boolean
+  danger?: boolean
+  checked?: boolean
+  title?: string
+}
+export type MenuItem = ActionItem | { label: string; submenu: MenuItem[]; disabled?: boolean } | 'separator'
 
 /** A choice of a quick pick (command palette listing given entries). */
 export interface PickEntry {
   key: string
   label: string
   detail?: string
-  /** Short badge. */
-  kind: string
+  /** Short badge: a letter or an icon. */
+  kind: ReactNode
   run: () => void
 }
 

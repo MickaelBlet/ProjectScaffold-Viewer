@@ -71,9 +71,11 @@ export function LinkInspector({ id }: { id: string }): ReactNode {
           onChange={setInterface}
         />
         {iface && (
-          <IconButton title="Open interface" onClick={() => select({ kind: 'interface', id: iface.id })}>
-            ↗
-          </IconButton>
+          <IconButton
+            icon="arrow-up-right"
+            title="Open interface"
+            onClick={() => select({ kind: 'interface', id: iface.id })}
+          />
         )}
       </Row>
       {mismatch && <p className="muted">Ends have different interfaces; picking one sets both ports.</p>}
@@ -88,8 +90,8 @@ export function LinkInspector({ id }: { id: string }): ReactNode {
         <Select
           value={c.direction}
           options={[
-            { value: 'unidirectional', label: '→ Unidirectional (one way)' },
-            { value: 'bidirectional', label: '⇄ Bidirectional (request / reply)' }
+            { value: 'unidirectional', label: 'Unidirectional (one way)' },
+            { value: 'bidirectional', label: 'Bidirectional (request / reply)' }
           ]}
           onChange={(v) =>
             withLink(id, (l) => {

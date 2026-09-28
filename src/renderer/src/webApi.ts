@@ -265,6 +265,7 @@ const webApi: Api = {
     return last ? readRecent(last, false) : null
   },
   saveFile,
+  writesFiles: !!fs.showSaveFilePicker,
   recentFiles: async () => (await loadRecent()).map((e) => e.name),
   openRecent: async (path) => {
     const entry = (await loadRecent()).find((e) => e.name === path)

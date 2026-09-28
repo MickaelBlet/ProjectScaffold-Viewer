@@ -6,6 +6,7 @@ import { useUiStore } from '@/store/ui'
 import { useProblems } from '@/panels/ProblemsPanel'
 import { findView } from '@/model/project'
 import { showTool } from './controllers'
+import { Icon } from '@/components/Icon'
 
 export function StatusBar(): ReactNode {
   const status = useUiStore((s) => s.status)
@@ -24,7 +25,10 @@ export function StatusBar(): ReactNode {
       <span className="status-text">{status?.text ?? 'Ready'}</span>
       <span className="spacer" />
       <button type="button" className="status-item" title="Problems" onClick={() => showTool('problems')}>
-        <span className={errors ? 'error' : ''}>✖ {errors}</span> ⚠ {problems.length - errors}
+        <span className={errors ? 'error' : ''}>
+          <Icon name="error" /> {errors}
+        </span>{' '}
+        <Icon name="warning" /> {problems.length - errors}
       </button>
       {selected > 0 && <span className="status-item">{selected} selected</span>}
       <span className="status-item" title="Focused view">
@@ -36,7 +40,7 @@ export function StatusBar(): ReactNode {
         title="Snap to grid"
         onClick={() => setSetting('snapToGrid', !snap)}
       >
-        # Snap
+        <Icon name="grid" /> Snap
       </button>
       <span className="status-item">{Math.round(zoom * 100)}%</span>
       <span className="status-item path" title={filePath ?? undefined}>

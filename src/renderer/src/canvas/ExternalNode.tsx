@@ -1,5 +1,6 @@
 import { memo, useEffect, type ReactNode } from 'react'
 import { Handle, Position, useUpdateNodeInternals, type Node, type NodeProps } from '@xyflow/react'
+import { Icon } from '@/components/Icon'
 
 export interface ExternalPort {
   id: string
@@ -40,7 +41,11 @@ export const ExternalNode = memo(function ExternalNode({
       isConnectable={false}
     />
   )
-  const label = <div className="external-label">↗ {data.label}</div>
+  const label = (
+    <div className="external-label">
+      <Icon name="arrow-up-right" /> {data.label}
+    </div>
+  )
   if (data.side === 'top' || data.side === 'bottom') {
     const band = (
       <div className={`port-band ${data.side}`}>

@@ -21,7 +21,7 @@ import {
 } from '@/model/project'
 import type { ProblemTarget } from '@/model/validate'
 import { GLOBAL_VIEW, type Id, type Orientation, type Project, type Rect } from '@/model/types'
-import { activeDoc, activateDoc, patchDoc, useDocs } from '@/store/documents'
+import { activeDoc, activateDoc, patchDoc, travelSelection as travel, useDocs } from '@/store/documents'
 import {
   addImportedModule,
   addModule,
@@ -100,6 +100,26 @@ export function navigate(target: ProblemTarget): void {
     if (hiddenAncestors.length) setHidden(view.id, hiddenAncestors, false)
   }
   revealWhenDrawn(ids)
+}
+
+/** Select a note and show it (notes are drawn in the global view only). */
+export function navigateToNote(id: Id): void {
+  select({ kind: 'note', id })
+  if (findView(getProject(), activeDoc().activeViewId).rootModuleId) openView(GLOBAL_VIEW)
+  revealWhenDrawn([id])
+}
+
+/** Go back (-1) or forward (1) through the selection history, showing each entity. */
+export function travelSelection(delta: -1 | 1): void {
+  const p = getProject()
+  travel(
+    delta,
+    (s) => s.kind === 'project' || selectionOf(p, s.id)?.kind === s.kind,
+    (s) => {
+      if (s.kind === 'note') return navigateToNote(s.id)
+      navigate(s.kind === 'imported' ? { kind: 'module', id: s.id } : s)
+    }
+  )
 }
 
 /** Reveal once the canvas shows the nodes (a view just opened or unhidden needs a few frames). */
@@ -263,7 +283,8 @@ function otherProjects(
         label: d.filePath ? fileName(d.filePath) : `${project.name} (unsaved)`,
         detail: `open · ${project.modules.length} modules`,
         get: async (): Promise<OtherProject | null> => {
-          if (d.filePath || !needFile) return { project, file: d.filePath ? fileName(d.filePath) : project.name }
+          if (d.filePath || !needFile)
+            return { project, file: d.filePath ? fileName(d.filePath) : project.name }
           showDialog('Save the other project first', [
             `"${project.name}" has no file yet: links to it need its file name.`
           ])
@@ -338,7 +359,10 @@ function importParent(): Id | null {
  * modules with their links, its notes (top level only), and the types and interfaces this project
  * lacks (the others are matched by name). Nothing ties the copy to that project afterwards.
  */
-export function importProjectContent(parent: Id | null = importParent(), pos?: { x: number; y: number }): void {
+export function importProjectContent(
+  parent: Id | null = importParent(),
+  pos?: { x: number; y: number }
+): void {
   quickPick(
     'Project to import',
     otherProjects(false).map((o, i) => ({
@@ -355,9 +379,8 @@ export function importProjectContent(parent: Id | null = importParent(), pos?: {
           let at = pos ?? activeCanvas()?.center() ?? { x: 80, y: 80 }
           if (!pos && parent) {
             // Below the module's current content, like a new submodule.
-            const m = p.modules.find((x) => x.id === parent)!
             const origin = absolutePosition(p, parent)
-            const top = contentTop(m, p.orientation) + LAYOUT_PAD
+            const top = contentTop(p.orientation) + LAYOUT_PAD
             const bottom = Math.max(
               top,
               ...childModules(p, parent).map((c) => c.layout.y + c.layout.height + LAYOUT_PAD)
@@ -518,7 +541,7 @@ export function groupSelection(): void {
     return showDialog('Cannot group', ['Only modules with the same parent can be grouped.'])
   const box = boundsOf(mods.map((m) => m.layout))
   const groupId = newId()
-  const top = contentTop({ ports: [] }, p.orientation) + LAYOUT_PAD / 2
+  const top = contentTop(p.orientation) + LAYOUT_PAD / 2
   update((d) => {
     d.modules.push({
       id: groupId,
@@ -583,6 +606,10 @@ export async function arrangeLayout(
         const r = arranged.modules.find((x) => x.id === m.id)?.layout
         // Locked modules keep their place; their size still follows their content.
         if (r) m.layout = m.locked ? { ...r, x: m.layout.x, y: m.layout.y } : { ...r }
+      }
+      for (const m of d.imports.flatMap((i) => i.modules)) {
+        const pos = findImported(arranged, m.id)?.module.position
+        if (pos) m.position = { ...pos }
       }
       // Hand-set bends do not fit the new layout; attachments do not fit a new orientation.
       const moved = scopeId ? subtreeIds(p, scopeId) : null

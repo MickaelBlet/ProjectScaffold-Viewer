@@ -79,7 +79,7 @@ export function snapChanges(prev: Project, next: Project, grid: number): Project
       // Children stay below their parent's header and ports.
       if (parent) {
         r.x = Math.max(r.x, ceilToGrid(origin.x + LAYOUT_PAD / 2, grid))
-        r.y = Math.max(r.y, ceilToGrid(origin.y + contentTop(parent, d.orientation), grid))
+        r.y = Math.max(r.y, ceilToGrid(origin.y + contentTop(d.orientation), grid))
       }
       m.layout = { ...r, x: r.x - origin.x, y: r.y - origin.y }
     }

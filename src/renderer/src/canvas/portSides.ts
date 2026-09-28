@@ -2,8 +2,9 @@
 // its name, so that links leave from where the port is drawn. A container's port linked to its
 // content keeps its edge.
 import { absoluteRect, allImported, MODULE_HEADER, PORT_BAND, PORT_ROW, subtreeIds } from '@/model/project'
-import type { Id, Orientation, PortRole, Project, Rect } from '@/model/types'
+import type { Id, LinkAnchor, Orientation, PortRole, Project, Rect } from '@/model/types'
 import type { Side } from './linkEnds'
+import { anchorPoint } from './linkRoute'
 
 export interface PortPlacement {
   side: Side
@@ -74,19 +75,72 @@ function portPoint(r: Rect, side: Side, i: number, n: number, rowsTop: number): 
 
 const SIDES: Side[] = ['left', 'right', 'top', 'bottom']
 
+/**
+ * Top of a module's side port rows, relative to it: centered between the header (and top band)
+ * and the bottom band, centered on the frame of a container (drawn outside it). See ModuleNode.
+ */
+function rowsTop(
+  ports: { id: Id }[],
+  placements: Record<Id, PortPlacement>,
+  anchors: Map<Id, LinkAnchor>,
+  r: Rect,
+  container: boolean,
+  o: Orientation,
+  floating: boolean
+): number {
+  const free = freePorts(ports, anchors)
+  const count = (side: Side): number => free.filter((pt) => placements[pt.id]?.side === side).length
+  const vertical = o === 'vertical'
+  const topBand = count('top') > 0 || (vertical && (!floating || container))
+  const bottomBand = count('bottom') > 0 || (vertical && (!floating || container))
+  const rows = Math.max(count('left'), count('right'))
+  const body = MODULE_HEADER + (topBand ? PORT_BAND : 0)
+  if (container) return (r.height - rows * PORT_ROW) / 2
+  return body + (r.height - body - (bottomBand ? PORT_BAND : 0) - rows * PORT_ROW) / 2
+}
+
 /** Where each port of a module is drawn (near enough to order the ports linked to it). */
 function placePorts(
   ports: { id: Id }[],
   placements: Record<Id, PortPlacement>,
+  anchors: Map<Id, LinkAnchor>,
   r: Rect,
-  topBand: boolean,
+  rowsTop: number,
   out: Map<Id, Point>
 ): void {
-  const rowsTop = MODULE_HEADER + (topBand ? PORT_BAND : 0) + 6
+  const free = freePorts(ports, anchors)
   for (const side of SIDES) {
-    const on = portsOn(ports, placements, side)
+    const on = portsOn(free, placements, side)
     on.forEach((pt, i) => out.set(pt.id, portPoint(r, side, i, on.length, rowsTop)))
   }
+  for (const pt of ports) {
+    const a = anchors.get(pt.id)
+    if (a) out.set(pt.id, anchorPoint(r, a))
+  }
+}
+
+/**
+ * Ports drawn at a hand-set attachment of one of their links (the first one on the edge the port
+ * is placed on, any edge when ports do not float), not in their edge's rows.
+ */
+export function portAnchors(p: Project, sides: PortSides | null): Map<Id, LinkAnchor> {
+  const out = new Map<Id, LinkAnchor>()
+  for (const l of p.links)
+    for (const [end, anchor] of [
+      [l.from, l.route?.from],
+      [l.to, l.route?.to]
+    ] as const) {
+      if (!anchor || out.has(end.portId)) continue
+      const placed = sides?.get(end.moduleId)?.[end.portId]
+      if (placed && placed.side !== anchor.side) continue
+      out.set(end.portId, anchor)
+    }
+  return out
+}
+
+/** Ports of a module drawn in their edge's rows, not at an attachment. */
+export function freePorts<T extends { id: Id }>(ports: T[], anchors: Map<Id, LinkAnchor>): T[] {
+  return ports.filter((pt) => !anchors.has(pt.id))
 }
 
 /** Where the ports of the stand-ins are drawn. */
@@ -98,13 +152,18 @@ function placeStandIns(standIns: Map<Id, StandIn>, out: Map<Id, Point>): void {
 /**
  * Placement of the ports of the visible modules (imported ones included). A port linked several
  * times goes where most of its links go; unlinked ports, links to hidden or enclosing modules, and
- * container ports linked to their content keep the orientation's default edge. `standIns` are the
+ * container ports linked to their content keep the orientation's default edge, unless a link is
+ * attached by hand elsewhere. `standIns` are the
  * modules outside a drill-down view, drawn at their stand-in.
  *
  * Along an edge, ports follow the ports they are linked to (barycenter sweeps), so that the links
  * between two edges do not cross.
  */
-export function floatingPortSides(p: Project, visible: Set<Id>, standIns = new Map<Id, StandIn>()): PortSides {
+export function floatingPortSides(
+  p: Project,
+  visible: Set<Id>,
+  standIns = new Map<Id, StandIn>()
+): PortSides {
   const parents = new Set(p.modules.flatMap((m) => m.parentId ?? []))
   const rects = new Map<Id, Rect>()
   const rect = (id: Id): Rect => {
@@ -114,7 +173,10 @@ export function floatingPortSides(p: Project, visible: Set<Id>, standIns = new M
   }
   const nested = (a: Id, b: Id): boolean => subtreeIds(p, a).has(b) || subtreeIds(p, b).has(a)
   /** Link ends of each port: the edge facing the other end, and that end. */
-  const ends = new Map<Id, { side: Side; other: { moduleId: Id; portId: Id }; index: number }[]>()
+  const ends = new Map<
+    Id,
+    { side: Side; other: { moduleId: Id; portId: Id }; index: number; anchored: boolean }[]
+  >()
   /** Container ports linked to their content. */
   const pinned = new Set<Id>()
   for (const [index, l] of p.links.entries())
@@ -124,13 +186,16 @@ export function floatingPortSides(p: Project, visible: Set<Id>, standIns = new M
     ] as const) {
       if (!visible.has(end.moduleId)) continue
       if (parents.has(end.moduleId) && subtreeIds(p, end.moduleId).has(other.moduleId)) pinned.add(end.portId)
-      if (!(visible.has(other.moduleId) || standIns.has(other.moduleId)) || nested(end.moduleId, other.moduleId))
-        continue
-      // A hand-set attachment takes its port to its side.
+      // A hand-set attachment takes its port to its side, whatever the other end.
       const anchor = end === l.from ? l.route?.from : l.route?.to
+      if (
+        !anchor &&
+        (!(visible.has(other.moduleId) || standIns.has(other.moduleId)) || nested(end.moduleId, other.moduleId))
+      )
+        continue
       const side = anchor?.side ?? facingSide(rect(end.moduleId), rect(other.moduleId), p.orientation)
       const list = ends.get(end.portId) ?? []
-      list.push({ side, other, index })
+      list.push({ side, other, index, anchored: !!anchor })
       ends.set(end.portId, list)
     }
 
@@ -140,7 +205,8 @@ export function floatingPortSides(p: Project, visible: Set<Id>, standIns = new M
     const placements: Record<Id, PortPlacement> = {}
     for (const pt of m.ports) {
       const fallback = defaultSide(pt.role, p.orientation)
-      const list = pinned.has(pt.id) ? [] : (ends.get(pt.id) ?? [])
+      // Container ports linked to their content keep their edge, unless attached elsewhere by hand.
+      const list = (ends.get(pt.id) ?? []).filter((v) => v.anchored || !pinned.has(pt.id))
       const count = new Map<Side, number>()
       for (const v of list) count.set(v.side, (count.get(v.side) ?? 0) + 1)
       const best = Math.max(0, ...count.values())
@@ -155,25 +221,33 @@ export function floatingPortSides(p: Project, visible: Set<Id>, standIns = new M
     out.set(m.id, placements)
   }
 
-  const vertical = p.orientation === 'vertical'
-  const topBand = (m: (typeof modules)[number], placements: Record<Id, PortPlacement>): boolean =>
-    m.ports.some((pt) => placements[pt.id]!.side === 'top') || (vertical && parents.has(m.id))
+  const anchors = portAnchors(p, out)
+  const top = (m: (typeof modules)[number], placements: Record<Id, PortPlacement>): number =>
+    rowsTop(m.ports, placements, anchors, rect(m.id), parents.has(m.id), p.orientation, true)
   const points = new Map<Id, Point>()
   placeStandIns(standIns, points)
-  for (const m of modules) placePorts(m.ports, out.get(m.id)!, rect(m.id), topBand(m, out.get(m.id)!), points)
+  for (const m of modules)
+    placePorts(m.ports, out.get(m.id)!, anchors, rect(m.id), top(m, out.get(m.id)!), points)
   for (let sweep = 0; sweep < SWEEPS; sweep++)
     for (const m of modules) {
       const placements = out.get(m.id)!
       for (const pt of m.ports) {
         const { side } = placements[pt.id]!
-        const list = pinned.has(pt.id) ? [] : (ends.get(pt.id) ?? []).filter((e) => e.side === side)
+        const list =
+          pinned.has(pt.id) || anchors.has(pt.id)
+            ? []
+            : (ends.get(pt.id) ?? []).filter((e) => e.side === side)
         if (!list.length) continue
         const axis = side === 'top' || side === 'bottom' ? 'x' : 'y'
         // Links between the same two ports keep their order at both ends.
-        const at = list.map((e) => points.get(e.other.portId)![axis] + e.index * 1e-6)
+        const at = list.flatMap((e) => {
+          const pt = points.get(e.other.portId)
+          return pt ? [pt[axis] + e.index * 1e-6] : []
+        })
+        if (!at.length) continue
         placements[pt.id] = { side, order: at.reduce((a, b) => a + b, 0) / at.length }
       }
-      placePorts(m.ports, placements, rect(m.id), topBand(m, placements), points)
+      placePorts(m.ports, placements, anchors, rect(m.id), top(m, placements), points)
     }
   return out
 }
@@ -181,16 +255,18 @@ export function floatingPortSides(p: Project, visible: Set<Id>, standIns = new M
 /** Where the ports of the visible modules are drawn, placed by `sides` or on their default edges. */
 export function portPoints(p: Project, visible: Set<Id>, sides: PortSides | null): Map<Id, Point> {
   const parents = new Set(p.modules.flatMap((m) => m.parentId ?? []))
+  const anchors = portAnchors(p, sides)
   const points = new Map<Id, Point>()
   for (const m of [...p.modules, ...allImported(p)]) {
     if (!visible.has(m.id)) continue
     const placements =
       sides?.get(m.id) ??
-      Object.fromEntries(m.ports.map((pt) => [pt.id, { side: defaultSide(pt.role, p.orientation), order: null }]))
-    const topBand =
-      m.ports.some((pt) => placements[pt.id]?.side === 'top') ||
-      (p.orientation === 'vertical' && (!sides || parents.has(m.id)))
-    placePorts(m.ports, placements, absoluteRect(p, m.id), topBand, points)
+      Object.fromEntries(
+        m.ports.map((pt) => [pt.id, { side: defaultSide(pt.role, p.orientation), order: null }])
+      )
+    const r = absoluteRect(p, m.id)
+    const top = rowsTop(m.ports, placements, anchors, r, parents.has(m.id), p.orientation, !!sides)
+    placePorts(m.ports, placements, anchors, r, top, points)
   }
   return points
 }

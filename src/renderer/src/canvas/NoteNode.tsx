@@ -1,6 +1,7 @@
 import { memo, useState, type CSSProperties, type ReactNode } from 'react'
 import { NodeResizer, type NodeProps } from '@xyflow/react'
 import { updateNote, useProjectStore } from '@/store/project'
+import { Icon } from '@/components/Icon'
 
 export const NoteNode = memo(function NoteNode({ id, selected }: NodeProps): ReactNode {
   const note = useProjectStore((s) => s.project.notes.find((n) => n.id === id))
@@ -44,7 +45,7 @@ export const NoteNode = memo(function NoteNode({ id, selected }: NodeProps): Rea
       {note.kind === 'frame' ? <div className="frame-title">{text}</div> : text}
       {note.locked && (
         <span className="lock-badge" title="Locked (Ctrl+L to unlock)">
-          🔒
+          <Icon name="lock" />
         </span>
       )}
     </div>

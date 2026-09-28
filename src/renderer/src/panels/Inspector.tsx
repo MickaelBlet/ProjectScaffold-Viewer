@@ -3,6 +3,8 @@ import { useDoc } from '@/store/documents'
 import { deleteItems, setLocked, setModuleColor, updateNote, useProjectStore } from '@/store/project'
 import { select } from '@/store/ui'
 import { commandItem } from '@/commands'
+import { navigate, navigateToNote } from '@/actions'
+import { frameContents } from '@/model/project'
 import { ColorPicker, Row, Section, Select, TextArea } from '@/components/fields'
 import { openEditor, type EditorKind } from '@/shell/controllers'
 import { ProjectInspector } from './ProjectInspector'
@@ -11,10 +13,10 @@ import { LinkInspector } from './LinkInspector'
 import { TypeInspector } from './TypeInspector'
 import { InterfaceInspector } from './InterfaceInspector'
 import { ImportedInspector } from './ImportedInspector'
+import { Icon, type IconName } from '@/components/Icon'
 
-function CommandButton({ id, label }: { id: string; label: string }): ReactNode {
+function CommandButton({ id, icon, label }: { id: string; icon?: IconName; label: string }): ReactNode {
   const c = commandItem(id)
-  if (c === 'separator') return null
   return (
     <button
       type="button"
@@ -22,7 +24,7 @@ function CommandButton({ id, label }: { id: string; label: string }): ReactNode 
       title={c.keys ? `${c.label} (${c.keys})` : c.label}
       onClick={c.run}
     >
-      {label}
+      {icon && <Icon name={icon} />} {label}
     </button>
   )
 }
@@ -50,15 +52,15 @@ function MultiInspector({ ids }: { ids: string[] }): ReactNode {
       {onCanvas > 1 && (
         <Section title="Align">
           <div className="button-grid">
-            <CommandButton id="arrange.left" label="⇤ Left" />
-            <CommandButton id="arrange.hcenter" label="↔ Center" />
-            <CommandButton id="arrange.right" label="Right ⇥" />
-            <CommandButton id="arrange.top" label="⤒ Top" />
-            <CommandButton id="arrange.vcenter" label="↕ Middle" />
-            <CommandButton id="arrange.bottom" label="Bottom ⤓" />
-            <CommandButton id="arrange.distH" label="Distribute ↔" />
-            <CommandButton id="arrange.distV" label="Distribute ↕" />
-            <CommandButton id="arrange.sameSize" label="Same size" />
+            <CommandButton id="arrange.left" icon="align-left" label="Left" />
+            <CommandButton id="arrange.hcenter" icon="align-hcenter" label="Center" />
+            <CommandButton id="arrange.right" icon="align-right" label="Right" />
+            <CommandButton id="arrange.top" icon="align-top" label="Top" />
+            <CommandButton id="arrange.vcenter" icon="align-vcenter" label="Middle" />
+            <CommandButton id="arrange.bottom" icon="align-bottom" label="Bottom" />
+            <CommandButton id="arrange.distH" icon="distribute-h" label="Distribute" />
+            <CommandButton id="arrange.distV" icon="distribute-v" label="Distribute" />
+            <CommandButton id="arrange.sameSize" icon="same-size" label="Same size" />
           </div>
         </Section>
       )}
@@ -115,8 +117,10 @@ function MultiInspector({ ids }: { ids: string[] }): ReactNode {
 }
 
 function NoteInspector({ id }: { id: string }): ReactNode {
-  const note = useProjectStore((s) => s.project.notes.find((n) => n.id === id))
+  const project = useProjectStore((s) => s.project)
+  const note = project.notes.find((n) => n.id === id)
   if (!note) return <p className="muted">Note deleted.</p>
+  const contents = note.kind === 'frame' ? frameContents(project, id) : []
   return (
     <>
       <h2>{note.kind}</h2>
@@ -148,6 +152,26 @@ function NoteInspector({ id }: { id: string }): ReactNode {
           Locked (position and size)
         </label>
       </Section>
+      {note.kind === 'frame' && (
+        <Section title={`Contents (${contents.length})`}>
+          <ul className="plain">
+            {contents.map((c) => (
+              <li key={c.id}>
+                <button
+                  type="button"
+                  className="link-button"
+                  onClick={() =>
+                    c.kind === 'note' ? navigateToNote(c.id) : navigate({ kind: 'module', id: c.id })
+                  }
+                >
+                  {c.name}
+                </button>
+              </li>
+            ))}
+          </ul>
+          {!contents.length && <p className="muted">Nothing lies fully inside this frame.</p>}
+        </Section>
+      )}
       <p className="muted">Notes and frames are editor annotations: they are saved but never exported.</p>
       <div className="actions">
         <button
@@ -181,7 +205,7 @@ export function Inspector(): ReactNode {
           title="Open in an editor tab"
           onClick={() => openEditor(openable, sel.id)}
         >
-          ↗
+          <Icon name="open-tab" />
         </button>
       )}
       {selectedIds.length > 1 ? (

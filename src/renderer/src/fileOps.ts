@@ -183,7 +183,12 @@ export async function saveProject(saveAs = false): Promise<void> {
     })
   }
   patchDoc({ filePath: path, savedProject: project }, doc.id)
-  setStatus('info', `Saved ${path}`)
+  if (window.api.writesFiles) setStatus('info', `Saved ${path}`)
+  else
+    setStatus(
+      'info',
+      `Downloaded ${path}: this browser cannot write files, use Chrome or Edge to save in place`
+    )
 }
 
 export async function saveAll(): Promise<void> {

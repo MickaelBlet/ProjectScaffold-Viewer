@@ -1,5 +1,45 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { useUiStore, type MenuItem } from '@/store/ui'
+import { Icon } from './Icon'
+
+/** Item opening a nested menu on hover, beside it (fixed, not to be clipped by the scrolling parent). */
+function Submenu({
+  item,
+  onDone
+}: {
+  item: Extract<MenuItem, { submenu: MenuItem[] }>
+  onDone: () => void
+}): ReactNode {
+  const ref = useRef<HTMLDivElement>(null)
+  const [rect, setRect] = useState<DOMRect | null>(null)
+  const show = (): void => {
+    if (!item.disabled) setRect(ref.current?.getBoundingClientRect() ?? null)
+  }
+  return (
+    <div ref={ref} onMouseEnter={show} onMouseLeave={() => setRect(null)}>
+      <button
+        type="button"
+        role="menuitem"
+        aria-haspopup="menu"
+        aria-expanded={!!rect}
+        className={`menu-item ${rect ? 'open' : ''}`}
+        disabled={item.disabled}
+        onClick={show}
+      >
+        <span className="menu-check" />
+        <span className="menu-label">{item.label}</span>
+        <span className="menu-arrow">
+          <Icon name="chevron-right" />
+        </span>
+      </button>
+      {rect && (
+        <div className="context-menu" role="menu" style={{ left: rect.right, top: rect.top - 5 }}>
+          <MenuList items={item.submenu} onDone={onDone} />
+        </div>
+      )}
+    </div>
+  )
+}
 
 export function MenuList({ items, onDone }: { items: MenuItem[]; onDone: () => void }): ReactNode {
   return (
@@ -7,11 +47,14 @@ export function MenuList({ items, onDone }: { items: MenuItem[]; onDone: () => v
       {items.map((it, i) =>
         it === 'separator' ? (
           <hr key={i} />
+        ) : 'submenu' in it ? (
+          <Submenu key={i} item={it} onDone={onDone} />
         ) : (
           <button
             key={i}
             type="button"
             role="menuitem"
+            title={it.title}
             className={`menu-item ${it.danger ? 'danger' : ''}`}
             disabled={it.disabled}
             onClick={() => {
@@ -19,7 +62,7 @@ export function MenuList({ items, onDone }: { items: MenuItem[]; onDone: () => v
               it.run()
             }}
           >
-            <span className="menu-check">{it.checked ? '✓' : ''}</span>
+            <span className="menu-check">{it.checked && <Icon name="check" />}</span>
             <span className="menu-label">{it.label}</span>
             {it.keys && <kbd>{it.keys}</kbd>}
           </button>

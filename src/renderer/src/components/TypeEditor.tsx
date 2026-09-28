@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useProjectStore } from '@/store/project'
+import { openContextMenu } from '@/store/ui'
+import { navigate } from '@/actions'
 import { parseTypeRef, printTypeRef, TypeExprError } from '@/model/typeExpr'
 import { CONTAINERS, PRIMITIVES, type Primitive, type TypeRef } from '@/model/types'
+import { Icon } from './Icon'
 
 const DEFAULT: TypeRef = { kind: 'primitive', name: 'uint8' }
 
@@ -16,6 +19,15 @@ function useTypeNames(): {
     const byName = new Map(types.map((t) => [t.name, t.id]))
     return { nameOf: (id) => byId.get(id), idOf: (n) => byName.get(n), names: types.map((t) => t.name) }
   }, [types])
+}
+
+/** Ids of the user types referenced by `t`, in order of appearance, without duplicates. */
+function refIds(t: TypeRef, out: string[] = []): string[] {
+  if (t.kind === 'ref') {
+    if (!out.includes(t.id)) out.push(t.id)
+  } else if ('of' in t) refIds(t.of, out)
+  else if (t.kind === 'map') refIds(t.value, refIds(t.key, out))
+  return out
 }
 
 /**
@@ -42,6 +54,7 @@ export function TypeEditor(props: {
     setError(null)
   }, [text])
 
+  const refs = refIds(props.value).filter((id) => nameOf(id) !== undefined)
   const candidates = useMemo(() => [...PRIMITIVES, ...names, ...CONTAINERS.map((c) => `${c}<`)], [names])
 
   const check = (s: string): TypeRef | null => {
@@ -138,6 +151,24 @@ export function TypeEditor(props: {
           )}
           {error && <span className="field-error">{error}</span>}
         </span>
+        {refs.length > 0 && (
+          <button
+            type="button"
+            className="icon"
+            title={refs.length === 1 ? `Go to ${nameOf(refs[0]!)}` : 'Go to type'}
+            aria-label="Go to type"
+            onClick={(e) =>
+              refs.length === 1
+                ? navigate({ kind: 'type', id: refs[0]! })
+                : openContextMenu(
+                    e,
+                    refs.map((id) => ({ label: nameOf(id)!, run: () => navigate({ kind: 'type', id }) }))
+                  )
+            }
+          >
+            <Icon name="arrow-up-right" />
+          </button>
+        )}
         <button
           type="button"
           className={`icon ${tree ? 'active' : ''}`}
@@ -145,7 +176,7 @@ export function TypeEditor(props: {
           aria-label="Structured editor"
           onClick={() => (props.onToggleTree ? props.onToggleTree() : setOwnTree(!ownTree))}
         >
-          ⋮
+          <Icon name="tree" />
         </button>
       </div>
       {tree && !props.onToggleTree && <TypeTree value={props.value} onChange={props.onChange} />}

@@ -8,6 +8,7 @@ import { getProject } from '@/store/project'
 import { useUiStore, type PickEntry } from '@/store/ui'
 import { navigate, openModuleView } from '@/actions'
 import { openView } from '@/shell/controllers'
+import { Icon } from './Icon'
 
 interface Entry extends PickEntry {
   keys?: string
@@ -42,7 +43,7 @@ function commandEntries(): Entry[] {
       key: c.id,
       label: `${c.category}: ${c.title}`,
       keys: c.keys?.[0] ? keyLabel(c.keys[0]) : undefined,
-      kind: c.checked ? (c.checked() ? '✓' : '') : '',
+      kind: c.checked?.() ? <Icon name="check" /> : '',
       run: () => {
         remember(c.id)
         runCommand(c.id)

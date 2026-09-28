@@ -1,8 +1,10 @@
 import { memo, useEffect, type ReactNode } from 'react'
-import { Handle, Position, useUpdateNodeInternals, type NodeProps } from '@xyflow/react'
-import type { Id, ImportedPort } from '@/model/types'
+import { useUpdateNodeInternals, type NodeProps } from '@xyflow/react'
+import type { Id, ImportedPort, LinkAnchor, Side } from '@/model/types'
+import { anchorStyle, inward, PortPoint } from './PortPoint'
 import { useProjectStore } from '@/store/project'
 import { defaultSide, portsOn, type PortPlacement } from './portSides'
+import { Icon } from '@/components/Icon'
 
 /** Module of another project: its ports floating (see portSides.ts) or on the orientation's default edges, linkable. */
 export const ImportedNode = memo(function ImportedNode({ id, selected, data }: NodeProps): ReactNode {
@@ -17,37 +19,47 @@ export const ImportedNode = memo(function ImportedNode({ id, selected, data }: N
     Object.fromEntries(
       (module?.ports ?? []).map((p) => [p.id, { side: defaultSide(p.role, orientation), order: null }])
     )
-  // Handles move when ports change edge or order.
-  const portsKey = (['top', 'bottom', 'left', 'right'] as const)
-    .map((side) => portsOn(module?.ports ?? [], placements, side).map((p) => `${p.id}:${p.role}`).join(','))
-    .join('|')
+  // Ports at a hand-set link attachment (see portAnchors), out of their edge's rows.
+  const anchors = (data as { anchors?: Record<Id, LinkAnchor> }).anchors ?? {}
+  const free = (module?.ports ?? []).filter((p) => !anchors[p.id])
+  // Handles move when ports change edge, order or attachment.
+  const portsKey = [
+    ...(['top', 'bottom', 'left', 'right'] as const).map((side) =>
+      portsOn(free, placements, side)
+        .map((p) => `${p.id}:${p.role}`)
+        .join(',')
+    ),
+    ...Object.entries(anchors).map(([p, a]) => `${p}:${a.side}:${a.at}`)
+  ].join('|')
   useEffect(() => updateInternals(id), [id, portsKey, updateInternals])
   if (!imp || !module) return null
   const vertical = orientation === 'vertical'
   const [top, bottom, left, right] = (['top', 'bottom', 'left', 'right'] as const).map((side) =>
-    portsOn(module.ports, placements, side)
+    portsOn(free, placements, side)
   )
-  const iface = (p: ImportedPort): string => p.interface ?? '—'
+  const iface = (p: ImportedPort): string | undefined => p.interface ?? undefined
   const unknown = (p: ImportedPort): boolean =>
     !!p.interface && !interfaces.some((i) => i.name === p.interface)
   const title = (p: ImportedPort): string =>
-    `${p.role} ${p.name}: ${iface(p)}${unknown(p) ? ' (interface not defined in this project)' : ''}`
-  const handle = (p: ImportedPort, position: Position): ReactNode => (
-    <Handle
-      type={p.role === 'in' ? 'target' : 'source'}
-      position={position}
-      id={p.id}
-      className={`handle ${p.role}`}
+    `${p.role} ${p.name}: ${iface(p) ?? 'no interface'}${unknown(p) ? ' (interface not defined in this project)' : ''}`
+  const point = (p: ImportedPort, edge: Side, fallback = inward(edge), anchor?: LinkAnchor): ReactNode => (
+    <PortPoint
+      key={p.id}
+      moduleId={id}
+      port={p}
+      iface={iface(p)}
+      title={title(p)}
+      edge={edge}
+      fallback={fallback}
+      className={`${unknown(p) ? 'unknown' : ''} ${anchor ? 'anchored' : ''}`}
+      style={anchor && anchorStyle(anchor)}
     />
   )
   const band = (list: ImportedPort[], side: 'top' | 'bottom'): ReactNode => (
     <div className={`port-band ${side}`}>
       {list.map((p) => (
-        <span key={p.id} className={`vport ${p.role} ${unknown(p) ? 'unknown' : ''}`} title={title(p)}>
-          {handle(p, side === 'top' ? Position.Top : Position.Bottom)}
-          <span className="vport-label">
-            {p.name} <small>{iface(p)}</small>
-          </span>
+        <span key={p.id} className="vport">
+          {point(p, side)}
         </span>
       ))}
     </div>
@@ -62,7 +74,10 @@ export const ImportedNode = memo(function ImportedNode({ id, selected, data }: N
       {(top!.length > 0 || (!floating && vertical)) && band(top!, 'top')}
       <div className="module-header">
         <span className="module-name">
-          <small className="imported-project">↗ {imp.name}</small> {module.path}
+          <small className="imported-project">
+            <Icon name="arrow-up-right" /> {imp.name}
+          </small>{' '}
+          {module.path}
         </span>
       </div>
       {rows > 0 && (
@@ -72,26 +87,19 @@ export const ImportedNode = memo(function ImportedNode({ id, selected, data }: N
             const pr = right![i]
             return (
               <div className="port-row" key={i}>
-                {pl && (
-                  <span className={`port left ${pl.role} ${unknown(pl) ? 'unknown' : ''}`} title={title(pl)}>
-                    {handle(pl, Position.Left)}
-                    {pl.name}
-                    <small>{iface(pl)}</small>
-                  </span>
-                )}
-                {pr && (
-                  <span className={`port right ${pr.role} ${unknown(pr) ? 'unknown' : ''}`} title={title(pr)}>
-                    <small>{iface(pr)}</small>
-                    {pr.name}
-                    {handle(pr, Position.Right)}
-                  </span>
-                )}
+                {pl && point(pl, 'left')}
+                {pr && point(pr, 'right')}
               </div>
             )
           })}
         </div>
       )}
       {(bottom!.length > 0 || (!floating && vertical)) && band(bottom!, 'bottom')}
+      {module.ports.map((p) => {
+        const a = anchors[p.id]
+        // Past top / bottom attachments the name goes outside, clear of the header.
+        return a && point(p, a.side, a.side === 'left' || a.side === 'right' ? inward(a.side) : a.side, a)
+      })}
     </div>
   )
 })

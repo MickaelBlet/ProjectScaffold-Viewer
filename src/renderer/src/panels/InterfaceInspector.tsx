@@ -7,6 +7,7 @@ import { CommitInput, IconButton, Row, Section, Select, TextArea } from '@/compo
 import { TypeEditor } from '@/components/TypeEditor'
 import { PARAM_DIRECTIONS, type Interface, type Message } from '@/model/types'
 import { FieldList } from './TypeInspector'
+import { Icon } from '@/components/Icon'
 
 function withInterface(id: string, fn: (i: Interface) => void): void {
   update((d) => {
@@ -67,7 +68,7 @@ export function InterfaceInspector({ id }: { id: string }): ReactNode {
               )
             }
           >
-            + message
+            <Icon name="plus" /> message
           </button>
         }
       >
@@ -80,14 +81,13 @@ export function InterfaceInspector({ id }: { id: string }): ReactNode {
                 onCommit={(n) => withMessage(m.id, (x) => void (x.name = n))}
               />
               <IconButton
+                icon="x"
                 title="Delete message"
                 danger
                 onClick={() =>
                   withInterface(id, (i) => void (i.messages = i.messages.filter((x) => x.id !== m.id)))
                 }
-              >
-                ×
-              </IconButton>
+              />
             </div>
             <TextArea
               value={m.description}
