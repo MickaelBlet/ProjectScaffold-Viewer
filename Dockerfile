@@ -1,9 +1,24 @@
 # syntax=docker/dockerfile:1
-# Tauri desktop builds for Linux amd64 (deb, rpm, AppImage) and Windows amd64 (NSIS, cross-compiled
-# with cargo-xwin). Usage: scripts/build_tauri.sh  -> dist-tauri/{linux,windows}/
+# Desktop builds, one stage per OS so BuildKit runs them in parallel on top of a single web build:
+#   tauri:    Linux amd64 (deb, rpm, AppImage), Windows amd64 (NSIS + portable exe, cargo-xwin)
+#   electron: Linux x64 (AppImage, tar.gz), Windows x64 (portable exe, zip; Wine stamps icon and version)
+# Usage: scripts/build_desktop.sh (both), scripts/build_tauri.sh, scripts/build_electron.sh
 
+# ---------- web: dist-web/index.html, shared by every desktop target ----------
+FROM node:22-bookworm-slim AS deps
+WORKDIR /app
+# electron-builder downloads its own Electron zips; the npm package binary is unused here.
+ENV ELECTRON_SKIP_BINARY_DOWNLOAD=1
+COPY package.json package-lock.json ./
+RUN --mount=type=cache,target=/root/.npm npm ci
+
+FROM deps AS web
+COPY . .
+RUN npm run build
+
+# ---------- tauri ----------
 # Ubuntu 22.04: oldest base with webkit2gtk-4.1, keeps the AppImage glibc requirement low.
-FROM ubuntu:22.04 AS toolchain
+FROM ubuntu:22.04 AS tauri-toolchain
 ARG NODE_MAJOR=22
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -31,22 +46,63 @@ RUN curl -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal --default-to
 # linuxdeploy (AppImage) is itself an AppImage: no FUSE inside containers.
 ENV APPIMAGE_EXTRACT_AND_RUN=1 XWIN_ACCEPT_LICENSE=1
 
-FROM toolchain AS build
+FROM tauri-toolchain AS tauri-src
 WORKDIR /app
+COPY --from=deps /app/node_modules node_modules
 COPY package.json package-lock.json ./
-RUN --mount=type=cache,target=/root/.npm npm ci
-COPY . .
-RUN --mount=type=cache,target=/usr/local/cargo/registry \
-    --mount=type=cache,target=/root/.cache \
-    --mount=type=cache,target=/app/src-tauri/target \
-    set -eux; \
-    npx tauri build --bundles deb,rpm,appimage; \
-    npx tauri build --runner cargo-xwin --target x86_64-pc-windows-msvc --bundles nsis; \
-    t=src-tauri/target; \
-    mkdir -p /out/linux /out/windows; \
-    cp $t/release/bundle/deb/*.deb $t/release/bundle/rpm/*.rpm $t/release/bundle/appimage/*.AppImage /out/linux/; \
-    cp $t/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe /out/windows/; \
-    cp $t/x86_64-pc-windows-msvc/release/project-scaffold.exe /out/windows/ProjectScaffold-portable.exe
+COPY src-tauri src-tauri
+COPY --from=web /app/dist-web dist-web
+# dist-web is already built: skip beforeBuildCommand (npm run build).
+RUN echo '{"build":{"beforeBuildCommand":null}}' > src-tauri/tauri.docker.json
 
-FROM scratch AS export
-COPY --from=build /out /
+# Separate target and tool caches per OS: the two builds run concurrently.
+FROM tauri-src AS tauri-linux
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,id=tauri-cache-linux,target=/root/.cache \
+    --mount=type=cache,id=tauri-target-linux,target=/app/src-tauri/target \
+    set -eux; \
+    npx tauri build --config src-tauri/tauri.docker.json --bundles deb,rpm,appimage; \
+    b=src-tauri/target/release/bundle; \
+    mkdir -p /out/linux; \
+    cp $b/deb/*.deb $b/rpm/*.rpm $b/appimage/*.AppImage /out/linux/
+
+FROM tauri-src AS tauri-windows
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,id=tauri-cache-windows,target=/root/.cache \
+    --mount=type=cache,id=tauri-target-windows,target=/app/src-tauri/target \
+    set -eux; \
+    npx tauri build --config src-tauri/tauri.docker.json --runner cargo-xwin --target x86_64-pc-windows-msvc --bundles nsis; \
+    t=src-tauri/target/x86_64-pc-windows-msvc/release; \
+    mkdir -p /out/windows; \
+    cp $t/bundle/nsis/*.exe /out/windows/; \
+    cp $t/project-scaffold.exe /out/windows/ProjectScaffold-portable.exe
+
+FROM scratch AS tauri
+COPY --from=tauri-linux /out /
+COPY --from=tauri-windows /out /
+
+# ---------- electron ----------
+FROM electronuserland/builder:24-wine AS electron-src
+WORKDIR /app
+COPY --from=deps /app/node_modules node_modules
+COPY package.json package-lock.json electron-builder.yml ./
+COPY electron electron
+COPY --from=web /app/dist-web dist-web
+
+FROM electron-src AS electron-linux
+RUN --mount=type=cache,id=electron-linux,target=/root/.cache/electron \
+    --mount=type=cache,id=electron-builder-linux,target=/root/.cache/electron-builder \
+    npx electron-builder --linux \
+    && mkdir -p /out/linux \
+    && cp dist-electron/*.AppImage dist-electron/*-linux-*.tar.gz /out/linux/
+
+FROM electron-src AS electron-windows
+RUN --mount=type=cache,id=electron-windows,target=/root/.cache/electron \
+    --mount=type=cache,id=electron-builder-windows,target=/root/.cache/electron-builder \
+    npx electron-builder --win \
+    && mkdir -p /out/windows \
+    && cp dist-electron/*-portable.exe dist-electron/*-win-*.zip /out/windows/
+
+FROM scratch AS electron
+COPY --from=electron-linux /out /
+COPY --from=electron-windows /out /
