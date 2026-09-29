@@ -4,7 +4,18 @@ import { minSize, nameError } from '@/model/project'
 import { getProject, setLocked, setModuleLayout, update, useProjectStore } from '@/store/project'
 import { useUiStore } from '@/store/ui'
 import { openModuleView } from '@/actions'
-import type { LinkAnchor, Port, Side } from '@/model/types'
+import { printTypeRef, walkTypeRef } from '@/model/typeExpr'
+import { formatValue } from '@/model/defaults'
+import {
+  QUALIFIERS,
+  type Attribute,
+  type LinkAnchor,
+  type Method,
+  type Port,
+  type Side,
+  type TypeDef,
+  type TypeRef
+} from '@/model/types'
 import { Icon } from '@/components/Icon'
 import { MODULE_HANDLE } from './constants'
 import type { PortNodeData } from './flowGraph'
@@ -51,6 +62,82 @@ function RenameInput({
   )
 }
 
+/**
+ * Attribute compartment below the header: typed properties, drawn apart from the ports on the
+ * border where links attach.
+ */
+/** Whether `t` references a type that no longer exists. */
+function hasDeletedRef(t: TypeRef, nameOf: (id: string) => string | undefined): boolean {
+  let deleted = false
+  walkTypeRef(t, (n) => {
+    if (n.kind === 'ref' && !nameOf(n.id)) deleted = true
+  })
+  return deleted
+}
+
+/** Qualifiers set on an attribute, method or parameter, each followed by a space. */
+const qualifierText = (q: { static?: boolean; const?: boolean }): string =>
+  QUALIFIERS.filter((k) => q[k])
+    .map((k) => `${k} `)
+    .join('')
+
+function Attributes({ attributes, types }: { attributes: Attribute[]; types: TypeDef[] }): ReactNode {
+  const nameOf = (id: string): string | undefined => types.find((t) => t.id === id)?.name
+  return (
+    <ul className="module-attrs">
+      {attributes.map((a) => {
+        const type = printTypeRef(a.type, nameOf)
+        const deleted = hasDeletedRef(a.type, nameOf)
+        const value = a.default === undefined ? '' : ` = ${formatValue(a.default)}`
+        const qualifiers = qualifierText(a)
+        const sig = `${qualifiers}${a.name}: ${type}${value}`
+        return (
+          <li key={a.id} title={a.description ? `${sig}\n${a.description}` : sig}>
+            {qualifiers && <span className="attr-qualifier">{qualifiers}</span>}
+            <span className="attr-name">{a.name}</span>
+            <span className={`attr-type ${deleted ? 'deleted' : ''}`}>: {type}</span>
+            {value && <span className="attr-default">{value}</span>}
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
+
+/** Method compartment below the attributes: `virtual name(a: T, out b: U): R const = 0`. */
+function Methods({ methods, types }: { methods: Method[]; types: TypeDef[] }): ReactNode {
+  const nameOf = (id: string): string | undefined => types.find((t) => t.id === id)?.name
+  return (
+    <ul className="module-attrs module-methods">
+      {methods.map((m) => {
+        const params = m.params
+          .map(
+            (prm) =>
+              `${prm.direction === 'in' ? '' : `${prm.direction} `}${qualifierText(prm)}${prm.name}: ${printTypeRef(prm.type, nameOf)}`
+          )
+          .join(', ')
+        const returns = m.returns ? `: ${printTypeRef(m.returns, nameOf)}` : ''
+        const deleted = [...m.params.map((prm) => prm.type), ...(m.returns ? [m.returns] : [])].some((t) =>
+          hasDeletedRef(t, nameOf)
+        )
+        const before = m.static ? 'static ' : m.virtual ? 'virtual ' : ''
+        const after = `${m.const ? ' const' : ''}${m.override ? ' override' : ''}${m.pure ? ' = 0' : ''}`
+        const sig = `${before}${m.name}(${params})${returns}${after}`
+        return (
+          <li key={m.id} title={m.description ? `${sig}\n${m.description}` : sig}>
+            {before && <span className="attr-qualifier">{before}</span>}
+            <span className={`attr-name ${m.pure ? 'pure' : ''}`}>{m.name}</span>
+            <span className={`attr-type ${deleted ? 'deleted' : ''}`}>
+              ({params}){returns}
+            </span>
+            {after && <span className="attr-qualifier">{after}</span>}
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
+
 export const ModuleNode = memo(function ModuleNode({
   id,
   selected,
@@ -59,9 +146,15 @@ export const ModuleNode = memo(function ModuleNode({
 }: NodeProps<Node<PortNodeData>>): ReactNode {
   const mod = useProjectStore((s) => s.project.modules.find((m) => m.id === id))
   const interfaces = useProjectStore((s) => s.project.interfaces)
+  const types = useProjectStore((s) => s.project.types)
   const hasChildren = useProjectStore((s) => s.project.modules.some((m) => m.parentId === id))
   const orientation = useProjectStore((s) => s.project.orientation)
   const renaming = useUiStore((s) => s.renaming === id)
+  // Stable string: re-renders only when a base is added, removed or renamed.
+  const bases = useProjectStore((s) => {
+    const m = s.project.modules.find((x) => x.id === id)
+    return (m?.bases ?? []).map((b) => s.project.modules.find((x) => x.id === b)?.name ?? '?').join(', ')
+  })
   const { floating, anchors, top, bottom, left, right } = usePortLayout(
     id,
     mod?.ports ?? [],
@@ -92,7 +185,6 @@ export const ModuleNode = memo(function ModuleNode({
       title={title(p)}
       edge={edge}
       fallback={fallback}
-      className={anchor ? 'anchored' : ''}
       style={anchor && anchorStyle(anchor)}
     />
   )
@@ -123,7 +215,11 @@ export const ModuleNode = memo(function ModuleNode({
         {renaming ? (
           <RenameInput id={id} name={mod.name} parentId={mod.parentId} />
         ) : (
-          <span className="module-name">{mod.name}</span>
+          <span className={`module-name ${mod.kind ?? ''}`}>
+            {mod.kind && <span className="module-kind">«{mod.kind}» </span>}
+            {mod.name}
+            {bases && <span className="module-bases"> : {bases}</span>}
+          </span>
         )}
         <Handle
           type="source"
@@ -157,6 +253,8 @@ export const ModuleNode = memo(function ModuleNode({
           <Icon name="expand" />
         </button>
       </div>
+      {mod.attributes.length > 0 && <Attributes attributes={mod.attributes} types={types} />}
+      {mod.methods.length > 0 && <Methods methods={mod.methods} types={types} />}
       {rows > 0 && (
         // A container's side ports are centered on its frame, over its content.
         <div className={`module-ports ${hasChildren ? 'framed' : ''}`}>

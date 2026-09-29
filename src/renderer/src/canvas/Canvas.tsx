@@ -55,7 +55,8 @@ import {
   openImportSource,
   openModuleView,
   paste,
-  refreshImports,
+  refreshDependencies,
+  showDependency,
   selectionOf,
   showAllInView
 } from '@/actions'
@@ -64,6 +65,7 @@ import { fileName } from '@/fileOps'
 import { openView, registerCanvas } from '@/shell/controllers'
 import { EXTERNAL } from './constants'
 import { endOf, externalNodes, linkEnds, standIns, toEdges, toNodes } from './flowGraph'
+import { INHERIT } from './inheritEdges'
 import { reuseUnchanged } from './reuseUnchanged'
 import { floatingPortSides, portPoints } from './portSides'
 import { ModuleNode } from './ModuleNode'
@@ -71,9 +73,10 @@ import { NoteNode } from './NoteNode'
 import { ExternalNode } from './ExternalNode'
 import { ImportedNode } from './ImportedNode'
 import { LinkEdge } from './LinkEdge'
+import { InheritEdge } from './InheritEdge'
 
 const nodeTypes = { module: ModuleNode, note: NoteNode, external: ExternalNode, imported: ImportedNode }
-const edgeTypes = { link: LinkEdge }
+const edgeTypes = { link: LinkEdge, inherit: InheritEdge }
 
 const GUIDE_PX = 6
 
@@ -180,7 +183,8 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
       snapToGrid: s.snapToGrid,
       gridSize: s.gridSize,
       theme: s.theme,
-      minimap: s.minimap
+      minimap: s.minimap,
+      inheritance: s.inheritance
     }))
   )
   const flow = useReactFlow()
@@ -222,8 +226,13 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
   const [edges, setEdges] = useEdgesState<Edge>([])
   useEffect(
     () =>
-      setEdges((prev) => reuseUnchanged(prev, toEdges(project, visible, !!view.rootModuleId, selectedLink))),
-    [project, visible, view.rootModuleId, selectedLink, setEdges]
+      setEdges((prev) =>
+        reuseUnchanged(
+          prev,
+          toEdges(project, visible, !!view.rootModuleId, selectedLink, settings.inheritance)
+        )
+      ),
+    [project, visible, view.rootModuleId, selectedLink, settings.inheritance, setEdges]
   )
 
   const absolute = useCallback(
@@ -304,11 +313,8 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
           const base = doc.filePath
             ? fileName(doc.filePath).replace(/\.[^.]+$/, '')
             : getProject().name || 'diagram'
-          const a = document.createElement('a')
-          a.href = url
-          a.download = `${base}-${view.name}.${format}`
-          a.click()
-          setStatus('info', `Exported ${a.download}`)
+          const saved = await window.api.saveImage(`${base}-${view.name}.${format}`, url)
+          if (saved) setStatus('info', `Exported ${saved}`)
         }
       }),
     [viewId, view.name, flow, fitView, screenToFlowPosition, nodeRect]
@@ -590,12 +596,13 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
     }
     if (!activeDoc().selectedIds.includes(node.id)) select(selectionOf(getProject(), node.id))
     if (node.type === 'imported') {
-      const imp = findImported(getProject(), node.id)?.imp
+      const dep = findImported(getProject(), node.id)?.dep
       return openContextMenu(e, [
-        ...(imp
+        ...(dep
           ? [
-              { label: 'Refresh from its project', run: () => refreshImports([imp.id]) },
-              { label: `Open ${imp.file}`, run: () => openImportSource(imp.file) }
+              { label: 'Refresh from its project', run: () => void refreshDependencies([dep.id]) },
+              { label: `Open ${dep.file}`, run: () => openImportSource(dep.file) },
+              { label: `Show dependency ${dep.name}`, run: () => showDependency(dep.id) }
             ]
           : []),
         'separator',
@@ -649,6 +656,23 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
 
   const edgeMenu = (e: React.MouseEvent, edge: Edge): void => {
     e.preventDefault()
+    if (edge.id.startsWith(INHERIT)) {
+      select({ kind: 'module', id: edge.source })
+      openContextMenu(e, [
+        { label: 'Go to base', run: () => navigate({ kind: 'module', id: edge.target }) },
+        {
+          label: 'Remove base',
+          run: () =>
+            update((d) => {
+              const m = d.modules.find((m) => m.id === edge.source)
+              if (!m?.bases) return
+              m.bases = m.bases.filter((b) => b !== edge.target)
+              if (!m.bases.length) delete m.bases
+            })
+        }
+      ])
+      return
+    }
     select({ kind: 'link', id: edge.id })
     const toggle = (fn: (l: Project['links'][number]) => void) => () =>
       update((d) => {
@@ -752,10 +776,12 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
         }}
         onNodeDoubleClick={(_, n) => {
           if (n.id.startsWith(EXTERNAL)) navigate({ kind: 'module', id: n.id.slice(EXTERNAL.length) })
-          const imp = n.type === 'imported' ? findImported(getProject(), n.id)?.imp : undefined
-          if (imp) openImportSource(imp.file)
+          const dep = n.type === 'imported' ? findImported(getProject(), n.id)?.dep : undefined
+          if (dep) openImportSource(dep.file)
         }}
-        onEdgeClick={(_, e) => select({ kind: 'link', id: e.id })}
+        onEdgeClick={(_, e) =>
+          select(e.type === 'inherit' ? { kind: 'module', id: e.source } : { kind: 'link', id: e.id })
+        }
         onPaneClick={() => select(null)}
         onNodeContextMenu={nodeMenu}
         onEdgeContextMenu={edgeMenu}
@@ -771,7 +797,7 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
         deleteKeyCode={null}
         selectionKeyCode="Shift"
         multiSelectionKeyCode={['Control', 'Meta']}
-        // Fixed stacking: edges (1000) and their badges (1001) stay above modules even when selected.
+        // Fixed stacking (see Z), even when selected; link badges (1001) stay above everything.
         zIndexMode="manual"
         snapToGrid={settings.snapToGrid}
         snapGrid={[settings.gridSize, settings.gridSize]}

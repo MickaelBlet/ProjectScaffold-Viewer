@@ -4,6 +4,7 @@ import { DockviewReact, type DockviewReadyEvent, type IDockviewPanelProps } from
 import { ExplorerPanel } from '@/panels/ExplorerPanel'
 import { OutlinePanel } from '@/panels/OutlinePanel'
 import { LinksPanel } from '@/panels/LinksPanel'
+import { DependenciesPanel } from '@/panels/DependenciesPanel'
 import { Inspector } from '@/panels/Inspector'
 import { ProblemsPanel, useProblemCounts } from '@/panels/ProblemsPanel'
 import { SearchPanel } from '@/panels/SearchPanel'
@@ -55,6 +56,7 @@ const components = {
   explorer: tool('explorer', ExplorerPanel),
   outline: tool('outline', OutlinePanel),
   links: tool('links', LinksPanel),
+  dependencies: tool('dependencies', DependenciesPanel),
   inspector: tool('inspector', Inspector),
   problems: ProblemsToolPanel,
   search: tool('search', SearchPanel),

@@ -4,6 +4,7 @@ import { MenuList } from '@/components/ContextMenu'
 import { fileName, openRecentProject } from '@/fileOps'
 import { useDoc } from '@/store/documents'
 import { useUiStore, type MenuItem } from '@/store/ui'
+import { IN_VSCODE } from '@/host'
 
 /** Menus built from the command registry: command ids, '-' for a separator between groups of
  *  related commands, 'recent' for the recent documents submenu. */
@@ -58,8 +59,9 @@ const MENUS: [Category, string[]][] = [
       'insert.frame',
       '-',
       'insert.projectContent',
+      'insert.dependency',
       'insert.imported',
-      'insert.refreshImports'
+      'insert.refreshDependencies'
     ]
   ],
   [
@@ -83,6 +85,7 @@ const MENUS: [Category, string[]][] = [
       'view.minimap',
       'view.badges',
       'view.autoOrient',
+      'view.inheritance',
       '-',
       'view.themeSystem',
       'view.themeLight',
@@ -120,6 +123,7 @@ const MENUS: [Category, string[]][] = [
       'window.explorer',
       'window.outline',
       'window.links',
+      'window.dependencies',
       'window.inspector',
       'window.problems',
       'window.search',
@@ -135,9 +139,23 @@ const MENUS: [Category, string[]][] = [
 ]
 
 // Every listed command must exist.
-for (const [, ids] of MENUS)
-  for (const id of ids)
-    if (id !== '-' && id !== 'recent' && !commands.some((c) => c.id === id)) throw new Error(id)
+if (!IN_VSCODE)
+  for (const [, ids] of MENUS)
+    for (const id of ids)
+      if (id !== '-' && id !== 'recent' && !commands.some((c) => c.id === id)) throw new Error(id)
+
+/** Menus without the commands VS Code leaves out (document commands), nor the separators they leave. */
+function availableMenus(): [Category, string[]][] {
+  if (!IN_VSCODE) return MENUS
+  return MENUS.map(([cat, ids]) => {
+    const kept = ids.filter((id) => id === '-' || commands.some((c) => c.id === id))
+    const between = (i: number): boolean =>
+      kept.slice(0, i).some((x) => x !== '-') && kept[i + 1] !== undefined && kept[i + 1] !== '-'
+    return [cat, kept.filter((id, i) => id !== '-' || between(i))]
+  })
+}
+
+const menus = availableMenus()
 
 function recentItem(recent: string[], filePath: string | null): MenuItem {
   return {
@@ -179,7 +197,7 @@ export function MenuBar(): ReactNode {
 
   return (
     <div className="menubar" ref={ref} role="menubar">
-      {MENUS.map(([cat, ids]) => (
+      {menus.map(([cat, ids]) => (
         <div className="dropdown" key={cat}>
           <button
             type="button"

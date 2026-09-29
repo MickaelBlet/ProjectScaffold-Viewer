@@ -24,6 +24,7 @@ import { ModuleInspector } from '@/panels/ModuleInspector'
 import { LinkInspector } from '@/panels/LinkInspector'
 import { SourcePanel } from '@/panels/SourcePanel'
 import { DocTabs } from './DocTabs'
+import { IN_VSCODE } from '@/host'
 import { closeView, editorApi, openView, setEditorApi, type EditorKind } from './controllers'
 import { dockTheme } from './theme'
 
@@ -214,7 +215,8 @@ export function EditorArea(): ReactNode {
   const docId = useDocs((s) => s.activeId)
   return (
     <div className="editor-area">
-      <DocTabs />
+      {/* VS Code shows each document in its own editor tab. */}
+      {!IN_VSCODE && <DocTabs />}
       <DocEditor key={docId} docId={docId} />
     </div>
   )

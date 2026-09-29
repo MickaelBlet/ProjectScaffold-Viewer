@@ -56,12 +56,22 @@ export function targetAt(p: Project, path: Path, names: (string | undefined)[]):
       const id = moduleAt(parts.join('.') || undefined)
       return id ? { kind: 'module', id } : null
     }
-    case 'imports': {
-      const imp = byName(p.imports, itemName(1, file.imports))
+    case 'dependencies': {
+      const dep = byName(p.dependencies, itemName(1, file.dependencies))
+      const fileDep = file.dependencies?.find((x) => x.name === dep?.name)
       const j = index(3)
-      if (!imp || path[2] !== 'modules' || j === null) return null
-      const modulePath = names[3] ?? file.imports?.find((i) => i.name === imp.name)?.modules[j]?.module
-      const m = imp.modules.find((m) => m.path === modulePath)
+      if (!dep || !fileDep || j === null) return null
+      if (path[2] === 'types') {
+        const t = byName(p.types, itemName(3, fileDep.types))
+        return t ? { kind: 'type', id: t.id } : null
+      }
+      if (path[2] === 'interfaces') {
+        const i = byName(p.interfaces, itemName(3, fileDep.interfaces))
+        return i ? { kind: 'interface', id: i.id } : null
+      }
+      if (path[2] !== 'modules') return null
+      const modulePath = names[3] ?? fileDep.modules?.[j]?.module
+      const m = dep.modules.find((m) => m.path === modulePath)
       return m ? { kind: 'module', id: m.id } : null
     }
     case 'editor': {

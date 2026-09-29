@@ -22,7 +22,8 @@ import {
   nudgeSelection,
   openModuleView,
   paste,
-  refreshImports,
+  refreshDependencies,
+  pickDependency,
   sameSizeSelection,
   selectAll,
   selectedIds,
@@ -47,6 +48,7 @@ import {
   type ToolId
 } from './shell/controllers'
 import { GLOBAL_VIEW } from './model/types'
+import { IN_PANEL, IN_PREVIEW, IN_VSCODE } from './host'
 
 export type Category = 'File' | 'Edit' | 'Insert' | 'View' | 'Arrange' | 'Window' | 'Help'
 
@@ -75,6 +77,10 @@ export function isEditable(el: Element | null): boolean {
   )
 }
 
+// VS Code undoes the document text, which replaces the page's own history.
+const undoModel = (): void => (window.api.undo ? window.api.undo() : undo())
+const redoModel = (): void => (window.api.redo ? window.api.redo() : redo())
+
 const hasSelection = (): boolean => selectedIds().length > 0
 const multi = (n: number) => (): boolean => selectedIds().length >= n
 const moduleSelected = (): boolean => activeDoc().selection?.kind === 'module'
@@ -84,7 +90,8 @@ function nudgeStep(far: boolean): number {
   return snapToGrid ? gridSize * (far ? 5 : 1) : far ? 20 : 2
 }
 
-type Toggle = 'snapToGrid' | 'guides' | 'minimap' | 'edgeBadges' | 'autoOrientLinks' | 'forceAnimations'
+type Toggle =
+  'snapToGrid' | 'guides' | 'minimap' | 'edgeBadges' | 'autoOrientLinks' | 'inheritance' | 'forceAnimations'
 const setting =
   <K extends Toggle>(key: K) =>
   (): boolean =>
@@ -106,7 +113,7 @@ const docCommands: Command[] = Array.from({ length: 9 }, (_, i) => ({
   }
 }))
 
-export const commands: Command[] = [
+const allCommands: Command[] = [
   // File
   { id: 'file.new', title: 'New project', category: 'File', keys: ['Alt+N'], global: true, run: newProject },
   {
@@ -186,7 +193,7 @@ export const commands: Command[] = [
     keys: ['Ctrl+Z'],
     global: true,
     // Inside a text field, undo the typing instead of the model.
-    run: () => (isEditable(document.activeElement) ? document.execCommand('undo') : undo())
+    run: () => (isEditable(document.activeElement) ? document.execCommand('undo') : undoModel())
   },
   {
     id: 'edit.redo',
@@ -194,7 +201,7 @@ export const commands: Command[] = [
     category: 'Edit',
     keys: ['Ctrl+Y', 'Ctrl+Shift+Z'],
     global: true,
-    run: () => (isEditable(document.activeElement) ? document.execCommand('redo') : redo())
+    run: () => (isEditable(document.activeElement) ? document.execCommand('redo') : redoModel())
   },
   // Ctrl+X / C / V go through the clipboard events (see installClipboard); listed for menus.
   {
@@ -321,11 +328,17 @@ export const commands: Command[] = [
     run: () => importProjectContent()
   },
   {
-    id: 'insert.refreshImports',
-    title: 'Refresh linked projects',
+    id: 'insert.dependency',
+    title: 'Add dependency…',
     category: 'Insert',
-    enabled: () => getProject().imports.length > 0,
-    run: () => refreshImports()
+    run: () => pickDependency()
+  },
+  {
+    id: 'insert.refreshDependencies',
+    title: 'Refresh dependencies',
+    category: 'Insert',
+    enabled: () => getProject().dependencies.length > 0,
+    run: () => void refreshDependencies()
   },
 
   // View
@@ -461,6 +474,13 @@ export const commands: Command[] = [
     run: toggle('autoOrientLinks')
   },
   {
+    id: 'view.inheritance',
+    title: 'Inheritance arrows',
+    category: 'View',
+    checked: setting('inheritance'),
+    run: toggle('inheritance')
+  },
+  {
     id: 'view.forceAnimations',
     title: 'Force animations',
     category: 'View',
@@ -469,7 +489,7 @@ export const commands: Command[] = [
   },
   {
     id: 'view.themeSystem',
-    title: 'Theme: system',
+    title: IN_VSCODE ? 'Theme: VS Code' : 'Theme: system',
     category: 'View',
     checked: () => useSettings.getState().theme === 'system',
     run: theme('system')
@@ -632,6 +652,7 @@ export const commands: Command[] = [
     global: true,
     run: tool('links')
   },
+  { id: 'window.dependencies', title: 'Dependencies', category: 'Window', run: tool('dependencies') },
   {
     id: 'window.inspector',
     title: 'Inspector',
@@ -699,6 +720,22 @@ export const commands: Command[] = [
   }
 ]
 
+/** Documents are opened, saved as and closed by VS Code, one per editor. A preview has its text beside. */
+const DOCUMENT_COMMANDS = new Set([
+  'file.new',
+  'file.open',
+  'file.saveAs',
+  'file.saveAll',
+  'file.close',
+  'window.nextDoc',
+  'window.prevDoc',
+  ...docCommands.map((c) => c.id)
+])
+
+export const commands: Command[] = IN_VSCODE
+  ? allCommands.filter((c) => !DOCUMENT_COMMANDS.has(c.id) && !(IN_PREVIEW && c.id === 'view.source'))
+  : allCommands
+
 const byId = new Map(commands.map((c) => [c.id, c]))
 
 export function getCommand(id: string): Command {
@@ -742,13 +779,20 @@ export function keyOf(e: KeyboardEvent): string {
   return `${e.ctrlKey || e.metaKey ? 'Ctrl+' : ''}${e.altKey ? 'Alt+' : ''}${e.shiftKey && !symbol ? 'Shift+' : ''}${key}`
 }
 
+/** Keys VS Code prevents the default of in webviews (print, find, save, undo) before the page sees them. */
+const VSCODE_PREVENTED = /^Ctrl\+(Shift\+)?[PFSZY]$/
+
 export function installKeyboard(): () => void {
   const byKey = new Map<string, Command>()
   for (const c of commands) for (const k of c.keys ?? []) byKey.set(k, c)
   const listener = (e: KeyboardEvent): void => {
-    if (e.isComposing || e.defaultPrevented) return
-    const c = byKey.get(keyOf(e))
+    if (e.isComposing) return
+    const key = keyOf(e)
+    if (e.defaultPrevented && !(IN_VSCODE && VSCODE_PREVENTED.test(key))) return
+    const c = byKey.get(key)
     if (!c) return
+    // The full editor: VS Code runs these keys itself, on the document text.
+    if (IN_VSCODE && !IN_PREVIEW && !IN_PANEL && (c.id === 'edit.undo' || c.id === 'edit.redo')) return
     // Clipboard shortcuts go through the copy / cut / paste events.
     if (c.id === 'edit.copy' || c.id === 'edit.cut' || c.id === 'edit.paste') return
     if (!c.global && isEditable(document.activeElement)) return

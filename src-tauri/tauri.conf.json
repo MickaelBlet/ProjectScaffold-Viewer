@@ -10,7 +10,16 @@
     "beforeBuildCommand": "npm run build"
   },
   "app": {
-    "windows": [{ "title": "ProjectScaffold", "width": 1400, "height": 900 }],
+    "windows": [
+      {
+        "title": "ProjectScaffold",
+        "width": 1400,
+        "height": 900,
+        "minWidth": 640,
+        "minHeight": 400,
+        "decorations": false
+      }
+    ],
     "security": { "csp": null }
   },
   "bundle": {

@@ -2,6 +2,7 @@
 import { align, distribute, sameSize, type AlignMode } from '@/model/align'
 import { arrange as arrangeProject, arrangeOptions } from '@/model/autoLayout'
 import { copyItems, copyProject, parseClip, pasteClip, type Clip } from '@/model/clipboard'
+import { addDependencyOf, type DependencyResult } from '@/model/dependencies'
 import {
   absolutePosition,
   absoluteRect,
@@ -21,11 +22,21 @@ import {
   subtreeIds,
   uniqueName
 } from '@/model/project'
+import { targetAt, type SourceTarget } from '@/components/sourceTarget'
+import { targetPath } from '@/model/locate'
 import type { ProblemTarget } from '@/model/validate'
 import { GLOBAL_VIEW, type Id, type Orientation, type Project, type Rect } from '@/model/types'
-import { activeDoc, activateDoc, patchDoc, travelSelection as travel, useDocs } from '@/store/documents'
 import {
-  addImportedModule,
+  activeDoc,
+  activateDoc,
+  patchDoc,
+  travelSelection as travel,
+  useDocs,
+  type DocState
+} from '@/store/documents'
+import {
+  addDependencyFrom,
+  detachDependencyById,
   addModule,
   addNote,
   addPort,
@@ -36,7 +47,9 @@ import {
   deleteLink,
   deleteType,
   getProject,
-  refreshImportFrom,
+  placeModuleFrom,
+  refreshDependenciesFrom,
+  removeDependencyById,
   setHidden,
   setLayouts,
   setLocked,
@@ -44,8 +57,11 @@ import {
 } from '@/store/project'
 import { quickPick, select, setStatus, showDialog, useUiStore, type Selection } from '@/store/ui'
 import { fileName } from '@/fileOps'
-import { formatFromPath, LoadError, loadText } from '@/model/serialize'
-import { activeCanvas, openView, showTool } from '@/shell/controllers'
+import { relativeFile, sameFile } from '@/model/sync'
+import { formatFromPath, LoadError, loadText, toFile } from '@/model/serialize'
+import { activeCanvas, openEditor, openView, showTool } from '@/shell/controllers'
+import { IN_PANEL } from '@/host'
+import type { DiagramAction } from '../../../vscode/src/protocol'
 
 // Selection
 
@@ -83,8 +99,16 @@ export function selectAll(): void {
 
 /** Select an entity and bring it into view (zoomed on it with `zoom`). */
 export function navigate(target: ProblemTarget, { zoom = false }: { zoom?: boolean } = {}): void {
-  if (target.kind === 'project') return select({ kind: 'project' })
-  select(target.kind === 'module' && isImportedId(target.id) ? { kind: 'imported', id: target.id } : target)
+  const before = activeDoc().selection
+  if (target.kind === 'project') select({ kind: 'project' })
+  else
+    select(target.kind === 'module' && isImportedId(target.id) ? { kind: 'imported', id: target.id } : target)
+  // VS Code side panel: the diagram shows it (installSelectionSync tells it of a new selection).
+  if (IN_PANEL) {
+    if (!revealing && activeDoc().selection === before) postSelection()
+    return
+  }
+  if (target.kind === 'project') return
   if (target.kind === 'type' || target.kind === 'interface') return showTool('inspector', false)
   const p = getProject()
   const link = target.kind === 'link' ? p.links.find((l) => l.id === target.id) : undefined
@@ -101,6 +125,79 @@ export function navigate(target: ProblemTarget, { zoom = false }: { zoom?: boole
     if (hiddenAncestors.length) setHidden(view.id, hiddenAncestors, false)
   }
   revealWhenDrawn(ids, zoom)
+}
+
+/** Selection shown for the text cursor: not sent back to move it. */
+let revealing = false
+
+function isSelected(target: SourceTarget): boolean {
+  const s = activeDoc().selection
+  const kind = s?.kind === 'imported' ? 'module' : s?.kind
+  return kind === target.kind && (s && 'id' in s ? s.id : null) === ('id' in target ? target.id : null)
+}
+
+/** Show the entity at a data path of the file, `names` naming its list items (see targetAt). */
+export function navigateToPath(path: (string | number)[], names: (string | undefined)[]): void {
+  const target = targetAt(getProject(), path, names)
+  // Already selected: the view stays where the user left it.
+  if (!target || isSelected(target)) return
+  revealing = true
+  try {
+    if (target.kind === 'note') navigateToNote(target.id, { zoom: true })
+    else navigate(target, { zoom: true })
+  } finally {
+    revealing = false
+  }
+}
+
+/** VS Code: tells the other pages of the document (and the text cursor) of the selection. */
+function postSelection(doc: DocState = activeDoc()): void {
+  const selection = doc.selection
+  if (!selection || selection.kind === 'note') return
+  const target: ProblemTarget =
+    selection.kind === 'imported' ? { kind: 'module', id: selection.id } : selection
+  const p = doc.store.getState().project
+  window.api.selected?.(targetPath(toFile(p, { editor: false }), p, target))
+}
+
+/** VS Code: the text cursor and the other pages of the document follow the selection. */
+export function installSelectionSync(): () => void {
+  return useDocs.subscribe((s, prev) => {
+    const doc = activeDoc(s)
+    if (!revealing && doc.selection !== activeDoc(prev).selection) postSelection(doc)
+  })
+}
+
+const viewName = (d: DocState): string | null =>
+  d.activeViewId === GLOBAL_VIEW
+    ? null
+    : (d.store.getState().project.views.find((v) => v.id === d.activeViewId)?.name ?? null)
+
+/** VS Code diagram: the side panels follow the view it shows. */
+export function installViewSync(): () => void {
+  window.api.viewChanged?.(viewName(activeDoc()))
+  return useDocs.subscribe((s, prev) => {
+    if (activeDoc(s).activeViewId !== activeDoc(prev).activeViewId)
+      window.api.viewChanged?.(viewName(activeDoc(s)))
+  })
+}
+
+/** VS Code side panel: the view the diagram shows, by name (null: global). */
+export function showDiagramView(name: string | null): void {
+  const view = name === null ? undefined : getProject().views.find((v) => v.name === name)
+  patchDoc({ activeViewId: view?.id ?? GLOBAL_VIEW })
+}
+
+/** VS Code diagram: an action asked by a side panel (commands: see runCommand). */
+export function runDiagramAction(action: Exclude<DiagramAction, { kind: 'command' }>): void {
+  const p = getProject()
+  if (action.kind === 'openView') {
+    const view = action.view === null ? GLOBAL_VIEW : p.views.find((v) => v.name === action.view)?.id
+    if (view) openView(view, { split: action.split })
+    return
+  }
+  const target = targetAt(p, action.path, [])
+  if (target?.kind === action.editor) openEditor(action.editor, target.id, { split: action.split })
 }
 
 /** Select a note and show it (notes are drawn in the global view only). */
@@ -218,14 +315,18 @@ export function deleteSelection(): void {
   )
   if (canvasIds.length) deleteItems(canvasIds)
   for (const id of ids) {
-    if (p.interfaces.some((i) => i.id === id)) deleteInterface(id)
+    const iface = p.interfaces.find((i) => i.id === id)
+    if (iface) {
+      const reasons = deleteInterface(id)
+      if (reasons.length) blocked.push(`${iface.name}: kept by ${reasons.join(', ')}`)
+    }
     const type = p.types.find((t) => t.id === id)
     if (type) {
       const usages = deleteType(id)
       if (usages.length) blocked.push(`${type.name}: used by ${usages.join(', ')}`)
     }
   }
-  if (blocked.length) showDialog('Some types were not deleted', blocked)
+  if (blocked.length) showDialog('Some types and interfaces were not deleted', blocked)
   select(null)
 }
 
@@ -265,28 +366,34 @@ export function addNoteAt(kind: 'note' | 'frame', pos?: { x: number; y: number }
   select({ kind: 'note', id })
 }
 
-// Links to other projects
+// Dependencies: other projects
 
-/** Another project to link to: an open document, or a file read without opening it. */
+/** Another project to depend on or link to: an open document, or a file read without opening it. */
 interface OtherProject {
   project: Project
   file: string
 }
 
 function otherProjects(
-  needFile = true
+  needFile = true,
+  describe = (p: Project): string => `${p.modules.length} modules`
 ): { label: string; detail: string; get: () => Promise<OtherProject | null> }[] {
   const { docs, activeId } = useDocs.getState()
+  // Dependencies name their file relative to this one.
+  const here = activeDoc().filePath
   const open = docs
     .filter((d) => d.id !== activeId)
     .map((d) => {
       const project = d.store.getState().project
       return {
         label: d.filePath ? fileName(d.filePath) : `${project.name} (unsaved)`,
-        detail: `open · ${project.modules.length} modules`,
+        detail: `open · ${describe(project)}`,
         get: (): Promise<OtherProject | null> => {
           if (d.filePath || !needFile)
-            return Promise.resolve({ project, file: d.filePath ? fileName(d.filePath) : project.name })
+            return Promise.resolve({
+              project,
+              file: d.filePath ? relativeFile(here, d.filePath) : project.name
+            })
           showDialog('Save the other project first', [
             `"${project.name}" has no file yet: links to it need its file name.`
           ])
@@ -303,7 +410,7 @@ function otherProjects(
         const f = await window.api.openFile()
         if (!f) return null
         try {
-          return { project: loadText(f.content, formatFromPath(f.path)), file: fileName(f.path) }
+          return { project: loadText(f.content, formatFromPath(f.path)), file: relativeFile(here, f.path) }
         } catch (e) {
           showDialog(`Cannot read ${f.path}`, e instanceof LoadError ? e.problems : [String(e)])
           return null
@@ -313,41 +420,85 @@ function otherProjects(
   ]
 }
 
+/** Lines telling what a change of dependencies did, when there is more than the change itself. */
+function dependencyLines(r: DependencyResult): string[] {
+  return [
+    ...r.conflicts.map((x) => `Not taken: ${x}`),
+    ...r.renamed.map((x) => `Renamed ${x}`),
+    ...r.detached.map((x) => `${x}: no longer in its project, kept here`),
+    ...r.missing
+  ]
+}
+
+/** Pick a module of `other` and place it on the canvas at `at`, depending on `other`. */
+function pickModuleOf(other: OtherProject, at: { x: number; y: number }): void {
+  const src = other.project
+  if (!src.modules.length) return setStatus('error', `${other.file} has no modules`)
+  quickPick(
+    `Module of ${other.file} to link to`,
+    src.modules.map((m) => ({
+      key: m.id,
+      label: modulePath(src, m.id),
+      detail: m.ports.map((pt) => `${pt.role} ${pt.name}`).join(', ') || 'no ports',
+      kind: 'M',
+      run: () => {
+        if (activeDoc().activeViewId !== GLOBAL_VIEW) openView(GLOBAL_VIEW)
+        const { id, result } = placeModuleFrom(src, other.file, m.id, at, selfFile())
+        if (id) select({ kind: 'imported', id })
+        const lines = dependencyLines(result)
+        if (lines.length) showDialog(`Linking to ${other.file}`, lines)
+      }
+    }))
+  )
+}
+
+/** The dependencies of this project, read from their files, as projects to pick from. */
+function dependencyProjects(): { label: string; detail: string; get: () => Promise<OtherProject | null> }[] {
+  return getProject().dependencies.map((x) => ({
+    label: x.name,
+    detail: `dependency · ${x.file}`,
+    get: async (): Promise<OtherProject | null> => {
+      const project = await importSource(x.file)
+      if (project) return { project, file: x.file }
+      showDialog(`Cannot read ${x.file}`, [cannotRead(x.name, x.file)])
+      return null
+    }
+  }))
+}
+
 /**
- * Pick another project, then one of its modules: it is placed on the canvas (global view) and its
- * ports can be linked to. Interfaces it uses that this project lacks are copied (matched by name).
+ * Pick a project (this one's dependencies first), then one of its modules: it is placed on the
+ * canvas (global view) and its ports can be linked to. The project becomes a dependency: its
+ * interfaces and types are used here, not copied.
  */
 export function linkOtherProject(pos?: { x: number; y: number }): void {
   const at = pos ?? activeCanvas()?.center() ?? { x: 80, y: 80 }
+  const deps = getProject().dependencies
+  const others = otherProjects().filter((o) => !deps.some((x) => sameFile(x.file, o.label)))
   quickPick(
     'Project to link to',
-    otherProjects().map((o, i) => ({
+    [...dependencyProjects(), ...others].map((o, i) => ({
       key: String(i),
       label: o.label,
       detail: o.detail,
       kind: 'P',
       run: () =>
         void o.get().then((other) => {
-          if (!other) return
-          const src = other.project
-          if (!src.modules.length) return setStatus('error', `${other.file} has no modules`)
-          quickPick(
-            `Module of ${other.file} to link to`,
-            src.modules.map((m) => ({
-              key: m.id,
-              label: modulePath(src, m.id),
-              detail: m.ports.map((pt) => `${pt.role} ${pt.name}`).join(', ') || 'no ports',
-              kind: 'M',
-              run: () => {
-                if (activeDoc().activeViewId !== GLOBAL_VIEW) openView(GLOBAL_VIEW)
-                const id = addImportedModule(src, other.file, m.id, at)
-                if (id) select({ kind: 'imported', id })
-              }
-            }))
-          )
+          if (other) pickModuleOf(other, at)
         })
     }))
   )
+}
+
+/** Pick a module of a dependency and place it on the canvas. */
+export function placeDependencyModule(id: Id, pos?: { x: number; y: number }): void {
+  const dep = getProject().dependencies.find((x) => x.id === id)
+  if (!dep) return
+  const at = pos ?? activeCanvas()?.center() ?? { x: 80, y: 80 }
+  void importSource(dep.file).then((project) => {
+    if (project) pickModuleOf({ project, file: dep.file }, at)
+    else showDialog(`Cannot read ${dep.file}`, [cannotRead(dep.name, dep.file)])
+  })
 }
 
 /** Where imported content goes: the selected module, else the focused view's module. */
@@ -359,7 +510,8 @@ function importParent(): Id | null {
 /**
  * Pick another project and copy its content into `parent` (a module, or the top level): its
  * modules with their links, its notes (top level only), and the types and interfaces this project
- * lacks (the others are matched by name). Nothing ties the copy to that project afterwards.
+ * lacks (the others are matched by name). Nothing ties the copy to that project afterwards, but
+ * the dependencies it uses are used here too.
  */
 export function importProjectContent(
   parent: Id | null = importParent(),
@@ -385,47 +537,134 @@ export function importProjectContent(
             at = { x: origin.x + LAYOUT_PAD, y: origin.y + belowContent(p, parent) }
           }
           let pasted: Id[] = []
-          update((d) => void (pasted = pasteClip(d, clip, { parent, at })))
+          let defs = 0
+          update((d) => {
+            // The dependencies of that project are used here too, not copied.
+            for (const n of other.project.dependencies)
+              if (!n.indirect) addDependencyOf(d, other.project, other.file, n.id)
+            const content = copyProject(other.project, d, !parent) ?? clip
+            defs = content.types.length + content.interfaces.length
+            pasted = pasteClip(d, content, { parent, at })
+          })
           selectMany(pasted)
           const modules = Object.keys(clip.rootParents).length
-          const defs = clip.types.length + clip.interfaces.length
           setStatus('info', `Imported ${modules} modules, ${defs} types and interfaces from ${other.file}`)
         })
     }))
   )
 }
 
-/** Open documents holding the project of an import (same file name). */
-function importSource(file: string): Project | null {
+/**
+ * Project of a dependency: from the open document of the same file name, else (VS Code) from the
+ * file next to the document.
+ */
+async function importSource(file: string): Promise<Project | null> {
   const doc = useDocs
     .getState()
     .docs.find((d) => d.id !== activeDoc().id && d.filePath && fileName(d.filePath) === fileName(file))
-  return doc ? doc.store.getState().project : null
-}
-
-/** Read the ports of imported modules again from their projects, when these are open. */
-export function refreshImports(importIds?: Id[]): void {
-  const p = getProject()
-  const lines: string[] = []
-  let refreshed = 0
-  for (const imp of p.imports) {
-    if (importIds && !importIds.includes(imp.id)) continue
-    const source = importSource(imp.file)
-    if (!source) {
-      lines.push(`${imp.name}: open ${imp.file} in a tab to refresh it`)
-      continue
-    }
-    refreshed++
-    const { missing, renamed } = refreshImportFrom(imp.id, source)
-    for (const r of renamed) lines.push(`${imp.name}: ${r}`)
-    for (const path of missing) lines.push(`${imp.name}: module '${path}' no longer exists in ${imp.file}`)
+  if (doc) return doc.store.getState().project
+  const text = await window.api.readSibling?.(file)
+  if (!text) return null
+  try {
+    return loadText(text, formatFromPath(file))
+  } catch {
+    return null
   }
-  if (lines.length) showDialog(`Refreshed ${refreshed} linked project${refreshed === 1 ? '' : 's'}`, lines)
-  else setStatus('info', `Refreshed ${refreshed} linked project${refreshed === 1 ? '' : 's'}`)
 }
 
-/** Show the project of an import in its tab when it is open. */
+const cannotRead = (name: string, file: string): string =>
+  window.api.readSibling
+    ? `${name}: cannot read ${file} next to this file`
+    : `${name}: open ${file} in a tab to read it`
+
+/** This project's file name: it cannot depend on itself. */
+const selfFile = (): string | null => {
+  const path = activeDoc().filePath
+  return path ? fileName(path) : null
+}
+
+/**
+ * Pick another project and depend on it: its types and interfaces are used here, read-only, with
+ * those of the projects it depends on, and its modules can be placed on the canvas to link to.
+ * They are refreshed from that file (Refresh, or live while it is open).
+ */
+export function pickDependency(): void {
+  const deps = getProject().dependencies
+  quickPick(
+    'Project to depend on',
+    otherProjects(
+      true,
+      (p) => `${p.types.length} types, ${p.interfaces.length} interfaces, ${p.modules.length} modules`
+    )
+      .filter((o) => !deps.some((x) => !x.indirect && sameFile(x.file, o.label)))
+      .map((o, i) => ({
+        key: String(i),
+        label: o.label,
+        detail: o.detail,
+        kind: 'P',
+        run: () =>
+          void o.get().then((other) => {
+            if (!other) return
+            const lines = dependencyLines(addDependencyFrom(other.project, other.file, selfFile()))
+            if (lines.length) return showDialog(`Depending on ${other.file}`, lines)
+            setStatus('info', `Depending on ${other.file}: its types and interfaces are read-only here`)
+          })
+      }))
+  )
+}
+
+/** Read dependencies again from their projects, when these can be read (all, or those of these ids). */
+export async function refreshDependencies(ids?: Id[]): Promise<void> {
+  const lines: string[] = []
+  const sources = new Map<Id, Project>()
+  for (const x of getProject().dependencies) {
+    if (ids && !ids.includes(x.id)) continue
+    const source = await importSource(x.file)
+    if (source) sources.set(x.id, source)
+    // Indirect dependencies also come with the dependencies using them.
+    else if (!x.indirect) lines.push(cannotRead(x.name, x.file))
+  }
+  if (sources.size) lines.push(...dependencyLines(refreshDependenciesFrom(sources, selfFile())))
+  const what = `Refreshed ${sources.size} dependenc${sources.size === 1 ? 'y' : 'ies'}`
+  if (lines.length) showDialog(what, lines)
+  else setStatus('info', what)
+}
+
+/** Stop depending on a project, or explain what keeps it. */
+export function removeDependencyAction(id: Id): void {
+  const dep = getProject().dependencies.find((x) => x.id === id)
+  if (!dep) return
+  const blockers = removeDependencyById(id)
+  if (blockers.length)
+    showDialog(`Dependency ${dep.name} is still used`, [
+      ...blockers.map((b) => `Used by: ${b}`),
+      'Remove its modules from the canvas, or detach it to keep its types and interfaces here as your own.'
+    ])
+  else setStatus('info', `No longer depending on ${dep.file}`)
+}
+
+/** Make a dependency's types and interfaces this project's own. */
+export function detachDependencyAction(id: Id): void {
+  const dep = getProject().dependencies.find((x) => x.id === id)
+  if (!dep) return
+  const blockers = detachDependencyById(id)
+  if (blockers.length)
+    showDialog(
+      `Dependency ${dep.name} is still used`,
+      blockers.map((b) => `Used by: ${b}`)
+    )
+  else setStatus('info', `Types and interfaces of ${dep.name} are now this project's own`)
+}
+
+/** Show a dependency's content in the Dependencies panel. */
+export function showDependency(id: Id): void {
+  useUiStore.setState({ dependency: id })
+  showTool('dependencies')
+}
+
+/** Show the project of a dependency in its tab when it is open (VS Code: in its editor). */
 export function openImportSource(file: string): void {
+  if (window.api.openSibling) return window.api.openSibling(file)
   const doc = useDocs.getState().docs.find((d) => d.filePath && fileName(d.filePath) === fileName(file))
   if (doc) activateDoc(doc.id)
   else setStatus('info', `${file} is not open`)
@@ -549,6 +788,8 @@ export function groupSelection(): void {
       description: '',
       parentId,
       metadata: {},
+      attributes: [],
+      methods: [],
       ports: [],
       layout: {
         x: box.x - LAYOUT_PAD,
@@ -604,7 +845,7 @@ export async function arrangeLayout(
         // Locked modules keep their place; their size still follows their content.
         if (r) m.layout = m.locked ? { ...r, x: m.layout.x, y: m.layout.y } : { ...r }
       }
-      for (const m of d.imports.flatMap((i) => i.modules)) {
+      for (const m of d.dependencies.flatMap((x) => x.modules)) {
         const pos = findImported(arranged, m.id)?.module.position
         if (pos) m.position = { ...pos }
       }

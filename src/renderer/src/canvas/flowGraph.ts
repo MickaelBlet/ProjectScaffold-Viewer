@@ -13,7 +13,8 @@ import {
 import { ceilToGrid } from '@/model/grid'
 import type { Id, LinkAnchor, PortRole, Project, View } from '@/model/types'
 import type { ExternalNodeData, ExternalPort } from './ExternalNode'
-import { EXTERNAL, MODULE_HANDLE, PERF_COLORS } from './constants'
+import { inheritEdges } from './inheritEdges'
+import { EXTERNAL, MODULE_HANDLE, PERF_COLORS, Z } from './constants'
 import {
   freePorts,
   neededHeight,
@@ -55,11 +56,12 @@ export function toNodes(
         height: n.layout.height,
         selected: selected.has(n.id),
         draggable: !n.locked,
-        // Frames stay behind modules.
-        zIndex: n.kind === 'frame' ? -1 : 500,
+        zIndex: n.kind === 'frame' ? Z.frame : Z.note,
         data: {}
       })
   const parents = new Set(p.modules.flatMap((m) => m.parentId ?? []))
+  // Modules drawn around others: links between their content go over them.
+  const containers = new Set(p.modules.flatMap((m) => (visible.has(m.id) && m.parentId) || []))
   // Ports at a hand-set link attachment are drawn there, out of their edge's rows.
   const anchors = portAnchors(p, sides)
   const portData = (
@@ -89,6 +91,7 @@ export function toNodes(
       // The root of a drill-down view is the frame of the view.
       draggable: !isRoot && !m.locked,
       selected: selected.has(m.id),
+      zIndex: containers.has(m.id) ? Z.container : Z.module,
       data: portData(m.ports, placements)
     })
   }
@@ -109,6 +112,7 @@ export function toNodes(
           : size.height
       ),
       selected: selected.has(m.id),
+      zIndex: Z.module,
       data: portData(m.ports, placements)
     })
   }
@@ -180,6 +184,7 @@ export function externalNodes(
       height,
       draggable: false,
       selectable: false,
+      zIndex: Z.module,
       data: { label: modulePath(p, moduleId), ports, side }
     }
   })
@@ -203,10 +208,16 @@ export function standIns(p: Project, view: View, externals: Node<ExternalNodeDat
   return out
 }
 
-export function toEdges(p: Project, visible: Set<Id>, drill: boolean, selectedLink: Id | null): Edge[] {
+export function toEdges(
+  p: Project,
+  visible: Set<Id>,
+  drill: boolean,
+  selectedLink: Id | null,
+  inheritance: boolean
+): Edge[] {
   const end = (moduleId: Id): string | null =>
     visible.has(moduleId) ? moduleId : drill ? EXTERNAL + moduleId : null
-  return p.links.flatMap((l) => {
+  const links = p.links.flatMap((l): Edge[] => {
     const source = end(l.from.moduleId)
     const target = end(l.to.moduleId)
     if (!source || !target || (source.startsWith(EXTERNAL) && target.startsWith(EXTERNAL))) return []
@@ -223,10 +234,11 @@ export function toEdges(p: Project, visible: Set<Id>, drill: boolean, selectedLi
         selected: l.id === selectedLink,
         markerEnd: marker,
         markerStart: l.constraints.direction === 'bidirectional' ? marker : undefined,
-        zIndex: 1000
+        zIndex: Z.link
       }
     ]
   })
+  return inheritance ? [...links, ...inheritEdges(p, visible)] : links
 }
 
 export interface ConnectEnd {

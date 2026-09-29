@@ -4,10 +4,13 @@ import '@xyflow/react/dist/style.css'
 import 'dockview-react/dist/styles/dockview.css'
 import './styles.css'
 import { App } from './App'
+import { IN_VSCODE } from './host'
 import { installRenameSync } from './store/sync'
+import { installVscodeApi } from './vscodeApi'
 import { installWebApi } from './webApi'
 
-installWebApi()
+if (IN_VSCODE) installVscodeApi()
+else installWebApi()
 installRenameSync()
 
 createRoot(document.getElementById('root')!).render(

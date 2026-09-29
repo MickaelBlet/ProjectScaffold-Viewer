@@ -1,8 +1,9 @@
 import { useEffect, useState, type PointerEvent, type ReactNode } from 'react'
 import type { ResizeEdge } from '@/api'
 import { Icon } from '@/components/Icon'
+import { tauriDesktop } from '@/tauriDesktop'
 
-const desktop = window.desktop
+const desktop = window.desktop ?? tauriDesktop
 const EDGES: ResizeEdge[] = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw']
 
 /** Tracks the maximized state; also sets data-frame on the root element for the window styles. */
@@ -43,13 +44,13 @@ export function WindowControls(): ReactNode {
 }
 
 function startResize(edge: ResizeEdge, e: PointerEvent<HTMLDivElement>): void {
-  if (!desktop || e.button !== 0) return
+  if (!desktop?.resize || e.button !== 0) return
   const target = e.currentTarget
   const { screenX, screenY, pointerId } = e
   target.setPointerCapture(pointerId)
-  desktop.resizeStart()
+  desktop.resizeStart?.()
   const onMove = (ev: globalThis.PointerEvent): void =>
-    desktop.resize(edge, ev.screenX - screenX, ev.screenY - screenY)
+    desktop.resize?.(edge, ev.screenX - screenX, ev.screenY - screenY)
   const onUp = (): void => {
     target.removeEventListener('pointermove', onMove)
     target.removeEventListener('pointerup', onUp)
@@ -64,7 +65,7 @@ function startResize(edge: ResizeEdge, e: PointerEvent<HTMLDivElement>): void {
 /** Resize handles along the borders of the frameless desktop window. */
 export function ResizeEdges(): ReactNode {
   const maximized = useMaximized()
-  if (!desktop || maximized) return null
+  if (!desktop?.resize || maximized) return null
   return EDGES.map((edge) => (
     <div key={edge} className={`resize-edge ${edge}`} onPointerDown={(e) => startResize(edge, e)} />
   ))

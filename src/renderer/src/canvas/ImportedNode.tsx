@@ -13,17 +13,17 @@ export const ImportedNode = memo(function ImportedNode({
   selected,
   data
 }: NodeProps<Node<PortNodeData>>): ReactNode {
-  const imp = useProjectStore((s) => s.project.imports.find((i) => i.modules.some((m) => m.id === id)))
+  const dep = useProjectStore((s) => s.project.dependencies.find((x) => x.modules.some((m) => m.id === id)))
   const interfaces = useProjectStore((s) => s.project.interfaces)
   const orientation = useProjectStore((s) => s.project.orientation)
-  const module = imp?.modules.find((m) => m.id === id)
+  const module = dep?.modules.find((m) => m.id === id)
   const { floating, anchors, top, bottom, left, right } = usePortLayout(
     id,
     module?.ports ?? [],
     data,
     orientation
   )
-  if (!imp || !module) return null
+  if (!dep || !module) return null
   const vertical = orientation === 'vertical'
   const iface = (p: ImportedPort): string | undefined => p.interface ?? undefined
   const unknown = (p: ImportedPort): boolean =>
@@ -39,7 +39,7 @@ export const ImportedNode = memo(function ImportedNode({
       title={title(p)}
       edge={edge}
       fallback={fallback}
-      className={`${unknown(p) ? 'unknown' : ''} ${anchor ? 'anchored' : ''}`}
+      className={unknown(p) ? 'unknown' : ''}
       style={anchor && anchorStyle(anchor)}
     />
   )
@@ -57,13 +57,13 @@ export const ImportedNode = memo(function ImportedNode({
   return (
     <div
       className={`module imported ${vertical ? 'vertical' : ''} ${selected ? 'selected' : ''}`}
-      title={`${module.path} in ${imp.file}`}
+      title={`${module.path} in ${dep.file}`}
     >
       {(top.length > 0 || (!floating && vertical)) && band(top, 'top')}
       <div className="module-header">
         <span className="module-name">
           <small className="imported-project">
-            <Icon name="arrow-up-right" /> {imp.name}
+            <Icon name="arrow-up-right" /> {dep.name}
           </small>{' '}
           {module.path}
         </span>

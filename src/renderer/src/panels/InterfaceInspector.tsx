@@ -1,12 +1,13 @@
 import type { ReactNode } from 'react'
-import { IDENTIFIER_RE, modulePath, nameError, newId, uniqueName } from '@/model/project'
+import { modulePath, nameError } from '@/model/project'
 import { deleteInterface, update, useProjectStore } from '@/store/project'
+import { dependencyOf } from '@/model/dependencies'
+import { DependencyBanner } from './DependencyBanner'
 import { select } from '@/store/ui'
 import { navigate } from '@/actions'
-import { CommitInput, IconButton, Row, Section, Select, TextArea } from '@/components/fields'
-import { TypeEditor } from '@/components/TypeEditor'
-import { PARAM_DIRECTIONS, type Interface, type Message } from '@/model/types'
-import { FieldList } from './TypeInspector'
+import { CommitInput, Row, Section, TextArea } from '@/components/fields'
+import type { Interface } from '@/model/types'
+import { addMessage, MessageList } from './MessageList'
 import { Icon } from '@/components/Icon'
 
 function withInterface(id: string, fn: (i: Interface) => void): void {
@@ -23,117 +24,44 @@ export function InterfaceInspector({ id }: { id: string }): ReactNode {
   const users = project.modules.flatMap((m) =>
     m.ports.filter((p) => p.interfaceId === id).map((p) => ({ module: m, port: p }))
   )
-  const withMessage = (mid: string, fn: (m: Message) => void): void =>
-    withInterface(id, (i) => {
-      const m = i.messages.find((m) => m.id === mid)
-      if (m) fn(m)
-    })
+
+  const dependency = dependencyOf(project, id)
 
   return (
     <>
       <h2>
         Interface <small className="muted">{iface.name}</small>
       </h2>
-      <Row label="Name">
-        <CommitInput
-          value={iface.name}
-          validate={(n) => nameError(project, { kind: 'interface', id }, n)}
-          onCommit={(n) => withInterface(id, (i) => void (i.name = n))}
+      {dependency && <DependencyBanner dependency={dependency} />}
+      <fieldset className="readonly" disabled={!!dependency}>
+        <Row label="Name">
+          <CommitInput
+            value={iface.name}
+            validate={(n) => nameError(project, { kind: 'interface', id }, n)}
+            onCommit={(n) => withInterface(id, (i) => void (i.name = n))}
+          />
+        </Row>
+        <TextArea
+          value={iface.description}
+          onChange={(v) => withInterface(id, (i) => void (i.description = v))}
         />
-      </Row>
-      <TextArea
-        value={iface.description}
-        onChange={(v) => withInterface(id, (i) => void (i.description = v))}
-      />
 
-      <Section
-        title={`Messages (${iface.messages.length})`}
-        actions={
-          <button
-            type="button"
-            onClick={() =>
-              withInterface(
-                id,
-                (i) =>
-                  void i.messages.push({
-                    id: newId(),
-                    name: uniqueName(
-                      'message',
-                      i.messages.map((m) => m.name)
-                    ),
-                    description: '',
-                    params: [],
-                    returns: null
-                  })
-              )
-            }
-          >
-            <Icon name="plus" /> message
-          </button>
-        }
-      >
-        {iface.messages.map((m) => (
-          <div className="card" key={m.id}>
-            <div className="card-header">
-              <CommitInput
-                value={m.name}
-                validate={(n) => (IDENTIFIER_RE.test(n) ? null : 'Must be an identifier')}
-                onCommit={(n) => withMessage(m.id, (x) => void (x.name = n))}
-              />
-              <IconButton
-                icon="x"
-                title="Delete message"
-                danger
-                onClick={() =>
-                  withInterface(id, (i) => void (i.messages = i.messages.filter((x) => x.id !== m.id)))
-                }
-              />
-            </div>
-            <TextArea
-              value={m.description}
-              onChange={(v) => withMessage(m.id, (x) => void (x.description = v))}
-            />
-            <h4>Parameters</h4>
-            <FieldList
-              fields={m.params}
-              addLabel="Add parameter"
-              extra={{ direction: 'in' }}
-              column={(prm, idx) => (
-                <Select
-                  value={prm.direction}
-                  options={PARAM_DIRECTIONS}
-                  onChange={(v) => withMessage(m.id, (x) => void (x.params[idx]!.direction = v))}
-                />
-              )}
-              onChange={(fn) => withMessage(m.id, (x) => fn(x.params))}
-            />
-            {m.params.some((prm) => prm.direction !== 'in') && (
-              <small className="muted">out / inout parameters require a bidirectional link</small>
-            )}
-            <h4>
-              <label className="check">
-                <input
-                  type="checkbox"
-                  checked={m.returns !== null}
-                  onChange={(e) =>
-                    withMessage(
-                      m.id,
-                      (x) => void (x.returns = e.target.checked ? { kind: 'primitive', name: 'bool' } : null)
-                    )
-                  }
-                />
-                Returns a value <small className="muted">(requires a bidirectional link)</small>
-              </label>
-            </h4>
-            {m.returns && (
-              <TypeEditor
-                value={m.returns}
-                onChange={(t) => withMessage(m.id, (x) => void (x.returns = t))}
-              />
-            )}
-          </div>
-        ))}
-      </Section>
+        <Section
+          title={`Messages (${iface.messages.length})`}
+          actions={
+            <button type="button" onClick={() => withInterface(id, (i) => addMessage(i.messages, 'message'))}>
+              <Icon name="plus" /> message
+            </button>
+          }
+        >
+          <MessageList
+            messages={iface.messages}
+            noun="message"
+            linkHints
+            onChange={(fn) => withInterface(id, (i) => fn(i.messages))}
+          />
+        </Section>
+      </fieldset>
 
       <Section title={`Used by (${users.length})`}>
         <ul className="plain">
@@ -152,7 +80,7 @@ export function InterfaceInspector({ id }: { id: string }): ReactNode {
         </ul>
       </Section>
 
-      <div className="actions">
+      <div className="actions" hidden={!!dependency}>
         <button
           type="button"
           className="danger"

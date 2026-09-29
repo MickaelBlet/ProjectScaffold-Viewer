@@ -10,6 +10,12 @@ import { findView } from '@/model/project'
 import { GLOBAL_VIEW, type Id, type Rect } from '@/model/types'
 import { activeDoc, patchDoc } from '@/store/documents'
 import { getProject } from '@/store/project'
+import { storage } from '@/storage'
+import { IN_PANEL, IN_PREVIEW, IN_VSCODE } from '@/host'
+import { sendToDiagram } from '@/fileOps'
+import { targetPath } from '@/model/locate'
+import { toFile } from '@/model/serialize'
+import type { SidePanel } from '../../../../vscode/src/protocol'
 
 export interface CanvasController {
   viewId: Id
@@ -42,12 +48,14 @@ export function activeCanvas(): CanvasController | undefined {
 
 // Dock layouts
 
-export type ToolId = 'explorer' | 'outline' | 'links' | 'inspector' | 'problems' | 'search' | 'settings'
+export type ToolId =
+  'explorer' | 'outline' | 'links' | 'dependencies' | 'inspector' | 'problems' | 'search' | 'settings'
 
 export const TOOL_TITLES: Record<ToolId, string> = {
   explorer: 'Explorer',
   outline: 'Outline',
   links: 'Links',
+  dependencies: 'Dependencies',
   inspector: 'Inspector',
   problems: 'Problems',
   search: 'Search',
@@ -59,6 +67,7 @@ const TOOL_SIZES: Record<ToolId, number> = {
   explorer: 250,
   outline: 250,
   links: 250,
+  dependencies: 280,
   inspector: 380,
   settings: 380,
   problems: 170,
@@ -73,12 +82,35 @@ export const setEditorApi = (api: DockviewApi | null): void => void (editor = ap
 export const editorApi = (): DockviewApi | null => editor
 
 export const EDITOR_AREA = 'editor-area'
-const LAYOUT_KEY = 'project-scaffold:layout'
+/** VS Code editors have layouts of their own: the side tools are in its side bar. */
+const LAYOUT_KEY = IN_PREVIEW
+  ? 'project-scaffold:layout:preview'
+  : IN_VSCODE
+    ? 'project-scaffold:layout:vscode'
+    : 'project-scaffold:layout'
 
-/** Tool panels around the editor area. */
+/** Tools of the VS Code side bar (see vscode/package.json). */
+const SIDE_TOOLS = new Set<ToolId>(['explorer', 'outline', 'links', 'settings'])
+const inSideBar = (id: ToolId): id is SidePanel => IN_VSCODE && SIDE_TOOLS.has(id)
+
+/**
+ * Tool panels around the editor area. In VS Code: only the Inspector (the side tools are in its side
+ * bar), none in the preview (tools open on demand).
+ */
 export function buildDefaultLayout(api: DockviewApi): void {
   api.clear()
   api.addPanel({ id: EDITOR_AREA, component: 'editorArea', title: 'Editor' })
+  if (IN_PREVIEW) return lockEditorArea(api)
+  if (IN_VSCODE) {
+    api.addPanel({
+      id: 'inspector',
+      component: 'inspector',
+      title: TOOL_TITLES.inspector,
+      initialWidth: TOOL_SIZES.inspector,
+      position: { referencePanel: EDITOR_AREA, direction: 'right' }
+    })
+    return lockEditorArea(api)
+  }
   api.addPanel({
     id: 'explorer',
     component: 'explorer',
@@ -127,6 +159,13 @@ export function buildDefaultLayout(api: DockviewApi): void {
     inactive: true,
     position: { referencePanel: 'problems', direction: 'within' }
   })
+  api.addPanel({
+    id: 'dependencies',
+    component: 'dependencies',
+    title: TOOL_TITLES.dependencies,
+    inactive: true,
+    position: { referencePanel: 'search', direction: 'within' }
+  })
   api.getPanel('explorer')?.api.setActive()
   lockEditorArea(api)
 }
@@ -140,17 +179,12 @@ export function lockEditorArea(api: DockviewApi): void {
 }
 
 export function saveOuterLayout(): void {
-  if (!outer) return
-  try {
-    localStorage.setItem(LAYOUT_KEY, JSON.stringify(outer.toJSON()))
-  } catch {
-    // Storage unavailable: the layout lasts for the session.
-  }
+  if (outer) storage.setItem(LAYOUT_KEY, JSON.stringify(outer.toJSON()))
 }
 
 export function loadOuterLayout(api: DockviewApi): void {
   try {
-    const saved = localStorage.getItem(LAYOUT_KEY)
+    const saved = storage.getItem(LAYOUT_KEY)
     if (saved) {
       api.fromJSON(JSON.parse(saved) as SerializedDockview)
       if (api.getPanel(EDITOR_AREA)) return lockEditorArea(api)
@@ -271,6 +305,7 @@ export function keepSizes(api: DockviewApi): void {
 }
 
 export function resetLayout(): void {
+  if (IN_PANEL) return sendToDiagram({ kind: 'command', id: 'window.resetLayout' })
   if (outer) buildDefaultLayout(outer)
 }
 
@@ -308,11 +343,19 @@ const TOOL_PLACES: Record<ToolId, Place[]> = {
   search: [
     ['problems', 'within'],
     [EDITOR_AREA, 'below']
+  ],
+  dependencies: [
+    ['search', 'within'],
+    ['problems', 'within'],
+    [EDITOR_AREA, 'below']
   ]
 }
 
 /** Show a tool panel, re-adding it where it belongs when it was closed. */
 export function showTool(id: ToolId, focus = true): void {
+  if (inSideBar(id)) return window.api.showPanel?.(id)
+  // A VS Code side panel has no dock: the diagram shows the tool.
+  if (IN_PANEL) return sendToDiagram({ kind: 'command', id: `window.${id}` })
   if (!outer) return
   const existing = outer.getPanel(id)
   if (existing) {
@@ -339,6 +382,7 @@ export function showTool(id: ToolId, focus = true): void {
 }
 
 export function toggleTool(id: ToolId): void {
+  if (inSideBar(id)) return window.api.showPanel?.(id)
   const panel = outer?.getPanel(id)
   if (panel) panel.api.close()
   else showTool(id)
@@ -363,6 +407,11 @@ export function viewPanelId(viewId: Id): string {
 
 export function openView(viewId: Id = GLOBAL_VIEW, options: { split?: boolean } = {}): void {
   patchDoc({ activeViewId: viewId })
+  if (IN_PANEL) {
+    const view =
+      viewId === GLOBAL_VIEW ? null : (getProject().views.find((v) => v.id === viewId)?.name ?? null)
+    return sendToDiagram({ kind: 'openView', view, split: options.split })
+  }
   if (!editor) return
   const id = viewPanelId(viewId)
   const existing = editor.getPanel(id)
@@ -406,6 +455,11 @@ export function openSource(options: { split?: boolean } = { split: true }): void
 
 /** Open an entity editor as a tab of the editor area. */
 export function openEditor(kind: EditorKind, id: Id, options: { split?: boolean } = {}): void {
+  if (IN_PANEL) {
+    const p = getProject()
+    const path = targetPath(toFile(p, { editor: false }), p, { kind, id })
+    return sendToDiagram({ kind: 'openEditor', editor: kind, path, split: options.split })
+  }
   if (!editor) return
   const panelId = `${kind}:${id}`
   const existing = editor.getPanel(panelId)

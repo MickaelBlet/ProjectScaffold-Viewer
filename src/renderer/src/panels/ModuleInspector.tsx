@@ -1,5 +1,15 @@
 import type { ReactNode } from 'react'
-import { absolutePosition, childModules, modulePath, nameError } from '@/model/project'
+import {
+  absolutePosition,
+  canDerive,
+  childModules,
+  modulePath,
+  nameError,
+  newId,
+  setMethodQualifier,
+  setQualifier,
+  unimplementedMethods
+} from '@/model/project'
 import {
   addPort,
   addSubmodule,
@@ -18,13 +28,16 @@ import {
   CommitInput,
   IconButton,
   MetadataEditor,
+  QualifierToggles,
   Row,
   Section,
   Select,
   TextArea
 } from '@/components/fields'
-import type { Module, Project } from '@/model/types'
+import { METHOD_QUALIFIERS, MODULE_KINDS, QUALIFIERS, type Module, type Project } from '@/model/types'
 import { Icon } from '@/components/Icon'
+import { DefaultInput, FieldList, setDefault } from './TypeInspector'
+import { addMessage, MessageList } from './MessageList'
 
 function withModule(id: string, fn: (m: Module, d: Project) => void): void {
   update((d) => {
@@ -40,6 +53,15 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
   const links = project.links.filter((l) => l.from.moduleId === id || l.to.moduleId === id)
   const parent = mod.parentId ? modulePath(project, mod.parentId) : null
   const children = childModules(project, id)
+  const bases = mod.bases ?? []
+  const baseOptions = [
+    { value: '', label: '+ add base…' },
+    ...project.modules
+      .filter((m) => !bases.includes(m.id) && canDerive(project, id, m.id))
+      .map((m) => ({ value: m.id, label: modulePath(project, m.id) }))
+      .sort((a, b) => a.label.localeCompare(b.label))
+  ]
+  const unimplemented = unimplementedMethods(project, id)
   const interfaceOptions = [
     { value: '', label: '— none —' },
     ...project.interfaces.map((i) => ({ value: i.id, label: i.name }))
@@ -80,7 +102,137 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
           <span className="muted">top level</span>
         )}
       </Row>
+      <Row label="Kind">
+        <Select
+          value={mod.kind ?? 'class'}
+          options={MODULE_KINDS}
+          onChange={(k) =>
+            withModule(id, (m) => {
+              if (k === 'class') delete m.kind
+              else m.kind = k
+              // An interface only declares pure methods.
+              if (k === 'interface') for (const x of m.methods) setMethodQualifier(x, 'pure', true)
+            })
+          }
+        />
+      </Row>
       <TextArea value={mod.description} onChange={(v) => withModule(id, (m) => void (m.description = v))} />
+
+      <Section title={`Bases (${bases.length})`}>
+        <ul className="plain">
+          {bases.map((b) => (
+            <li key={b} className="row-inline">
+              <button
+                type="button"
+                className="link-button"
+                onClick={() => navigate({ kind: 'module', id: b })}
+              >
+                {modulePath(project, b) || '<deleted>'}
+              </button>
+              <IconButton
+                icon="x"
+                title="Remove base"
+                danger
+                onClick={() =>
+                  withModule(id, (m) => {
+                    m.bases = m.bases?.filter((x) => x !== b)
+                    if (!m.bases?.length) delete m.bases
+                  })
+                }
+              />
+            </li>
+          ))}
+        </ul>
+        {baseOptions.length > 1 && (
+          <Select
+            value=""
+            options={baseOptions}
+            onChange={(b) => b && withModule(id, (m) => void (m.bases = [...(m.bases ?? []), b]))}
+          />
+        )}
+      </Section>
+
+      <Section title={`Attributes (${mod.attributes.length})`}>
+        <FieldList
+          fields={mod.attributes}
+          addLabel="Add attribute"
+          baseName="attribute"
+          onChange={(fn) => withModule(id, (m) => fn(m.attributes))}
+          column={(a, i) => (
+            <QualifierToggles
+              qualifiers={QUALIFIERS}
+              value={a}
+              short
+              onChange={(q, on) => withModule(id, (m) => setQualifier(m.attributes[i]!, q, on))}
+            />
+          )}
+          value={(a, i) => (
+            <DefaultInput
+              field={a}
+              types={project.types}
+              onChange={(v) => withModule(id, (m) => setDefault(m.attributes[i]!, v))}
+            />
+          )}
+        />
+      </Section>
+
+      <Section
+        title={`Methods (${mod.methods.length})`}
+        actions={
+          <>
+            {unimplemented.length > 0 && (
+              <button
+                type="button"
+                title={`Override ${unimplemented.map((u) => u.method.name).join(', ')}`}
+                onClick={() =>
+                  withModule(id, (m) => {
+                    for (const { method } of unimplemented) {
+                      const copy = structuredClone(method)
+                      delete copy.pure
+                      m.methods.push({
+                        ...copy,
+                        id: newId(),
+                        params: copy.params.map((prm) => ({ ...prm, id: newId() })),
+                        virtual: true,
+                        override: true
+                      })
+                    }
+                  })
+                }
+              >
+                <Icon name="plus" /> implement ({unimplemented.length})
+              </button>
+            )}
+            <button type="button" onClick={() => withModule(id, (m) => addMessage(m.methods, 'method'))}>
+              <Icon name="plus" /> method
+            </button>
+          </>
+        }
+      >
+        <MessageList
+          messages={mod.methods}
+          noun="method"
+          onChange={(fn) => withModule(id, (m) => fn(m.methods))}
+          extra={(x, change) => (
+            <QualifierToggles
+              qualifiers={METHOD_QUALIFIERS}
+              value={x}
+              onChange={(q, on) => change((y) => setMethodQualifier(y, q, on))}
+            />
+          )}
+          paramExtra={(prm, change) =>
+            // Only `in` parameters can be const.
+            prm.direction === 'in' && (
+              <QualifierToggles
+                qualifiers={['const']}
+                value={prm}
+                short
+                onChange={(q, on) => change((y) => setQualifier(y, q, on))}
+              />
+            )
+          }
+        />
+      </Section>
 
       <Section
         title={`Ports (${mod.ports.length})`}

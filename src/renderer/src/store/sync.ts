@@ -1,48 +1,49 @@
-// Renames made in a document are carried to the open documents linked to it: those importing it
-// (module, port and interface renames) and those it imports (interface renames). Each document
-// gets the change as an undoable edit of its own; closed files catch up on Refresh.
+// Changes made in a document reach the open documents depending on it: its renames of modules,
+// ports, types and interfaces, then its types, interfaces and placed modules as they are now. Each
+// document gets the change as an undoable edit of its own; closed files catch up on Refresh.
 import { produce } from 'immer'
-import { applySourceRenames, diffRenames, renameInterfaces, sameFile } from '@/model/sync'
+import { applyDependencyRenames, refreshDependencies } from '@/model/dependencies'
+import { baseName, diffRenames, sameFile } from '@/model/sync'
 import type { Id, Project } from '@/model/types'
 import { docTitle } from '@/fileOps'
 import { findDoc, projectListeners, useDocs } from './documents'
 import { setStatus } from './ui'
 
 function carryRenames(docId: Id, prev: Project, next: Project): void {
-  const doc = findDoc(docId)
-  const file = doc?.filePath ?? null
-  const others = useDocs.getState().docs.filter((d) => d.id !== docId)
-  const importsThis = (p: Project): boolean => !!file && p.imports.some((i) => sameFile(i.file, file))
-  const importedHere = (path: string | null): boolean =>
-    !!path && next.imports.some((i) => sameFile(i.file, path))
-  const linked = others.filter((d) => importsThis(d.store.getState().project) || importedHere(d.filePath))
-  // Imported files that are not open: renamed interfaces they share are not carried there.
-  const closed = next.imports.filter((i) => !others.some((d) => d.filePath && sameFile(d.filePath, i.file)))
-  if (!linked.length && !closed.length) return
+  const file = findDoc(docId)?.filePath ?? null
+  if (!file) return
+  // What dependents read: definitions, modules and ports, and the dependencies carried along.
+  if (
+    prev.types === next.types &&
+    prev.interfaces === next.interfaces &&
+    prev.modules === next.modules &&
+    prev.dependencies === next.dependencies
+  )
+    return
+  const linked = useDocs
+    .getState()
+    .docs.filter(
+      (d) => d.id !== docId && d.store.getState().project.dependencies.some((x) => sameFile(x.file, file))
+    )
+  if (!linked.length) return
 
   const renames = diffRenames(prev, next)
-  if (!renames) return
   const updated: string[] = []
+  const conflicts: string[] = []
   for (const d of linked) {
     const p = d.store.getState().project
     const q = produce(p, (draft) => {
-      if (file && importsThis(p)) applySourceRenames(draft, file, renames)
-      else renameInterfaces(draft, renames.interfaces)
+      if (renames) applyDependencyRenames(draft, file, renames)
+      const dep = draft.dependencies.find((x) => sameFile(x.file, file))!
+      const self = d.filePath ? baseName(d.filePath) : null
+      conflicts.push(...refreshDependencies(draft, new Map([[dep.id, next]]), self).conflicts)
     })
     if (q === p) continue
     d.store.setState({ project: q })
     updated.push(docTitle(d))
   }
-  const shared = [...renames.interfaces.values()]
-  const stale = closed.filter((i) =>
-    i.modules.some((m) => m.ports.some((pt) => shared.includes(pt.interface ?? '')))
-  )
-  if (stale.length)
-    setStatus(
-      'info',
-      `Not open, rename there too: ${stale.map((i) => i.file).join(', ')} (Refresh would restore the old name)`
-    )
-  else if (updated.length) setStatus('info', `Renamed in linked documents: ${updated.join(', ')}`)
+  if (conflicts.length) return setStatus('error', `Not taken from this project: ${conflicts.join('; ')}`)
+  if (updated.length && renames) setStatus('info', `Renamed in dependent documents: ${updated.join(', ')}`)
 }
 
 /** Carry renames to the linked documents from now on. */

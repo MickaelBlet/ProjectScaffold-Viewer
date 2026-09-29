@@ -1,4 +1,4 @@
-// Views, types, interfaces, modules and links of the active document. Click selects (Ctrl / Shift for several),
+// Views, dependencies, types, interfaces, modules and links of the active document. Click selects (Ctrl / Shift for several),
 // double-click opens an editor tab, right click for more. Arrows move between items, Enter selects.
 import { useId, useMemo, useState, type MouseEvent, type ReactNode } from 'react'
 import { endpointLabel, findView, modulePaths } from '@/model/project'
@@ -8,6 +8,7 @@ import {
   addInterface,
   addType,
   addView,
+  deleteItems,
   deleteView,
   getProject,
   renameView,
@@ -15,7 +16,16 @@ import {
 } from '@/store/project'
 import { openContextMenu, select } from '@/store/ui'
 import { commandItem } from '@/commands'
-import { addModuleAt, navigate, newView, selectionOf } from '@/actions'
+import {
+  addModuleAt,
+  navigate,
+  newView,
+  openImportSource,
+  pickDependency,
+  selectionOf,
+  showDependency
+} from '@/actions'
+import { dependencyMenu } from './DependenciesPanel'
 import { openEditor, openView } from '@/shell/controllers'
 import { Icon } from '@/components/Icon'
 import { onListKeyDown, tabStop } from '@/components/listKeys'
@@ -179,7 +189,8 @@ export function ExplorerPanel(): ReactNode {
   const views = useProjectStore((s) => s.project.views)
   const modules = useProjectStore((s) => s.project.modules)
   const links = useProjectStore((s) => s.project.links)
-  const imports = useProjectStore((s) => s.project.imports)
+  const dependencies = useProjectStore((s) => s.project.dependencies)
+  const [collapsed, setCollapsed] = useState<Set<Id>>(new Set())
   const selectedIds = useDoc((d) => d.selectedIds)
   const activeViewId = useDoc((d) => d.activeViewId)
   const [filter, setFilter] = useState('')
@@ -188,7 +199,7 @@ export function ExplorerPanel(): ReactNode {
   const isSelected = (id: Id): boolean => selectedIds.includes(id)
 
   // Paths and link ends change with modules and links only, not with every edit.
-  const paths = useMemo(() => modulePaths({ modules, imports }), [modules, imports])
+  const paths = useMemo(() => modulePaths({ modules, dependencies }), [modules, dependencies])
   const allModules = useMemo(
     () =>
       modules
@@ -201,16 +212,32 @@ export function ExplorerPanel(): ReactNode {
       links
         .map((l) => ({
           l,
-          from: endpointLabel({ modules, imports }, paths, l.from),
-          to: endpointLabel({ modules, imports }, paths, l.to)
+          from: endpointLabel({ modules, dependencies }, paths, l.from),
+          to: endpointLabel({ modules, dependencies }, paths, l.to)
         }))
         .sort((a, b) => a.l.name.localeCompare(b.l.name)),
-    [links, modules, imports, paths]
+    [links, modules, dependencies, paths]
   )
 
   const shownViews = [GLOBAL, ...views].filter((v) => match(v.name))
-  const shownTypes = types.filter((t) => match(t.name))
-  const shownInterfaces = interfaces.filter((i) => match(i.name))
+  const ownTypes = types.filter((t) => !t.dependency)
+  const ownInterfaces = interfaces.filter((i) => !i.dependency)
+  const shownTypes = ownTypes.filter((t) => match(t.name))
+  const shownInterfaces = ownInterfaces.filter((i) => match(i.name))
+  // Dependencies, each followed by its types, interfaces and placed modules (unless folded).
+  const shownDependencies = dependencies.map((dep) => ({
+    dep,
+    entities: [...types, ...interfaces].filter((e) => e.dependency === dep.id && match(e.name)),
+    placed: dep.modules.filter((m) => match(m.path))
+  }))
+  const dependencyIds = shownDependencies.flatMap(({ dep, entities, placed }) =>
+    collapsed.has(dep.id) ? [dep.id] : [dep.id, ...entities.map((e) => e.id), ...placed.map((m) => m.id)]
+  )
+  const toggleDependency = (id: Id): void => {
+    const next = new Set(collapsed)
+    if (!next.delete(id)) next.add(id)
+    setCollapsed(next)
+  }
   const shownModules = allModules.filter((x) => match(x.path))
   const shownLinks = allLinks.filter((x) => match(x.l.name) || match(x.from) || match(x.to))
   const typeIds = shownTypes.map((t) => t.id)
@@ -223,6 +250,7 @@ export function ExplorerPanel(): ReactNode {
   )
   const typeStop = tabStop(typeIds, isSelected)
   const interfaceStop = tabStop(interfaceIds, isSelected)
+  const dependencyStop = tabStop(dependencyIds, isSelected)
   const moduleStop = tabStop(moduleIds, isSelected)
   const linkStop = tabStop(linkIds, isSelected)
 
@@ -275,8 +303,88 @@ export function ExplorerPanel(): ReactNode {
       </Section>
 
       <Section
+        title="Dependencies"
+        count={dependencies.length}
+        actions={
+          <button type="button" className="icon" title="Add dependency…" onClick={() => pickDependency()}>
+            <Icon name="plus" />
+          </button>
+        }
+      >
+        <EntityList label="Dependencies" multiselectable>
+          {shownDependencies.map(({ dep, entities, placed }) => [
+            <Item
+              key={dep.id}
+              selected={false}
+              tabStop={dep.id === dependencyStop}
+              className="dependency"
+              title={`${dep.file}${dep.indirect ? ' (used by another dependency)' : ''}${dep.uses.length ? `\nUses ${dep.uses.join(', ')}` : ''}`}
+              onClick={() => toggleDependency(dep.id)}
+              onDoubleClick={() => showDependency(dep.id)}
+              onContextMenu={(e) => dependencyMenu(e, dep)}
+            >
+              <Icon name={collapsed.has(dep.id) ? 'chevron-right' : 'chevron-down'} />
+              <span className="kind-badge dependency">D</span>
+              {dep.name}
+              <small>{dep.indirect ? 'indirect' : dep.file}</small>
+            </Item>,
+            ...(collapsed.has(dep.id) ? [] : entities).map((e) => {
+              const kind = 'messages' in e ? 'interface' : 'type'
+              return (
+                <Item
+                  key={e.id}
+                  selected={isSelected(e.id)}
+                  tabStop={e.id === dependencyStop}
+                  className={`nested ${isSelected(e.id) ? 'active' : ''}`}
+                  onClick={(ev) => clickItem(ev, e.id, dependencyIds)}
+                  onDoubleClick={() => openEditor(kind, e.id)}
+                  onContextMenu={(ev) => entityMenu(ev, kind, e.id)}
+                >
+                  {'messages' in e ? (
+                    <span className="kind-badge interface">I</span>
+                  ) : (
+                    <span className={`kind-badge ${e.kind}`} title={e.kind}>
+                      {KIND_BADGE[e.kind]}
+                    </span>
+                  )}
+                  {e.name}
+                  {'messages' in e && <small>{e.messages.length} msg</small>}
+                </Item>
+              )
+            }),
+            ...(collapsed.has(dep.id) ? [] : placed).map((m) => (
+              <Item
+                key={m.id}
+                selected={isSelected(m.id)}
+                tabStop={m.id === dependencyStop}
+                className={`nested ${isSelected(m.id) ? 'active' : ''}`}
+                title={`${m.path}, placed on the canvas`}
+                onClick={(ev) => clickItem(ev, m.id, dependencyIds)}
+                onDoubleClick={() => navigate({ kind: 'module', id: m.id })}
+                onContextMenu={(ev) => {
+                  ev.preventDefault()
+                  select({ kind: 'imported', id: m.id })
+                  openContextMenu(ev, [
+                    { label: 'Show on the canvas', run: () => navigate({ kind: 'module', id: m.id }) },
+                    { label: `Open ${dep.file}`, run: () => openImportSource(dep.file) },
+                    'separator',
+                    { label: 'Remove from this project', danger: true, run: () => deleteItems([m.id]) }
+                  ])
+                }}
+              >
+                <span className="kind-badge mod">M</span>
+                {m.path}
+                <small>on canvas</small>
+              </Item>
+            ))
+          ])}
+          {!dependencies.length && <Empty>No dependencies: Insert › Add dependency…</Empty>}
+        </EntityList>
+      </Section>
+
+      <Section
         title="Types"
-        count={types.length}
+        count={ownTypes.length}
         actions={(['struct', 'enum', 'alias', 'primitive'] as const).map((k) => (
           <button
             key={k}
@@ -313,7 +421,7 @@ export function ExplorerPanel(): ReactNode {
 
       <Section
         title="Interfaces"
-        count={interfaces.length}
+        count={ownInterfaces.length}
         actions={
           <button
             type="button"
@@ -366,7 +474,9 @@ export function ExplorerPanel(): ReactNode {
               onDoubleClick={() => openEditor('module', m.id)}
               onContextMenu={(e) => entityMenu(e, 'module', m.id)}
             >
-              <span className="kind-badge mod">M</span>
+              <span className="kind-badge mod" style={m.color ? { background: m.color } : undefined}>
+                M
+              </span>
               {m.name}
               <small>{path.slice(0, -m.name.length - 1)}</small>
             </Item>

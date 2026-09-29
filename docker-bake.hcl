@@ -1,5 +1,5 @@
-# Desktop builds (see Dockerfile). `docker buildx bake` builds tauri and electron in parallel,
-# sharing one web build. Single target: `docker buildx bake tauri`.
+# Desktop builds and the VS Code extension (see Dockerfile). `docker buildx bake` builds tauri and
+# electron in parallel, sharing one web build. Single target: `docker buildx bake tauri` (or electron, vscode).
 group "default" {
   targets = ["tauri", "electron"]
 }
@@ -19,4 +19,10 @@ target "electron" {
   inherits = ["_desktop"]
   target   = "electron"
   output   = ["type=local,dest=dist-electron"]
+}
+
+target "vscode" {
+  inherits = ["_desktop"]
+  target   = "vscode"
+  output   = ["type=local,dest=dist-vscode"]
 }

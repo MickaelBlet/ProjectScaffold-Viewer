@@ -1,6 +1,8 @@
-// User preferences, kept in localStorage.
+// User preferences, kept in the preferences storage.
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
+import { IN_VSCODE, vscodeTheme } from '@/host'
+import { onStorageChange, storage } from '@/storage'
 
 export type Theme = 'system' | 'light' | 'dark'
 export type EdgeStyle = 'bezier' | 'smoothstep' | 'step' | 'straight'
@@ -19,6 +21,8 @@ export interface Settings {
   edgeBadges: boolean
   /** Link ends attach to the module side facing the other end. */
   autoOrientLinks: boolean
+  /** Arrows from modules to their bases. */
+  inheritance: boolean
   /** Arrange files without editor layout with ELK when opening them. */
   autoLayoutOnOpen: boolean
   /** Keep animations even when the system asks for reduced motion. */
@@ -39,20 +43,28 @@ export const DEFAULT_SETTINGS: Settings = {
   minimap: true,
   edgeBadges: true,
   autoOrientLinks: true,
+  inheritance: true,
   autoLayoutOnOpen: true,
   forceAnimations: false,
   sourceWhitespace: true,
   sourceFollow: true
 }
 
+const SETTINGS_KEY = 'project-scaffold:settings'
+
 export const useSettings = create<Settings>()(
   persist(() => ({ ...DEFAULT_SETTINGS }), {
-    name: 'project-scaffold:settings',
+    name: SETTINGS_KEY,
     // Settings added later get their default.
     merge: (saved, current) => ({ ...current, ...(saved as Partial<Settings>) }),
-    storage: createJSONStorage(() => localStorage)
+    storage: createJSONStorage(() => storage)
   })
 )
+
+// VS Code: settings changed in another editor.
+onStorageChange((key) => {
+  if (key === SETTINGS_KEY) void useSettings.persist.rehydrate()
+})
 
 export function setSetting<K extends keyof Settings>(key: K, value: Settings[K]): void {
   useSettings.setState({ [key]: value } as Pick<Settings, K>)
@@ -68,6 +80,12 @@ export function applyPortStyle(style: PortStyle): void {
 }
 
 export function applyTheme(theme: Theme): void {
-  if (theme === 'system') delete document.documentElement.dataset.theme
-  else document.documentElement.dataset.theme = theme
+  // In VS Code, the system theme is the VS Code color theme: its kind and its colors.
+  const vscodeColors = theme === 'system' && IN_VSCODE
+  const resolved = vscodeColors ? vscodeTheme() : theme
+  const root = document.documentElement
+  if (resolved === 'system') delete root.dataset.theme
+  else root.dataset.theme = resolved
+  if (vscodeColors) root.dataset.vscodeColors = ''
+  else delete root.dataset.vscodeColors
 }

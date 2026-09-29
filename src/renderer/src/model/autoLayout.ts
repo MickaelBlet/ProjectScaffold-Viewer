@@ -96,8 +96,8 @@ export async function computeArrangement(
   // Horizontal: a container's side port labels sit inside its frame (see ModuleNode), clear of its content.
   const labels = (m: Pick<Module, 'ports'>, role: PortRole): number =>
     vertical ? 0 : Math.max(0, ...m.ports.filter((pt) => pt.role === role).map((pt) => labelWidth(p, pt)))
-  const padding = (m: Pick<Module, 'ports'>): string =>
-    `[top=${contentTop(o) + LAYOUT_PAD / 2},left=${Math.max(LAYOUT_PAD, labels(m, 'in'))},` +
+  const padding = (m: Pick<Module, 'ports' | 'attributes' | 'methods'>): string =>
+    `[top=${contentTop(o, m) + LAYOUT_PAD / 2},left=${Math.max(LAYOUT_PAD, labels(m, 'in'))},` +
     `bottom=${contentBottom(o)},right=${Math.max(LAYOUT_PAD, labels(m, 'out'))}]`
 
   // Spacing applies to each container's own content.
@@ -270,7 +270,7 @@ export function applyArrangement(
           height: Math.round(r.height)
         }
     }
-    for (const m of d.imports.flatMap((i) => i.modules)) {
+    for (const m of d.dependencies.flatMap((x) => x.modules)) {
       const r = rects.get(m.id)
       if (r) m.position = { x: Math.round(r.x), y: Math.round(r.y) }
     }

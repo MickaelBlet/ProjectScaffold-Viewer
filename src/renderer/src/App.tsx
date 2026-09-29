@@ -7,13 +7,37 @@ import { ContextMenu } from './components/ContextMenu'
 import { CommandPalette } from './components/CommandPalette'
 import { AboutDialog } from './components/AboutDialog'
 import { ShortcutsDialog } from './components/ShortcutsDialog'
-import { anyDirty, checkDiskChanges, currentSession, docTitle, openProject, restoreSession } from './fileOps'
+import {
+  anyDirty,
+  applyHostText,
+  checkDiskChanges,
+  currentSession,
+  docTitle,
+  installHostSync,
+  openProject,
+  restoreSession,
+  showHostDocument
+} from './fileOps'
 import { installClipboard, installKeyboard, runCommand } from './commands'
-import { activeDoc, isDocDirty, useDocs } from './store/documents'
+import { activeDoc, isDocDirty, useDoc, useDocs } from './store/documents'
 import { applyForceAnimations, applyPortStyle, applyTheme, useSettings } from './store/settings'
 import { useProjectStore } from './store/project'
 import { useUiStore } from './store/ui'
 import { Icon } from '@/components/Icon'
+import { IN_PANEL, IN_PREVIEW, IN_VSCODE, SIDE_PANEL } from './host'
+import {
+  installSelectionSync,
+  installViewSync,
+  navigateToPath,
+  runDiagramAction,
+  showDiagramView
+} from './actions'
+import { toggleTool } from './shell/controllers'
+import { ExplorerPanel } from './panels/ExplorerPanel'
+import { OutlinePanel } from './panels/OutlinePanel'
+import { LinksPanel } from './panels/LinksPanel'
+import { SettingsPanel } from './panels/SettingsPanel'
+import type { SidePanel } from '../../../vscode/src/protocol'
 
 /** How often open files are checked for changes made by other programs. */
 const DISK_CHECK_MS = 2000
@@ -47,6 +71,33 @@ function Dialog(): ReactNode {
   )
 }
 
+const SIDE_PANELS: Record<SidePanel, () => ReactNode> = {
+  explorer: ExplorerPanel,
+  outline: OutlinePanel,
+  links: LinksPanel,
+  settings: SettingsPanel
+}
+
+/** A tool panel alone, in the VS Code side bar: it shows the active project document. */
+function SidePanelView({ panel }: { panel: SidePanel }): ReactNode {
+  const Content = SIDE_PANELS[panel]
+  const filePath = useDoc((d) => d.filePath)
+  return (
+    <div className="app side-panel">
+      {filePath || panel === 'settings' ? (
+        <div className="tool-panel" data-panel={panel}>
+          <Content />
+        </div>
+      ) : (
+        <p className="side-panel-empty">Open a project file (*.scaffold.yaml) to see its content here.</p>
+      )}
+      <ContextMenu />
+      <CommandPalette />
+      <Dialog />
+    </div>
+  )
+}
+
 function ToolbarButton({
   command,
   children,
@@ -74,7 +125,14 @@ export function App(): ReactNode {
   // The session is only written once the startup documents are loaded, not to overwrite them.
   const [loaded, setLoaded] = useState(false)
 
-  useEffect(() => applyTheme(theme), [theme])
+  useEffect(() => {
+    applyTheme(theme)
+    if (!IN_VSCODE) return
+    // The VS Code color theme is the class of the body.
+    const observer = new MutationObserver(() => applyTheme(theme))
+    observer.observe(document.body, { attributes: true, attributeFilter: ['class'] })
+    return () => observer.disconnect()
+  }, [theme])
   useEffect(() => applyForceAnimations(forceAnimations), [forceAnimations])
   useEffect(() => applyPortStyle(portStyle), [portStyle])
 
@@ -96,8 +154,29 @@ export function App(): ReactNode {
     return () => off.forEach((f) => f())
   }, [])
 
-  // Files edited in another program are reloaded.
+  // VS Code: the document text follows the project, and the project the text.
   useEffect(() => {
+    if (!loaded || !IN_VSCODE) return
+    const off = [
+      installHostSync(),
+      window.api.onExternalChange!(applyHostText),
+      window.api.onCommand!(runCommand),
+      window.api.onReveal!(navigateToPath),
+      installSelectionSync(),
+      // A side panel follows the active document and the view of its diagram, which acts for it.
+      ...(IN_PANEL
+        ? [window.api.onDocument!(showHostDocument), window.api.onView!(showDiagramView)]
+        : [
+            window.api.onAction!((a) => (a.kind === 'command' ? runCommand(a.id) : runDiagramAction(a))),
+            installViewSync()
+          ])
+    ]
+    return () => off.forEach((f) => f())
+  }, [loaded])
+
+  // Files edited in another program are reloaded (VS Code sends the changes itself).
+  useEffect(() => {
+    if (IN_VSCODE) return
     const check = (): void => {
       if (document.visibilityState === 'visible') void checkDiskChanges()
     }
@@ -127,27 +206,34 @@ export function App(): ReactNode {
     }
   }, [loaded, docs, project])
 
+  if (SIDE_PANEL) return <SidePanelView panel={SIDE_PANEL} />
   return (
     <div className="app">
-      <header className="toolbar">
-        <svg className="brand" viewBox="0 0 32 32" role="img" aria-label="ProjectScaffold">
-          <title>ProjectScaffold</title>
-          <rect width="32" height="32" rx="7" fill="#3b6fe0" />
-          <path
-            d="M15 10h7v8"
-            fill="none"
-            stroke="#fff"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <rect x="5" y="5" width="10" height="10" rx="2" fill="#fff" />
-          <rect x="17" y="17" width="10" height="10" rx="2" fill="#fff" />
-          <circle cx="15" cy="10" r="2" fill="#3b6fe0" stroke="#fff" strokeWidth="1.5" />
-          <circle cx="22" cy="17" r="2" fill="#3b6fe0" stroke="#fff" strokeWidth="1.5" />
-        </svg>
-        <MenuBar />
-        <span className="sep" />
+      {/* Moves the Tauri window; its buttons and menus stay clickable. */}
+      <header className="toolbar" data-tauri-drag-region="deep">
+        {/* The preview is compact: VS Code has the file commands, its palette the others. */}
+        {!IN_PREVIEW && (
+          <>
+            <svg className="brand" viewBox="0 0 32 32" role="img" aria-label="ProjectScaffold">
+              <title>ProjectScaffold</title>
+              <rect width="32" height="32" rx="7" fill="#3b6fe0" />
+              <path
+                d="M15 10h7v8"
+                fill="none"
+                stroke="#fff"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <rect x="5" y="5" width="10" height="10" rx="2" fill="#fff" />
+              <rect x="17" y="17" width="10" height="10" rx="2" fill="#fff" />
+              <circle cx="15" cy="10" r="2" fill="#3b6fe0" stroke="#fff" strokeWidth="1.5" />
+              <circle cx="22" cy="17" r="2" fill="#3b6fe0" stroke="#fff" strokeWidth="1.5" />
+            </svg>
+            <MenuBar />
+            <span className="sep" />
+          </>
+        )}
         <ToolbarButton command="insert.module" title="Add module (Ctrl+M)">
           <Icon name="plus" /> Module
         </ToolbarButton>
@@ -161,6 +247,11 @@ export function App(): ReactNode {
         <ToolbarButton command="edit.redo" title="Redo (Ctrl+Y)">
           <Icon name="redo" />
         </ToolbarButton>
+        {IN_PREVIEW && (
+          <button type="button" title="Show or hide the Inspector" onClick={() => toggleTool('inspector')}>
+            Inspector
+          </button>
+        )}
         <span className="spacer" />
         <button
           type="button"
@@ -171,12 +262,16 @@ export function App(): ReactNode {
           Go to… <kbd>Ctrl+P</kbd>
         </button>
         <span className="spacer" />
-        <ToolbarButton command="file.exportYaml" title="Export YAML (Ctrl+E)" className="primary">
-          Export YAML
-        </ToolbarButton>
-        <ToolbarButton command="file.exportJson" title="Export JSON (Ctrl+Shift+E)" className="primary">
-          Export JSON
-        </ToolbarButton>
+        {!IN_PREVIEW && (
+          <>
+            <ToolbarButton command="file.exportYaml" title="Export YAML (Ctrl+E)" className="primary">
+              Export YAML
+            </ToolbarButton>
+            <ToolbarButton command="file.exportJson" title="Export JSON (Ctrl+Shift+E)" className="primary">
+              Export JSON
+            </ToolbarButton>
+          </>
+        )}
         <WindowControls />
       </header>
       <DockShell />

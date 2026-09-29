@@ -7,6 +7,7 @@ import {
   type PortStyle,
   type Theme
 } from '@/store/settings'
+import { IN_VSCODE } from '@/host'
 import { Row, Section, Select } from '@/components/fields'
 import { resetLayout } from '@/shell/controllers'
 
@@ -32,7 +33,11 @@ export function SettingsPanel(): ReactNode {
         <Row label="Theme">
           <Select
             value={s.theme}
-            options={['system', 'light', 'dark'] as Theme[]}
+            options={[
+              { value: 'system' as Theme, label: IN_VSCODE ? 'VS Code' : 'system' },
+              { value: 'light' as Theme, label: 'light' },
+              { value: 'dark' as Theme, label: 'dark' }
+            ]}
             onChange={(t) => setSetting('theme', t)}
           />
         </Row>
@@ -60,6 +65,12 @@ export function SettingsPanel(): ReactNode {
           hint="Links leave from the module side facing their other end"
           value={s.autoOrientLinks}
           onChange={(v) => setSetting('autoOrientLinks', v)}
+        />
+        <Check
+          label="Inheritance arrows"
+          hint="Arrows from modules to their bases, dashed to interfaces"
+          value={s.inheritance}
+          onChange={(v) => setSetting('inheritance', v)}
         />
         <Check label="Minimap" value={s.minimap} onChange={(v) => setSetting('minimap', v)} />
         <Check

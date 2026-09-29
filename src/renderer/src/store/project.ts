@@ -20,8 +20,17 @@ import {
   typeUsages,
   uniqueName
 } from '@/model/project'
-import { importModule, refreshImport, removeImported, type RefreshResult } from '@/model/imports'
-import { followInterfaceRenames } from '@/model/sync'
+import {
+  addDependency,
+  dependencyOf,
+  detachDependency,
+  followInterfaceRenames,
+  placeModule,
+  refreshDependencies,
+  removeDependency,
+  removePlaced,
+  type DependencyResult
+} from '@/model/dependencies'
 import { snapChanges } from '@/model/grid'
 import type { Endpoint, Id, LinkRoute, PortRole, Project, Rect, Side, TypeDef } from '@/model/types'
 import { activeDoc, useDoc } from './documents'
@@ -44,7 +53,7 @@ export function update(fn: (draft: Project) => void): void {
   projectStore().setState((s) => {
     const project = produce(s.project, (d) => {
       fn(d)
-      // Imported ports reference interfaces by name.
+      // Placed ports reference interfaces by name.
       followInterfaceRenames(s.project, d)
     })
     // Whatever an edit moves or resizes lands on the grid.
@@ -82,6 +91,8 @@ export function addModule(parentId: Id | null, x: number, y: number): Id {
       parentId,
       color: nextModuleColor(d),
       metadata: {},
+      attributes: [],
+      methods: [],
       ports: [],
       layout: { x, y, ...defaultSize({ ports: [] }, d.orientation) }
     })
@@ -98,11 +109,16 @@ export function addSubmodule(parentId: Id): Id {
 /** Delete modules (with their content), imported modules and notes in one undo step. */
 export function deleteItems(ids: Id[]): void {
   update((d) => {
-    removeImported(d, new Set(ids))
+    removePlaced(d, new Set(ids))
     const gone = new Set<Id>()
     for (const id of ids)
       if (d.modules.some((m) => m.id === id)) for (const s of subtreeIds(d, id)) gone.add(s)
     d.modules = d.modules.filter((m) => !gone.has(m.id))
+    for (const m of d.modules)
+      if (m.bases?.some((b) => gone.has(b))) {
+        m.bases = m.bases.filter((b) => !gone.has(b))
+        if (!m.bases.length) delete m.bases
+      }
     d.links = d.links.filter((l) => !gone.has(l.from.moduleId) && !gone.has(l.to.moduleId))
     d.notes = d.notes.filter((n) => !ids.includes(n.id))
     pruneViews(d)
@@ -118,7 +134,7 @@ export function setLayouts(layouts: Map<Id, Partial<Rect>>): void {
       if (m) Object.assign(m.layout, r)
       const n = d.notes.find((n) => n.id === id)
       if (n) Object.assign(n.layout, r)
-      const im = d.imports.flatMap((i) => i.modules).find((m) => m.id === id)
+      const im = findImported(d, id)?.module
       if (im) im.position = { x: r.x ?? im.position.x, y: r.y ?? im.position.y }
     }
     for (const id of layouts.keys()) growAncestors(d, id)
@@ -254,11 +270,7 @@ export function connect(from: LinkEnd, to: LinkEnd): Id | null {
 function pushLink(d: Project, id: Id, from: Endpoint, to: Endpoint): void {
   const moduleName = (e: Endpoint): string | undefined =>
     d.modules.find((m) => m.id === e.moduleId)?.name ??
-    d.imports
-      .flatMap((i) => i.modules)
-      .find((m) => m.id === e.moduleId)
-      ?.path.split('.')
-      .pop()
+    findImported(d, e.moduleId)?.module.path.split('.').pop()
   const a = moduleName(from) ?? 'a'
   const b = moduleName(to) ?? 'b'
   const name = uniqueName(
@@ -274,32 +286,65 @@ export function deleteLink(id: Id): void {
   })
 }
 
-// Imports
+// Dependencies
 
-/** Place a module of another project on the canvas; returns its id here (null if not found). */
-export function addImportedModule(
+/**
+ * Place a module of another project (saved as `file`) on the canvas, depending on that project.
+ * `self`: this project's file name. Returns the placed module id (null if not found).
+ */
+export function placeModuleFrom(
   source: Project,
   file: string,
   moduleId: Id,
-  position: { x: number; y: number }
-): Id | null {
-  let id: Id | null = null
-  update((d) => void (id = importModule(d, source, file, moduleId, position)))
-  return id
+  position: { x: number; y: number },
+  self: string | null
+): { id: Id | null; result: DependencyResult } {
+  let placed!: { id: Id | null; result: DependencyResult }
+  update((d) => void (placed = placeModule(d, source, file, moduleId, position, self)))
+  return placed
 }
 
-/** Update an import from its project. */
-export function refreshImportFrom(importId: Id, source: Project): RefreshResult {
-  let result: RefreshResult = { missing: [], renamed: [] }
-  update((d) => void (result = refreshImport(d, importId, source)))
+/**
+ * Depend on `source` (saved as `file`). `self`: this project's file name. Types and interfaces
+ * defined differently here are not taken: they are listed in the conflicts.
+ */
+export function addDependencyFrom(source: Project, file: string, self: string | null): DependencyResult {
+  let result!: DependencyResult
+  update((d) => void (result = addDependency(d, source, file, self)))
   return result
 }
 
-export function renameImport(importId: Id, name: string): void {
+/** Read dependencies again from their projects (by dependency id). */
+export function refreshDependenciesFrom(sources: Map<Id, Project>, self: string | null): DependencyResult {
+  let result: DependencyResult = { conflicts: [], detached: [], renamed: [], missing: [] }
+  update((d) => void (result = refreshDependencies(d, sources, self)))
+  return result
+}
+
+/** Rename a dependency, and its mentions in the others' `uses`. */
+export function renameDependency(id: Id, name: string): void {
   update((d) => {
-    const i = d.imports.find((i) => i.id === importId)
-    if (i) i.name = name
+    const dep = d.dependencies.find((x) => x.id === id)
+    if (!dep) return
+    for (const x of d.dependencies) x.uses = x.uses.map((u) => (u === dep.name ? name : u))
+    dep.name = name
   })
+}
+
+/** Stop depending on a project; returns what prevents it (then nothing changes). */
+export function removeDependencyById(id: Id): string[] {
+  let blockers: string[] = []
+  produce(getProject(), (d) => void (blockers = removeDependency(d, id)))
+  if (!blockers.length) update((d) => void removeDependency(d, id))
+  return blockers
+}
+
+/** Make a dependency's types and interfaces this project's own; returns what prevents it. */
+export function detachDependencyById(id: Id): string[] {
+  let blockers: string[] = []
+  produce(getProject(), (d) => void (blockers = detachDependency(d, id)))
+  if (!blockers.length) update((d) => void detachDependency(d, id))
+  return blockers
 }
 
 // Types & interfaces
@@ -322,6 +367,8 @@ export function addType(kind: TypeDef['kind']): Id {
 
 /** Returns the usages that prevent deletion, or an empty list once deleted. */
 export function deleteType(id: Id): string[] {
+  const dep = dependencyOf(getProject(), id)
+  if (dep) return [`dependency ${dep.name}, which defines it`]
   const usages = typeUsages(getProject(), id)
   if (usages.length) return usages
   update((d) => {
@@ -343,11 +390,15 @@ export function addInterface(): Id {
   return id
 }
 
-export function deleteInterface(id: Id): void {
+/** Returns why the interface cannot be deleted, or an empty list once deleted. */
+export function deleteInterface(id: Id): string[] {
+  const dep = dependencyOf(getProject(), id)
+  if (dep) return [`dependency ${dep.name}, which defines it`]
   update((d) => {
     d.interfaces = d.interfaces.filter((i) => i.id !== id)
     for (const m of d.modules) for (const p of m.ports) if (p.interfaceId === id) p.interfaceId = null
   })
+  return []
 }
 
 // Views

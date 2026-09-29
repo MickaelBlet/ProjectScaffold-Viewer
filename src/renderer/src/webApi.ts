@@ -21,7 +21,7 @@ interface PickerType {
 }
 
 interface FsAccessWindow {
-  showOpenFilePicker?(opts: { types: PickerType[] }): Promise<FileHandle[]>
+  showOpenFilePicker?(opts: { types: PickerType[]; multiple?: boolean }): Promise<FileHandle[]>
   showSaveFilePicker?(opts: { suggestedName: string; types: PickerType[] }): Promise<FileHandle>
 }
 
@@ -40,24 +40,29 @@ function isAbort(e: unknown): boolean {
   return e instanceof DOMException && e.name === 'AbortError'
 }
 
-function pickWithInput(): Promise<File | null> {
+function pickWithInput(multiple: boolean): Promise<File[]> {
   return new Promise((done) => {
     const input = document.createElement('input')
     input.type = 'file'
     input.accept = '.yaml,.yml,.json'
-    input.onchange = () => done(input.files?.[0] ?? null)
-    input.oncancel = () => done(null)
+    input.multiple = multiple
+    input.onchange = () => done([...(input.files ?? [])])
+    input.oncancel = () => done([])
     input.click()
   })
+}
+
+function downloadUrl(name: string, url: string): void {
+  const a = document.createElement('a')
+  a.href = url
+  a.download = name
+  a.click()
 }
 
 function download(name: string, content: string, format: SaveRequest['format']): void {
   const type = format === 'json' ? 'application/json' : 'application/yaml'
   const url = URL.createObjectURL(new Blob([content], { type }))
-  const a = document.createElement('a')
-  a.href = url
-  a.download = name
-  a.click()
+  downloadUrl(name, url)
   setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
@@ -91,27 +96,38 @@ async function changedOnDisk(path: string): Promise<string | null> {
   }
 }
 
-async function openFile(): Promise<OpenResult | null> {
+async function pickFiles(multiple: boolean): Promise<OpenResult[]> {
   if (fs.showOpenFilePicker) {
     try {
-      const [handle] = await fs.showOpenFilePicker({
-        types: [{ description: 'Architecture', accept: { 'application/yaml': ['.yaml', '.yml', '.json'] } }]
+      const picked = await fs.showOpenFilePicker({
+        types: [{ description: 'Architecture', accept: { 'application/yaml': ['.yaml', '.yml', '.json'] } }],
+        multiple
       })
-      if (!handle) return null
-      handles.set(handle.name, handle)
-      const content = await read(handle)
-      await remember({ name: handle.name, content, handle })
-      return { path: handle.name, content }
+      const files: OpenResult[] = []
+      for (const handle of picked) {
+        handles.set(handle.name, handle)
+        const content = await read(handle)
+        await remember({ name: handle.name, content, handle })
+        files.push({ path: handle.name, content })
+      }
+      return files
     } catch (e) {
-      if (isAbort(e)) return null
+      if (isAbort(e)) return []
       throw e
     }
   }
-  const file = await pickWithInput()
-  if (!file) return null
-  const content = await file.text()
-  await remember({ name: file.name, content })
-  return { path: file.name, content }
+  const files: OpenResult[] = []
+  for (const file of await pickWithInput(multiple)) {
+    const content = await file.text()
+    await remember({ name: file.name, content })
+    files.push({ path: file.name, content })
+  }
+  return files
+}
+
+async function openFile(): Promise<OpenResult | null> {
+  const [file] = await pickFiles(false)
+  return file ?? null
 }
 
 async function saveFile(req: SaveRequest): Promise<string | null> {
@@ -286,6 +302,7 @@ let dirty = false
 
 const webApi: Api = {
   openFile,
+  openFiles: () => pickFiles(true),
   initialFile: async () => {
     const [last] = await loadRecent()
     return last ? readRecent(last, false) : null
@@ -311,7 +328,11 @@ const webApi: Api = {
     dirty = value
   },
   saveSession,
-  loadSession
+  loadSession,
+  saveImage: (name, dataUrl) => {
+    downloadUrl(name, dataUrl)
+    return Promise.resolve(name)
+  }
 }
 
 export function installWebApi(): void {

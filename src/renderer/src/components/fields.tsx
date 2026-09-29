@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { PALETTE } from '@/model/project'
+import type { Qualifier } from '@/model/types'
 import { Icon, type IconName } from './Icon'
 import { useDraft } from './useDraft'
 
@@ -9,6 +10,7 @@ export function CommitInput(props: {
   onCommit: (value: string) => void
   validate?: (value: string) => string | null
   placeholder?: string
+  title?: string
   className?: string
   autoFocus?: boolean
   list?: string
@@ -27,6 +29,7 @@ export function CommitInput(props: {
         className={error ? 'invalid' : ''}
         value={draft}
         placeholder={props.placeholder}
+        title={props.title}
         autoFocus={props.autoFocus}
         list={props.list}
         spellCheck={false}
@@ -107,6 +110,34 @@ export function Select<T extends string>(props: {
         )
       })}
     </select>
+  )
+}
+
+/** Toggle buttons of the qualifiers of an attribute, method or parameter; `short` labels them by initial. */
+export function QualifierToggles(props: {
+  qualifiers: readonly Qualifier[]
+  value: { [K in Qualifier]?: boolean }
+  onChange: (q: Qualifier, on: boolean) => void
+  short?: boolean
+}): ReactNode {
+  return (
+    <span className="qualifiers">
+      {props.qualifiers.map((q) => {
+        const on = !!props.value[q]
+        return (
+          <button
+            type="button"
+            key={q}
+            className={`qualifier ${on ? 'on' : ''}`}
+            aria-pressed={on}
+            title={props.short ? q : undefined}
+            onClick={() => props.onChange(q, !on)}
+          >
+            {props.short ? q[0]!.toUpperCase() : q}
+          </button>
+        )
+      })}
+    </span>
   )
 }
 

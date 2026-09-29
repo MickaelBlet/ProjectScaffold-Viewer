@@ -12,6 +12,7 @@
   --warning: #c98a00;
   --ok: #2e9e5b;
   --node-bg: #ffffff;
+  --node-label-bg: rgba(255, 255, 255, 0.7);
   --node-container: rgba(59, 111, 224, 0.05);
   --perf-realtime: #e0513b;
   --perf-low: #d98b00;
@@ -36,6 +37,7 @@
     --warning: #e8b43c;
     --ok: #4cc27f;
     --node-bg: #222733;
+    --node-label-bg: rgba(34, 39, 51, 0.7);
     --node-container: rgba(111, 155, 255, 0.07);
     --perf-normal: #9aa3b5;
     --syn-key: #82aaff;
@@ -57,12 +59,38 @@
   --warning: #e8b43c;
   --ok: #4cc27f;
   --node-bg: #222733;
+  --node-label-bg: rgba(34, 39, 51, 0.7);
   --node-container: rgba(111, 155, 255, 0.07);
   --perf-normal: #9aa3b5;
   --syn-key: #82aaff;
   --syn-string: #9ccc7a;
   --syn-literal: #f0a45d;
   color-scheme: dark;
+}
+/* VS Code, theme "VS Code": the colors of its color theme (variables it gives its webviews), the
+   light / dark ones above as fallbacks. */
+:root[data-vscode-colors] {
+  --bg: var(--vscode-editor-background);
+  --panel: var(--vscode-sideBar-background, var(--vscode-editor-background));
+  --panel-2: var(--vscode-editorGroupHeader-tabsBackground, var(--vscode-editorWidget-background));
+  --border: var(--vscode-panel-border, var(--vscode-editorGroup-border, var(--vscode-widget-border)));
+  --text: var(--vscode-foreground);
+  --muted: var(--vscode-descriptionForeground);
+  --accent: var(--vscode-button-background, var(--vscode-focusBorder));
+  --on-accent: var(--vscode-button-foreground, #fff);
+  --accent-soft: var(--vscode-list-inactiveSelectionBackground, var(--vscode-list-hoverBackground));
+  --danger: var(--vscode-errorForeground);
+  --warning: var(--vscode-editorWarning-foreground, var(--vscode-charts-yellow));
+  --ok: var(--vscode-testing-iconPassed, var(--vscode-charts-green));
+  --node-bg: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+  --node-label-bg: color-mix(in srgb, var(--node-bg) 70%, transparent);
+  --node-container: color-mix(in srgb, var(--accent) 6%, transparent);
+  --syn-key: var(--vscode-debugTokenExpression-name, var(--vscode-symbolIcon-propertyForeground));
+  --syn-string: var(--vscode-debugTokenExpression-string, var(--vscode-charts-green));
+  --syn-literal: var(--vscode-debugTokenExpression-number, var(--vscode-charts-orange));
+}
+:root[data-vscode-colors] body {
+  font-family: var(--vscode-font-family, system-ui, sans-serif);
 }
 
 * {
@@ -73,6 +101,8 @@ body,
 #root {
   height: 100%;
   margin: 0;
+  /* VS Code webviews pad the body. */
+  padding: 0;
 }
 body {
   font:
@@ -131,7 +161,7 @@ button:disabled {
 button.primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--on-accent, #fff);
 }
 button.danger {
   color: var(--danger);
@@ -234,6 +264,18 @@ button.link-button:hover {
   overflow: auto;
   background: var(--panel);
   color: var(--text);
+}
+/* VS Code side bar: one tool panel, on the side bar background. */
+.app.side-panel {
+  grid-template-rows: 1fr;
+}
+.side-panel .tool-panel {
+  background: var(--vscode-sideBar-background, var(--panel));
+}
+.side-panel-empty {
+  margin: 0;
+  padding: 12px;
+  color: var(--muted);
 }
 .canvas {
   position: relative;
@@ -612,6 +654,7 @@ kbd {
   cursor: default;
 }
 .kind-badge {
+  flex-shrink: 0;
   display: inline-grid;
   place-items: center;
   width: 18px;
@@ -648,6 +691,209 @@ kbd {
 }
 .kind-badge.view {
   background: var(--ok);
+}
+.kind-badge.dependency {
+  background: #6b5a3b;
+}
+.entity-list li.nested {
+  padding-left: 32px;
+}
+.actions[hidden] {
+  display: none;
+}
+/* Dependencies panel: the list of dependencies beside the content of the chosen one (stacked when narrow). */
+.tool-panel[data-panel='dependencies'] {
+  container-type: inline-size;
+  overflow: hidden;
+}
+.libraries {
+  display: grid;
+  grid-template-columns: minmax(140px, 200px) 1fr;
+  height: 100%;
+  min-height: 0;
+}
+.lib-list {
+  overflow: auto;
+  border-right: 1px solid var(--border);
+}
+.lib-list > header {
+  display: flex;
+  align-items: center;
+  padding: 6px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.lib-list li > span:not(.kind-badge) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lib-main {
+  overflow: auto;
+  min-width: 0;
+}
+@container (max-width: 420px) {
+  .libraries {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+  .lib-list {
+    max-height: 30cqh;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+}
+.lib-detail {
+  padding: 0 8px 12px;
+}
+.lib-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.lib-header h3 {
+  margin: 0;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lib-tag {
+  padding: 0 6px;
+  border-radius: 8px;
+  font-size: 11px;
+  color: var(--ok);
+  border: 1px solid currentColor;
+}
+.lib-tag.indirect {
+  color: var(--muted);
+}
+.lib-file {
+  margin: 2px 0 6px;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lib-relation {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+  font-size: 12px;
+}
+.lib-relation > .muted:first-child {
+  min-width: 56px;
+}
+button.lib-chip {
+  padding: 0 6px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+.lib-entities {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+.lib-group {
+  margin: 10px 0 2px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.lib-group small {
+  font-weight: normal;
+}
+.lib-entity {
+  border-radius: 4px;
+  cursor: pointer;
+}
+.lib-entity:hover {
+  background: var(--panel-2);
+}
+.lib-entity.active {
+  background: var(--accent-soft);
+}
+.lib-entity:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.lib-entity-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 4px;
+}
+.lib-entity-head > small {
+  color: var(--muted);
+  white-space: nowrap;
+}
+.lib-entity-head > small:first-of-type {
+  margin-left: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lib-entity-name {
+  font-weight: 600;
+}
+.lib-usage.unused {
+  font-style: italic;
+}
+.lib-entity-body {
+  padding: 0 8px 6px 44px;
+}
+.lib-description {
+  margin: 0 0 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.lib-members {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 8px;
+  border-left: 1px solid var(--border);
+}
+.lib-members li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 10px;
+  padding: 1px 0;
+}
+.lib-members code {
+  font:
+    12px ui-monospace,
+    'SF Mono',
+    Consolas,
+    monospace;
+}
+.lib-members small {
+  color: var(--muted);
+}
+.lib-member-name {
+  color: var(--syn-key);
+}
+.lib-type {
+  color: var(--syn-string);
+}
+.lib-default,
+.lib-dir {
+  color: var(--syn-literal);
+}
+.lib-none {
+  padding: 0 8px;
+}
+/* Read-only content: a library's type or interface. */
+fieldset.readonly {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
 }
 
 /* Inspector */
@@ -747,8 +993,19 @@ input.number {
 .grid.fields td:last-child {
   width: 78px;
 }
+/* Narrowest that fits its control: qualifier toggles, or a select (parameter direction). */
 .grid.fields td.extra {
-  width: 68px;
+  width: 46px;
+}
+.grid.fields td.extra:has(.qualifier:only-child),
+.grid.fields td.extra:empty {
+  width: 24px;
+}
+.grid.fields td.extra:has(select) {
+  width: 64px;
+}
+.grid.fields td.default {
+  width: 24%;
 }
 .grid td.nowrap {
   white-space: nowrap;
@@ -761,6 +1018,49 @@ input.number {
   align-items: center;
   gap: 6px;
   margin: 4px 0;
+}
+.qualifiers {
+  /* Columns of equal width, sized to the longest label. */
+  display: inline-grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 4px;
+  margin: 4px 0;
+}
+/* Qualifier toggle: muted when off, accent when on. */
+button.qualifier {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--muted);
+  background: none;
+}
+button.qualifier.on {
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+/* In a field row: single-letter square toggles, centered on the row's inputs. */
+.grid .qualifiers {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  margin: 0;
+  /* Height of an input: line height plus padding and border. */
+  height: calc(1.4em + 8px);
+}
+.grid button.qualifier {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border-radius: 4px;
 }
 .metadata .kv {
   display: grid;
@@ -801,6 +1101,16 @@ ul.plain {
   border: 1px solid var(--danger);
   border-radius: 4px;
   color: var(--danger);
+}
+.callout.dependency {
+  margin-bottom: 10px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel-2);
+}
+.callout.dependency .actions {
+  margin-top: 8px;
 }
 
 /* Type editor */
@@ -907,6 +1217,17 @@ ul.plain {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* UML-like: abstract and interface modules have an italic name after their stereotype. */
+.module-name.abstract,
+.module-name.interface {
+  font-style: italic;
+}
+.module-kind,
+.module-bases {
+  font-style: normal;
+  font-weight: 400;
+  color: var(--muted);
+}
 .module.colored {
   border-color: var(--module-color);
 }
@@ -919,6 +1240,43 @@ ul.plain {
 }
 .module.selected.colored {
   border-color: var(--accent);
+}
+/* Attributes: a compartment below the header, inset from the border where ports and links attach. */
+.module-attrs {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 4px 14px 3px;
+  list-style: none;
+  font-family: ui-monospace, 'SF Mono', Consolas, monospace;
+  font-size: 11px;
+  line-height: 18px;
+  background: color-mix(in srgb, var(--text) 4%, transparent);
+  border-bottom: 1px solid var(--border);
+}
+.module.colored .module-attrs {
+  background: color-mix(in srgb, var(--module-color) 8%, transparent);
+  border-bottom-color: color-mix(in srgb, var(--module-color) 50%, transparent);
+}
+.module-attrs li {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.attr-type {
+  color: var(--muted);
+}
+.attr-type.deleted {
+  color: var(--danger);
+}
+.attr-default {
+  color: var(--accent);
+}
+.attr-qualifier {
+  color: var(--accent);
+  font-style: italic;
+}
+.attr-name.pure {
+  font-style: italic;
 }
 .module-rename {
   flex: 1;
@@ -1591,7 +1949,7 @@ ul.plain {
   color: var(--accent);
 }
 
-/* Frameless desktop window (Electron): data-frame is 'frameless' or 'maximized' */
+/* Frameless desktop window (Electron, Tauri): data-frame is 'frameless' or 'maximized' */
 :root[data-frame='frameless'] .app {
   border: 1px solid var(--border);
 }
@@ -2148,6 +2506,11 @@ mark {
   line-height: 16px;
   cursor: grab;
   pointer-events: auto;
+  /* Stays readable over the attributes and links it lies on. */
+  z-index: 1;
+  padding: 0 3px;
+  background: var(--node-label-bg);
+  border-radius: 3px;
 }
 .port-label.dragging {
   cursor: grabbing;
@@ -2238,4 +2601,19 @@ mark {
 }
 .tree [data-item]:focus-visible > .tree-row .eye {
   opacity: 1;
+}
+
+/* Inheritance: UML generalization (solid) or realization of an interface (dashed), hollow triangle on the base. */
+.react-flow__edge-path.inherit-edge {
+  stroke: var(--muted);
+  stroke-width: 1.5;
+}
+.react-flow__edge-path.inherit-edge.realization {
+  stroke-dasharray: 6 4;
+}
+.inherit-arrow {
+  fill: var(--bg);
+  stroke: var(--muted);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
 }

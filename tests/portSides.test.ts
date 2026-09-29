@@ -16,6 +16,8 @@ const mod = (
   description: '',
   parentId,
   metadata: {},
+  attributes: [],
+  methods: [],
   ports,
   layout: { x, y, width: 200, height: 72 }
 })

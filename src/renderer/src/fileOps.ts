@@ -20,6 +20,7 @@ import {
   isDocDirty,
   isPristine,
   patchDoc,
+  projectListeners,
   removeDoc,
   replaceDoc,
   useDocs,
@@ -27,7 +28,8 @@ import {
   type DocState
 } from '@/store/documents'
 import { useSettings } from '@/store/settings'
-import { setStatus, showDialog } from '@/store/ui'
+import { setStatus, showDialog, useUiStore } from '@/store/ui'
+import type { DiagramAction } from '../../../vscode/src/protocol'
 import type { OpenResult, Session } from './api'
 
 export const fileName = (path: string): string => path.split(/[\\/]/).pop() ?? path
@@ -57,8 +59,12 @@ export function newProject(): void {
   addDoc(createDoc())
 }
 
+/** Opens the given file, or the files picked in an open dialog. */
 export async function openProject(file?: OpenResult | null): Promise<void> {
-  if (file === undefined) file = await window.api.openFile()
+  if (file === undefined) {
+    for (const f of await window.api.openFiles()) await openProject(f)
+    return
+  }
   if (!file) return
   const already = useDocs.getState().docs.find((d) => d.filePath === file.path)
   if (already && isDocDirty(already)) {
@@ -179,18 +185,39 @@ export async function checkDiskChanges(): Promise<void> {
   }
 }
 
+/** The project of a document's new file content, or null when it cannot be read (status shown). */
+function reloaded(doc: DocState, content: string, what: string): Project | null {
+  try {
+    const project = reloadText(content, formatFromPath(doc.filePath!), doc.store.getState().project)
+    clearReadError()
+    return project
+  } catch (e) {
+    showReadError(`${docTitle(doc)} ${what}`, e)
+    return null
+  }
+}
+
+/** Status telling that a file text cannot be read: cleared once it can (fixed in another editor). */
+let readError: unknown = null
+
+function showReadError(what: string, e: unknown): void {
+  const problems = e instanceof LoadError ? e.problems : [String(e)]
+  setStatus('error', `${what}: ${problems[0] ?? ''}`)
+  readError = useUiStore.getState().status
+}
+
+/** Clears the read error unless another status replaced it. */
+function clearReadError(): void {
+  if (readError && useUiStore.getState().status === readError) useUiStore.setState({ status: null })
+  readError = null
+}
+
 /** Replace a document's project with its file's new content, in one undo step. */
 function reloadFromDisk(doc: DocState, content: string): void {
   const name = docTitle(doc)
   const current = doc.store.getState().project
-  let project: Project
-  try {
-    project = reloadText(content, formatFromPath(doc.filePath!), current)
-  } catch (e) {
-    const problems = e instanceof LoadError ? e.problems : [String(e)]
-    setStatus('error', `${name} changed on disk but cannot be read: ${problems[0] ?? ''}`)
-    return
-  }
+  const project = reloaded(doc, content, 'changed on disk but cannot be read')
+  if (!project) return
   if (sameContent(project, current)) {
     patchDoc({ savedProject: current }, doc.id)
     return
@@ -200,6 +227,81 @@ function reloadFromDisk(doc: DocState, content: string): void {
   doc.store.setState({ project })
   patchDoc({ savedProject: project }, doc.id)
   setStatus('info', `Reloaded ${name}: changed on disk`)
+}
+
+/** Delay before a project change is written to the VS Code document: a drag is one undo step. */
+const HOST_SYNC_MS = 150
+let hostSync: ReturnType<typeof setTimeout> | undefined
+
+/** VS Code: writes the project to the document text unless it is the text's project already. */
+function pushToHost(): void {
+  hostSync = undefined
+  const doc = activeDoc()
+  const project = doc.store.getState().project
+  if (!doc.filePath || project === doc.savedProject) return
+  window.api.updateText?.(saveText(project, formatFromPath(doc.filePath), { editor: true }))
+  // Unsaved edits are the document's: VS Code shows them.
+  patchDoc({ savedProject: project }, doc.id)
+}
+
+/** VS Code: project changes are written to the document text, which VS Code undoes and saves. */
+export function installHostSync(): () => void {
+  const schedule = (): void => {
+    clearTimeout(hostSync)
+    hostSync = setTimeout(pushToHost, HOST_SYNC_MS)
+  }
+  projectListeners.add(schedule)
+  window.addEventListener('blur', flush)
+  return () => {
+    projectListeners.delete(schedule)
+    window.removeEventListener('blur', flush)
+    clearTimeout(hostSync)
+  }
+}
+
+/** VS Code: writes a project change not written yet. */
+function flush(): void {
+  if (hostSync === undefined) return
+  clearTimeout(hostSync)
+  pushToHost()
+}
+
+/** VS Code side panel: asks the diagram for an action, once it has the changes made here. */
+export function sendToDiagram(action: DiagramAction): void {
+  flush()
+  window.api.inDiagram?.(action)
+}
+
+/** VS Code side panel: shows another project document (none when its path is empty). */
+export function showHostDocument(file: OpenResult): void {
+  // Pending changes go to the previous document (the edit names it).
+  flush()
+  let doc = createDoc()
+  if (file.path) {
+    try {
+      doc = createDoc(loadText(file.content, formatFromPath(file.path)), file.path)
+      clearReadError()
+    } catch (e) {
+      doc = createDoc(undefined, file.path)
+      showReadError(`${fileName(file.path)} cannot be read`, e)
+    }
+  }
+  useDocs.setState({ docs: [doc], activeId: doc.id })
+}
+
+/** VS Code: the document text changed outside the page (undo, text editor, file on disk). */
+export function applyHostText(content: string): void {
+  // The text wins over a change not written yet.
+  clearTimeout(hostSync)
+  hostSync = undefined
+  const doc = activeDoc()
+  if (!doc.filePath) return
+  const current = doc.store.getState().project
+  const project = reloaded(doc, content, 'cannot be read')
+  if (!project) return
+  if (!sameContent(project, current)) doc.store.setState({ project })
+  // The page's project now matches the text: not written back.
+  patchDoc({ savedProject: doc.store.getState().project }, doc.id)
 }
 
 /** Save the active project file (export format + editor layout). */

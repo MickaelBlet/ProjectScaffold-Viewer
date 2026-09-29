@@ -20,7 +20,7 @@ interface Row {
   bidirectional: boolean
 }
 
-function rows(p: Pick<Project, 'links' | 'modules' | 'imports' | 'interfaces'>): Row[] {
+function rows(p: Pick<Project, 'links' | 'modules' | 'dependencies' | 'interfaces'>): Row[] {
   const paths = modulePaths(p)
   return p.links
     .map((l) => {
@@ -40,14 +40,14 @@ function rows(p: Pick<Project, 'links' | 'modules' | 'imports' | 'interfaces'>):
 export function LinksPanel(): ReactNode {
   const links = useProjectStore((s) => s.project.links)
   const modules = useProjectStore((s) => s.project.modules)
-  const imports = useProjectStore((s) => s.project.imports)
+  const dependencies = useProjectStore((s) => s.project.dependencies)
   const interfaces = useProjectStore((s) => s.project.interfaces)
   const selection = useDoc((d) => d.selection)
   const [filter, setFilter] = useState('')
   // Rebuilt when links, modules or interfaces change, not on every edit.
   const all = useMemo(
-    () => rows({ links, modules, imports, interfaces }),
-    [links, modules, imports, interfaces]
+    () => rows({ links, modules, dependencies, interfaces }),
+    [links, modules, dependencies, interfaces]
   )
   const f = filter.trim().toLowerCase()
   const shown = f

@@ -5,6 +5,7 @@ import { fuzzyFilter } from '@/model/fuzzy'
 import { modulePaths } from '@/model/project'
 import { GLOBAL_VIEW } from '@/model/types'
 import { getProject } from '@/store/project'
+import { storage } from '@/storage'
 import { useUiStore, type PickEntry } from '@/store/ui'
 import { navigate } from '@/actions'
 import { openView } from '@/shell/controllers'
@@ -18,21 +19,14 @@ const RECENT_KEY = 'project-scaffold:recent-commands'
 
 function recentCommands(): string[] {
   try {
-    return JSON.parse(localStorage.getItem(RECENT_KEY) ?? '[]') as string[]
+    return JSON.parse(storage.getItem(RECENT_KEY) ?? '[]') as string[]
   } catch {
     return []
   }
 }
 
 function remember(id: string): void {
-  try {
-    localStorage.setItem(
-      RECENT_KEY,
-      JSON.stringify([id, ...recentCommands().filter((x) => x !== id)].slice(0, 8))
-    )
-  } catch {
-    // Not remembered.
-  }
+  storage.setItem(RECENT_KEY, JSON.stringify([id, ...recentCommands().filter((x) => x !== id)].slice(0, 8)))
 }
 
 function commandEntries(): Entry[] {

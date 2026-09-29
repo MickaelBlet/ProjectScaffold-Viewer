@@ -36,7 +36,7 @@ export function snapRect(
 export function snapChanges(prev: Project, next: Project, grid: number): Project {
   const modules = new Map(prev.modules.map((m) => [m.id, m]))
   const notes = new Map(prev.notes.map((n) => [n.id, n]))
-  const imported = new Map(prev.imports.flatMap((i) => i.modules).map((m) => [m.id, m]))
+  const imported = new Map(prev.dependencies.flatMap((x) => x.modules).map((m) => [m.id, m]))
   /** A resize puts the edges on the grid; a move keeps the size, only rounded up. */
   const place = (r: Rect, before: Rect | undefined, min: { width: number; height: number }): Rect =>
     !before || before.width !== r.width || before.height !== r.height
@@ -52,8 +52,8 @@ export function snapChanges(prev: Project, next: Project, grid: number): Project
   if (
     next.modules.every((m) => !touched(modules.get(m.id)?.layout, m.layout)) &&
     next.notes.every((n) => !touched(notes.get(n.id)?.layout, n.layout)) &&
-    next.imports.every((i) =>
-      i.modules.every((m) => {
+    next.dependencies.every((x) =>
+      x.modules.every((m) => {
         const a = imported.get(m.id)?.position
         return a?.x === m.position.x && a.y === m.position.y
       })
@@ -79,7 +79,7 @@ export function snapChanges(prev: Project, next: Project, grid: number): Project
       // Children stay below their parent's header and ports.
       if (parent) {
         r.x = Math.max(r.x, ceilToGrid(origin.x + LAYOUT_PAD / 2, grid))
-        r.y = Math.max(r.y, ceilToGrid(origin.y + contentTop(d.orientation), grid))
+        r.y = Math.max(r.y, ceilToGrid(origin.y + contentTop(d.orientation, parent), grid))
       }
       m.layout = { ...r, x: r.x - origin.x, y: r.y - origin.y }
     }
@@ -101,7 +101,7 @@ export function snapChanges(prev: Project, next: Project, grid: number): Project
       const before = notes.get(n.id)?.layout
       if (!n.locked && touched(before, n.layout)) n.layout = place(n.layout, before, NOTE_MIN)
     }
-    for (const m of d.imports.flatMap((i) => i.modules)) {
+    for (const m of d.dependencies.flatMap((x) => x.modules)) {
       const before = imported.get(m.id)?.position
       if (before && before.x === m.position.x && before.y === m.position.y) continue
       m.position = { x: snapValue(m.position.x, grid), y: snapValue(m.position.y, grid) }
