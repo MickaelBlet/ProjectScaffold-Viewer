@@ -34,6 +34,7 @@ import {
   travelSelection
 } from './actions'
 import { closeDocument, exportProject, newProject, openProject, saveAll, saveProject } from './fileOps'
+import { generateCode } from './generateCode'
 import { activeDoc, cycleDoc, patchDoc, useDocs, activateDoc } from './store/documents'
 import { getProject, redo, undo } from './store/project'
 import { setSetting, useSettings, type Theme } from './store/settings'
@@ -183,6 +184,20 @@ const allCommands: Command[] = [
     title: 'Export diagram as SVG',
     category: 'File',
     run: () => void exportImage('svg')
+  },
+  {
+    id: 'file.generate',
+    title: 'Generate code',
+    category: 'File',
+    keys: ['Ctrl+Alt+G'],
+    global: true,
+    run: () => void generateCode(false)
+  },
+  {
+    id: 'file.generateInto',
+    title: 'Generate code into…',
+    category: 'File',
+    run: () => void generateCode(true)
   },
 
   // Edit

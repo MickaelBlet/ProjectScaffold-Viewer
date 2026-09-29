@@ -25,6 +25,9 @@ const MENUS: [Category, string[]][] = [
       'file.exportPng',
       'file.exportSvg',
       '-',
+      'file.generate',
+      'file.generateInto',
+      '-',
       'file.close'
     ]
   ],

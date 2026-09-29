@@ -33,6 +33,16 @@ export type DiagramAction =
   | { kind: 'openEditor'; editor: 'type' | 'interface' | 'module' | 'link'; path: DataPath; split?: boolean }
   | { kind: 'command'; id: string }
 
+export interface OutputDirReply {
+  /** URI of the directory, given back in `outputFile`. */
+  dir: string
+  /** Shown to the user. */
+  label: string
+}
+
+/** Content of a file read (null: no such file); an error when the operation failed. */
+export type OutputFileReply = { text: string | null } | { error: string }
+
 /** Page → extension. Messages with an `id` get a `reply` with the same id. */
 export type ToHost =
   /** The project changed: new text of the document (an undoable, unsaved edit). */
@@ -51,6 +61,21 @@ export type ToHost =
   | { type: 'readSibling'; id: number; file: string }
   /** Opens a project file next to the document in its own editor. */
   | { type: 'openSibling'; file: string }
+  /**
+   * Directory of the code generated from the document: the one picked for it before, else the one
+   * of the settings (`name`: the project's namespace); always picked with `pick`. Replies with an
+   * `OutputDirReply`, or null when cancelled.
+   */
+  | { type: 'outputDir'; id: number; pick: boolean; name: string }
+  /** File of a directory given by `outputDir`, by relative path: replies with an `OutputFileReply`. */
+  | {
+      type: 'outputFile'
+      id: number
+      dir: string
+      path: string
+      op: 'read' | 'write' | 'remove'
+      text?: string
+    }
   /** The selection changed: data path of the selected entity in the file. */
   | { type: 'selected'; path: DataPath }
   /** A diagram shows another view (by name, null: global). */

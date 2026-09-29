@@ -1,4 +1,5 @@
 import type { DiagramAction, SidePanel } from '../../../vscode/src/protocol'
+import type { OutputDir } from './codegen/run'
 
 export interface OpenResult {
   path: string
@@ -14,6 +15,14 @@ export interface SaveRequest {
   title?: string
   /** Exports are not added to the recent documents. */
   export?: boolean
+}
+
+export interface OutputDirRequest {
+  pick: boolean
+  /** File of the document; null for an unsaved project. */
+  document: string | null
+  /** Default directory name (the project's namespace). */
+  name: string
 }
 
 /** An open document kept across page reloads. */
@@ -62,6 +71,11 @@ export interface Api {
   loadSession(): Promise<Session | null>
   /** Saves an exported diagram image (data: URL); resolves to its name, or null when cancelled. */
   saveImage(name: string, dataUrl: string): Promise<string | null>
+  /**
+   * Directory generated code goes to: the one last used for the document, else one to pick (always
+   * with `pick`); null when cancelled. Absent when the host cannot write into a directory.
+   */
+  outputDir?(request: OutputDirRequest): Promise<OutputDir | null>
 
   // VS Code only: the page edits one document whose text, undo history and file VS Code owns.
   /** Writes the project's new content to the document text, as an unsaved edit. */

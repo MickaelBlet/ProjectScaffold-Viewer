@@ -3,7 +3,8 @@
 // through a file input and a download. Paths are file names: browsers never expose real paths.
 // Recent documents live in IndexedDB: their last known content, and their file handle when
 // available so that reopening reads the file again and Save rewrites it.
-import type { Api, OpenResult, SaveRequest, Session } from './api'
+import type { Api, OpenResult, OutputDirRequest, SaveRequest, Session } from './api'
+import type { OutputDir } from './codegen/run'
 
 type Permission = 'granted' | 'denied' | 'prompt'
 
@@ -20,9 +21,19 @@ interface PickerType {
   accept: Record<string, string[]>
 }
 
+interface DirHandle {
+  name: string
+  getDirectoryHandle(name: string, opts?: { create?: boolean }): Promise<DirHandle>
+  getFileHandle(name: string, opts?: { create?: boolean }): Promise<FileHandle>
+  removeEntry(name: string): Promise<void>
+  queryPermission?(opts: { mode: 'readwrite' }): Promise<Permission>
+  requestPermission?(opts: { mode: 'readwrite' }): Promise<Permission>
+}
+
 interface FsAccessWindow {
   showOpenFilePicker?(opts: { types: PickerType[]; multiple?: boolean }): Promise<FileHandle[]>
   showSaveFilePicker?(opts: { suggestedName: string; types: PickerType[] }): Promise<FileHandle>
+  showDirectoryPicker?(opts: { id?: string; mode: 'readwrite'; startIn?: DirHandle }): Promise<DirHandle>
 }
 
 const TYPES: Record<SaveRequest['format'], PickerType> = {
@@ -298,6 +309,86 @@ async function loadSession(): Promise<Session | null> {
   return session
 }
 
+// Output directories of generated code, by document; kept in IndexedDB when handles can be stored.
+const outputDirs = new Map<string, DirHandle>()
+const outputKey = (doc: string | null): string => `outputDir:${doc ?? ''}`
+
+async function rememberedOutput(doc: string | null): Promise<DirHandle | undefined> {
+  const known = outputDirs.get(outputKey(doc))
+  if (known) return known
+  try {
+    return await withStore<DirHandle | undefined>(
+      'readonly',
+      (s) => s.get(outputKey(doc)) as IDBRequest<DirHandle | undefined>
+    )
+  } catch {
+    return undefined
+  }
+}
+
+const notFound = (e: unknown): boolean =>
+  e instanceof DOMException && (e.name === 'NotFoundError' || e.name === 'TypeMismatchError')
+
+/** A directory handle as an output directory: paths are `/`-separated, relative to it. */
+function handleDir(root: DirHandle): OutputDir {
+  const locate = async (path: string, create: boolean): Promise<[DirHandle, string]> => {
+    const parts = path.split('/')
+    const name = parts.pop()!
+    let dir = root
+    for (const p of parts) dir = await dir.getDirectoryHandle(p, { create })
+    return [dir, name]
+  }
+  return {
+    label: root.name,
+    read: async (path) => {
+      try {
+        const [dir, name] = await locate(path, false)
+        return await (await (await dir.getFileHandle(name)).getFile()).text()
+      } catch (e) {
+        if (notFound(e)) return null
+        throw e
+      }
+    },
+    write: async (path, text) => {
+      const [dir, name] = await locate(path, true)
+      const w = await (await dir.getFileHandle(name, { create: true })).createWritable()
+      await w.write(text)
+      await w.close()
+    },
+    remove: async (path) => {
+      try {
+        const [dir, name] = await locate(path, false)
+        await dir.removeEntry(name)
+      } catch (e) {
+        if (!notFound(e)) throw e
+      }
+    }
+  }
+}
+
+async function outputDir(req: OutputDirRequest): Promise<OutputDir | null> {
+  const previous = await rememberedOutput(req.document)
+  let handle = req.pick ? undefined : previous
+  if (handle && (await handle.queryPermission?.({ mode: 'readwrite' })) !== 'granted') {
+    if ((await handle.requestPermission?.({ mode: 'readwrite' })) !== 'granted') handle = undefined
+  }
+  if (!handle) {
+    try {
+      handle = await fs.showDirectoryPicker!({ id: 'generate', mode: 'readwrite', startIn: previous })
+    } catch (e) {
+      if (isAbort(e)) return null
+      throw e
+    }
+    outputDirs.set(outputKey(req.document), handle)
+    try {
+      await withStore('readwrite', (s) => s.put(handle, outputKey(req.document)))
+    } catch {
+      // Handles cannot be stored (file:// origin, private browsing): remembered for the session.
+    }
+  }
+  return handleDir(handle)
+}
+
 let dirty = false
 
 const webApi: Api = {
@@ -332,7 +423,8 @@ const webApi: Api = {
   saveImage: (name, dataUrl) => {
     downloadUrl(name, dataUrl)
     return Promise.resolve(name)
-  }
+  },
+  outputDir: fs.showDirectoryPicker ? outputDir : undefined
 }
 
 export function installWebApi(): void {

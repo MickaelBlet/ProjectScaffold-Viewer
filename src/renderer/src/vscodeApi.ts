@@ -3,8 +3,15 @@
 // (IN_PANEL) changes document with the active project document.
 // Project changes are written to the text (see installHostSync in fileOps.ts); text changes made
 // elsewhere come back through onExternalChange.
-import type { DiagramAction, ToHost, ToPage } from '../../../vscode/src/protocol'
-import type { Api, OpenResult, Session } from './api'
+import type {
+  DiagramAction,
+  OutputDirReply,
+  OutputFileReply,
+  ToHost,
+  ToPage
+} from '../../../vscode/src/protocol'
+import type { Api, OpenResult, OutputDirRequest, Session } from './api'
+import type { OutputDir } from './codegen/run'
 import { IN_PANEL, IN_PREVIEW, vscode } from './host'
 import { storageChanged } from './storage'
 
@@ -78,6 +85,39 @@ function dataUrlPayload(url: string): { data: string; encoding: 'utf8' | 'base64
   return meta.endsWith(';base64')
     ? { data: payload, encoding: 'base64' }
     : { data: decodeURIComponent(payload), encoding: 'utf8' }
+}
+
+/** Output directory of the extension (see ToHost `outputDir`). */
+async function outputDir(req: OutputDirRequest): Promise<OutputDir | null> {
+  const found = await request<OutputDirReply | null>((id) => ({
+    type: 'outputDir',
+    id,
+    pick: req.pick,
+    name: req.name
+  }))
+  if (!found) return null
+  const file = async (
+    op: 'read' | 'write' | 'remove',
+    path: string,
+    text?: string
+  ): Promise<string | null> => {
+    const r = await request<OutputFileReply>((id) => ({
+      type: 'outputFile',
+      id,
+      dir: found.dir,
+      path,
+      op,
+      text
+    }))
+    if ('error' in r) throw new Error(r.error)
+    return r.text
+  }
+  return {
+    label: found.label,
+    read: (path) => file('read', path),
+    write: async (path, text) => void (await file('write', path, text)),
+    remove: async (path) => void (await file('remove', path))
+  }
 }
 
 /** Document shown: the initial one, or the one a side panel was given since. Set by installVscodeApi:
@@ -159,7 +199,9 @@ const vscodeApi: Api = {
   onView: (cb) => listen(viewListeners, cb),
   viewChanged: (view) => post({ type: 'view', view }),
   onAction: (cb) => listen(actionListeners, cb),
-  showPanel: (panel) => post({ type: 'showPanel', panel })
+  showPanel: (panel) => post({ type: 'showPanel', panel }),
+  // Side panels have no Generate command.
+  outputDir: IN_PANEL ? undefined : outputDir
 }
 
 export function installVscodeApi(): void {
