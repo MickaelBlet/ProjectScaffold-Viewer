@@ -34,7 +34,7 @@ import {
 } from './actions'
 import { toggleTool } from './shell/controllers'
 import { ExplorerPanel } from './panels/ExplorerPanel'
-import { OutlinePanel } from './panels/OutlinePanel'
+import { ModulesPanel } from './panels/ModulesPanel'
 import { LinksPanel } from './panels/LinksPanel'
 import { SettingsPanel } from './panels/SettingsPanel'
 import type { SidePanel } from '../../../vscode/src/protocol'
@@ -73,7 +73,7 @@ function Dialog(): ReactNode {
 
 const SIDE_PANELS: Record<SidePanel, () => ReactNode> = {
   explorer: ExplorerPanel,
-  outline: OutlinePanel,
+  modules: ModulesPanel,
   links: LinksPanel,
   settings: SettingsPanel
 }

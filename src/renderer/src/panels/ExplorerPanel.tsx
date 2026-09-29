@@ -34,7 +34,7 @@ import {
   showDependency
 } from '@/actions'
 import { dependencyMenu } from './DependenciesPanel'
-import { childrenByParent, matching } from './OutlinePanel'
+import { childrenByParent, matching } from './ModulesPanel'
 import { openEditor, openView } from '@/shell/controllers'
 import { Icon } from '@/components/Icon'
 import { onListKeyDown, tabStop } from '@/components/listKeys'
@@ -246,7 +246,7 @@ export function ExplorerPanel(): ReactNode {
     if (!next.delete(id)) next.add(id)
     setCollapsed(next)
   }
-  // Modules as in the outline: nested under their parent, in project order (all open while filtering).
+  // Modules as in Modules: nested under their parent, in project order (all open while filtering).
   const shownModules: { m: Module; depth: number; parent: boolean; open: boolean }[] = []
   const walk = (list: Module[], depth: number): void => {
     for (const m of list) {
@@ -492,7 +492,7 @@ export function ExplorerPanel(): ReactNode {
               style={{ paddingLeft: 6 + depth * 14 }}
               onClick={(e) => clickItem(e, m.id, moduleIds)}
               onKeyDown={(e) => {
-                // Right expands, Left collapses, as in the outline.
+                // Right expands, Left collapses, as in Modules.
                 if (!parent || moduleMatches || e.key !== (open ? 'ArrowLeft' : 'ArrowRight')) return
                 e.preventDefault()
                 toggle(m.id)

@@ -637,12 +637,12 @@ const allCommands: Command[] = [
   // Window
   { id: 'window.explorer', title: 'Explorer', category: 'Window', run: tool('explorer') },
   {
-    id: 'window.outline',
-    title: 'Outline',
+    id: 'window.modules',
+    title: 'Modules',
     category: 'Window',
     keys: ['Ctrl+Shift+O'],
     global: true,
-    run: tool('outline')
+    run: tool('modules')
   },
   {
     id: 'window.links',

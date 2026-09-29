@@ -1,4 +1,4 @@
-// Keyboard access to clickable lists (Explorer, Outline, Links, Search, Problems): the items are
+// Keyboard access to clickable lists (Explorer, Modules, Links, Search, Problems): the items are
 // `[data-item]` elements, one of them in the tab order (roving tab index).
 import type { KeyboardEvent } from 'react'
 

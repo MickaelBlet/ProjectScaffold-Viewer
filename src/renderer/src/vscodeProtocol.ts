@@ -8,7 +8,7 @@
 export type WebviewMode = 'editor' | 'preview' | 'panel'
 
 /** Tool panels of the ProjectScaffold side bar. */
-export type SidePanel = 'explorer' | 'outline' | 'links' | 'settings'
+export type SidePanel = 'explorer' | 'modules' | 'links' | 'settings'
 
 type DataPath = (string | number)[]
 

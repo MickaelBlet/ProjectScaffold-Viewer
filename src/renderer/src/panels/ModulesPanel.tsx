@@ -183,7 +183,7 @@ function TreeNode({ m, depth, tree }: { m: Module; depth: number; tree: TreeStat
   )
 }
 
-export function OutlinePanel(): ReactNode {
+export function ModulesPanel(): ReactNode {
   const modules = useProjectStore((s) => s.project.modules)
   const views = useProjectStore((s) => s.project.views)
   const viewId = useDoc((d) => d.activeViewId)
@@ -231,7 +231,7 @@ export function OutlinePanel(): ReactNode {
 
   return (
     <div
-      className={`outline ${over ? 'drop' : ''}`}
+      className={`modules-panel ${over ? 'drop' : ''}`}
       onDragOver={(e) => {
         if (!e.dataTransfer.types.includes(DRAG)) return
         e.preventDefault()

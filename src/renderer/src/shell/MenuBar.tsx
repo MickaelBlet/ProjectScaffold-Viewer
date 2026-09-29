@@ -121,7 +121,7 @@ const MENUS: [Category, string[]][] = [
     'Window',
     [
       'window.explorer',
-      'window.outline',
+      'window.modules',
       'window.links',
       'window.dependencies',
       'window.inspector',

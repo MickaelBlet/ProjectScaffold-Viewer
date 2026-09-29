@@ -49,11 +49,11 @@ export function activeCanvas(): CanvasController | undefined {
 // Dock layouts
 
 export type ToolId =
-  'explorer' | 'outline' | 'links' | 'dependencies' | 'inspector' | 'problems' | 'search' | 'settings'
+  'explorer' | 'modules' | 'links' | 'dependencies' | 'inspector' | 'problems' | 'search' | 'settings'
 
 export const TOOL_TITLES: Record<ToolId, string> = {
   explorer: 'Explorer',
-  outline: 'Outline',
+  modules: 'Modules',
   links: 'Links',
   dependencies: 'Dependencies',
   inspector: 'Inspector',
@@ -65,7 +65,7 @@ export const TOOL_TITLES: Record<ToolId, string> = {
 /** Width of the side tools, height of the bottom ones, when first opened. */
 const TOOL_SIZES: Record<ToolId, number> = {
   explorer: 250,
-  outline: 250,
+  modules: 250,
   links: 250,
   dependencies: 280,
   inspector: 380,
@@ -90,7 +90,7 @@ const LAYOUT_KEY = IN_PREVIEW
     : 'project-scaffold:layout'
 
 /** Tools of the VS Code side bar (see vscode/package.json). */
-const SIDE_TOOLS = new Set<ToolId>(['explorer', 'outline', 'links', 'settings'])
+const SIDE_TOOLS = new Set<ToolId>(['explorer', 'modules', 'links', 'settings'])
 const inSideBar = (id: ToolId): id is SidePanel => IN_VSCODE && SIDE_TOOLS.has(id)
 
 /**
@@ -119,9 +119,9 @@ export function buildDefaultLayout(api: DockviewApi): void {
     position: { referencePanel: EDITOR_AREA, direction: 'left' }
   })
   api.addPanel({
-    id: 'outline',
-    component: 'outline',
-    title: TOOL_TITLES.outline,
+    id: 'modules',
+    component: 'modules',
+    title: TOOL_TITLES.modules,
     position: { referencePanel: 'explorer', direction: 'below' }
   })
   api.addPanel({
@@ -129,7 +129,7 @@ export function buildDefaultLayout(api: DockviewApi): void {
     component: 'links',
     title: TOOL_TITLES.links,
     inactive: true,
-    position: { referencePanel: 'outline', direction: 'within' }
+    position: { referencePanel: 'modules', direction: 'within' }
   })
   api.addPanel({
     id: 'inspector',
@@ -314,17 +314,17 @@ type Place = [ref: string, direction: Direction] | [ref: null, direction: Exclud
 /** Where a closed tool goes back: beside the first open reference, else on an edge of the window. */
 const TOOL_PLACES: Record<ToolId, Place[]> = {
   explorer: [
-    ['outline', 'above'],
+    ['modules', 'above'],
     ['links', 'above'],
     [null, 'left']
   ],
-  outline: [
+  modules: [
     ['links', 'within'],
     ['explorer', 'below'],
     [null, 'left']
   ],
   links: [
-    ['outline', 'within'],
+    ['modules', 'within'],
     ['explorer', 'below'],
     [null, 'left']
   ],

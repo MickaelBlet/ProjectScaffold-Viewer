@@ -2,7 +2,7 @@
 import { useCallback, useEffect, type ReactNode } from 'react'
 import { DockviewReact, type DockviewReadyEvent, type IDockviewPanelProps } from 'dockview-react'
 import { ExplorerPanel } from '@/panels/ExplorerPanel'
-import { OutlinePanel } from '@/panels/OutlinePanel'
+import { ModulesPanel } from '@/panels/ModulesPanel'
 import { LinksPanel } from '@/panels/LinksPanel'
 import { DependenciesPanel } from '@/panels/DependenciesPanel'
 import { Inspector } from '@/panels/Inspector'
@@ -54,7 +54,7 @@ function ProblemsToolPanel(props: IDockviewPanelProps): ReactNode {
 const components = {
   editorArea: EditorArea,
   explorer: tool('explorer', ExplorerPanel),
-  outline: tool('outline', OutlinePanel),
+  modules: tool('modules', ModulesPanel),
   links: tool('links', LinksPanel),
   dependencies: tool('dependencies', DependenciesPanel),
   inspector: tool('inspector', Inspector),
