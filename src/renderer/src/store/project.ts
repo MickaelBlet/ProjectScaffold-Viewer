@@ -32,7 +32,17 @@ import {
   type DependencyResult
 } from '@/model/dependencies'
 import { snapChanges } from '@/model/grid'
-import type { Endpoint, Id, LinkRoute, PortRole, Project, Rect, Side, TypeDef } from '@/model/types'
+import type {
+  Endpoint,
+  Id,
+  ImportedModule,
+  LinkRoute,
+  PortRole,
+  Project,
+  Rect,
+  Side,
+  TypeDef
+} from '@/model/types'
 import { activeDoc, useDoc } from './documents'
 import type { ProjectState } from './projectStore'
 import { useSettings } from './settings'
@@ -135,10 +145,17 @@ export function setLayouts(layouts: Map<Id, Partial<Rect>>): void {
       const n = d.notes.find((n) => n.id === id)
       if (n) Object.assign(n.layout, r)
       const im = findImported(d, id)?.module
-      if (im) im.position = { x: r.x ?? im.position.x, y: r.y ?? im.position.y }
+      if (im) setImportedRect(im, r)
     }
     for (const id of layouts.keys()) growAncestors(d, id)
   })
+}
+
+/** Move or resize a placed module of a dependency. */
+function setImportedRect(im: ImportedModule, r: Partial<Rect>): void {
+  im.position = { x: r.x ?? im.position.x, y: r.y ?? im.position.y }
+  if (r.width !== undefined || r.height !== undefined)
+    im.size = { width: r.width ?? im.size?.width ?? 0, height: r.height ?? im.size?.height ?? 0 }
 }
 
 /** Bend points of the links whose both ends move by the same offset, outside a moving module, move with them. */
@@ -170,6 +187,8 @@ function shiftBends(d: Project, layouts: Map<Id, Partial<Rect>>): void {
 
 export function setModuleLayout(id: Id, layout: Partial<Rect>): void {
   update((d) => {
+    const im = findImported(d, id)?.module
+    if (im) return setImportedRect(im, layout)
     const m = d.modules.find((m) => m.id === id)
     if (!m) return
     Object.assign(m.layout, layout)

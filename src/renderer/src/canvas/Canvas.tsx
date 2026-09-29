@@ -363,7 +363,7 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
   /** Smallest size of a resizable node. */
   const minOf = useCallback((id: string) => {
     const p = getProject()
-    const m = p.modules.find((m) => m.id === id)
+    const m = p.modules.find((m) => m.id === id) ?? findImported(p, id)?.module
     return m ? minSize(m, p.orientation) : NOTE_MIN
   }, [])
 

@@ -1,13 +1,17 @@
 import { memo, type ReactNode } from 'react'
-import type { Node, NodeProps } from '@xyflow/react'
+import { NodeResizer, type Node, type NodeProps } from '@xyflow/react'
+import { minSize } from '@/model/project'
 import type { ImportedPort, LinkAnchor, Side } from '@/model/types'
-import { useProjectStore } from '@/store/project'
+import { setModuleLayout, useProjectStore } from '@/store/project'
 import { Icon } from '@/components/Icon'
 import type { PortNodeData } from './flowGraph'
 import { anchorStyle, inward, PortPoint } from './PortPoint'
 import { usePortLayout } from './usePortLayout'
 
-/** Module of another project: its ports floating (see portSides.ts) or on the orientation's default edges, linkable. */
+/**
+ * Module of another project: its ports floating (see portSides.ts) or on the orientation's default
+ * edges, linkable; resizable.
+ */
 export const ImportedNode = memo(function ImportedNode({
   id,
   selected,
@@ -25,6 +29,7 @@ export const ImportedNode = memo(function ImportedNode({
   )
   if (!dep || !module) return null
   const vertical = orientation === 'vertical'
+  const min = minSize(module, orientation)
   const iface = (p: ImportedPort): string | undefined => p.interface ?? undefined
   const unknown = (p: ImportedPort): boolean =>
     !!p.interface && !interfaces.some((i) => i.name === p.interface)
@@ -59,6 +64,12 @@ export const ImportedNode = memo(function ImportedNode({
       className={`module imported ${vertical ? 'vertical' : ''} ${selected ? 'selected' : ''}`}
       title={`${module.path} in ${dep.file}`}
     >
+      <NodeResizer
+        isVisible={selected}
+        minWidth={min.width}
+        minHeight={min.height}
+        onResizeEnd={(_, r) => setModuleLayout(id, { x: r.x, y: r.y, width: r.width, height: r.height })}
+      />
       {(top.length > 0 || (!floating && vertical)) && band(top, 'top')}
       <div className="module-header">
         <span className="module-name">
