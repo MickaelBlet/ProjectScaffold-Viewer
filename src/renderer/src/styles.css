@@ -2481,6 +2481,11 @@ mark {
   height: 0;
   font-size: 12px;
 }
+/* Name of a container port, in the viewport (placed by transform, see PortPoint). */
+.port-point.lifted {
+  left: 0;
+  top: 0;
+}
 .port-point.at-left {
   left: 0;
   top: 50%;

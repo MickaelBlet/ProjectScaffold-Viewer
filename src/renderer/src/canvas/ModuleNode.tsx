@@ -186,6 +186,7 @@ export const ModuleNode = memo(function ModuleNode({
       edge={edge}
       fallback={fallback}
       style={anchor && anchorStyle(anchor)}
+      lift={hasChildren}
     />
   )
   const band = (ports: Port[], side: 'top' | 'bottom'): ReactNode => (

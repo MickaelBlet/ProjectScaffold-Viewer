@@ -1,9 +1,9 @@
-import { useState, type CSSProperties, type ReactNode } from 'react'
-import { Handle } from '@xyflow/react'
+import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react'
+import { Handle, useStore, ViewportPortal } from '@xyflow/react'
 import type { Id, LinkAnchor, PortRole, Side } from '@/model/types'
 import { setPortLabel } from '@/store/project'
 import { Icon } from '@/components/Icon'
-import { OPPOSITE, POSITION } from './constants'
+import { OPPOSITE, POSITION, Z } from './constants'
 
 /** Direction pointing into a module from its `edge`. */
 export const inward = (edge: Side): Side => OPPOSITE[edge]
@@ -28,6 +28,35 @@ function IfaceLabel({ name }: { name: string | undefined }): ReactNode {
   )
 }
 
+/**
+ * Port name drawn in the viewport above the links (a container is below them), at the place of its
+ * port point in the module, measured after each render of the module and on its moves.
+ */
+function Lifted(props: {
+  moduleId: Id
+  point: RefObject<HTMLSpanElement | null>
+  children: ReactNode
+}): ReactNode {
+  const origin = useStore((s) => s.nodeLookup.get(props.moduleId)?.internals.positionAbsolute)
+  const zoom = useStore((s) => s.transform[2])
+  const at = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    const point = props.point.current
+    const node = point?.closest('.react-flow__node')
+    if (!origin || !point || !node || !at.current) return
+    const a = point.getBoundingClientRect()
+    const b = node.getBoundingClientRect()
+    at.current.style.transform = `translate(${origin.x + (a.left - b.left) / zoom}px, ${origin.y + (a.top - b.top) / zoom}px)`
+  })
+  return (
+    <ViewportPortal>
+      <div ref={at} className="port-point lifted" style={{ zIndex: Z.label }}>
+        {props.children}
+      </div>
+    </ViewportPortal>
+  )
+}
+
 /** Direction of `dx, dy` from the origin, along its main axis. */
 function towards(dx: number, dy: number): Side {
   if (Math.abs(dx) >= Math.abs(dy)) return dx < 0 ? 'left' : 'right'
@@ -36,7 +65,8 @@ function towards(dx: number, dy: number): Side {
 
 /**
  * Port as a point on its module's `edge` (placed by the parent's CSS, or `style`): its handle
- * there, its name on one side of it, by default `fallback`, dragged to another side.
+ * there, its name on one side of it, by default `fallback`, dragged to another side; with `lift`,
+ * the name is drawn above the links.
  */
 export function PortPoint({
   moduleId,
@@ -46,7 +76,8 @@ export function PortPoint({
   edge,
   fallback,
   className = '',
-  style
+  style,
+  lift = false
 }: {
   moduleId: Id
   port: { id: Id; role: PortRole; name: string; label?: Side }
@@ -56,10 +87,12 @@ export function PortPoint({
   fallback: Side
   className?: string
   style?: CSSProperties
+  lift?: boolean
 }): ReactNode {
   /** Side of the name being dragged. */
   const [draft, setDraft] = useState<Side | null>(null)
   const label = draft ?? port.label ?? fallback
+  const point = useRef<HTMLSpanElement>(null)
 
   /** Drags the name around the handle, to the side the pointer is on. */
   const dragLabel = (e: React.PointerEvent<HTMLElement>): void => {
@@ -86,8 +119,23 @@ export function PortPoint({
     window.addEventListener('pointerup', up)
   }
 
+  const name = (
+    <span
+      className={`port-label label-${label} nodrag nopan ${draft ? 'dragging' : ''}`}
+      title={`${title}\nDrag around the port to move its name; double-click to reset`}
+      onPointerDown={dragLabel}
+      onDoubleClick={(e) => {
+        e.stopPropagation()
+        if (port.label) setPortLabel(moduleId, port.id, undefined)
+      }}
+    >
+      {port.name}
+      <IfaceLabel name={iface} />
+    </span>
+  )
+
   return (
-    <span className={`port-point at-${edge} ${port.role} ${className}`} style={style}>
+    <span ref={point} className={`port-point at-${edge} ${port.role} ${className}`} style={style}>
       <Handle
         type={port.role === 'in' ? 'target' : 'source'}
         position={POSITION[edge]}
@@ -105,18 +153,13 @@ export function PortPoint({
         className="inner-handle"
         isConnectableStart={false}
       />
-      <span
-        className={`port-label label-${label} nodrag nopan ${draft ? 'dragging' : ''}`}
-        title={`${title}\nDrag around the port to move its name; double-click to reset`}
-        onPointerDown={dragLabel}
-        onDoubleClick={(e) => {
-          e.stopPropagation()
-          if (port.label) setPortLabel(moduleId, port.id, undefined)
-        }}
-      >
-        {port.name}
-        <IfaceLabel name={iface} />
-      </span>
+      {lift ? (
+        <Lifted moduleId={moduleId} point={point}>
+          {name}
+        </Lifted>
+      ) : (
+        name
+      )}
     </span>
   )
 }
