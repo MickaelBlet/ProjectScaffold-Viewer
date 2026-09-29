@@ -631,8 +631,8 @@ kbd {
 .entity-list li {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 4px 8px;
+  gap: 5px;
+  padding: 2px 6px;
   border-radius: 4px;
   cursor: pointer;
 }
@@ -696,7 +696,7 @@ kbd {
   background: #6b5a3b;
 }
 .entity-list li.nested {
-  padding-left: 32px;
+  padding-left: calc(11px + var(--icon-size));
 }
 .actions[hidden] {
   display: none;

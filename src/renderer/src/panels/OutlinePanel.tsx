@@ -35,18 +35,18 @@ function toggleHidden(id: Id, hidden: boolean): void {
 }
 
 /** Modules by parent (null: top level), in project order. */
-function childrenByParent(modules: Module[]): Map<Id | null, Module[]> {
+export function childrenByParent(modules: Module[]): Map<Id | null, Module[]> {
   const map = new Map<Id | null, Module[]>()
   for (const m of modules) map.set(m.parentId, [...(map.get(m.parentId) ?? []), m])
   return map
 }
 
-/** Modules whose name contains `filter`, with their ancestors. */
-function matching(children: Map<Id | null, Module[]>, filter: string): Set<Id> {
+/** Modules passing `test`, with their ancestors. */
+export function matching(children: Map<Id | null, Module[]>, test: (m: Module) => boolean): Set<Id> {
   const shown = new Set<Id>()
   const visit = (m: Module): boolean => {
     const inside = (children.get(m.id) ?? []).map(visit).some(Boolean)
-    const match = inside || m.name.toLowerCase().includes(filter)
+    const match = inside || test(m)
     if (match) shown.add(m.id)
     return match
   }
@@ -193,7 +193,10 @@ export function OutlinePanel(): ReactNode {
   const [over, setOver] = useState(false)
   const f = filter.trim().toLowerCase()
   const children = useMemo(() => childrenByParent(modules), [modules])
-  const shown = useMemo(() => (f ? matching(children, f) : null), [children, f])
+  const shown = useMemo(
+    () => (f ? matching(children, (m) => m.name.toLowerCase().includes(f)) : null),
+    [children, f]
+  )
   const hiddenIds = findView({ views }, viewId).hidden
   const hidden = useMemo(() => new Set(hiddenIds), [hiddenIds])
   const selected = useMemo(() => new Set(selectedIds), [selectedIds])

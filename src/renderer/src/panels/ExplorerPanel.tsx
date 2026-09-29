@@ -1,8 +1,16 @@
 // Views, dependencies, types, interfaces, modules and links of the active document. Click selects (Ctrl / Shift for several),
 // double-click opens an editor tab, right click for more. Arrows move between items, Enter selects.
-import { useId, useMemo, useState, type MouseEvent, type ReactNode } from 'react'
+import {
+  useId,
+  useMemo,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent,
+  type MouseEvent,
+  type ReactNode
+} from 'react'
 import { endpointLabel, findView, modulePaths } from '@/model/project'
-import { GLOBAL_VIEW, type Id, type View } from '@/model/types'
+import { GLOBAL_VIEW, type Id, type Module, type View } from '@/model/types'
 import { activeDoc, patchDoc, useDoc } from '@/store/documents'
 import {
   addInterface,
@@ -26,6 +34,7 @@ import {
   showDependency
 } from '@/actions'
 import { dependencyMenu } from './DependenciesPanel'
+import { childrenByParent, matching } from './OutlinePanel'
 import { openEditor, openView } from '@/shell/controllers'
 import { Icon } from '@/components/Icon'
 import { onListKeyDown, tabStop } from '@/components/listKeys'
@@ -83,7 +92,9 @@ function Item(props: {
   tabStop: boolean
   className?: string
   title?: string
+  style?: CSSProperties
   onClick: (e: MouseEvent) => void
+  onKeyDown?: (e: KeyboardEvent) => void
   onDoubleClick?: () => void
   onContextMenu: (e: MouseEvent) => void
   children: ReactNode
@@ -96,7 +107,9 @@ function Item(props: {
       tabIndex={props.tabStop ? 0 : -1}
       className={props.className}
       title={props.title}
+      style={props.style}
       onClick={props.onClick}
+      onKeyDown={props.onKeyDown}
       onDoubleClick={props.onDoubleClick}
       onContextMenu={props.onContextMenu}
     >
@@ -200,13 +213,8 @@ export function ExplorerPanel(): ReactNode {
 
   // Paths and link ends change with modules and links only, not with every edit.
   const paths = useMemo(() => modulePaths({ modules, dependencies }), [modules, dependencies])
-  const allModules = useMemo(
-    () =>
-      modules
-        .map((m) => ({ m, path: paths.get(m.id) ?? m.name }))
-        .sort((a, b) => a.path.localeCompare(b.path)),
-    [modules, paths]
-  )
+  const moduleChildren = useMemo(() => childrenByParent(modules), [modules])
+  const moduleMatches = f ? matching(moduleChildren, (m) => match(paths.get(m.id) ?? m.name)) : null
   const allLinks = useMemo(
     () =>
       links
@@ -233,12 +241,23 @@ export function ExplorerPanel(): ReactNode {
   const dependencyIds = shownDependencies.flatMap(({ dep, entities, placed }) =>
     collapsed.has(dep.id) ? [dep.id] : [dep.id, ...entities.map((e) => e.id), ...placed.map((m) => m.id)]
   )
-  const toggleDependency = (id: Id): void => {
+  const toggle = (id: Id): void => {
     const next = new Set(collapsed)
     if (!next.delete(id)) next.add(id)
     setCollapsed(next)
   }
-  const shownModules = allModules.filter((x) => match(x.path))
+  // Modules as in the outline: nested under their parent, in project order (all open while filtering).
+  const shownModules: { m: Module; depth: number; parent: boolean; open: boolean }[] = []
+  const walk = (list: Module[], depth: number): void => {
+    for (const m of list) {
+      if (moduleMatches && !moduleMatches.has(m.id)) continue
+      const children = moduleChildren.get(m.id) ?? []
+      const open = !!moduleMatches || !collapsed.has(m.id)
+      shownModules.push({ m, depth, parent: children.length > 0, open })
+      if (open) walk(children, depth + 1)
+    }
+  }
+  walk(moduleChildren.get(null) ?? [], 0)
   const shownLinks = allLinks.filter((x) => match(x.l.name) || match(x.from) || match(x.to))
   const typeIds = shownTypes.map((t) => t.id)
   const interfaceIds = shownInterfaces.map((i) => i.id)
@@ -319,7 +338,7 @@ export function ExplorerPanel(): ReactNode {
               tabStop={dep.id === dependencyStop}
               className="dependency"
               title={`${dep.file}${dep.indirect ? ' (used by another dependency)' : ''}${dep.uses.length ? `\nUses ${dep.uses.join(', ')}` : ''}`}
-              onClick={() => toggleDependency(dep.id)}
+              onClick={() => toggle(dep.id)}
               onDoubleClick={() => showDependency(dep.id)}
               onContextMenu={(e) => dependencyMenu(e, dep)}
             >
@@ -463,22 +482,39 @@ export function ExplorerPanel(): ReactNode {
         }
       >
         <EntityList label="Modules" multiselectable>
-          {shownModules.map(({ m, path }) => (
+          {shownModules.map(({ m, depth, parent, open }) => (
             <Item
               key={m.id}
               selected={isSelected(m.id)}
               tabStop={m.id === moduleStop}
               className={isSelected(m.id) ? 'active' : ''}
-              title={path}
+              title={paths.get(m.id)}
+              style={{ paddingLeft: 6 + depth * 14 }}
               onClick={(e) => clickItem(e, m.id, moduleIds)}
+              onKeyDown={(e) => {
+                // Right expands, Left collapses, as in the outline.
+                if (!parent || moduleMatches || e.key !== (open ? 'ArrowLeft' : 'ArrowRight')) return
+                e.preventDefault()
+                toggle(m.id)
+              }}
               onDoubleClick={() => openEditor('module', m.id)}
               onContextMenu={(e) => entityMenu(e, 'module', m.id)}
             >
+              <span
+                className="chevron"
+                aria-hidden
+                onClick={(e) => {
+                  e.stopPropagation()
+                  if (parent) toggle(m.id)
+                }}
+              >
+                {parent && <Icon name={open ? 'chevron-down' : 'chevron-right'} />}
+              </span>
               <span className="kind-badge mod" style={m.color ? { background: m.color } : undefined}>
                 M
               </span>
               {m.name}
-              <small>{path.slice(0, -m.name.length - 1)}</small>
+              <small>{m.ports.length ? `${m.ports.length}p` : ''}</small>
             </Item>
           ))}
           {!shownModules.length && <Empty>{f ? 'No match' : 'No modules yet'}</Empty>}
