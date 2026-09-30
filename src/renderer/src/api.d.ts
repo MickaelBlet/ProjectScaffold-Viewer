@@ -69,6 +69,12 @@ export interface Api {
   saveSession(session: Session): void
   /** The open documents of the previous page load. */
   loadSession(): Promise<Session | null>
+  /**
+   * Reads the project files a workspace file lists, relative to its folder (asking for the folder
+   * when needed): each file, or null when it cannot be read. Null when cancelled. Absent when the
+   * host opens documents one by one (VS Code).
+   */
+  readWorkspace?(path: string, files: string[]): Promise<(OpenResult | null)[] | null>
   /** Saves an exported diagram image (data: URL); resolves to its name, or null when cancelled. */
   saveImage(name: string, dataUrl: string): Promise<string | null>
   /**
@@ -105,8 +111,10 @@ export interface Api {
   viewChanged?(view: string | null): void
   /** Diagram: actions asked by the side panels. */
   onAction?(cb: (action: DiagramAction) => void): () => void
-  /** Diagram: shows a panel of the VS Code side bar. */
-  showPanel?(panel: SidePanel): void
+  /** Shows a panel of the VS Code side bar; the Dependencies panel with a dependency (by name). */
+  showPanel?(panel: SidePanel, dependency?: string): void
+  /** Dependencies side panel: the dependency another page shows (by name). */
+  onDependency?(cb: (name: string) => void): () => void
 }
 
 /** Window edge or corner a resize starts from. */

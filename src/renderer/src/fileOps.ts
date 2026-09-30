@@ -11,7 +11,15 @@ import {
 } from '@/model/serialize'
 import { hasErrors, validate } from '@/model/validate'
 import { arrange, arrangeOptions } from '@/model/autoLayout'
+import { baseName } from '@/model/sync'
 import type { Project } from '@/model/types'
+import {
+  isWorkspaceData,
+  WORKSPACE_SUFFIX,
+  workspaceFromFile,
+  workspaceText,
+  type Workspace
+} from '@/model/workspace'
 import {
   activeDoc,
   addDoc,
@@ -59,34 +67,118 @@ export function newProject(): void {
   addDoc(createDoc())
 }
 
-/** Opens the given file, or the files picked in an open dialog. */
+const problemsOf = (e: unknown): string[] => (e instanceof LoadError ? e.problems : [String(e)])
+
+const openDoc = (path: string): DocState | undefined =>
+  useDocs.getState().docs.find((d) => d.filePath === path)
+
+/** Opens the given file, or the files picked in an open dialog; a workspace file opens its projects. */
 export async function openProject(file?: OpenResult | null): Promise<void> {
   if (file === undefined) {
     for (const f of await window.api.openFiles()) await openProject(f)
     return
   }
   if (!file) return
-  const already = useDocs.getState().docs.find((d) => d.filePath === file.path)
-  if (already && isDocDirty(already)) {
-    activateDoc(already.id)
-    setStatus('info', `${file.path} is already open with unsaved changes`)
-    return
-  }
   try {
     const data = parseText(file.content, formatFromPath(file.path))
-    const project = fromFile(data)
-    let doc: DocState
-    if (already) {
-      doc = { ...createDoc(project, file.path), layout: already.layout }
-      replaceDoc(already.id, doc)
-    } else doc = showLoaded(project, file.path)
+    if (isWorkspaceData(data)) return await openWorkspace(file.path, workspaceFromFile(data))
+    const already = openDoc(file.path)
+    if (already && isDocDirty(already)) {
+      activateDoc(already.id)
+      setStatus('info', `${file.path} is already open with unsaved changes`)
+      return
+    }
+    showProject(file.path, data)
     setStatus('info', `Opened ${file.path}`)
-    const hasLayout = !!(data as { editor?: unknown }).editor
-    if (!hasLayout && project.modules.length && useSettings.getState().autoLayoutOnOpen)
-      void arrangeLoaded(doc.id)
   } catch (e) {
-    showDialog(`Cannot open ${file.path}`, e instanceof LoadError ? e.problems : [String(e)])
+    showDialog(`Cannot open ${file.path}`, problemsOf(e))
   }
+}
+
+/** Shows a project file's data: in its tab when open, else as a loaded project. */
+function showProject(path: string, data: unknown): DocState {
+  const project = fromFile(data)
+  const already = openDoc(path)
+  let doc: DocState
+  if (already) {
+    doc = { ...createDoc(project, path), layout: already.layout }
+    replaceDoc(already.id, doc)
+  } else doc = showLoaded(project, path)
+  const hasLayout = !!(data as { editor?: unknown }).editor
+  if (!hasLayout && project.modules.length && useSettings.getState().autoLayoutOnOpen)
+    void arrangeLoaded(doc.id)
+  return doc
+}
+
+/** Workspace last opened or saved: Save workspace rewrites it. */
+let workspace: { path: string; ws: Workspace } | null = null
+
+/** Opens the projects of a workspace file, each in its tab; the first one is shown. */
+async function openWorkspace(path: string, ws: Workspace): Promise<void> {
+  if (!window.api.readWorkspace)
+    throw new Error('Workspaces cannot be opened here: open its projects one by one')
+  const files = await window.api.readWorkspace(path, ws.projects)
+  if (!files) return
+  const problems: string[] = []
+  let first: DocState | undefined
+  for (const [i, file] of files.entries()) {
+    const name = ws.projects[i]!
+    if (!file) {
+      problems.push(`${name}: cannot be read`)
+      continue
+    }
+    const already = openDoc(file.path)
+    if (already && isDocDirty(already)) {
+      problems.push(`${name}: already open with unsaved changes, kept`)
+      first ??= already
+      continue
+    }
+    try {
+      const doc = showProject(file.path, parseText(file.content, formatFromPath(file.path)))
+      first ??= doc
+    } catch (e) {
+      problems.push(...problemsOf(e).map((p) => `${name}: ${p}`))
+    }
+  }
+  workspace = { path, ws }
+  if (first) activateDoc(first.id)
+  const opened = `Opened workspace ${ws.name}: ${files.filter(Boolean).length} of ${ws.projects.length} projects`
+  if (problems.length) showDialog(opened, problems)
+  else setStatus('info', opened)
+}
+
+/**
+ * Saves the open project files as a workspace: into the workspace last opened or saved, or (`saveAs`,
+ * or none yet) into a file picked in a save dialog. Unsaved projects are left out.
+ */
+export async function saveWorkspace(saveAs = false): Promise<void> {
+  const { docs } = useDocs.getState()
+  const saved = docs.flatMap((d) => (d.filePath ? [d.filePath] : []))
+  if (!saved.length)
+    return showDialog('No project file to list in a workspace', [
+      'A workspace lists project files: save the open projects first.'
+    ])
+  const known = new Set(workspace?.ws.projects)
+  // Paths are file names, or paths in the workspace folder for projects read from it.
+  const projects = saved.map((path) => (known.has(path) ? path : baseName(path)))
+  const ws: Workspace = {
+    ...(workspace?.ws ?? { name: docs[0]!.store.getState().project.name || 'Workspace' }),
+    projects
+  }
+  const path = await window.api.saveFile({
+    path: saveAs ? null : (workspace?.path ?? null),
+    content: workspaceText(ws),
+    defaultName: `${ws.name.replace(/[^\w.-]+/g, '_') || 'workspace'}${WORKSPACE_SUFFIX}`,
+    format: 'yaml',
+    title: 'Save workspace'
+  })
+  if (!path) return
+  workspace = { path, ws }
+  const skipped = docs.length - saved.length
+  setStatus(
+    'info',
+    `Saved workspace ${path}: ${projects.length} projects${skipped ? `, ${skipped} unsaved left out` : ''}`
+  )
 }
 
 /** Arrange a freshly loaded document without layout; the result counts as its saved state. */

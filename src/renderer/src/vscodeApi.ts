@@ -35,6 +35,7 @@ const revealListeners = new Set<(path: (string | number)[], names: (string | und
 const documentListeners = new Set<(file: OpenResult) => void>()
 const viewListeners = new Set<(view: string | null) => void>()
 const actionListeners = new Set<(action: DiagramAction) => void>()
+const dependencyListeners = new Set<(name: string) => void>()
 /** Latest text received while the document was still loading. */
 let unheard: string | null = null
 
@@ -69,6 +70,9 @@ function onMessage(e: MessageEvent<ToPage>): void {
       break
     case 'action':
       actionListeners.forEach((cb) => cb(msg.action))
+      break
+    case 'dependency':
+      dependencyListeners.forEach((cb) => cb(msg.name))
       break
     case 'reply':
       pending.get(msg.id)?.(msg.result)
@@ -199,7 +203,8 @@ const vscodeApi: Api = {
   onView: (cb) => listen(viewListeners, cb),
   viewChanged: (view) => post({ type: 'view', view }),
   onAction: (cb) => listen(actionListeners, cb),
-  showPanel: (panel) => post({ type: 'showPanel', panel }),
+  showPanel: (panel, dependency) => post({ type: 'showPanel', panel, dependency }),
+  onDependency: (cb) => listen(dependencyListeners, cb),
   // Side panels have no Generate command.
   outputDir: IN_PANEL ? undefined : outputDir
 }

@@ -90,7 +90,7 @@ const LAYOUT_KEY = IN_PREVIEW
     : 'project-scaffold:layout'
 
 /** Tools of the VS Code side bar (see vscode/package.json). */
-const SIDE_TOOLS = new Set<ToolId>(['explorer', 'modules', 'links', 'settings'])
+const SIDE_TOOLS = new Set<ToolId>(['explorer', 'modules', 'links', 'dependencies', 'settings'])
 const inSideBar = (id: ToolId): id is SidePanel => IN_VSCODE && SIDE_TOOLS.has(id)
 
 /**

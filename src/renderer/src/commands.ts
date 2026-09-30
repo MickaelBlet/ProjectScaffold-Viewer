@@ -33,7 +33,15 @@ import {
   toggleLockSelection,
   travelSelection
 } from './actions'
-import { closeDocument, exportProject, newProject, openProject, saveAll, saveProject } from './fileOps'
+import {
+  closeDocument,
+  exportProject,
+  newProject,
+  openProject,
+  saveAll,
+  saveProject,
+  saveWorkspace
+} from './fileOps'
 import { generateCode } from './generateCode'
 import { activeDoc, cycleDoc, patchDoc, useDocs, activateDoc } from './store/documents'
 import { getProject, redo, undo } from './store/project'
@@ -148,6 +156,18 @@ const allCommands: Command[] = [
     keys: ['Ctrl+Alt+S'],
     global: true,
     run: () => void saveAll()
+  },
+  {
+    id: 'file.saveWorkspace',
+    title: 'Save workspace',
+    category: 'File',
+    run: () => void saveWorkspace()
+  },
+  {
+    id: 'file.saveWorkspaceAs',
+    title: 'Save workspace as…',
+    category: 'File',
+    run: () => void saveWorkspace(true)
   },
   {
     id: 'file.close',
@@ -741,6 +761,8 @@ const DOCUMENT_COMMANDS = new Set([
   'file.open',
   'file.saveAs',
   'file.saveAll',
+  'file.saveWorkspace',
+  'file.saveWorkspaceAs',
   'file.close',
   'window.nextDoc',
   'window.prevDoc',

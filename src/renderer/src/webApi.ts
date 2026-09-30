@@ -33,7 +33,11 @@ interface DirHandle {
 interface FsAccessWindow {
   showOpenFilePicker?(opts: { types: PickerType[]; multiple?: boolean }): Promise<FileHandle[]>
   showSaveFilePicker?(opts: { suggestedName: string; types: PickerType[] }): Promise<FileHandle>
-  showDirectoryPicker?(opts: { id?: string; mode: 'readwrite'; startIn?: DirHandle }): Promise<DirHandle>
+  showDirectoryPicker?(opts: {
+    id?: string
+    mode: 'readwrite'
+    startIn?: DirHandle | FileHandle
+  }): Promise<DirHandle>
 }
 
 const TYPES: Record<SaveRequest['format'], PickerType> = {
@@ -42,9 +46,12 @@ const TYPES: Record<SaveRequest['format'], PickerType> = {
 }
 
 const fs = window as unknown as FsAccessWindow
-/** Handles of files opened or saved in this session, by name, so Save can rewrite them. */
+/**
+ * Handles of files opened or saved in this session, by path (name, or path in a workspace folder),
+ * so Save can rewrite them.
+ */
 const handles = new Map<string, FileHandle>()
-/** Modification time of each file as last read or written here, by name. */
+/** Modification time of each file as last read or written here, by path. */
 const stamps = new Map<string, number>()
 
 function isAbort(e: unknown): boolean {
@@ -77,17 +84,17 @@ function download(name: string, content: string, format: SaveRequest['format']):
   setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
-async function write(handle: FileHandle, content: string): Promise<void> {
+async function write(handle: FileHandle, content: string, path = handle.name): Promise<void> {
   const w = await handle.createWritable()
   await w.write(content)
   await w.close()
-  stamps.set(handle.name, (await handle.getFile()).lastModified)
+  stamps.set(path, (await handle.getFile()).lastModified)
 }
 
 /** Reads a file through its handle, noting when it was last modified. */
-async function read(handle: FileHandle): Promise<string> {
+async function read(handle: FileHandle, path = handle.name): Promise<string> {
   const file = await handle.getFile()
-  stamps.set(handle.name, file.lastModified)
+  stamps.set(path, file.lastModified)
   return file.text()
 }
 
@@ -143,15 +150,18 @@ async function openFile(): Promise<OpenResult | null> {
 
 async function saveFile(req: SaveRequest): Promise<string | null> {
   const path = await writeFile(req)
-  if (path && !req.export) await remember({ name: path, content: req.content, handle: handles.get(path) })
+  if (path && !req.export) {
+    await remember({ name: path, content: req.content, handle: handles.get(path) })
+    await updateWorkspaceFile(path, req.content)
+  }
   return path
 }
 
 async function writeFile(req: SaveRequest): Promise<string | null> {
   const known = req.path ? handles.get(req.path) : undefined
-  if (known) {
-    await write(known, req.content)
-    return known.name
+  if (req.path && known) {
+    await write(known, req.content, req.path)
+    return req.path
   }
   if (fs.showSaveFilePicker) {
     try {
@@ -257,7 +267,7 @@ async function readRecent(entry: RecentEntry, ask: boolean, touch = true): Promi
     try {
       const opts = { mode: 'readwrite' } as const
       const perm = ask ? await handle.requestPermission?.(opts) : await handle.queryPermission?.(opts)
-      if (perm === 'granted') content = await read(handle)
+      if (perm === 'granted') content = await read(handle, entry.name)
     } catch {
       // File moved or deleted: keep the stored content.
     }
@@ -301,12 +311,138 @@ async function loadSession(): Promise<Session | null> {
   const session = readSession()
   if (!session) return null
   // Save rewrites the documents' files when they are recent ones with a handle.
-  const recent = await loadRecent()
+  const known = [...(await loadRecent()), ...((await loadWorkspace())?.files ?? [])]
   for (const doc of session.docs) {
-    const handle = recent.find((e) => e.name === doc.path)?.handle
-    if (handle) handles.set(handle.name, handle)
+    const handle = known.find((e) => e.name === doc.path)?.handle
+    if (handle && doc.path) handles.set(doc.path, handle)
   }
   return session
+}
+
+// Last workspace read: its folder, and its files as last read or saved, so that its documents are
+// read again after a page reload (not all of them are recent documents).
+const WORKSPACE_KEY = 'workspace'
+
+interface WorkspaceRecord {
+  /** Path of the workspace file. */
+  name: string
+  dir?: DirHandle
+  files: RecentEntry[]
+}
+
+async function loadWorkspace(): Promise<WorkspaceRecord | undefined> {
+  try {
+    return await withStore<WorkspaceRecord | undefined>(
+      'readonly',
+      (s) => s.get(WORKSPACE_KEY) as IDBRequest<WorkspaceRecord | undefined>
+    )
+  } catch {
+    return undefined
+  }
+}
+
+async function storeWorkspace(record: WorkspaceRecord): Promise<void> {
+  try {
+    await withStore('readwrite', (s) => s.put(record, WORKSPACE_KEY))
+  } catch {
+    try {
+      // Handles cannot be stored (file:// origin): keep the contents.
+      const files = record.files.map(({ name, content }) => ({ name, content }))
+      await withStore('readwrite', (s) => s.put({ name: record.name, files }, WORKSPACE_KEY))
+    } catch {
+      // Blocked storage: the workspace documents are not restored after a reload.
+    }
+  }
+}
+
+/** Keeps the stored content of a saved workspace file up to date. */
+async function updateWorkspaceFile(name: string, content: string): Promise<void> {
+  const record = await loadWorkspace()
+  const file = record?.files.find((f) => f.name === name)
+  if (!record || !file) return
+  file.content = content
+  await storeWorkspace(record)
+}
+
+/** Whether read-write access to a folder is granted; asks for it with `ask` (needs a user gesture). */
+async function granted(dir: DirHandle, ask: boolean): Promise<boolean> {
+  try {
+    const opts = { mode: 'readwrite' } as const
+    if ((await dir.queryPermission?.(opts)) === 'granted') return true
+    return ask && (await dir.requestPermission?.(opts)) === 'granted'
+  } catch {
+    return false
+  }
+}
+
+/** Handle of the file at a `/`-separated path in a folder; null when absent or out of it. */
+async function fileAt(dir: DirHandle, path: string): Promise<FileHandle | null> {
+  const parts = path.split('/')
+  const name = parts.pop()!
+  if (parts.some((p) => p === '..' || p === '') || /^[A-Za-z]:/.test(path)) return null
+  try {
+    for (const p of parts) if (p !== '.') dir = await dir.getDirectoryHandle(p)
+    return await dir.getFileHandle(name)
+  } catch (e) {
+    if (notFound(e)) return null
+    throw e
+  }
+}
+
+/** Folder picked with a file input (no File System Access API): its files by path inside it. */
+function pickFolderWithInput(): Promise<Map<string, File> | null> {
+  return new Promise((done) => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.webkitdirectory = true
+    input.onchange = () =>
+      done(
+        new Map([...(input.files ?? [])].map((f) => [f.webkitRelativePath.split('/').slice(1).join('/'), f]))
+      )
+    input.oncancel = () => done(null)
+    input.click()
+  })
+}
+
+async function readWorkspace(path: string, files: string[]): Promise<(OpenResult | null)[] | null> {
+  const record = await loadWorkspace()
+  const entries: RecentEntry[] = []
+  const results: (OpenResult | null)[] = []
+  let dir = record?.name === path && record.dir && (await granted(record.dir, true)) ? record.dir : undefined
+  if (!dir && fs.showDirectoryPicker) {
+    try {
+      dir = await fs.showDirectoryPicker({ id: 'workspace', mode: 'readwrite', startIn: handles.get(path) })
+    } catch (e) {
+      if (isAbort(e)) return null
+      throw e
+    }
+    if (!(await fileAt(dir, path.split(/[\\/]/).pop()!)))
+      throw new Error(`${path} is not in the folder ${dir.name}: pick the folder holding it`)
+  }
+  if (dir) {
+    for (const file of files) {
+      const handle = await fileAt(dir, file)
+      if (!handle) {
+        results.push(null)
+        continue
+      }
+      const content = await read(handle, file)
+      handles.set(file, handle)
+      entries.push({ name: file, content, handle })
+      results.push({ path: file, content })
+    }
+  } else {
+    const picked = await pickFolderWithInput()
+    if (!picked) return null
+    for (const file of files) {
+      const found = picked.get(file.replace(/^(\.\/)+/, ''))
+      const content = found ? await found.text() : null
+      if (content !== null) entries.push({ name: file, content })
+      results.push(content === null ? null : { path: file, content })
+    }
+  }
+  await storeWorkspace({ name: path, dir, files: entries })
+  return results
 }
 
 // Output directories of generated code, by document; kept in IndexedDB when handles can be stored.
@@ -407,7 +543,9 @@ const webApi: Api = {
     return entry ? readRecent(entry, true) : null
   },
   reopen: async (path) => {
-    const entry = (await loadRecent()).find((e) => e.name === path)
+    const entry =
+      (await loadRecent()).find((e) => e.name === path) ??
+      (await loadWorkspace())?.files.find((e) => e.name === path)
     return entry ? readRecent(entry, false, false) : null
   },
   clearRecent: () => storeRecent([]),
@@ -420,6 +558,7 @@ const webApi: Api = {
   },
   saveSession,
   loadSession,
+  readWorkspace,
   saveImage: (name, dataUrl) => {
     downloadUrl(name, dataUrl)
     return Promise.resolve(name)

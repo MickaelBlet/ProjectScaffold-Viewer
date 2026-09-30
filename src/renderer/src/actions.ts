@@ -61,7 +61,7 @@ import { fileName } from '@/fileOps'
 import { relativeFile, sameFile } from '@/model/sync'
 import { formatFromPath, LoadError, loadText, toFile } from '@/model/serialize'
 import { activeCanvas, openEditor, openView, showTool } from '@/shell/controllers'
-import { IN_PANEL } from '@/host'
+import { IN_PANEL, IN_VSCODE } from '@/host'
 import type { DiagramAction } from '../../../vscode/src/protocol'
 
 // Selection
@@ -660,7 +660,16 @@ export function detachDependencyAction(id: Id): void {
 /** Show a dependency's content in the Dependencies panel. */
 export function showDependency(id: Id): void {
   useUiStore.setState({ dependency: id })
+  // VS Code: the Dependencies panel is a page of the side bar, told which one by name.
+  const dep = getProject().dependencies.find((x) => x.id === id)
+  if (IN_VSCODE && dep) return window.api.showPanel?.('dependencies', dep.name)
   showTool('dependencies')
+}
+
+/** VS Code Dependencies side panel: the dependency another page shows, by name. */
+export function showDependencyNamed(name: string): void {
+  const dep = getProject().dependencies.find((x) => x.name === name)
+  if (dep) useUiStore.setState({ dependency: dep.id })
 }
 
 /** Show the project of a dependency in its tab when it is open (VS Code: in its editor). */
