@@ -22,6 +22,7 @@ import {
   useProjectStore
 } from '@/store/project'
 import { select } from '@/store/ui'
+import { assignBinary } from '@/model/binaries'
 import { navigate } from '@/actions'
 import {
   ColorPicker,
@@ -62,6 +63,10 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
       .sort((a, b) => a.label.localeCompare(b.label))
   ]
   const unimplemented = unimplementedMethods(project, id)
+  const binaryOptions = [
+    { value: '', label: '— none —' },
+    ...project.binaries.map((b) => ({ value: b.id, label: b.name }))
+  ]
   const interfaceOptions = [
     { value: '', label: '— none —' },
     ...project.interfaces.map((i) => ({ value: i.id, label: i.name }))
@@ -116,6 +121,15 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
           }
         />
       </Row>
+      {!mod.parentId && (project.binaries.length > 0 || mod.binaryId) && (
+        <Row label="Binary">
+          <Select
+            value={mod.binaryId ?? ''}
+            options={binaryOptions}
+            onChange={(b) => update((d) => assignBinary(d, [id], b || null))}
+          />
+        </Row>
+      )}
       <TextArea value={mod.description} onChange={(v) => withModule(id, (m) => void (m.description = v))} />
 
       <Section title={`Bases (${bases.length})`}>

@@ -3,6 +3,7 @@ import { align, distribute, sameSize, type AlignMode } from '@/model/align'
 import { arrange as arrangeProject, arrangeOptions } from '@/model/autoLayout'
 import { copyItems, copyProject, parseClip, pasteClip, type Clip } from '@/model/clipboard'
 import { addDependencyOf, type DependencyResult } from '@/model/dependencies'
+import { binarySnapshot, settleBinaries } from '@/model/binaries'
 import {
   absolutePosition,
   absoluteRect,
@@ -779,6 +780,7 @@ export function groupSelection(): void {
   const groupId = newId()
   const top = contentTop(p.orientation) + LAYOUT_PAD / 2
   update((d) => {
+    const before = binarySnapshot(d)
     d.modules.push({
       id: groupId,
       name: uniqueName(
@@ -812,6 +814,7 @@ export function groupSelection(): void {
     const moved = new Set(mods.flatMap((m) => [...subtreeIds(d, m.id)]))
     d.modules = [...d.modules.filter((o) => !moved.has(o.id)), ...d.modules.filter((o) => moved.has(o.id))]
     growAncestors(d, groupId)
+    settleBinaries(d, before)
   })
   select({ kind: 'module', id: groupId })
 }

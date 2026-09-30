@@ -32,6 +32,7 @@ import {
   type DependencyResult
 } from '@/model/dependencies'
 import { snapChanges } from '@/model/grid'
+import { binarySnapshot, settleBinaries } from '@/model/binaries'
 import type {
   Endpoint,
   Id,
@@ -205,6 +206,7 @@ export function reparentModule(id: Id, parentId: Id | null, x: number, y: number
     const taken = childModules(d, parentId)
       .filter((s) => s.id !== id)
       .map((s) => s.name)
+    const before = binarySnapshot(d)
     m.name = uniqueName(m.name, taken)
     m.parentId = parentId
     m.layout.x = x
@@ -213,6 +215,7 @@ export function reparentModule(id: Id, parentId: Id | null, x: number, y: number
     // Parents must precede children for the canvas.
     const moved = subtreeIds(d, id)
     d.modules = [...d.modules.filter((o) => !moved.has(o.id)), ...d.modules.filter((o) => moved.has(o.id))]
+    settleBinaries(d, before)
   })
 }
 

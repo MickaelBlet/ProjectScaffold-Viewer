@@ -695,6 +695,9 @@ kbd {
 .kind-badge.dependency {
   background: #6b5a3b;
 }
+.kind-badge.binary {
+  background: #3b6b5a;
+}
 .entity-list li.nested {
   padding-left: calc(11px + var(--icon-size));
 }
@@ -2582,6 +2585,18 @@ mark {
 .imported-project {
   color: var(--muted);
   font-weight: 500;
+}
+.module-binary {
+  margin-left: 6px;
+  padding: 0 4px;
+  border-radius: 3px;
+  font-style: normal;
+  font-weight: 500;
+  color: var(--binary-color, var(--muted));
+  background: color-mix(in srgb, var(--binary-color, var(--muted)) 14%, transparent);
+}
+.binary-item {
+  margin-bottom: 8px;
 }
 .module.imported .unknown small {
   color: var(--danger);

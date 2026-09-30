@@ -30,6 +30,7 @@ import {
   visibleModuleIds
 } from '@/model/project'
 import { NOTE_MIN, snapRect, snapValue } from '@/model/grid'
+import { assignBinary } from '@/model/binaries'
 import { GLOBAL_VIEW, type Id, type Project, type View } from '@/model/types'
 import {
   connect,
@@ -45,7 +46,7 @@ import {
 } from '@/store/project'
 import { activeDoc, patchDoc, useDoc } from '@/store/documents'
 import { useSettings } from '@/store/settings'
-import { openContextMenu, select, setStatus, useUiStore } from '@/store/ui'
+import { openContextMenu, select, setStatus, useUiStore, type MenuItem } from '@/store/ui'
 import {
   addModuleAt,
   addNoteAt,
@@ -611,6 +612,26 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
     }
     const multiple = activeDoc().selectedIds.length > 1
     const at = screenToFlowPosition({ x: e.clientX, y: e.clientY })
+    const project = getProject()
+    const topLevel = activeDoc().selectedIds.filter((id) =>
+      project.modules.some((m) => m.id === id && !m.parentId)
+    )
+    const current = new Set(topLevel.map((id) => project.modules.find((m) => m.id === id)!.binaryId ?? ''))
+    const binaryMenu: MenuItem[] =
+      project.binaries.length && topLevel.length
+        ? [
+            {
+              label: 'Binary',
+              submenu: [
+                ...[...project.binaries, { id: '', name: 'None' }].map((b) => ({
+                  label: b.name,
+                  checked: current.size === 1 && current.has(b.id),
+                  run: () => update((d) => assignBinary(d, topLevel, b.id || null))
+                }))
+              ]
+            }
+          ]
+        : []
     if (node.type === 'note') {
       return openContextMenu(e, [
         item('edit.cut'),
@@ -636,6 +657,7 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
             item('arrange.distV')
           ]
         : [item('edit.rename'), item('insert.inPort'), item('insert.outPort'), item('insert.submodule')]),
+      ...binaryMenu,
       'separator',
       item('view.openModule'),
       item('view.openModuleSplit'),

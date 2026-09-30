@@ -1,8 +1,17 @@
 import type { ReactNode } from 'react'
-import { transportError, uniqueName } from '@/model/project'
+import { binaryError, newId, transportError, uniqueName } from '@/model/project'
+import { removeBinary } from '@/model/binaries'
 import { TRANSPORTS } from '@/model/types'
 import { update, useProjectStore } from '@/store/project'
-import { CommitInput, IconButton, MetadataEditor, Row, Section, TextArea } from '@/components/fields'
+import {
+  ColorPicker,
+  CommitInput,
+  IconButton,
+  MetadataEditor,
+  Row,
+  Section,
+  TextArea
+} from '@/components/fields'
 import { Icon } from '@/components/Icon'
 
 /** Rename a custom transport, and the links using it. */
@@ -63,6 +72,62 @@ export function ProjectInspector(): ReactNode {
           </tbody>
         </table>
         <p className="muted">Offered for remote links besides the built-in ones: {TRANSPORTS.join(', ')}.</p>
+      </Section>
+      <Section
+        title={`Binaries (${p.binaries.length})`}
+        actions={
+          <button
+            type="button"
+            onClick={() =>
+              update(
+                (d) =>
+                  void d.binaries.push({
+                    id: newId(),
+                    name: uniqueName(
+                      'Binary',
+                      d.binaries.map((b) => b.name)
+                    ),
+                    description: ''
+                  })
+              )
+            }
+          >
+            <Icon name="plus" /> add
+          </button>
+        }
+      >
+        {p.binaries.map((b) => (
+          <div key={b.id} className="binary-item">
+            <span className="row-inline">
+              <CommitInput
+                value={b.name}
+                validate={(n) => binaryError(p, n, b.id)}
+                onCommit={(n) => update((d) => void (d.binaries.find((x) => x.id === b.id)!.name = n))}
+              />
+              <span className="muted">{p.modules.filter((m) => m.binaryId === b.id).length} modules</span>
+              <IconButton
+                icon="x"
+                title="Remove binary"
+                danger
+                onClick={() => update((d) => removeBinary(d, b.id))}
+              />
+            </span>
+            <ColorPicker
+              value={b.color}
+              onChange={(c) =>
+                update((d) => {
+                  const x = d.binaries.find((x) => x.id === b.id)!
+                  if (c) x.color = c
+                  else delete x.color
+                })
+              }
+            />
+          </div>
+        ))}
+        <p className="muted">
+          Executables the top-level modules are split into: each module names its own, and links between two
+          binaries must be remote, with a transport.
+        </p>
       </Section>
       <Section title="Summary">
         <p className="muted">

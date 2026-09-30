@@ -13,6 +13,7 @@ const PATHS = {
   'arrow-up': 'M8 13V3M4 7l4-4 4 4',
   'arrow-down': 'M8 3v10M4 9l4 4 4-4',
   'arrow-up-right': 'M5 11l6-6M6 5h5v5',
+  binary: 'M2.5 3.5h11v9h-11zM2.5 6h11M5 8.5l1.5 1.5L5 11.5M8 11.5h3',
   'level-up': 'M13 13H8a3 3 0 0 1-3-3V3M2 6l3-3 3 3',
   'open-tab': 'M12 9v3.5H3.5V4H7M9 3h4v4M13 3 8 8',
   expand: 'M9 3h4v4M13 3 9 7M7 13H3V9M3 13l4-4',

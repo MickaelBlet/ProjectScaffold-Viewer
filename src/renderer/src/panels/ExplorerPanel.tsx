@@ -9,7 +9,8 @@ import {
   type MouseEvent,
   type ReactNode
 } from 'react'
-import { endpointLabel, findView, modulePaths } from '@/model/project'
+import { endpointLabel, findView, modulePaths, newId, uniqueName } from '@/model/project'
+import { removeBinary } from '@/model/binaries'
 import { GLOBAL_VIEW, type Id, type Module, type View } from '@/model/types'
 import { activeDoc, patchDoc, useDoc } from '@/store/documents'
 import {
@@ -20,6 +21,7 @@ import {
   deleteView,
   getProject,
   renameView,
+  update,
   useProjectStore
 } from '@/store/project'
 import { openContextMenu, select } from '@/store/ui'
@@ -126,6 +128,18 @@ function Empty({ children }: { children: ReactNode }): ReactNode {
   )
 }
 
+/** New binary, edited in the project inspector. */
+function addBinary(): void {
+  update((d) => {
+    const name = uniqueName(
+      'Binary',
+      d.binaries.map((b) => b.name)
+    )
+    d.binaries.push({ id: newId(), name, description: '' })
+  })
+  select({ kind: 'project' })
+}
+
 /** Click with Ctrl toggles, with Shift extends the selection over the list. */
 function clickItem(e: MouseEvent, id: Id, list: Id[]): void {
   const doc = activeDoc()
@@ -203,6 +217,7 @@ export function ExplorerPanel(): ReactNode {
   const modules = useProjectStore((s) => s.project.modules)
   const links = useProjectStore((s) => s.project.links)
   const dependencies = useProjectStore((s) => s.project.dependencies)
+  const binaries = useProjectStore((s) => s.project.binaries)
   const [collapsed, setCollapsed] = useState<Set<Id>>(new Set())
   const selectedIds = useDoc((d) => d.selectedIds)
   const activeViewId = useDoc((d) => d.activeViewId)
@@ -258,6 +273,8 @@ export function ExplorerPanel(): ReactNode {
     }
   }
   walk(moduleChildren.get(null) ?? [], 0)
+  const shownBinaries = binaries.filter((b) => match(b.name))
+  const binaryIds = shownBinaries.map((b) => b.id)
   const shownLinks = allLinks.filter((x) => match(x.l.name) || match(x.from) || match(x.to))
   const typeIds = shownTypes.map((t) => t.id)
   const interfaceIds = shownInterfaces.map((i) => i.id)
@@ -271,6 +288,7 @@ export function ExplorerPanel(): ReactNode {
   const interfaceStop = tabStop(interfaceIds, isSelected)
   const dependencyStop = tabStop(dependencyIds, isSelected)
   const moduleStop = tabStop(moduleIds, isSelected)
+  const binaryStop = tabStop(binaryIds, () => false)
   const linkStop = tabStop(linkIds, isSelected)
 
   return (
@@ -398,6 +416,58 @@ export function ExplorerPanel(): ReactNode {
             ))
           ])}
           {!dependencies.length && <Empty>No dependencies: Insert › Add dependency…</Empty>}
+        </EntityList>
+      </Section>
+
+      <Section
+        title="Binaries"
+        count={binaries.length}
+        actions={
+          <button type="button" className="icon" title="New binary" onClick={() => addBinary()}>
+            <Icon name="plus" />
+          </button>
+        }
+      >
+        <EntityList label="Binaries">
+          {shownBinaries.map((b) => {
+            const inside = modules.filter((m) => m.binaryId === b.id)
+            return (
+              <Item
+                key={b.id}
+                selected={false}
+                tabStop={b.id === binaryStop}
+                title={`${b.description ? `${b.description}\n` : ''}Click: select its modules. Double-click: edit the binaries.`}
+                onClick={() =>
+                  patchDoc({
+                    selectedIds: inside.map((m) => m.id),
+                    selection: inside.length ? { kind: 'module', id: inside[0]!.id } : null
+                  })
+                }
+                onDoubleClick={() => select({ kind: 'project' })}
+                onContextMenu={(e) => {
+                  e.preventDefault()
+                  openContextMenu(e, [
+                    { label: 'Edit binaries', run: () => select({ kind: 'project' }) },
+                    'separator',
+                    {
+                      label: 'Remove binary',
+                      danger: true,
+                      run: () => update((d) => removeBinary(d, b.id))
+                    }
+                  ])
+                }}
+              >
+                <span className="kind-badge binary" style={b.color ? { background: b.color } : undefined}>
+                  B
+                </span>
+                {b.name}
+                <small>{inside.length} modules</small>
+              </Item>
+            )
+          })}
+          {!shownBinaries.length && (
+            <Empty>{f ? 'No match' : 'One binary: add some to split the modules into executables'}</Empty>
+          )}
         </EntityList>
       </Section>
 

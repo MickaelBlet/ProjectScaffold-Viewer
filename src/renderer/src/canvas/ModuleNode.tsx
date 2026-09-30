@@ -149,6 +149,10 @@ export const ModuleNode = memo(function ModuleNode({
   const types = useProjectStore((s) => s.project.types)
   const hasChildren = useProjectStore((s) => s.project.modules.some((m) => m.parentId === id))
   const orientation = useProjectStore((s) => s.project.orientation)
+  const binary = useProjectStore((s) => {
+    const m = s.project.modules.find((m) => m.id === id)
+    return m?.binaryId ? s.project.binaries.find((b) => b.id === m.binaryId) : undefined
+  })
   const renaming = useUiStore((s) => s.renaming === id)
   // Stable string: re-renders only when a base is added, removed or renamed.
   const bases = useProjectStore((s) => {
@@ -220,6 +224,15 @@ export const ModuleNode = memo(function ModuleNode({
             {mod.kind && <span className="module-kind">«{mod.kind}» </span>}
             {mod.name}
             {bases && <span className="module-bases"> : {bases}</span>}
+            {binary && (
+              <small
+                className="module-binary"
+                title={`Runs in binary ${binary.name}`}
+                style={binary.color ? ({ '--binary-color': binary.color } as CSSProperties) : undefined}
+              >
+                <Icon name="binary" /> {binary.name}
+              </small>
+            )}
           </span>
         )}
         <Handle
