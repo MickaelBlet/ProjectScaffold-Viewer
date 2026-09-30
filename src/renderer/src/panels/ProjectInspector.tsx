@@ -1,13 +1,15 @@
 import type { ReactNode } from 'react'
 import { binaryError, newId, transportError, uniqueName } from '@/model/project'
 import { removeBinary } from '@/model/binaries'
-import { TRANSPORTS } from '@/model/types'
+import { DEFAULT_BASE_PORT, DEFAULT_HOST } from '@/model/transports'
+import { TRANSPORTS, type RemoteDefaults } from '@/model/types'
 import { update, useProjectStore } from '@/store/project'
 import {
   ColorPicker,
   CommitInput,
   IconButton,
   MetadataEditor,
+  NumberInput,
   Row,
   Section,
   TextArea
@@ -20,6 +22,18 @@ function renameTransport(i: number, name: string): void {
     const was = d.transports[i]
     d.transports[i] = name
     for (const l of d.links) if (l.constraints.remote.transport === was) l.constraints.remote.transport = name
+  })
+}
+
+/** Edit the defaults of the remote links, dropping what ends up empty. */
+function withRemoteDefaults(fn: (r: RemoteDefaults) => void): void {
+  update((d) => {
+    const r = d.remoteDefaults ?? {}
+    fn(r)
+    for (const side of ['client', 'server'] as const) if (!r[side]?.host) delete r[side]
+    if (r.basePort === undefined) delete r.basePort
+    if (Object.keys(r).length) d.remoteDefaults = r
+    else delete d.remoteDefaults
   })
 }
 
@@ -72,6 +86,30 @@ export function ProjectInspector(): ReactNode {
           </tbody>
         </table>
         <p className="muted">Offered for remote links besides the built-in ones: {TRANSPORTS.join(', ')}.</p>
+      </Section>
+      <Section title="Remote defaults">
+        {(['client', 'server'] as const).map((side) => (
+          <Row key={side} label={side === 'client' ? 'Client host' : 'Server host'}>
+            <CommitInput
+              value={p.remoteDefaults?.[side]?.host ?? ''}
+              placeholder={DEFAULT_HOST}
+              onCommit={(v) => withRemoteDefaults((r) => void (r[side] = { host: v || undefined }))}
+            />
+          </Row>
+        ))}
+        <Row label="Base port">
+          <NumberInput
+            value={p.remoteDefaults?.basePort}
+            integer
+            min={1}
+            placeholder={String(DEFAULT_BASE_PORT)}
+            onChange={(v) => withRemoteDefaults((r) => void (r.basePort = v))}
+          />
+        </Row>
+        <p className="muted">
+          Addresses of the links between binaries without settings of their own: the n-th listens on port base
+          + n.
+        </p>
       </Section>
       <Section
         title={`Binaries (${p.binaries.length})`}

@@ -1,10 +1,36 @@
-import { useState, type ReactNode } from 'react'
+import { Fragment, useState, type ReactNode } from 'react'
 import { findPort, IDENTIFIER_RE, isImportedId, modulePath, transportError } from '@/model/project'
 import { deleteLink, reverseLink, update, useProjectStore } from '@/store/project'
 import { select } from '@/store/ui'
 import { navigate } from '@/actions'
-import { CommitInput, IconButton, NumberInput, Row, Section, Select, TextArea } from '@/components/fields'
-import { PERFORMANCE_CLASSES, TRANSPORTS, type Endpoint, type Link } from '@/model/types'
+import {
+  CommitInput,
+  IconButton,
+  MetadataEditor,
+  NumberInput,
+  Row,
+  Section,
+  Select,
+  TextArea
+} from '@/components/fields'
+import { dependencyName } from '@/model/dependencies'
+import { snake } from '@/codegen/filters'
+import {
+  DEFAULT_BASE_PORT,
+  DEFAULT_HOST,
+  DEFAULT_SHM_CAPACITY,
+  pruneSettings,
+  transportFields
+} from '@/model/transports'
+import {
+  PERFORMANCE_CLASSES,
+  TRANSPORTS,
+  type Endpoint,
+  type HostPort,
+  type Link,
+  type Project,
+  type TransportSettings
+} from '@/model/types'
 
 function withLink(id: string, fn: (l: Link) => void): void {
   update((d) => {
@@ -20,9 +46,130 @@ function setTransport(id: string, transport: string | undefined): void {
   update((d) => {
     const l = d.links.find((l) => l.id === id)
     if (!l) return
-    l.constraints.remote.transport = transport
+    const remote = l.constraints.remote
+    remote.transport = transport
+    const settings = pruneSettings(remote.settings, transport)
+    if (settings) remote.settings = settings
+    else delete remote.settings
     if (transport && !transportError(d, transport)) d.transports.push(transport)
   })
+}
+
+/** Edit the transport settings of a link, dropping what ends up empty. */
+function withSettings(id: string, fn: (s: TransportSettings) => void): void {
+  withLink(id, (l) => {
+    const remote = l.constraints.remote
+    const s = remote.settings ?? {}
+    fn(s)
+    const settings = pruneSettings(s, remote.transport)
+    if (settings) remote.settings = settings
+    else delete remote.settings
+  })
+}
+
+type End = 'client' | 'server' | 'broker'
+type Text = 'path' | 'name' | 'socket' | 'topic' | 'interface' | 'device'
+type Count = 'capacity' | 'id' | 'baud'
+
+const LABELS: Record<End | Text | Count, string> = {
+  client: 'Client',
+  server: 'Server',
+  broker: 'Broker',
+  path: 'Path',
+  name: 'Segment',
+  socket: 'Socket',
+  topic: 'Topic',
+  interface: 'Interface',
+  device: 'Device',
+  capacity: 'Capacity (bytes)',
+  id: 'Frame id',
+  baud: 'Baud rate'
+}
+
+/** Fields of the settings of the link's transport, placeholders showing their defaults. */
+function TransportSettingsFields({ project, link }: { project: Project; link: Link }): ReactNode {
+  const { id, name } = link
+  const remote = link.constraints.remote
+  const s = remote.settings ?? {}
+  const defaults = project.remoteDefaults ?? {}
+  const end = (e: End): ReactNode => {
+    const at: HostPort = s[e] ?? {}
+    const host = e === 'broker' ? undefined : (defaults[e]?.host ?? DEFAULT_HOST)
+    const port = e === 'broker' ? undefined : `${defaults.basePort ?? DEFAULT_BASE_PORT} + n`
+    const set = (fn: (h: HostPort) => void): void =>
+      withSettings(id, (d) => {
+        d[e] ??= {}
+        fn(d[e])
+      })
+    return (
+      <Fragment key={e}>
+        <Row label={`${LABELS[e]} host`}>
+          <CommitInput
+            value={at.host ?? ''}
+            placeholder={host}
+            onCommit={(v) => set((h) => void (h.host = v || undefined))}
+          />
+        </Row>
+        <Row label={`${LABELS[e]} port`}>
+          <NumberInput
+            value={at.port}
+            integer
+            min={1}
+            placeholder={port}
+            onChange={(v) => set((h) => void (h.port = v))}
+          />
+        </Row>
+      </Fragment>
+    )
+  }
+  const placeholders: Partial<Record<Text | Count, string>> = {
+    path: `/${name}`,
+    name: snake(`${dependencyName(project.name)}_${name}`),
+    capacity: String(DEFAULT_SHM_CAPACITY)
+  }
+  const text = (f: Text): ReactNode => (
+    <Row key={f} label={LABELS[f]}>
+      <CommitInput
+        value={s[f] ?? ''}
+        placeholder={placeholders[f]}
+        onCommit={(v) => withSettings(id, (d) => void (d[f] = v || undefined))}
+      />
+    </Row>
+  )
+  const count = (f: Count): ReactNode => (
+    <Row key={f} label={LABELS[f]}>
+      <NumberInput
+        value={s[f]}
+        integer
+        min={f === 'id' ? 0 : 1}
+        placeholder={placeholders[f]}
+        onChange={(v) => withSettings(id, (d) => void (d[f] = v))}
+      />
+    </Row>
+  )
+  return (
+    <>
+      {transportFields(remote.transport).map((f) =>
+        f === 'client' || f === 'server' || f === 'broker'
+          ? end(f)
+          : f === 'capacity' || f === 'id' || f === 'baud'
+            ? count(f)
+            : text(f)
+      )}
+      <div className="row">
+        <span className="row-label">Options</span>
+      </div>
+      <MetadataEditor
+        value={s.options ?? {}}
+        onChange={(fn) =>
+          withSettings(id, (d) => {
+            d.options ??= {}
+            fn(d.options)
+          })
+        }
+      />
+    </>
+  )
 }
 
 /** Transport select, with an entry to declare a new transport inline. */
@@ -239,8 +386,10 @@ export function LinkInspector({ id }: { id: string }): ReactNode {
             onChange={(e) =>
               withLink(id, (l) => {
                 l.constraints.remote.enabled = e.target.checked
-                if (!e.target.checked) delete l.constraints.remote.transport
-                else l.constraints.remote.transport ??= 'tcp'
+                if (!e.target.checked) {
+                  delete l.constraints.remote.transport
+                  delete l.constraints.remote.settings
+                } else l.constraints.remote.transport ??= 'tcp'
               })
             }
           />
@@ -252,6 +401,12 @@ export function LinkInspector({ id }: { id: string }): ReactNode {
           </Row>
         )}
       </Section>
+
+      {c.remote.enabled && c.remote.transport && (
+        <Section title="Transport settings">
+          <TransportSettingsFields project={project} link={link} />
+        </Section>
+      )}
 
       <div className="actions">
         <button type="button" onClick={() => reverseLink(id)} title="Swap endpoints">
