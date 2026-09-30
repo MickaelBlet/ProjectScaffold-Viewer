@@ -130,6 +130,10 @@ textarea {
   padding: 3px 6px;
   min-width: 0;
 }
+/* As tall as inputs and buttons (line height, padding and border): a select is shorter by default. */
+select {
+  height: calc(1lh + 8px);
+}
 input:focus,
 select:focus,
 textarea:focus {
@@ -943,6 +947,11 @@ fieldset.readonly {
   margin-top: 14px;
   border-top: 1px solid var(--border);
   padding-top: 8px;
+}
+.inspector > .section:first-child {
+  margin-top: 0;
+  border-top: none;
+  padding-top: 0;
 }
 .section header {
   display: flex;
