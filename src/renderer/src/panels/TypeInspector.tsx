@@ -185,7 +185,6 @@ export function FieldList<F extends Field = Field>(props: {
   before?: (f: F, i: number) => ReactNode
 }): ReactNode {
   const { fields, onChange } = props
-  const columns = 3 + (props.column ? 1 : 0) + (props.value ? 1 : 0) + (props.before ? 1 : 0)
   const [trees, setTrees] = useState<ReadonlySet<string>>(new Set())
   const toggleTree = (id: string): void =>
     setTrees((s) => {
@@ -195,61 +194,57 @@ export function FieldList<F extends Field = Field>(props: {
     })
   return (
     <>
-      <table className="grid fields">
-        <tbody>
-          {fields.map((f, i) => (
-            <Fragment key={f.id}>
-              <tr>
-                <td>
-                  <CommitInput
-                    value={f.name}
-                    validate={identifier}
-                    onCommit={(n) => onChange((fs) => void (fs[i]!.name = n))}
-                  />
-                </td>
-                {props.column && <td className="extra">{props.column(f, i)}</td>}
-                {props.before && <td className="extra">{props.before(f, i)}</td>}
-                <td className="wide">
-                  <TypeEditor
-                    value={f.type}
-                    onChange={(t) => onChange((fs) => void (fs[i]!.type = t))}
-                    tree={trees.has(f.id)}
-                    onToggleTree={() => toggleTree(f.id)}
-                  />
-                </td>
-                {props.value && <td className="default">{props.value(f, i)}</td>}
-                <td className="nowrap">
-                  <IconButton
-                    icon="arrow-up"
-                    title="Move up"
-                    disabled={i === 0}
-                    onClick={() => onChange((fs) => move(fs, i, -1))}
-                  />
-                  <IconButton
-                    icon="arrow-down"
-                    title="Move down"
-                    disabled={i === fields.length - 1}
-                    onClick={() => onChange((fs) => move(fs, i, 1))}
-                  />
-                  <IconButton
-                    icon="x"
-                    title="Remove"
-                    danger
-                    onClick={() => onChange((fs) => void fs.splice(i, 1))}
-                  />
-                </td>
-              </tr>
-              {trees.has(f.id) && (
-                <tr className="type-tree-row">
-                  <td colSpan={columns}>
-                    <TypeTree value={f.type} onChange={(t) => onChange((fs) => void (fs[i]!.type = t))} />
-                  </td>
-                </tr>
-              )}
-            </Fragment>
-          ))}
-        </tbody>
-      </table>
+      <div className={`field-list${props.value ? ' has-value' : ''}`}>
+        {fields.map((f, i) => (
+          <Fragment key={f.id}>
+            <div className="field-row">
+              <div className="name">
+                <CommitInput
+                  value={f.name}
+                  validate={identifier}
+                  onCommit={(n) => onChange((fs) => void (fs[i]!.name = n))}
+                />
+              </div>
+              {props.column && <div className="column">{props.column(f, i)}</div>}
+              {props.before && <div className="before">{props.before(f, i)}</div>}
+              <div className="type">
+                <TypeEditor
+                  value={f.type}
+                  onChange={(t) => onChange((fs) => void (fs[i]!.type = t))}
+                  tree={trees.has(f.id)}
+                  onToggleTree={() => toggleTree(f.id)}
+                />
+              </div>
+              {props.value && <div className="value">{props.value(f, i)}</div>}
+              <div className="actions-cell">
+                <IconButton
+                  icon="arrow-up"
+                  title="Move up"
+                  disabled={i === 0}
+                  onClick={() => onChange((fs) => move(fs, i, -1))}
+                />
+                <IconButton
+                  icon="arrow-down"
+                  title="Move down"
+                  disabled={i === fields.length - 1}
+                  onClick={() => onChange((fs) => move(fs, i, 1))}
+                />
+                <IconButton
+                  icon="x"
+                  title="Remove"
+                  danger
+                  onClick={() => onChange((fs) => void fs.splice(i, 1))}
+                />
+              </div>
+            </div>
+            {trees.has(f.id) && (
+              <div className="field-tree">
+                <TypeTree value={f.type} onChange={(t) => onChange((fs) => void (fs[i]!.type = t))} />
+              </div>
+            )}
+          </Fragment>
+        ))}
+      </div>
       <button
         type="button"
         className="link-button"

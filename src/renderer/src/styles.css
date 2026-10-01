@@ -289,6 +289,8 @@ button.link-button:hover {
 .inspector {
   position: relative;
   padding: 10px 12px 24px;
+  /* Lists and rows rearrange by the width of the inspector, not of the window. */
+  container-type: inline-size;
 }
 .inspector .open-tab {
   position: absolute;
@@ -298,7 +300,6 @@ button.link-button:hover {
 .entity-editor {
   height: 100%;
   overflow: auto;
-  max-width: 720px;
   background: var(--panel);
 }
 .source-editor {
@@ -641,7 +642,8 @@ kbd {
   gap: 2px;
 }
 /* Icon buttons beside inputs / selects: as tall as them. */
-:is(.grid, .metadata, .row-value, .row-inline, .card-header, .section-actions) button:has(> .ico) {
+:is(.grid, .field-row, .metadata, .row-value, .row-inline, .card-header, .section-actions)
+  button:has(> .ico) {
   min-height: calc(1lh + 8px);
 }
 .explorer-actions button.icon {
@@ -898,9 +900,6 @@ kbd {
   overflow: auto;
   min-width: 0;
 }
-.def-main > * {
-  max-width: 760px;
-}
 @container (max-width: 560px) {
   .definitions {
     grid-template-columns: 1fr;
@@ -1079,7 +1078,7 @@ fieldset.readonly {
 }
 .row {
   display: grid;
-  grid-template-columns: 110px 1fr;
+  grid-template-columns: 110px minmax(0, 1fr);
   align-items: center;
   gap: 8px;
   margin: 4px 0;
@@ -1154,31 +1153,88 @@ input.number {
   padding: 2px 2px;
   vertical-align: top;
 }
-.grid.fields {
-  table-layout: fixed;
+/*
+ * Named, typed entries (fields, parameters, attributes): one line when the inspector is wide enough,
+ * the type then the value wrapped onto lines of their own when it is not. Rows share the list's
+ * columns (subgrid) so they stay aligned; columns of controls take the width of their content.
+ */
+.field-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto minmax(0, 2fr) 0 auto;
 }
-.grid.fields td:first-child {
-  width: 25%;
+.field-list.has-value {
+  grid-template-columns: minmax(0, 1fr) auto auto minmax(0, 2fr) minmax(0, 1fr) auto;
 }
-.grid.fields td:last-child {
-  width: 78px;
+.field-row {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
 }
-/* Narrowest that fits its control: qualifier toggles, or a select (parameter direction). */
-.grid.fields td.extra {
-  width: 46px;
+.field-row > * {
+  min-width: 0;
+  padding: 2px;
 }
-.grid.fields td.extra:has(.qualifier:only-child),
-.grid.fields td.extra:empty {
-  width: 24px;
+.field-row > .name {
+  grid-column: 1;
 }
-.grid.fields td.extra:has(select) {
-  width: 64px;
+.field-row > .column {
+  grid-column: 2;
 }
-.grid.fields td.default {
-  width: 24%;
+.field-row > .before {
+  grid-column: 3;
 }
-.grid td.nowrap {
+.field-row > .type {
+  grid-column: 4;
+}
+.field-row > .value {
+  grid-column: 5;
+}
+.field-row > .actions-cell {
+  grid-column: 6;
   white-space: nowrap;
+}
+.field-row > :is(.name, .value) > input,
+.field-row select {
+  width: 100%;
+}
+.field-tree {
+  grid-column: 1 / -1;
+}
+.field-tree .type-tree {
+  margin: 0 0 4px 4px;
+}
+@container (max-width: 560px) {
+  .field-list.has-value {
+    grid-template-columns: minmax(0, 1fr) auto auto minmax(0, 2fr) 0 auto;
+  }
+  .field-list.has-value > .field-row > .value {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  /* Entries on several lines: a line between them tells them apart. */
+  .field-list.has-value > .field-row:not(:first-child) {
+    margin-top: 2px;
+    padding-top: 2px;
+    border-top: 1px solid var(--border);
+  }
+}
+@container (max-width: 380px) {
+  .field-list,
+  .field-list.has-value {
+    grid-template-columns: minmax(0, 1fr) auto auto 0 0 auto;
+  }
+  .field-row > .type {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  .field-list.has-value > .field-row > .value {
+    grid-row: 3;
+  }
+  .field-row:not(:first-child) {
+    margin-top: 2px;
+    padding-top: 2px;
+    border-top: 1px solid var(--border);
+  }
 }
 .grid select {
   width: 100%;
@@ -1217,7 +1273,7 @@ button.qualifier.on {
   border-color: var(--accent);
 }
 /* In a field row: single-letter square toggles, centered on the row's inputs. */
-.grid .qualifiers {
+.field-row .qualifiers {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1226,7 +1282,7 @@ button.qualifier.on {
   /* Height of an input: line height plus padding and border. */
   height: calc(1.4em + 8px);
 }
-.grid button.qualifier {
+.field-row button.qualifier {
   width: 20px;
   height: 20px;
   padding: 0;
@@ -1234,9 +1290,23 @@ button.qualifier.on {
 }
 .metadata .kv {
   display: grid;
-  grid-template-columns: 1fr 1.4fr auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto;
   gap: 4px;
   margin-bottom: 4px;
+}
+/* Narrow inspector: labels above their value, metadata values below their key. */
+@container (max-width: 300px) {
+  .row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+  .metadata .kv {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .metadata .kv > :nth-child(2) {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
 }
 .card {
   border: 1px solid var(--border);
@@ -1341,15 +1411,6 @@ ul.plain {
   color: var(--muted);
   font-size: 11px;
   min-width: 42px;
-}
-.grid.fields .type-tree-row > td {
-  padding-top: 0;
-}
-.grid.fields .type-tree-row > td:last-child {
-  width: auto;
-}
-.grid.fields .type-tree-row .type-tree {
-  margin: 0 0 4px 4px;
 }
 
 /* Canvas nodes */
