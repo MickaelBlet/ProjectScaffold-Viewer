@@ -32,6 +32,14 @@ export interface OutputDirRequest {
   name: string
 }
 
+/** Template folder of a document's code generation: the chosen one (`current`, null when none),
+ *  one to pick and remember (`pick`, null when cancelled), or none any more (`forget`). */
+export interface TemplateDirRequest {
+  op: 'current' | 'pick' | 'forget'
+  /** File of the document; null for an unsaved project. */
+  document: string | null
+}
+
 /** An open document kept across page reloads. */
 export interface SessionDoc {
   /** File of the document; null for an unsaved project. */
@@ -92,6 +100,11 @@ export interface Api {
    * with `pick`); null when cancelled. Absent when the host cannot write into a directory.
    */
   outputDir?(request: OutputDirRequest): Promise<OutputDir | null>
+  /**
+   * Folder of the template set generating a document's code, used instead of the default one
+   * (see `TemplateDirRequest`); written to only to copy the built-in templates into it.
+   */
+  templateDir?(request: TemplateDirRequest): Promise<OutputDir | null>
 
   // VS Code only: the page edits one document whose text, undo history and file VS Code owns.
   /** Writes the project's new content to the document text, as an unsaved edit. */

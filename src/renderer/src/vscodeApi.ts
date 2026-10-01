@@ -10,7 +10,7 @@ import type {
   ToHost,
   ToPage
 } from '../../../vscode/src/protocol'
-import type { Api, OpenResult, OutputDirRequest, Session } from './api'
+import type { Api, OpenResult, OutputDirRequest, Session, TemplateDirRequest } from './api'
 import type { OutputDir } from './codegen/run'
 import { IN_PANEL, IN_PREVIEW, vscode } from './host'
 import { storageChanged } from './storage'
@@ -91,15 +91,8 @@ function dataUrlPayload(url: string): { data: string; encoding: 'utf8' | 'base64
     : { data: decodeURIComponent(payload), encoding: 'utf8' }
 }
 
-/** Output directory of the extension (see ToHost `outputDir`). */
-async function outputDir(req: OutputDirRequest): Promise<OutputDir | null> {
-  const found = await request<OutputDirReply | null>((id) => ({
-    type: 'outputDir',
-    id,
-    pick: req.pick,
-    name: req.name
-  }))
-  if (!found) return null
+/** Directory given by the extension (`outputDir`, `templateDir`), its files read and written by it. */
+function hostDir(found: OutputDirReply): OutputDir {
   const file = async (
     op: 'read' | 'write' | 'remove',
     path: string,
@@ -122,6 +115,23 @@ async function outputDir(req: OutputDirRequest): Promise<OutputDir | null> {
     write: async (path, text) => void (await file('write', path, text)),
     remove: async (path) => void (await file('remove', path))
   }
+}
+
+/** Output directory of the extension (see ToHost `outputDir`). */
+async function outputDir(req: OutputDirRequest): Promise<OutputDir | null> {
+  const found = await request<OutputDirReply | null>((id) => ({
+    type: 'outputDir',
+    id,
+    pick: req.pick,
+    name: req.name
+  }))
+  return found && hostDir(found)
+}
+
+/** Template folder of the extension (see ToHost `templateDir`); the document is the page's. */
+async function templateDir(req: TemplateDirRequest): Promise<OutputDir | null> {
+  const found = await request<OutputDirReply | null>((id) => ({ type: 'templateDir', id, op: req.op }))
+  return found && hostDir(found)
 }
 
 /** Document shown: the initial one, or the one a side panel was given since. Set by installVscodeApi:
@@ -208,7 +218,8 @@ const vscodeApi: Api = {
   showPanel: (panel, dependency) => post({ type: 'showPanel', panel, dependency }),
   onDependency: (cb) => listen(dependencyListeners, cb),
   // Side panels have no Generate command.
-  outputDir: IN_PANEL ? undefined : outputDir
+  outputDir: IN_PANEL ? undefined : outputDir,
+  templateDir: IN_PANEL ? undefined : templateDir
 }
 
 export function installVscodeApi(): void {

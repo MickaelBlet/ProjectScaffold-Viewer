@@ -42,7 +42,7 @@ import {
   saveProject,
   saveWorkspace
 } from './fileOps'
-import { generateCode } from './generateCode'
+import { canChooseTemplates, chooseTemplates, generateCode } from './generateCode'
 import { activeDoc, cycleDoc, patchDoc, useDocs, activateDoc } from './store/documents'
 import { getProject, redo, undo } from './store/project'
 import { setSetting, useSettings, type Theme } from './store/settings'
@@ -218,6 +218,13 @@ const allCommands: Command[] = [
     title: 'Generate code into…',
     category: 'File',
     run: () => void generateCode(true)
+  },
+  {
+    id: 'file.codeTemplates',
+    title: 'Code templates…',
+    category: 'File',
+    enabled: canChooseTemplates,
+    run: () => void chooseTemplates()
   },
 
   // Edit

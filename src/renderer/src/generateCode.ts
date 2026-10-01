@@ -1,13 +1,15 @@
-// Code generation from the editor: the active project, rendered with the built-in C++17 template
-// set (or the output directory's own, see codegen/run.ts) into a directory the host gives.
+// Code generation from the editor: the active project, rendered with the template folder chosen
+// for the document, else the output directory's own template set (see codegen/run.ts), else the
+// built-in C++17 one, into a directory the host gives.
 import { snake } from '@/codegen/filters'
-import { formatReport, generateInto, templateSetFor } from '@/codegen/run'
-import { parseManifest, type TemplateSet } from '@/codegen/templateSet'
+import { formatReport, generateInto, templateSetFor, type OutputDir } from '@/codegen/run'
+import { loadTemplateSet, MANIFEST, parseManifest, type TemplateSet } from '@/codegen/templateSet'
 import { dependencyName } from '@/model/dependencies'
 import { toFile } from '@/model/serialize'
 import { hasErrors, validate } from '@/model/validate'
+import type { TemplateDirRequest } from '@/api'
 import { activeDoc } from '@/store/documents'
-import { setStatus, showDialog } from '@/store/ui'
+import { quickPick, setStatus, showDialog } from '@/store/ui'
 
 const BUILTIN = import.meta.glob<string>('../../../templates/cpp17/*', {
   query: '?raw',
@@ -15,13 +17,23 @@ const BUILTIN = import.meta.glob<string>('../../../templates/cpp17/*', {
   eager: true
 })
 
+/** Files of the built-in template set, by name. */
+const builtinFiles = (): Record<string, string> =>
+  Object.fromEntries(Object.entries(BUILTIN).map(([path, text]) => [path.split('/').pop()!, text]))
+
 /** The C++17 template set shipped with the app (templates/cpp17). */
 export function builtinTemplates(): TemplateSet {
-  const files = Object.fromEntries(
-    Object.entries(BUILTIN).map(([path, text]) => [path.split('/').pop()!, text])
-  )
-  const { 'manifest.yaml': manifest, ...templates } = files
+  const { [MANIFEST]: manifest, ...templates } = builtinFiles()
   return { manifest: parseManifest(manifest ?? ''), files: templates }
+}
+
+/** The template set of a folder; its problems name the folder. */
+async function folderTemplates(dir: OutputDir): Promise<TemplateSet> {
+  try {
+    return await loadTemplateSet((path) => dir.read(path))
+  } catch (e) {
+    throw new Error(`templates ${dir.label}: ${e instanceof Error ? e.message : String(e)}`, { cause: e })
+  }
 }
 
 /** Whether the host can write generated files. */
@@ -55,9 +67,10 @@ export async function generateCode(pick: boolean): Promise<void> {
     })
     if (!dir) return
     label = dir.label
-    const set = await templateSetFor(dir, builtinTemplates)
+    const templates = await window.api.templateDir?.({ op: 'current', document: doc.filePath })
+    const set = templates ? await folderTemplates(templates) : await templateSetFor(dir, builtinTemplates)
     const report = await generateInto(toFile(project, { editor: false }), set, dir)
-    const summary = `Code generated into ${label}: ${report.written.length} written, ${report.unchanged.length} unchanged`
+    const summary = `Code generated into ${label} (templates ${templates ? templates.label : set.manifest.name}): ${report.written.length} written, ${report.unchanged.length} unchanged`
     if (report.conflicts.length || report.orphans.length || report.stale.length || report.warnings.length)
       showDialog(summary, formatReport(report, label, false).split('\n').slice(0, -1))
     else setStatus('info', summary)
@@ -66,4 +79,85 @@ export async function generateCode(pick: boolean): Promise<void> {
       e instanceof Error ? e.message : String(e)
     ])
   }
+}
+
+/** Whether the host can give template folders. */
+export const canChooseTemplates = (): boolean => !!window.api.templateDir
+
+/**
+ * Chooses the templates generating the active document's code: the default ones, a folder of the
+ * user's own, or a copy of the built-in ones to edit.
+ */
+export async function chooseTemplates(): Promise<void> {
+  if (!window.api.templateDir) return
+  const document = activeDoc().filePath
+  const templateDir = async (op: TemplateDirRequest['op']): Promise<OutputDir | null> =>
+    (await window.api.templateDir?.({ op, document })) ?? null
+  const fail = (title: string, e: unknown): void =>
+    showDialog(title, [e instanceof Error ? e.message : String(e)])
+  let current: OutputDir | null = null
+  try {
+    current = await templateDir('current')
+  } catch (e) {
+    fail('Cannot read the template folder', e)
+  }
+  const adopt = async (copy: boolean): Promise<void> => {
+    try {
+      const dir = await templateDir('pick')
+      if (!dir) return
+      if (copy) {
+        if ((await dir.read(MANIFEST)) !== null) {
+          showDialog(`${dir.label} already holds a template set`, [
+            'It is used as it is: copy the built-in templates into an empty folder to start again.'
+          ])
+          return
+        }
+        for (const [name, text] of Object.entries(builtinFiles())) await dir.write(name, text)
+      }
+      const set = await folderTemplates(dir)
+      setStatus(
+        'info',
+        `${copy ? 'Built-in templates copied into' : 'Code generation uses the templates of'} ${dir.label} (${set.manifest.name})`
+      )
+    } catch (e) {
+      fail('Cannot use this template folder', e)
+    }
+  }
+  quickPick('Templates generating the code of this document', [
+    {
+      key: 'default',
+      label: `${current ? '' : '✓ '}Default templates`,
+      detail: 'the output directory’s .scaffold/templates, else built-in C++17',
+      kind: 'T',
+      run: () =>
+        void templateDir('forget')
+          .then(() => setStatus('info', 'Code generation uses the default templates'))
+          .catch((e: unknown) => fail('Cannot forget the template folder', e))
+    },
+    ...(current
+      ? [
+          {
+            key: 'current',
+            label: `✓ ${current.label}`,
+            detail: 'template folder in use',
+            kind: 'T',
+            run: () => {}
+          }
+        ]
+      : []),
+    {
+      key: 'pick',
+      label: 'Template folder…',
+      detail: 'a manifest.yaml and its templates',
+      kind: 'T',
+      run: () => void adopt(false)
+    },
+    {
+      key: 'copy',
+      label: 'Copy the built-in templates into a folder…',
+      detail: 'to edit them, then generate with them',
+      kind: 'T',
+      run: () => void adopt(true)
+    }
+  ])
 }

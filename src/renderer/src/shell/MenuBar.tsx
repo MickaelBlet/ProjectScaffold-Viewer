@@ -30,6 +30,7 @@ const MENUS: [Category, string[]][] = [
       '-',
       'file.generate',
       'file.generateInto',
+      'file.codeTemplates',
       '-',
       'file.close'
     ]

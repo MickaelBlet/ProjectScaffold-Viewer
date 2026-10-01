@@ -74,6 +74,12 @@ export type ToHost =
    * `OutputDirReply`, or null when cancelled.
    */
   | { type: 'outputDir'; id: number; pick: boolean; name: string }
+  /**
+   * Template folder of the document's code generation: the one picked for it, else the one of the
+   * settings, else null (`current`); one to pick and remember (`pick`, null when cancelled); back to
+   * the settings (`forget`, replies null). Replies with an `OutputDirReply`, read with `outputFile`.
+   */
+  | { type: 'templateDir'; id: number; op: 'current' | 'pick' | 'forget' }
   /** File of a directory given by `outputDir`, by relative path: replies with an `OutputFileReply`. */
   | {
       type: 'outputFile'

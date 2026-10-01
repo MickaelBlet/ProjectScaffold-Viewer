@@ -3,7 +3,15 @@
 // through a file input and a download. Paths are file names: browsers never expose real paths.
 // Recent documents live in IndexedDB: their last known content, and their file handle when
 // available so that reopening reads the file again and Save rewrites it.
-import type { Api, FileFilter, OpenResult, OutputDirRequest, SaveRequest, Session } from './api'
+import type {
+  Api,
+  FileFilter,
+  OpenResult,
+  OutputDirRequest,
+  SaveRequest,
+  Session,
+  TemplateDirRequest
+} from './api'
 import type { OutputDir } from './codegen/run'
 
 type Permission = 'granted' | 'denied' | 'prompt'
@@ -458,20 +466,43 @@ async function readWorkspace(path: string, files: string[]): Promise<(OpenResult
   return results
 }
 
-// Output directories of generated code, by document; kept in IndexedDB when handles can be stored.
-const outputDirs = new Map<string, DirHandle>()
+// Output directories of generated code and template folders, by document; kept in IndexedDB when
+// handles can be stored.
+const dirHandles = new Map<string, DirHandle>()
 const outputKey = (doc: string | null): string => `outputDir:${doc ?? ''}`
+const templateKey = (doc: string | null): string => `templateDir:${doc ?? ''}`
 
-async function rememberedOutput(doc: string | null): Promise<DirHandle | undefined> {
-  const known = outputDirs.get(outputKey(doc))
+async function rememberedDir(key: string): Promise<DirHandle | undefined> {
+  const known = dirHandles.get(key)
   if (known) return known
   try {
     return await withStore<DirHandle | undefined>(
       'readonly',
-      (s) => s.get(outputKey(doc)) as IDBRequest<DirHandle | undefined>
+      (s) => s.get(key) as IDBRequest<DirHandle | undefined>
     )
   } catch {
     return undefined
+  }
+}
+
+async function rememberDir(key: string, handle: DirHandle | null): Promise<void> {
+  if (handle) dirHandles.set(key, handle)
+  else dirHandles.delete(key)
+  try {
+    if (handle) await withStore('readwrite', (s) => s.put(handle, key))
+    else await withStore('readwrite', (s) => s.delete(key))
+  } catch {
+    // Handles cannot be stored (file:// origin, private browsing): remembered for the session.
+  }
+}
+
+/** Folder picked by the user; null when cancelled. */
+async function pickDir(id: string, startIn?: DirHandle): Promise<DirHandle | null> {
+  try {
+    return await fs.showDirectoryPicker!({ id, mode: 'readwrite', startIn })
+  } catch (e) {
+    if (isAbort(e)) return null
+    throw e
   }
 }
 
@@ -516,26 +547,57 @@ function handleDir(root: DirHandle): OutputDir {
 }
 
 async function outputDir(req: OutputDirRequest): Promise<OutputDir | null> {
-  const previous = await rememberedOutput(req.document)
+  const key = outputKey(req.document)
+  const previous = await rememberedDir(key)
   let handle = req.pick ? undefined : previous
-  if (handle && (await handle.queryPermission?.({ mode: 'readwrite' })) !== 'granted') {
-    if ((await handle.requestPermission?.({ mode: 'readwrite' })) !== 'granted') handle = undefined
-  }
+  if (handle && !(await granted(handle, true))) handle = undefined
   if (!handle) {
-    try {
-      handle = await fs.showDirectoryPicker!({ id: 'generate', mode: 'readwrite', startIn: previous })
-    } catch (e) {
-      if (isAbort(e)) return null
-      throw e
-    }
-    outputDirs.set(outputKey(req.document), handle)
-    try {
-      await withStore('readwrite', (s) => s.put(handle, outputKey(req.document)))
-    } catch {
-      // Handles cannot be stored (file:// origin, private browsing): remembered for the session.
-    }
+    const picked = await pickDir('generate', previous)
+    if (!picked) return null
+    await rememberDir(key, picked)
+    handle = picked
   }
   return handleDir(handle)
+}
+
+/** A remembered folder as a directory, asking for access to it on first use (after a user gesture). */
+function askingDir(handle: DirHandle): OutputDir {
+  const dir = handleDir(handle)
+  let access: Promise<boolean> | undefined
+  const ensure = async (): Promise<void> => {
+    if (await (access ??= granted(handle, true))) return
+    access = undefined
+    throw new Error(`access to the folder ${handle.name} is not granted`)
+  }
+  return {
+    label: dir.label,
+    read: async (path) => {
+      await ensure()
+      return dir.read(path)
+    },
+    write: async (path, text) => {
+      await ensure()
+      await dir.write(path, text)
+    },
+    remove: async (path) => {
+      await ensure()
+      await dir.remove(path)
+    }
+  }
+}
+
+async function templateDir(req: TemplateDirRequest): Promise<OutputDir | null> {
+  const key = templateKey(req.document)
+  if (req.op === 'forget') {
+    await rememberDir(key, null)
+    return null
+  }
+  const previous = await rememberedDir(key)
+  if (req.op === 'current') return previous ? askingDir(previous) : null
+  const picked = await pickDir('templates', previous)
+  if (!picked) return null
+  await rememberDir(key, picked)
+  return handleDir(picked)
 }
 
 let dirty = false
@@ -576,7 +638,8 @@ const webApi: Api = {
     downloadUrl(name, dataUrl)
     return Promise.resolve(name)
   },
-  outputDir: fs.showDirectoryPicker ? outputDir : undefined
+  outputDir: fs.showDirectoryPicker ? outputDir : undefined,
+  templateDir: fs.showDirectoryPicker ? templateDir : undefined
 }
 
 export function installWebApi(): void {
