@@ -7,7 +7,7 @@
  */
 export type WebviewMode = 'editor' | 'preview' | 'panel'
 
-/** Tool panels of the ProjectScaffold views (VS Code's Explorer or the ProjectScaffold side bar). */
+/** Tool panels of the ProjectScaffold views (the ProjectScaffold side bar). */
 export type SidePanel = 'explorer' | 'modules' | 'links' | 'dependencies' | 'settings'
 
 type DataPath = (string | number)[]
