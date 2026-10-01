@@ -1,4 +1,4 @@
-// Views, dependencies, types, interfaces, constants, modules and links of the active document. Click selects (Ctrl / Shift for several),
+// Views, binaries, dependencies, constants, types, interfaces, modules and links of the active document. Click selects (Ctrl / Shift for several),
 // double-click opens an editor tab, right click for more. Arrows move between items, Enter selects.
 // Sections can be reordered (drag their header, Alt+Up / Alt+Down) and hidden; kept in the settings.
 import {
@@ -60,22 +60,22 @@ const KIND_BADGE = {
 
 const SECTIONS = [
   'views',
-  'dependencies',
   'binaries',
+  'dependencies',
+  'constants',
   'types',
   'interfaces',
-  'constants',
   'modules',
   'links'
 ] as const
 type SectionId = (typeof SECTIONS)[number]
 const SECTION_TITLES: Record<SectionId, string> = {
   views: 'Views',
-  dependencies: 'Dependencies',
   binaries: 'Binaries',
+  dependencies: 'Dependencies',
+  constants: 'Constants',
   types: 'Types',
   interfaces: 'Interfaces',
-  constants: 'Constants',
   modules: 'Modules',
   links: 'Links'
 }

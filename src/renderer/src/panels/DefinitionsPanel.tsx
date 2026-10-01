@@ -62,11 +62,11 @@ interface Row {
 
 // Same order as the Explorer's sections.
 const CATEGORIES: { kind: Category; title: string }[] = [
-  { kind: 'dependency', title: 'Dependencies' },
   { kind: 'binary', title: 'Binaries' },
+  { kind: 'dependency', title: 'Dependencies' },
+  { kind: 'const', title: 'Constants' },
   { kind: 'type', title: 'Types' },
   { kind: 'interface', title: 'Interfaces' },
-  { kind: 'const', title: 'Constants' },
   { kind: 'module', title: 'Modules' },
   { kind: 'link', title: 'Links' }
 ]
