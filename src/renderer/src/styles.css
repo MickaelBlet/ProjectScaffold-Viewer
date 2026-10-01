@@ -686,6 +686,9 @@ kbd {
 .kind-badge.const {
   background: #9a6b2f;
 }
+.kind-badge.exception {
+  background: #c0392b;
+}
 .kind-badge.alias {
   background: #2e9e8f;
 }
@@ -2677,4 +2680,24 @@ mark {
 .case-labels > :first-child {
   flex: 1;
   min-width: 0;
+}
+
+/* Exceptions a message raises: chips, then a choice of the others. */
+.raises {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+.raises .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 0 0 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 12px;
+}
+.raises select {
+  width: auto;
 }

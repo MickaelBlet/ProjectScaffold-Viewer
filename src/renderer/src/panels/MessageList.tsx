@@ -2,7 +2,8 @@ import type { ReactNode } from 'react'
 import { IDENTIFIER_RE, newId, uniqueName } from '@/model/project'
 import { CommitInput, IconButton, Select, TextArea } from '@/components/fields'
 import { TypeEditor } from '@/components/TypeEditor'
-import { PARAM_DIRECTIONS, type Message } from '@/model/types'
+import { PARAM_DIRECTIONS, type Id, type Message } from '@/model/types'
+import { useProjectStore } from '@/store/project'
 import { FieldList } from './TypeInspector'
 
 /** Append an empty message named after `base`, unique in `list`. */
@@ -102,6 +103,50 @@ export function MessageList<M extends Message>(props: {
       {m.returns && (
         <TypeEditor value={m.returns} onChange={(t) => withMessage(m.id, (x) => void (x.returns = t))} />
       )}
+      <Raises
+        value={m.raises ?? []}
+        onChange={(ids) =>
+          withMessage(m.id, (x) => {
+            if (ids.length) x.raises = ids
+            else delete x.raises
+          })
+        }
+      />
     </div>
   ))
+}
+
+/** Exceptions a message may raise: removable chips, and a choice of the others. */
+function Raises(props: { value: Id[]; onChange: (ids: Id[]) => void }): ReactNode {
+  const types = useProjectStore((s) => s.project.types)
+  const exceptions = types.filter((t) => t.kind === 'exception')
+  if (!exceptions.length && !props.value.length) return null
+  const others = exceptions.filter((e) => !props.value.includes(e.id))
+  return (
+    <>
+      <h4>Raises</h4>
+      <div className="raises">
+        {props.value.map((id) => (
+          <span key={id} className="chip">
+            {types.find((t) => t.id === id)?.name ?? '<deleted>'}
+            <IconButton
+              icon="x"
+              title="Remove"
+              onClick={() => props.onChange(props.value.filter((x) => x !== id))}
+            />
+          </span>
+        ))}
+        {others.length > 0 && (
+          <Select
+            value=""
+            options={[
+              { value: '', label: '+ exception…' },
+              ...others.map((e) => ({ value: e.id, label: e.name }))
+            ]}
+            onChange={(v) => v && props.onChange([...props.value, v])}
+          />
+        )}
+      </div>
+    </>
+  )
 }

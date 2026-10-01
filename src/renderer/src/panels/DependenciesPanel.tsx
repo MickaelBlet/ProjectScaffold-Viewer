@@ -24,7 +24,15 @@ import { onListKeyDown, tabStop } from '@/components/listKeys'
 
 type Entity = TypeDef | Interface
 
-const KIND_BADGE = { struct: 'S', enum: 'E', bitmask: 'B', union: 'U', alias: 'A', primitive: 'P' } as const
+const KIND_BADGE = {
+  struct: 'S',
+  enum: 'E',
+  bitmask: 'B',
+  union: 'U',
+  exception: 'X',
+  alias: 'A',
+  primitive: 'P'
+} as const
 
 const isInterface = (e: Entity): e is Interface => 'messages' in e
 const kindOf = (e: Entity): 'type' | 'interface' => (isInterface(e) ? 'interface' : 'type')
@@ -32,7 +40,7 @@ const kindOf = (e: Entity): 'type' | 'interface' => (isInterface(e) ? 'interface
 /** Names of the members of an entity, for the filter. */
 function memberNames(e: Entity): string[] {
   if (isInterface(e)) return e.messages.map((m) => m.name)
-  if (e.kind === 'struct') return e.fields.map((f) => f.name)
+  if (e.kind === 'struct' || e.kind === 'exception') return e.fields.map((f) => f.name)
   if (e.kind === 'enum') return e.values.map((v) => v.name)
   if (e.kind === 'bitmask') return e.flags.map((v) => v.name)
   if (e.kind === 'union') return e.cases.map((c) => c.name)
@@ -43,6 +51,7 @@ function summary(e: Entity, print: (t: TypeRef) => string): string {
   if (isInterface(e)) return `${e.messages.length} msg`
   switch (e.kind) {
     case 'struct':
+    case 'exception':
       return `${e.fields.length} field${e.fields.length === 1 ? '' : 's'}`
     case 'enum':
       return `${e.underlying}, ${e.values.length} value${e.values.length === 1 ? '' : 's'}`
@@ -90,7 +99,7 @@ function signature(m: Message, print: (t: TypeRef) => string): ReactNode {
 function Members({ e, print }: { e: Entity; print: (t: TypeRef) => string }): ReactNode {
   const rows: { key: string; code: ReactNode; description?: string }[] = isInterface(e)
     ? e.messages.map((m) => ({ key: m.id, code: signature(m, print), description: m.description }))
-    : e.kind === 'struct'
+    : e.kind === 'struct' || e.kind === 'exception'
       ? e.fields.map((f) => ({
           key: f.id,
           code: (

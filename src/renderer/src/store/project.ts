@@ -379,7 +379,7 @@ export function addType(kind: TypeDef['kind']): Id {
       description: '',
       name: uniqueName(kind[0]!.toUpperCase() + kind.slice(1), globalTypeNames(d))
     }
-    if (kind === 'struct') d.types.push({ ...base, kind, fields: [] })
+    if (kind === 'struct' || kind === 'exception') d.types.push({ ...base, kind, fields: [] })
     else if (kind === 'enum') d.types.push({ ...base, kind, underlying: 'uint8', values: [] })
     else if (kind === 'bitmask') d.types.push({ ...base, kind, underlying: 'uint32', flags: [] })
     else if (kind === 'union')

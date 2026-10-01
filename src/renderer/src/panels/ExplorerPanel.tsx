@@ -44,7 +44,15 @@ import { openEditor, openView } from '@/shell/controllers'
 import { Icon } from '@/components/Icon'
 import { onListKeyDown, tabStop } from '@/components/listKeys'
 
-const KIND_BADGE = { struct: 'S', enum: 'E', bitmask: 'B', union: 'U', alias: 'A', primitive: 'P' } as const
+const KIND_BADGE = {
+  struct: 'S',
+  enum: 'E',
+  bitmask: 'B',
+  union: 'U',
+  exception: 'X',
+  alias: 'A',
+  primitive: 'P'
+} as const
 
 function Section(props: {
   title: string
@@ -484,18 +492,20 @@ export function ExplorerPanel(): ReactNode {
       <Section
         title="Types"
         count={ownTypes.length}
-        actions={(['struct', 'enum', 'bitmask', 'union', 'alias', 'primitive'] as const).map((k) => (
-          <button
-            key={k}
-            type="button"
-            className="icon"
-            title={`New ${k}`}
-            onClick={() => select({ kind: 'type', id: addType(k) })}
-          >
-            <Icon name="plus" />
-            {KIND_BADGE[k]}
-          </button>
-        ))}
+        actions={(['struct', 'enum', 'bitmask', 'union', 'exception', 'alias', 'primitive'] as const).map(
+          (k) => (
+            <button
+              key={k}
+              type="button"
+              className="icon"
+              title={`New ${k}`}
+              onClick={() => select({ kind: 'type', id: addType(k) })}
+            >
+              <Icon name="plus" />
+              {KIND_BADGE[k]}
+            </button>
+          )
+        )}
       >
         <EntityList label="Types" multiselectable>
           {shownTypes.map((t) => (

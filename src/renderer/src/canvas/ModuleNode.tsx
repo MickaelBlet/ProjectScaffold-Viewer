@@ -122,7 +122,10 @@ function Methods({ methods, types }: { methods: Method[]; types: TypeDef[] }): R
         )
         const before = m.static ? 'static ' : m.virtual ? 'virtual ' : ''
         const after = `${m.const ? ' const' : ''}${m.override ? ' override' : ''}${m.pure ? ' = 0' : ''}`
-        const sig = `${before}${m.name}(${params})${returns}${after}`
+        const raises = m.raises?.length
+          ? ` throws ${m.raises.map((id) => nameOf(id) ?? '<deleted>').join(', ')}`
+          : ''
+        const sig = `${before}${m.name}(${params})${returns}${after}${raises}`
         return (
           <li key={m.id} title={m.description ? `${sig}\n${m.description}` : sig}>
             {before && <span className="attr-qualifier">{before}</span>}

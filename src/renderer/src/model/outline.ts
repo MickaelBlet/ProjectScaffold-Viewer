@@ -13,6 +13,7 @@ export type OutlineKind =
   | 'enum'
   | 'bitmask'
   | 'union'
+  | 'exception'
   | 'alias'
   | 'primitive'
   | 'field'
@@ -105,7 +106,15 @@ function list(
   })
 }
 
-const TYPE_KINDS = new Set<OutlineKind>(['struct', 'enum', 'bitmask', 'union', 'alias', 'primitive'])
+const TYPE_KINDS = new Set<OutlineKind>([
+  'struct',
+  'enum',
+  'bitmask',
+  'union',
+  'exception',
+  'alias',
+  'primitive'
+])
 
 /** Qualifiers set on an attribute, method or parameter (`static const`, `virtual pure`). */
 function qualifierText(map: YAMLMap): string[] {
@@ -137,7 +146,7 @@ const type: Make = (item, path, names) => {
   const kind = text(item, 'kind') as OutlineKind | undefined
   if (!kind || !TYPE_KINDS.has(kind)) return entry(item, 'struct', path, names)
   const children =
-    kind === 'struct'
+    kind === 'struct' || kind === 'exception'
       ? list(item, 'fields', path, names, field)
       : kind === 'enum'
         ? list(item, 'values', path, names, (v, p, n) =>

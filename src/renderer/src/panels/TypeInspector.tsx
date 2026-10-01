@@ -299,20 +299,23 @@ export function TypeInspector({ id }: { id: string }): ReactNode {
         </Row>
         <TextArea value={t.description} onChange={(v) => withType(id, (x) => void (x.description = v))} />
 
-        {t.kind === 'struct' && (
+        {(t.kind === 'struct' || t.kind === 'exception') && (
           <Section title={`Fields (${t.fields.length})`}>
             <FieldList
               fields={t.fields}
               addLabel="Add field"
-              onChange={(fn) => withType<'struct'>(id, (x) => fn(x.fields))}
+              onChange={(fn) => withType<'struct' | 'exception'>(id, (x) => fn(x.fields))}
               value={(f, i) => (
                 <DefaultInput
                   field={f}
                   types={project.types}
-                  onChange={(v) => withType<'struct'>(id, (x) => setDefault(x.fields[i]!, v))}
+                  onChange={(v) => withType<'struct' | 'exception'>(id, (x) => setDefault(x.fields[i]!, v))}
                 />
               )}
             />
+            {t.kind === 'exception' && (
+              <p className="muted">Raised by messages and methods (their raises).</p>
+            )}
           </Section>
         )}
 

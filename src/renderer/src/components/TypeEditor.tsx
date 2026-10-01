@@ -18,7 +18,9 @@ function useTypeNames(): {
   return useMemo(() => {
     const byId = new Map(types.map((t) => [t.id, t.name]))
     const byName = new Map(types.map((t) => [t.name, t.id]))
-    return { nameOf: (id) => byId.get(id), idOf: (n) => byName.get(n), names: types.map((t) => t.name) }
+    // Exceptions are only raised: not offered as types.
+    const names = types.filter((t) => t.kind !== 'exception').map((t) => t.name)
+    return { nameOf: (id) => byId.get(id), idOf: (n) => byName.get(n), names }
   }, [types])
 }
 
@@ -257,11 +259,13 @@ export function TypeTree(props: {
           </optgroup>
           {types.length > 0 && (
             <optgroup label="User types">
-              {types.map((ut) => (
-                <option key={ut.id} value={`ref:${ut.id}`}>
-                  {ut.name}
-                </option>
-              ))}
+              {types
+                .filter((ut) => ut.kind !== 'exception')
+                .map((ut) => (
+                  <option key={ut.id} value={`ref:${ut.id}`}>
+                    {ut.name}
+                  </option>
+                ))}
             </optgroup>
           )}
           <optgroup label="Containers">
