@@ -2060,8 +2060,9 @@ ul.plain {
   gap: 6px;
   color: var(--muted);
 }
-/* Same outlines as the view / expand icons of components/Icon.tsx */
-.view-tab .dv-default-tab-content::before {
+/* Editor tabs by data-tab (EditorArea.tsx). Same outlines as the view / expand icons of components/Icon.tsx */
+.dv-default-tab:is([data-tab='view'], [data-tab='drill'], [data-tab='definitions'])
+  .dv-default-tab-content::before {
   content: '';
   display: inline-block;
   width: var(--icon-size);
@@ -2072,19 +2073,19 @@ ul.plain {
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 2.5 13.5 8 8 13.5 2.5 8z'/%3E%3C/svg%3E")
     center / contain no-repeat;
 }
-.view-tab.drill .dv-default-tab-content::before {
+.dv-default-tab[data-tab='drill'] .dv-default-tab-content::before {
   mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 3h4v4M13 3 9 7M7 13H3V9M3 13l4-4'/%3E%3C/svg%3E");
 }
 /* List outline of components/Icon.tsx */
-.definitions-tab .dv-default-tab-content::before {
+.dv-default-tab[data-tab='definitions'] .dv-default-tab-content::before {
   mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 4h.01M3 8h.01M3 12h.01M6 4h7M6 8h7M6 12h7'/%3E%3C/svg%3E");
 }
 /* Temporary view (opened from a module, not saved until kept), as VS Code's preview tabs */
-.view-tab.temporary .dv-default-tab-content {
+.dv-default-tab[data-temporary] .dv-default-tab-content {
   font-style: italic;
 }
-.entity-tab .dv-default-tab-content::before {
-  content: attr(data-kind) ' ';
+.dv-default-tab[data-tab='entity'] .dv-default-tab-content::before {
+  content: var(--tab-kind);
   font-weight: 700;
   color: var(--accent);
 }

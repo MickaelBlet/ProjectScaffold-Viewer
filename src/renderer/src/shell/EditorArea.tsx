@@ -1,5 +1,13 @@
 // Center of the window: the document tabs, then the active document's views and editor tabs.
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode
+} from 'react'
 import {
   DockviewDefaultTab,
   DockviewReact,
@@ -124,7 +132,9 @@ function ViewTab(props: IDockviewPanelHeaderProps<{ viewId: Id }>): ReactNode {
   return (
     <DockviewDefaultTab
       {...props}
-      className={`view-tab ${drill ? 'drill' : ''} ${temporary ? 'temporary' : ''}`}
+      // DockviewDefaultTab sets its own className: styles.css goes by these attributes.
+      data-tab={drill ? 'drill' : 'view'}
+      data-temporary={temporary || undefined}
       // A temporary view is kept by a double click, as VS Code's preview tabs.
       onDoubleClick={temporary ? () => keepView(viewId) : rename}
       onContextMenu={(e) => {
@@ -148,7 +158,7 @@ function DefinitionsTab(props: IDockviewPanelHeaderProps): ReactNode {
   return (
     <DockviewDefaultTab
       {...props}
-      className="view-tab definitions-tab"
+      data-tab="definitions"
       onContextMenu={(e) => {
         e.preventDefault()
         openContextMenu(e, [
@@ -165,8 +175,9 @@ function EntityTab(props: IDockviewPanelHeaderProps<{ kind: EditorKind | 'source
   return (
     <DockviewDefaultTab
       {...props}
-      className="entity-tab"
-      data-kind={KIND_ICON[props.params.kind]}
+      data-tab="entity"
+      // Inherited by the title's ::before, which attr() cannot reach.
+      style={{ '--tab-kind': `'${KIND_ICON[props.params.kind]} '` } as CSSProperties}
       onContextMenu={(e) => {
         e.preventDefault()
         openContextMenu(e, [
