@@ -677,6 +677,9 @@ kbd {
 .kind-badge.enum {
   background: #8a4fd1;
 }
+.kind-badge.bitmask {
+  background: #c0567a;
+}
 .kind-badge.alias {
   background: #2e9e8f;
 }
@@ -2648,4 +2651,13 @@ mark {
   stroke: var(--muted);
   stroke-width: 1.5;
   stroke-linejoin: round;
+}
+
+/* Default value of a bitmask: opens the flags to toggle. */
+.flags-input {
+  width: 100%;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

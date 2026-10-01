@@ -3,12 +3,26 @@ import { IDENTIFIER_RE, nameError, newId, typeUsageTargets, uniqueName } from '@
 import { deleteType, update, useProjectStore } from '@/store/project'
 import { dependencyOf } from '@/model/dependencies'
 import { DependencyBanner } from './DependencyBanner'
-import { select } from '@/store/ui'
+import { openContextMenu, select } from '@/store/ui'
 import { navigate } from '@/actions'
 import { CommitInput, IconButton, NumberInput, Row, Section, Select, TextArea } from '@/components/fields'
 import { TypeEditor, TypeTree } from '@/components/TypeEditor'
-import { INT_PRIMITIVES, type Field, type TypeDef, type Value, type ValueField } from '@/model/types'
-import { formatValue, parseValue, valueChoices, valueErrors, valueExample } from '@/model/defaults'
+import {
+  INT_PRIMITIVES,
+  UNSIGNED_PRIMITIVES,
+  type Field,
+  type TypeDef,
+  type Value,
+  type ValueField
+} from '@/model/types'
+import {
+  formatValue,
+  parseValue,
+  valueChoices,
+  valueErrors,
+  valueExample,
+  valueFlags
+} from '@/model/defaults'
 import { Icon } from '@/components/Icon'
 
 function withType<K extends TypeDef['kind']>(
@@ -40,6 +54,37 @@ export function DefaultInput(props: {
 }): ReactNode {
   const { field, types, onChange } = props
   const text = field.default === undefined ? '' : formatValue(field.default)
+  const flags = valueFlags(field.type, types)
+  if (flags) {
+    const set = Array.isArray(field.default) ? field.default : []
+    const toggle = (name: string): Value[] =>
+      set.includes(name) ? set.filter((x) => x !== name) : flags.filter((x) => x === name || set.includes(x))
+    return (
+      <button
+        type="button"
+        className="flags-input"
+        title="Flags set by default"
+        onClick={(e) =>
+          openContextMenu(e, [
+            { label: '— no default —', checked: field.default === undefined, run: () => onChange(undefined) },
+            {
+              label: 'No flag',
+              checked: Array.isArray(field.default) && !set.length,
+              run: () => onChange([])
+            },
+            'separator',
+            ...flags.map((name) => ({
+              label: name,
+              checked: set.includes(name),
+              run: () => onChange(toggle(name))
+            }))
+          ])
+        }
+      >
+        {text || '— no default —'}
+      </button>
+    )
+  }
   const choices = valueChoices(field.type, types)
   if (choices) {
     const texts = choices.map(formatValue)
@@ -289,6 +334,70 @@ export function TypeInspector({ id }: { id: string }): ReactNode {
               }
             >
               <Icon name="plus" /> Add value
+            </button>
+          </Section>
+        )}
+
+        {t.kind === 'bitmask' && (
+          <Section title={`Flags (${t.flags.length})`}>
+            <Row label="Underlying">
+              <Select
+                value={t.underlying}
+                options={UNSIGNED_PRIMITIVES}
+                onChange={(v) => withType<'bitmask'>(id, (x) => void (x.underlying = v))}
+              />
+            </Row>
+            <table className="grid">
+              <tbody>
+                {t.flags.map((v, i) => (
+                  <tr key={v.id}>
+                    <td>
+                      <CommitInput
+                        value={v.name}
+                        validate={identifier}
+                        onCommit={(n) => withType<'bitmask'>(id, (x) => void (x.flags[i]!.name = n))}
+                      />
+                    </td>
+                    <td title="Bit: value 1 << bit">
+                      <NumberInput
+                        value={v.bit}
+                        integer
+                        min={0}
+                        onChange={(n) =>
+                          n !== undefined && withType<'bitmask'>(id, (x) => void (x.flags[i]!.bit = n))
+                        }
+                      />
+                    </td>
+                    <td>
+                      <IconButton
+                        icon="x"
+                        title="Remove"
+                        danger
+                        onClick={() => withType<'bitmask'>(id, (x) => void x.flags.splice(i, 1))}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <button
+              type="button"
+              className="link-button"
+              onClick={() =>
+                withType<'bitmask'>(id, (x) => {
+                  const next = x.flags.length ? Math.max(...x.flags.map((v) => v.bit)) + 1 : 0
+                  x.flags.push({
+                    id: newId(),
+                    name: uniqueName(
+                      'Flag',
+                      x.flags.map((v) => v.name)
+                    ),
+                    bit: next
+                  })
+                })
+              }
+            >
+              <Icon name="plus" /> Add flag
             </button>
           </Section>
         )}

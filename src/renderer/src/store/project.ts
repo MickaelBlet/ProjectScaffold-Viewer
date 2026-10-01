@@ -381,6 +381,7 @@ export function addType(kind: TypeDef['kind']): Id {
     }
     if (kind === 'struct') d.types.push({ ...base, kind, fields: [] })
     else if (kind === 'enum') d.types.push({ ...base, kind, underlying: 'uint8', values: [] })
+    else if (kind === 'bitmask') d.types.push({ ...base, kind, underlying: 'uint32', flags: [] })
     else if (kind === 'alias') d.types.push({ ...base, kind, type: { kind: 'primitive', name: 'uint32' } })
     else d.types.push({ ...base, kind })
   })

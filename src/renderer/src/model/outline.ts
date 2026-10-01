@@ -11,6 +11,7 @@ export type OutlineKind =
   | 'section'
   | 'struct'
   | 'enum'
+  | 'bitmask'
   | 'alias'
   | 'primitive'
   | 'field'
@@ -102,7 +103,7 @@ function list(
   })
 }
 
-const TYPE_KINDS = new Set<OutlineKind>(['struct', 'enum', 'alias', 'primitive'])
+const TYPE_KINDS = new Set<OutlineKind>(['struct', 'enum', 'bitmask', 'alias', 'primitive'])
 
 /** Qualifiers set on an attribute, method or parameter (`static const`, `virtual pure`). */
 function qualifierText(map: YAMLMap): string[] {
@@ -129,8 +130,17 @@ const type: Make = (item, path, names) => {
         ? list(item, 'values', path, names, (v, p, n) =>
             entry(v, 'value', p, n, { detail: text(v, 'value') })
           )
-        : []
-  const detail = kind === 'alias' ? typeText(item, 'type') : kind === 'enum' ? text(item, 'underlying') : kind
+        : kind === 'bitmask'
+          ? list(item, 'flags', path, names, (v, p, n) =>
+              entry(v, 'value', p, n, { detail: `1 << ${text(v, 'bit') ?? '?'}` })
+            )
+          : []
+  const detail =
+    kind === 'alias'
+      ? typeText(item, 'type')
+      : kind === 'enum' || kind === 'bitmask'
+        ? text(item, 'underlying')
+        : kind
   return entry(item, kind, path, names, { detail, children })
 }
 
