@@ -93,6 +93,12 @@ export function SettingsPanel(): ReactNode {
           />
         </Row>
         <Check
+          label="Select before moving"
+          hint="Only selected modules, notes and frames move when dragged; dragging others pans the view"
+          value={s.selectToMove}
+          onChange={(v) => setSetting('selectToMove', v)}
+        />
+        <Check
           label="Alignment guides while dragging"
           value={s.guides}
           onChange={(v) => setSetting('guides', v)}

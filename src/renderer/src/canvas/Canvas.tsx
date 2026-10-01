@@ -196,7 +196,8 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
       gridSize: s.gridSize,
       theme: s.theme,
       minimap: s.minimap,
-      inheritance: s.inheritance
+      inheritance: s.inheritance,
+      selectToMove: s.selectToMove
     }))
   )
   const flow = useReactFlow()
@@ -230,10 +231,13 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
   }, [project, view, visible, settings.autoOrientLinks])
   const grid = settings.snapToGrid ? settings.gridSize : null
   // Nodes and links are rebuilt on every edit; only those that changed get new objects (and render again).
+  const selectToMove = settings.selectToMove
   useEffect(
     () =>
-      setNodes((prev) => reuseUnchanged(prev, toNodes(project, view, selectedSet, sides, externals, grid))),
-    [project, view, selectedSet, sides, externals, grid, setNodes]
+      setNodes((prev) =>
+        reuseUnchanged(prev, toNodes(project, view, selectedSet, sides, externals, grid, selectToMove))
+      ),
+    [project, view, selectedSet, sides, externals, grid, selectToMove, setNodes]
   )
   const [edges, setEdges] = useEdgesState<Edge>([])
   useEffect(
@@ -536,7 +540,8 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
   const onNodeDragStart: OnNodeDrag = useCallback(
     (_, node, dragged) => {
       frameDrag.current = null
-      const notes = getProject().notes
+      const p = getProject()
+      const notes = p.notes
       const frames = dragged
         .filter((n) => notes.find((x) => x.id === n.id)?.kind === 'frame')
         .map((n) => nodeRect(n.id))
@@ -545,7 +550,9 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
       const moving = new Set(dragged.map((n) => n.id))
       const nodes = new Map<string, Point>()
       for (const n of flow.getNodes()) {
-        if (moving.has(n.id) || n.parentId || n.draggable === false || n.type === 'external') continue
+        // Unselected nodes are not draggable with `selectToMove`, yet still carried: only locked ones stay.
+        const locked = [...p.modules, ...notes].find((x) => x.id === n.id)?.locked
+        if (moving.has(n.id) || n.parentId || locked || n.type === 'external') continue
         const r = nodeRect(n.id)
         if (r && frames.some((f) => within(r, f))) nodes.set(n.id, { ...n.position })
       }

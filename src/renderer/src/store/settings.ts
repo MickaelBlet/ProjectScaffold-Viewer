@@ -15,6 +15,8 @@ export interface Settings {
   gridSize: number
   /** Alignment guides and snapping to sibling edges while dragging. */
   guides: boolean
+  /** Only selected modules, notes and frames move when dragged; others pan the view. */
+  selectToMove: boolean
   edgeStyle: EdgeStyle
   portStyle: PortStyle
   minimap: boolean
@@ -42,6 +44,7 @@ export const DEFAULT_SETTINGS: Settings = {
   snapToGrid: false,
   gridSize: 20,
   guides: true,
+  selectToMove: true,
   edgeStyle: 'bezier',
   portStyle: 'hollow',
   minimap: true,

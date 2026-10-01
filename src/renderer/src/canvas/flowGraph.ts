@@ -33,15 +33,20 @@ export type PortNodeData = {
   anchors: Record<Id, LinkAnchor>
 }
 
-/** React Flow nodes of a view: its modules (parents first), notes and outside stand-ins. */
+/**
+ * React Flow nodes of a view: its modules (parents first), notes and outside stand-ins. With
+ * `selectToMove`, only selected nodes are draggable.
+ */
 export function toNodes(
   p: Project,
   view: View,
   selected: Set<Id>,
   sides: PortSides | null,
   externals: Node<ExternalNodeData>[],
-  grid: number | null
+  grid: number | null,
+  selectToMove = false
 ): Node[] {
+  const movable = (id: Id): boolean => !selectToMove || selected.has(id)
   // On the grid, sizes grown for their ports stay multiples of it.
   const fit = (v: number): number => (grid ? ceilToGrid(v, grid) : v)
   const visible = visibleModuleIds(p, view)
@@ -55,7 +60,7 @@ export function toNodes(
         width: n.layout.width,
         height: n.layout.height,
         selected: selected.has(n.id),
-        draggable: !n.locked,
+        draggable: !n.locked && movable(n.id),
         zIndex: n.kind === 'frame' ? Z.frame : Z.note,
         data: {}
       })
@@ -89,7 +94,7 @@ export function toNodes(
         : m.layout.height,
       parentId: isRoot ? undefined : (m.parentId ?? undefined),
       // The root of a drill-down view is the frame of the view.
-      draggable: !isRoot && !m.locked,
+      draggable: !isRoot && !m.locked && movable(m.id),
       selected: selected.has(m.id),
       zIndex: containers.has(m.id) ? Z.container : Z.module,
       data: portData(m.ports, placements)
@@ -112,6 +117,7 @@ export function toNodes(
           : size.height
       ),
       selected: selected.has(m.id),
+      draggable: movable(m.id),
       zIndex: Z.module,
       data: portData(m.ports, placements)
     })
