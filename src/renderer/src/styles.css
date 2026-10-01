@@ -3,6 +3,9 @@
   --bg: #f6f7f9;
   --panel: #ffffff;
   --panel-2: #f0f2f5;
+  /* Alternating entries of field lists. */
+  --row-even: #e6e6e6;
+  --row-odd: #f3f5f8;
   --border: #d9dde3;
   --text: #1d2330;
   --muted: #6b7384;
@@ -28,6 +31,8 @@
     --bg: #15181e;
     --panel: #1c2028;
     --panel-2: #232833;
+    --row-odd: #2c323f;
+    --row-even: #222731;
     --border: #333a47;
     --text: #e3e7ef;
     --muted: #8b93a5;
@@ -50,6 +55,8 @@
   --bg: #15181e;
   --panel: #1c2028;
   --panel-2: #232833;
+  --row-odd: #2c323f;
+  --row-even: #222731;
   --border: #333a47;
   --text: #e3e7ef;
   --muted: #8b93a5;
@@ -73,6 +80,8 @@
   --bg: var(--vscode-editor-background);
   --panel: var(--vscode-sideBar-background, var(--vscode-editor-background));
   --panel-2: var(--vscode-editorGroupHeader-tabsBackground, var(--vscode-editorWidget-background));
+  --row-even: var(--panel);
+  --row-odd: color-mix(in srgb, var(--text) 5%, var(--panel));
   --border: var(--vscode-panel-border, var(--vscode-editorGroup-border, var(--vscode-widget-border)));
   --text: var(--vscode-foreground);
   --muted: var(--vscode-descriptionForeground);
@@ -1145,13 +1154,36 @@ fieldset.readonly {
 input.number {
   width: 90px;
 }
+/* Table rows: the cells carry the look of list entries, the outer ones its rounded ends. */
 .grid {
   width: 100%;
-  border-collapse: collapse;
+  margin: -4px 0;
+  border-collapse: separate;
+  border-spacing: 0 4px;
 }
 .grid td {
-  padding: 2px 2px;
+  padding: 8px 2px;
   vertical-align: top;
+  background: var(--row-odd);
+}
+.grid tr:nth-child(even) > td {
+  background: var(--row-even);
+}
+.grid td:first-child {
+  padding-left: 8px;
+  border-radius: 6px 0 0 6px;
+}
+.grid td:last-child {
+  padding-right: 8px;
+  border-radius: 0 6px 6px 0;
+}
+.grid td:only-child {
+  border-radius: 6px;
+}
+/* Columns of buttons and numbers as wide as their content; the others share the rest. */
+.grid td:is(:empty, :has(> button.icon, input.number)) {
+  width: 1px;
+  white-space: nowrap;
 }
 /*
  * Named, typed entries (fields, parameters, attributes): one line when the inspector is wide enough,
@@ -1161,6 +1193,7 @@ input.number {
 .field-list {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto minmax(0, 2fr) 0 auto;
+  row-gap: 4px;
 }
 .field-list.has-value {
   grid-template-columns: minmax(0, 1fr) auto auto minmax(0, 2fr) minmax(0, 1fr) auto;
@@ -1169,6 +1202,27 @@ input.number {
   display: grid;
   grid-column: 1 / -1;
   grid-template-columns: subgrid;
+}
+/*
+ * Entries of the inspector's lists (fields, metadata, binaries, references; table rows above): rounded,
+ * every other one shaded (type trees between field rows do not count).
+ */
+.field-row,
+.metadata .kv,
+.binary-item,
+ul.plain > li {
+  border-radius: 6px;
+  padding: 6px;
+  background: var(--row-odd);
+}
+.field-row:nth-child(even of .field-row),
+.metadata .kv:nth-child(even of .kv),
+.binary-item:nth-child(even of .binary-item),
+ul.plain > li:nth-child(even) {
+  background: var(--row-even);
+}
+ul.plain > li + li {
+  margin-top: 4px;
 }
 .field-row > * {
   min-width: 0;
@@ -1211,12 +1265,6 @@ input.number {
     grid-column: 1 / -1;
     grid-row: 2;
   }
-  /* Entries on several lines: a line between them tells them apart. */
-  .field-list.has-value > .field-row:not(:first-child) {
-    margin-top: 3px;
-    padding-top: 3px;
-    border-top: 1px solid var(--border);
-  }
 }
 @container (max-width: 380px) {
   .field-list,
@@ -1229,11 +1277,6 @@ input.number {
   }
   .field-list.has-value > .field-row > .value {
     grid-row: 3;
-  }
-  .field-row:not(:first-child) {
-    margin-top: 3px;
-    padding-top: 3px;
-    border-top: 1px solid var(--border);
   }
 }
 .grid select {
@@ -2836,7 +2879,7 @@ mark {
   background: color-mix(in srgb, var(--binary-color, var(--muted)) 14%, transparent);
 }
 .binary-item {
-  margin-bottom: 8px;
+  margin-bottom: 4px;
 }
 .module.imported .unknown small {
   color: var(--danger);
