@@ -3,7 +3,7 @@ import { useProjectStore } from '@/store/project'
 import { openContextMenu } from '@/store/ui'
 import { navigate } from '@/actions'
 import { parseTypeRef, printTypeRef, TypeExprError } from '@/model/typeExpr'
-import { CONTAINERS, PRIMITIVES, type Primitive, type TypeRef } from '@/model/types'
+import { BOUNDED_PRIMITIVES, CONTAINERS, PRIMITIVES, type Primitive, type TypeRef } from '@/model/types'
 import { Icon } from './Icon'
 import { useDraft } from './useDraft'
 
@@ -192,22 +192,55 @@ export function TypeTree(props: {
   const t = props.value
   const selected = t.kind === 'primitive' ? t.name : t.kind === 'ref' ? `ref:${t.id}` : t.kind
 
+  // The bound is kept from one bounded kind to another.
+  const bound = 'max' in t && t.max !== undefined ? { max: t.max } : {}
+  const boundable =
+    t.kind === 'primitive'
+      ? (BOUNDED_PRIMITIVES as readonly string[]).includes(t.name)
+      : t.kind === 'vector' || t.kind === 'list' || t.kind === 'set' || t.kind === 'map'
+
   const change = (v: string): void => {
     if ((PRIMITIVES as readonly string[]).includes(v))
-      return props.onChange({ kind: 'primitive', name: v as Primitive })
+      return props.onChange({
+        kind: 'primitive',
+        name: v as Primitive,
+        ...((BOUNDED_PRIMITIVES as readonly string[]).includes(v) ? bound : {})
+      })
     if (v.startsWith('ref:')) return props.onChange({ kind: 'ref', id: v.slice(4) })
     const inner = 'of' in t ? t.of : t.kind === 'map' ? t.value : DEFAULT
     switch (v) {
       case 'array':
         return props.onChange({ kind: 'array', of: inner, size: 'size' in t ? t.size : 1 })
       case 'map':
-        return props.onChange({ kind: 'map', key: { kind: 'primitive', name: 'string' }, value: inner })
+        return props.onChange({
+          kind: 'map',
+          key: { kind: 'primitive', name: 'string' },
+          value: inner,
+          ...bound
+        })
       case 'vector':
       case 'list':
       case 'set':
+        return props.onChange({ kind: v, of: inner, ...bound })
       case 'optional':
         return props.onChange({ kind: v, of: inner })
     }
+  }
+
+  const changeMax = (text: string): void => {
+    if (
+      t.kind !== 'primitive' &&
+      t.kind !== 'vector' &&
+      t.kind !== 'list' &&
+      t.kind !== 'set' &&
+      t.kind !== 'map'
+    )
+      return
+    const rest = { ...t }
+    delete rest.max
+    const max = Math.floor(Number(text))
+    if (!text.trim()) props.onChange(rest)
+    else if (max > 0) props.onChange({ ...rest, max })
   }
 
   return (
@@ -253,6 +286,17 @@ export function TypeTree(props: {
               const size = Math.floor(Number(e.target.value))
               if (size > 0) props.onChange({ ...t, size })
             }}
+          />
+        )}
+        {boundable && (
+          <input
+            className="number"
+            type="number"
+            min={1}
+            value={'max' in t ? (t.max ?? '') : ''}
+            placeholder="max"
+            title="Bound: most bytes of a string or bytes, most items of a container (empty: none)"
+            onChange={(e) => changeMax(e.target.value)}
           />
         )}
       </div>
