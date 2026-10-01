@@ -36,6 +36,9 @@ interface DirHandle {
   removeEntry(name: string): Promise<void>
   queryPermission?(opts: { mode: 'readwrite' }): Promise<Permission>
   requestPermission?(opts: { mode: 'readwrite' }): Promise<Permission>
+  /** Names from this folder down to the entry; null when it is not inside. */
+  resolve?(entry: FileHandle | DirHandle): Promise<string[] | null>
+  isSameEntry?(other: DirHandle): Promise<boolean>
 }
 
 interface FsAccessWindow {
@@ -425,20 +428,88 @@ function pickFolderWithInput(): Promise<Map<string, File> | null> {
   })
 }
 
+// Folders of the workspaces read, most recent first: a workspace file inside one of them is read
+// again without picking its folder.
+const WORKSPACE_DIRS_KEY = 'workspaceDirs'
+const MAX_WORKSPACE_DIRS = 20
+
+async function loadWorkspaceDirs(): Promise<DirHandle[]> {
+  try {
+    return (
+      (await withStore<DirHandle[] | undefined>(
+        'readonly',
+        (s) => s.get(WORKSPACE_DIRS_KEY) as IDBRequest<DirHandle[] | undefined>
+      )) ?? []
+    )
+  } catch {
+    return []
+  }
+}
+
+async function rememberWorkspaceDir(dir: DirHandle): Promise<void> {
+  const known = await loadWorkspaceDirs()
+  const others: DirHandle[] = []
+  for (const d of known) if (!(await d.isSameEntry?.(dir).catch(() => false))) others.push(d)
+  try {
+    const dirs = [dir, ...others].slice(0, MAX_WORKSPACE_DIRS)
+    await withStore('readwrite', (s) => s.put(dirs, WORKSPACE_DIRS_KEY))
+  } catch {
+    // Handles cannot be stored (file:// origin, private browsing): the folder is picked next time.
+  }
+}
+
+/** The folder holding a file, from a folder it is somewhere inside; null when it is not. */
+async function folderOf(root: DirHandle, file: FileHandle): Promise<DirHandle | null> {
+  try {
+    const parts = await root.resolve?.(file)
+    if (!parts?.length) return null
+    let dir = root
+    for (const p of parts.slice(0, -1)) dir = await dir.getDirectoryHandle(p)
+    return dir
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Folder of a workspace file from the folders granted before: those still granted first, else the
+ * first one holding it, whose permission is asked again.
+ */
+async function knownWorkspaceFolder(file: FileHandle): Promise<DirHandle | undefined> {
+  const dirs = await loadWorkspaceDirs()
+  for (const ask of [false, true])
+    for (const root of dirs) {
+      if (!(await granted(root, false))) {
+        // Permission is asked for one folder only, and only once a folder holds the file.
+        if (!ask || !(await root.resolve?.(file).catch(() => null))) continue
+        if (!(await granted(root, true))) return undefined
+      }
+      const dir = await folderOf(root, file)
+      if (dir) return dir
+    }
+  return undefined
+}
+
 async function readWorkspace(path: string, files: string[]): Promise<(OpenResult | null)[] | null> {
   const record = await loadWorkspace()
   const entries: RecentEntry[] = []
   const results: (OpenResult | null)[] = []
-  let dir = record?.name === path && record.dir && (await granted(record.dir, true)) ? record.dir : undefined
+  const file = handles.get(path)
+  let dir = file ? await knownWorkspaceFolder(file) : undefined
+  if (!dir && record?.name === path && record.dir && (await granted(record.dir, true))) dir = record.dir
   if (!dir && fs.showDirectoryPicker) {
+    let picked: DirHandle
     try {
-      dir = await fs.showDirectoryPicker({ id: 'workspace', mode: 'readwrite', startIn: handles.get(path) })
+      picked = await fs.showDirectoryPicker({ id: 'workspace', mode: 'readwrite', startIn: file })
     } catch (e) {
       if (isAbort(e)) return null
       throw e
     }
+    // The folder holding the workspace file, or any folder above it.
+    dir = (file && (await folderOf(picked, file))) ?? picked
     if (!(await fileAt(dir, path.split(/[\\/]/).pop()!)))
-      throw new Error(`${path} is not in the folder ${dir.name}: pick the folder holding it`)
+      throw new Error(`${path} is not in the folder ${picked.name}: pick the folder holding it`)
+    await rememberWorkspaceDir(picked)
   }
   if (dir) {
     for (const file of files) {
