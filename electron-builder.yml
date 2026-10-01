@@ -22,3 +22,5 @@ win:
     - { target: zip, arch: x64 }
 portable:
   artifactName: ${productName}-${version}-portable.${ext}
+  # Unpacks next to the exe (scripts/patch_portable.sh): true keeps the template's %TEMP% folder off.
+  unpackDirName: true

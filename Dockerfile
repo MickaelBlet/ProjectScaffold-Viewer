@@ -89,6 +89,7 @@ WORKDIR /app
 COPY --from=deps /app/node_modules node_modules
 COPY package.json package-lock.json electron-builder.yml ./
 COPY electron electron
+COPY scripts/patch_portable.sh scripts/
 COPY --from=web /app/dist-web dist-web
 
 FROM electron-src AS electron-linux
@@ -101,7 +102,7 @@ RUN --mount=type=cache,id=electron-linux,target=/root/.cache/electron \
 FROM electron-src AS electron-windows
 RUN --mount=type=cache,id=electron-windows,target=/root/.cache/electron \
     --mount=type=cache,id=electron-builder-windows,target=/root/.cache/electron-builder \
-    npx electron-builder --win \
+    scripts/patch_portable.sh && npx electron-builder --win \
     && mkdir -p /out/windows \
     && cp dist-electron/*-portable.exe dist-electron/*-win-*.zip /out/windows/
 
