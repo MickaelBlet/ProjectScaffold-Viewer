@@ -12,6 +12,7 @@ export type OutlineKind =
   | 'struct'
   | 'enum'
   | 'bitmask'
+  | 'union'
   | 'alias'
   | 'primitive'
   | 'field'
@@ -103,7 +104,7 @@ function list(
   })
 }
 
-const TYPE_KINDS = new Set<OutlineKind>(['struct', 'enum', 'bitmask', 'alias', 'primitive'])
+const TYPE_KINDS = new Set<OutlineKind>(['struct', 'enum', 'bitmask', 'union', 'alias', 'primitive'])
 
 /** Qualifiers set on an attribute, method or parameter (`static const`, `virtual pure`). */
 function qualifierText(map: YAMLMap): string[] {
@@ -116,6 +117,17 @@ function valueText(map: YAMLMap): string | undefined {
   const type = typeText(map, 'type')
   const typed = node === undefined ? type : `${type ?? ''} = ${formatValue(node.toJSON() as Value)}`
   return [...qualifierText(map), typed].filter(Boolean).join(' ') || undefined
+}
+
+/** Type of a union case, then its labels: `Circle (1, 2)`, `Other (default)`. */
+function caseText(map: YAMLMap): string | undefined {
+  const labels = map.get('labels', true) as YamlNode | undefined
+  const shown = [
+    ...(isSeq(labels) ? labels.items.map((l) => formatValue((l as YamlNode).toJSON() as Value)) : []),
+    ...(map.get('default') === true ? ['default'] : [])
+  ]
+  const type = typeText(map, 'type')
+  return [type, shown.length ? `(${shown.join(', ')})` : ''].filter(Boolean).join(' ') || undefined
 }
 
 const field: Make = (item, path, names) => entry(item, 'field', path, names, { detail: valueText(item) })
@@ -134,13 +146,17 @@ const type: Make = (item, path, names) => {
           ? list(item, 'flags', path, names, (v, p, n) =>
               entry(v, 'value', p, n, { detail: `1 << ${text(v, 'bit') ?? '?'}` })
             )
-          : []
+          : kind === 'union'
+            ? list(item, 'cases', path, names, (v, p, n) => entry(v, 'field', p, n, { detail: caseText(v) }))
+            : []
   const detail =
     kind === 'alias'
       ? typeText(item, 'type')
-      : kind === 'enum' || kind === 'bitmask'
-        ? text(item, 'underlying')
-        : kind
+      : kind === 'union'
+        ? `switch (${typeText(item, 'discriminator') ?? '?'})`
+        : kind === 'enum' || kind === 'bitmask'
+          ? text(item, 'underlying')
+          : kind
   return entry(item, kind, path, names, { detail, children })
 }
 

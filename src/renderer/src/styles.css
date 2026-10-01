@@ -680,6 +680,9 @@ kbd {
 .kind-badge.bitmask {
   background: #c0567a;
 }
+.kind-badge.union {
+  background: #3f8f3a;
+}
 .kind-badge.alias {
   background: #2e9e8f;
 }
@@ -2660,4 +2663,15 @@ mark {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Labels of a union case, then its default checkbox. */
+.case-labels {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.case-labels > :first-child {
+  flex: 1;
+  min-width: 0;
 }

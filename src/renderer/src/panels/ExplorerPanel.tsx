@@ -41,7 +41,7 @@ import { openEditor, openView } from '@/shell/controllers'
 import { Icon } from '@/components/Icon'
 import { onListKeyDown, tabStop } from '@/components/listKeys'
 
-const KIND_BADGE = { struct: 'S', enum: 'E', bitmask: 'B', alias: 'A', primitive: 'P' } as const
+const KIND_BADGE = { struct: 'S', enum: 'E', bitmask: 'B', union: 'U', alias: 'A', primitive: 'P' } as const
 
 function Section(props: {
   title: string
@@ -474,7 +474,7 @@ export function ExplorerPanel(): ReactNode {
       <Section
         title="Types"
         count={ownTypes.length}
-        actions={(['struct', 'enum', 'bitmask', 'alias', 'primitive'] as const).map((k) => (
+        actions={(['struct', 'enum', 'bitmask', 'union', 'alias', 'primitive'] as const).map((k) => (
           <button
             key={k}
             type="button"

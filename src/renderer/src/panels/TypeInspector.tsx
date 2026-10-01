@@ -12,6 +12,8 @@ import {
   UNSIGNED_PRIMITIVES,
   type Field,
   type TypeDef,
+  type TypeRef,
+  type UnionCase,
   type Value,
   type ValueField
 } from '@/model/types'
@@ -119,6 +121,45 @@ export function DefaultInput(props: {
       validate={(v) => parse(v).error}
       onCommit={(v) => onChange(parse(v).value)}
     />
+  )
+}
+
+/** Labels of a union case (`1, 2`, `Circle`), and whether it is the default case. */
+function CaseLabels(props: {
+  value: UnionCase
+  discriminator: TypeRef
+  types: TypeDef[]
+  onChange: (labels: Value[], isDefault: boolean) => void
+}): ReactNode {
+  const { value: c, discriminator, types, onChange } = props
+  const text = c.labels.map(formatValue).join(', ')
+  const parse = (v: string): { labels: Value[]; error: string | null } => {
+    if (!v.trim()) return { labels: [], error: null }
+    try {
+      const parsed = parseValue(`[${v}]`)
+      const labels = Array.isArray(parsed) ? parsed : [parsed]
+      const errors = labels.flatMap((l) =>
+        valueErrors(l, discriminator, types).map((e) => `${formatValue(l)}: ${e}`)
+      )
+      return { labels, error: errors.join('; ') || null }
+    } catch (e) {
+      return { labels: [], error: e instanceof Error ? e.message.split('\n')[0]! : String(e) }
+    }
+  }
+  return (
+    <div className="case-labels">
+      <CommitInput
+        value={text}
+        placeholder={formatValue(valueExample(discriminator, types))}
+        title="Labels: discriminator values selecting the case, separated by commas"
+        validate={(v) => parse(v).error}
+        onCommit={(v) => onChange(parse(v).labels, c.isDefault)}
+      />
+      <label className="check" title="Held for the discriminator values no case lists">
+        <input type="checkbox" checked={c.isDefault} onChange={(e) => onChange(c.labels, e.target.checked)} />
+        default
+      </label>
+    </div>
   )
 }
 
@@ -269,6 +310,37 @@ export function TypeInspector({ id }: { id: string }): ReactNode {
                   field={f}
                   types={project.types}
                   onChange={(v) => withType<'struct'>(id, (x) => setDefault(x.fields[i]!, v))}
+                />
+              )}
+            />
+          </Section>
+        )}
+
+        {t.kind === 'union' && (
+          <Section title={`Cases (${t.cases.length})`}>
+            <Row label="Discriminator">
+              <TypeEditor
+                value={t.discriminator}
+                onChange={(d) => withType<'union'>(id, (x) => void (x.discriminator = d))}
+              />
+            </Row>
+            <FieldList<UnionCase>
+              fields={t.cases}
+              addLabel="Add case"
+              baseName="case"
+              extra={{ labels: [], isDefault: false }}
+              onChange={(fn) => withType<'union'>(id, (x) => fn(x.cases))}
+              value={(c, i) => (
+                <CaseLabels
+                  value={c}
+                  discriminator={t.discriminator}
+                  types={project.types}
+                  onChange={(labels, isDefault) =>
+                    withType<'union'>(id, (x) => {
+                      x.cases[i]!.labels = labels
+                      x.cases[i]!.isDefault = isDefault
+                    })
+                  }
                 />
               )}
             />

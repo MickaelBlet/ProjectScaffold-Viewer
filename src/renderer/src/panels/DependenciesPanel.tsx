@@ -23,7 +23,7 @@ import { onListKeyDown, tabStop } from '@/components/listKeys'
 
 type Entity = TypeDef | Interface
 
-const KIND_BADGE = { struct: 'S', enum: 'E', bitmask: 'B', alias: 'A', primitive: 'P' } as const
+const KIND_BADGE = { struct: 'S', enum: 'E', bitmask: 'B', union: 'U', alias: 'A', primitive: 'P' } as const
 
 const isInterface = (e: Entity): e is Interface => 'messages' in e
 const kindOf = (e: Entity): 'type' | 'interface' => (isInterface(e) ? 'interface' : 'type')
@@ -34,6 +34,7 @@ function memberNames(e: Entity): string[] {
   if (e.kind === 'struct') return e.fields.map((f) => f.name)
   if (e.kind === 'enum') return e.values.map((v) => v.name)
   if (e.kind === 'bitmask') return e.flags.map((v) => v.name)
+  if (e.kind === 'union') return e.cases.map((c) => c.name)
   return []
 }
 
@@ -46,6 +47,8 @@ function summary(e: Entity, print: (t: TypeRef) => string): string {
       return `${e.underlying}, ${e.values.length} value${e.values.length === 1 ? '' : 's'}`
     case 'bitmask':
       return `${e.underlying}, ${e.flags.length} flag${e.flags.length === 1 ? '' : 's'}`
+    case 'union':
+      return `switch (${print(e.discriminator)}), ${e.cases.length} case${e.cases.length === 1 ? '' : 's'}`
     case 'alias':
       return `= ${print(e.type)}`
     case 'primitive':
@@ -98,25 +101,43 @@ function Members({ e, print }: { e: Entity; print: (t: TypeRef) => string }): Re
           ),
           description: f.description
         }))
-      : e.kind === 'enum'
-        ? e.values.map((v) => ({
-            key: v.id,
+      : e.kind === 'union'
+        ? e.cases.map((c) => ({
+            key: c.id,
             code: (
               <>
-                <span className="lib-member-name">{v.name}</span> = {v.value}
+                <span className="lib-member-name">{c.name}</span>:{' '}
+                <span className="lib-type">{print(c.type)}</span>{' '}
+                <span className="lib-default">
+                  (
+                  {[...c.labels.map((l) => JSON.stringify(l)), ...(c.isDefault ? ['default'] : [])].join(
+                    ', '
+                  )}
+                  )
+                </span>
               </>
-            )
+            ),
+            description: c.description
           }))
-        : e.kind === 'bitmask'
-          ? e.flags.map((v) => ({
+        : e.kind === 'enum'
+          ? e.values.map((v) => ({
               key: v.id,
               code: (
                 <>
-                  <span className="lib-member-name">{v.name}</span> = 1 &lt;&lt; {v.bit}
+                  <span className="lib-member-name">{v.name}</span> = {v.value}
                 </>
               )
             }))
-          : []
+          : e.kind === 'bitmask'
+            ? e.flags.map((v) => ({
+                key: v.id,
+                code: (
+                  <>
+                    <span className="lib-member-name">{v.name}</span> = 1 &lt;&lt; {v.bit}
+                  </>
+                )
+              }))
+            : []
   if (!rows.length) return null
   return (
     <ul className="lib-members">
