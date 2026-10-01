@@ -795,7 +795,7 @@ kbd {
 .lib-detail {
   padding: 0 8px 12px;
 }
-/* Definitions tab: every constant, type and interface beside the editor of the chosen one. */
+/* Definitions tab: every definition but the views, beside the editor of the chosen one. */
 .definitions-editor {
   container-type: inline-size;
   height: 100%;

@@ -219,7 +219,8 @@ function Chips({
   )
 }
 
-function Detail({ lib, filter }: { lib: Dependency; filter: string }): ReactNode {
+/** A dependency: its relations, types, interfaces, constants and placed modules. */
+export function DependencyDetail({ lib, filter }: { lib: Dependency; filter: string }): ReactNode {
   const project = useProjectStore((s) => s.project)
   const selectedIds = useDoc((d) => d.selectedIds)
   const [collapsed, setCollapsed] = useState<ReadonlySet<Id>>(new Set())
@@ -512,7 +513,7 @@ export function DependenciesPanel(): ReactNode {
           />
         </div>
         {lib ? (
-          <Detail key={lib.id} lib={lib} filter={filter} />
+          <DependencyDetail key={lib.id} lib={lib} filter={filter} />
         ) : (
           <p className="muted lib-none">No dependency selected.</p>
         )}

@@ -461,7 +461,7 @@ const allCommands: Command[] = [
   },
   {
     id: 'view.definitions',
-    title: 'Open definitions view (constants, types, interfaces)',
+    title: 'Open definitions view',
     category: 'View',
     keys: ['Alt+T'],
     run: () => openDefinitions()

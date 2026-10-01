@@ -489,7 +489,7 @@ export function ExplorerPanel(): ReactNode {
                   selected={id === currentView}
                   tabStop={id === viewStop}
                   className={id === currentView ? 'current' : ''}
-                  title="Every constant, type and interface"
+                  title="Every dependency, binary, type, interface, constant, module and link"
                   onClick={() => openDefinitions()}
                   onContextMenu={definitionsMenu}
                 >
@@ -497,7 +497,15 @@ export function ExplorerPanel(): ReactNode {
                     <Icon name="definitions" />
                   </span>
                   Definitions
-                  <small>{ownConsts.length + ownTypes.length + ownInterfaces.length}</small>
+                  <small>
+                    {dependencies.length +
+                      binaries.length +
+                      ownTypes.length +
+                      ownInterfaces.length +
+                      ownConsts.length +
+                      modules.length +
+                      links.length}
+                  </small>
                 </Item>
               )
             const v = id === GLOBAL_VIEW ? GLOBAL : views.find((v) => v.id === id)!
