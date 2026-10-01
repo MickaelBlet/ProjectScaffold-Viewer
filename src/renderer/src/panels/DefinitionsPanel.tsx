@@ -1,6 +1,16 @@
 // Definitions tab: every dependency, binary, type, interface, constant, module and link of the document
 // in one list (filter, kinds, usages, problems), beside the editor of the chosen one.
-import { useMemo, useState, type MouseEvent, type ReactNode } from 'react'
+import {
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent,
+  type MouseEvent,
+  type PointerEvent,
+  type ReactNode,
+  type RefObject
+} from 'react'
 import { allTypeRefs, endpointLabel, modulePaths, newId, uniqueName } from '@/model/project'
 import { removeBinary } from '@/model/binaries'
 import { dependencyEntities } from '@/model/dependencies'
@@ -15,6 +25,7 @@ import { commandItem } from '@/commands'
 import { addModuleAt, navigate, openImportSource, pickDependency } from '@/actions'
 import { openEditor, type EditorKind } from '@/shell/controllers'
 import { Icon } from '@/components/Icon'
+import { storage } from '@/storage'
 import { onListKeyDown, tabStop } from '@/components/listKeys'
 import { childrenByParent } from './ModulesPanel'
 import { dependencyMenu, DependencyDetail } from './DependenciesPanel'
@@ -227,6 +238,84 @@ function rowsOf(p: Project): Record<Category, Row[]> {
   }
 }
 
+const WIDTH_KEY = 'project-scaffold:definitions-list-width'
+const DEFAULT_WIDTH = 280
+const MIN_WIDTH = 180
+/** Room kept for the editor beside the list. */
+const MIN_MAIN = 240
+
+function savedWidth(): number {
+  const n = Number(storage.getItem(WIDTH_KEY))
+  return n >= MIN_WIDTH ? n : DEFAULT_WIDTH
+}
+
+/** Width of the list, dragged or moved by the arrow keys on the splitter, kept between sessions. */
+function useListWidth(): {
+  width: number
+  container: RefObject<HTMLDivElement | null>
+  splitter: {
+    onPointerDown: (e: PointerEvent<HTMLDivElement>) => void
+    onKeyDown: (e: KeyboardEvent<HTMLDivElement>) => void
+    onDoubleClick: () => void
+  }
+} {
+  const [width, setWidth] = useState(savedWidth)
+  const container = useRef<HTMLDivElement>(null)
+  const clamp = (w: number): number => {
+    const max = (container.current?.clientWidth ?? Infinity) - MIN_MAIN
+    return Math.round(Math.max(MIN_WIDTH, Math.min(w, max)))
+  }
+  const commit = (w: number): void => {
+    setWidth(w)
+    storage.setItem(WIDTH_KEY, String(w))
+  }
+  return {
+    width,
+    container,
+    splitter: {
+      onPointerDown: (e) => {
+        if (e.button !== 0) return
+        const target = e.currentTarget
+        const { clientX, pointerId } = e
+        const start = clamp(width)
+        let last = start
+        target.setPointerCapture(pointerId)
+        const onMove = (ev: globalThis.PointerEvent): void => {
+          last = clamp(start + ev.clientX - clientX)
+          setWidth(last)
+        }
+        const onUp = (): void => {
+          target.removeEventListener('pointermove', onMove)
+          target.removeEventListener('pointerup', onUp)
+          target.removeEventListener('lostpointercapture', onUp)
+          commit(last)
+        }
+        target.addEventListener('pointermove', onMove)
+        target.addEventListener('pointerup', onUp)
+        target.addEventListener('lostpointercapture', onUp)
+        e.preventDefault()
+      },
+      onKeyDown: (e) => {
+        const step = e.shiftKey ? 64 : 16
+        const next =
+          e.key === 'ArrowLeft'
+            ? width - step
+            : e.key === 'ArrowRight'
+              ? width + step
+              : e.key === 'Home'
+                ? MIN_WIDTH
+                : e.key === 'End'
+                  ? Infinity
+                  : null
+        if (next === null) return
+        e.preventDefault()
+        commit(clamp(next))
+      },
+      onDoubleClick: () => commit(clamp(DEFAULT_WIDTH))
+    }
+  }
+}
+
 /** New binary, returning its id. */
 function addBinary(): Id {
   const id = newId()
@@ -304,6 +393,7 @@ export function DefinitionsPanel(): ReactNode {
   const [filter, setFilter] = useState('')
   const [only, setOnly] = useState<Category | null>(null)
   const [withDependencies, setWithDependencies] = useState(false)
+  const { width, container, splitter } = useListWidth()
 
   // Follows what is selected elsewhere (Explorer, canvas, Used by, Search) and the chosen dependency.
   const [seen, setSeen] = useState({ selection, dependency })
@@ -358,10 +448,14 @@ export function DefinitionsPanel(): ReactNode {
   }
 
   return (
-    <div className="definitions">
+    <div
+      ref={container}
+      className="definitions"
+      style={{ '--def-list-width': `${width}px` } as CSSProperties}
+    >
       <div className="def-list">
-        <div className="panel-filter">
-          <div className="row-inline">
+        <div className="panel-filter def-filter">
+          <div className="def-search">
             <input
               data-autofocus
               type="search"
@@ -390,15 +484,15 @@ export function DefinitionsPanel(): ReactNode {
                 {c.title}
               </button>
             ))}
-            <label className="check" title="Also list what the dependencies define (read-only)">
-              <input
-                type="checkbox"
-                checked={withDependencies}
-                onChange={(e) => setWithDependencies(e.target.checked)}
-              />
-              From dependencies
-            </label>
           </div>
+          <label className="check def-from" title="Also list what the dependencies define (read-only)">
+            <input
+              type="checkbox"
+              checked={withDependencies}
+              onChange={(e) => setWithDependencies(e.target.checked)}
+            />
+            From dependencies
+          </label>
         </div>
         {groups.map(({ kind, title, rows }) => (
           <section key={kind} className="explorer-section open">
@@ -452,6 +546,16 @@ export function DefinitionsPanel(): ReactNode {
           </section>
         ))}
       </div>
+      <div
+        className="def-splitter"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize the list"
+        aria-valuenow={width}
+        tabIndex={0}
+        title="Drag to resize, double-click to reset"
+        {...splitter}
+      />
       <div className="def-main inspector">
         {exists && current ? (
           editor(current)

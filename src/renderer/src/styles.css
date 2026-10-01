@@ -804,38 +804,78 @@ kbd {
 }
 .definitions {
   display: grid;
-  grid-template-columns: minmax(220px, 320px) 1fr;
+  /* The stored width, shrunk when the tab is narrower so the editor keeps some room. */
+  grid-template-columns: min(var(--def-list-width, 280px), max(180px, calc(100% - 240px))) auto minmax(0, 1fr);
   height: 100%;
   min-height: 0;
 }
 .def-list {
   overflow: auto;
-  border-right: 1px solid var(--border);
+  min-width: 0;
 }
-.def-list .row-inline input {
+/* Drag handle between the list and the editor: a thin line, wider to grab. */
+.def-splitter {
+  position: relative;
+  width: 1px;
+  background: var(--border);
+  cursor: col-resize;
+  touch-action: none;
+}
+.def-splitter::before {
+  content: '';
+  position: absolute;
+  inset: 0 -3px;
+  z-index: 2;
+}
+.def-splitter:hover,
+.def-splitter:active,
+.def-splitter:focus-visible {
+  outline: none;
+  background: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.def-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-bottom: 1px solid var(--border);
+}
+.def-search {
+  display: flex;
+  gap: 4px;
+}
+.def-search input {
   flex: 1;
   min-width: 0;
+}
+.def-search button {
+  flex: none;
 }
 .def-kinds {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  gap: 2px;
-  margin-top: 4px;
+  gap: 4px;
   font-size: 12px;
 }
 .def-kinds button {
-  padding: 0 6px;
-  border-color: transparent;
+  padding: 1px 8px;
+  border-radius: 10px;
+  border-color: var(--border);
   background: none;
   color: var(--muted);
 }
-.def-kinds button.on {
-  border-color: var(--border);
+.def-kinds button:hover {
   color: var(--text);
 }
-.def-kinds .check {
-  margin-left: auto;
+.def-kinds button.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--text);
+}
+.def-filter .def-from {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
 }
 .def-name {
   overflow: hidden;
@@ -868,8 +908,10 @@ kbd {
   }
   .def-list {
     max-height: 40cqh;
-    border-right: none;
     border-bottom: 1px solid var(--border);
+  }
+  .def-splitter {
+    display: none;
   }
 }
 .lib-header {
