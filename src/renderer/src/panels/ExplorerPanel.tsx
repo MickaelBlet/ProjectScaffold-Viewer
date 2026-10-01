@@ -1,10 +1,13 @@
 // Views, dependencies, types, interfaces, constants, modules and links of the active document. Click selects (Ctrl / Shift for several),
 // double-click opens an editor tab, right click for more. Arrows move between items, Enter selects.
+// Sections can be reordered (drag their header, Alt+Up / Alt+Down) and hidden; kept in the settings.
 import {
+  Fragment,
   useId,
   useMemo,
   useState,
   type CSSProperties,
+  type DragEvent,
   type KeyboardEvent,
   type MouseEvent,
   type ReactNode
@@ -27,7 +30,8 @@ import {
   update,
   useProjectStore
 } from '@/store/project'
-import { openContextMenu, select } from '@/store/ui'
+import { openContextMenu, select, type MenuItem } from '@/store/ui'
+import { setSetting, useSettings } from '@/store/settings'
 import { commandItem } from '@/commands'
 import {
   addModuleAt,
@@ -40,7 +44,7 @@ import {
 } from '@/actions'
 import { dependencyMenu } from './DependenciesPanel'
 import { childrenByParent, matching } from './ModulesPanel'
-import { openEditor, openView } from '@/shell/controllers'
+import { DEFINITIONS_PANEL, openDefinitions, openEditor, openView } from '@/shell/controllers'
 import { Icon } from '@/components/Icon'
 import { onListKeyDown, tabStop } from '@/components/listKeys'
 
@@ -54,23 +58,162 @@ const KIND_BADGE = {
   primitive: 'P'
 } as const
 
+const SECTIONS = [
+  'views',
+  'dependencies',
+  'binaries',
+  'types',
+  'interfaces',
+  'constants',
+  'modules',
+  'links'
+] as const
+type SectionId = (typeof SECTIONS)[number]
+const SECTION_TITLES: Record<SectionId, string> = {
+  views: 'Views',
+  dependencies: 'Dependencies',
+  binaries: 'Binaries',
+  types: 'Types',
+  interfaces: 'Interfaces',
+  constants: 'Constants',
+  modules: 'Modules',
+  links: 'Links'
+}
+const SECTION_DRAG = 'application/x-explorer-section'
+
+const isSection = (s: string): s is SectionId => (SECTIONS as readonly string[]).includes(s)
+
+/** Saved order; sections it lacks (added later) go after the section preceding them by default. */
+function sectionOrder(saved: readonly string[]): SectionId[] {
+  const order = [...new Set(saved.filter(isSection))]
+  SECTIONS.forEach((id, i) => {
+    if (!order.includes(id)) order.splice(i ? order.indexOf(SECTIONS[i - 1]!) + 1 : 0, 0, id)
+  })
+  return order
+}
+
+function shownSections(): SectionId[] {
+  const { explorerOrder, explorerHidden } = useSettings.getState()
+  return sectionOrder(explorerOrder).filter((id) => !explorerHidden.includes(id))
+}
+
+/** Puts section `id` just before or after `target`. */
+function placeSection(id: SectionId, target: SectionId, after: boolean): void {
+  if (id === target) return
+  const order = sectionOrder(useSettings.getState().explorerOrder).filter((s) => s !== id)
+  order.splice(order.indexOf(target) + (after ? 1 : 0), 0, id)
+  setSetting('explorerOrder', order)
+}
+
+/** Moves a section past its shown neighbor above (-1) or below (1). */
+function stepSection(id: SectionId, step: -1 | 1): void {
+  const shown = shownSections()
+  const target = shown[shown.indexOf(id) + step]
+  if (target) placeSection(id, target, step > 0)
+}
+
+function setSectionHidden(id: SectionId, hide: boolean): void {
+  const hidden = useSettings.getState().explorerHidden.filter((s) => s !== id)
+  setSetting('explorerHidden', hide ? [...hidden, id] : hidden)
+}
+
+function resetSections(): void {
+  setSetting('explorerOrder', [])
+  setSetting('explorerHidden', [])
+}
+
+function showHiddenItems(hidden: SectionId[]): MenuItem[] {
+  return [
+    ...hidden.map((id) => ({ label: SECTION_TITLES[id], run: () => setSectionHidden(id, false) })),
+    'separator',
+    { label: 'Show all', run: () => setSetting('explorerHidden', []) }
+  ]
+}
+
+function hiddenMenu(e: MouseEvent, hidden: SectionId[]): void {
+  openContextMenu(e, showHiddenItems(hidden))
+}
+
+function sectionMenu(e: MouseEvent, id: SectionId): void {
+  e.preventDefault()
+  const shown = shownSections()
+  const i = shown.indexOf(id)
+  const hidden = sectionOrder(useSettings.getState().explorerOrder).filter((s) => !shown.includes(s))
+  openContextMenu(e, [
+    { label: 'Move up', keys: 'Alt+Up', disabled: i <= 0, run: () => stepSection(id, -1) },
+    { label: 'Move down', keys: 'Alt+Down', disabled: i >= shown.length - 1, run: () => stepSection(id, 1) },
+    { label: 'Move to top', disabled: i <= 0, run: () => placeSection(id, shown[0]!, false) },
+    {
+      label: 'Move to bottom',
+      disabled: i >= shown.length - 1,
+      run: () => placeSection(id, shown.at(-1)!, true)
+    },
+    'separator',
+    { label: `Hide ${SECTION_TITLES[id]}`, run: () => setSectionHidden(id, true) },
+    { label: 'Show hidden sections', disabled: !hidden.length, submenu: showHiddenItems(hidden) },
+    'separator',
+    { label: 'Reset sections', run: resetSections }
+  ])
+}
+
+/** Collapsible section; its header drags to reorder, right click for the section menu. */
 function Section(props: {
+  id: SectionId
   title: string
   count?: number
   actions?: ReactNode
   children: ReactNode
 }): ReactNode {
   const [open, setOpen] = useState(true)
+  const [drop, setDrop] = useState<'before' | 'after' | null>(null)
   const body = useId()
+  const dropSide = (e: DragEvent): 'before' | 'after' => {
+    const r = e.currentTarget.getBoundingClientRect()
+    return e.clientY < r.top + r.height / 2 ? 'before' : 'after'
+  }
   return (
-    <section className={`explorer-section ${open ? 'open' : ''}`}>
-      <header>
+    <section
+      className={`explorer-section ${open ? 'open' : ''} ${drop ? `drop-${drop}` : ''}`}
+      onDragOver={(e) => {
+        if (!e.dataTransfer.types.includes(SECTION_DRAG)) return
+        e.preventDefault()
+        e.dataTransfer.dropEffect = 'move'
+        setDrop(dropSide(e))
+      }}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDrop(null)
+      }}
+      onDrop={(e) => {
+        setDrop(null)
+        const from = e.dataTransfer.getData(SECTION_DRAG)
+        if (!isSection(from)) return
+        e.preventDefault()
+        placeSection(from, props.id, dropSide(e) === 'after')
+      }}
+    >
+      <header
+        draggable
+        title="Drag to move the section, right click for more"
+        onDragStart={(e) => {
+          e.dataTransfer.setData(SECTION_DRAG, props.id)
+          e.dataTransfer.effectAllowed = 'move'
+        }}
+        onContextMenu={(e) => sectionMenu(e, props.id)}
+      >
         <button
           type="button"
           className="explorer-toggle"
           aria-expanded={open}
           aria-controls={body}
           onClick={() => setOpen(!open)}
+          onKeyDown={(e) => {
+            // Alt+Up / Alt+Down move the section; focus stays on its toggle.
+            if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return
+            e.preventDefault()
+            const button = e.currentTarget
+            stepSection(props.id, e.key === 'ArrowUp' ? -1 : 1)
+            requestAnimationFrame(() => button.focus())
+          }}
         >
           <span className="chevron">
             <Icon name={open ? 'chevron-down' : 'chevron-right'} />
@@ -221,6 +364,14 @@ function viewMenu(e: MouseEvent, v: View): void {
 
 const GLOBAL: View = { id: GLOBAL_VIEW, name: 'Global', rootModuleId: null, hidden: [] }
 
+function definitionsMenu(e: MouseEvent): void {
+  e.preventDefault()
+  openContextMenu(e, [
+    { label: 'Open', run: () => openDefinitions() },
+    { label: 'Open to the side', run: () => openDefinitions({ split: true }) }
+  ])
+}
+
 export function ExplorerPanel(): ReactNode {
   const types = useProjectStore((s) => s.project.types)
   const interfaces = useProjectStore((s) => s.project.interfaces)
@@ -233,7 +384,12 @@ export function ExplorerPanel(): ReactNode {
   const [collapsed, setCollapsed] = useState<Set<Id>>(new Set())
   const selectedIds = useDoc((d) => d.selectedIds)
   const activeViewId = useDoc((d) => d.activeViewId)
+  const definitionsActive = useDoc((d) => d.definitionsActive)
   const [filter, setFilter] = useState('')
+  const savedOrder = useSettings((s) => s.explorerOrder)
+  const savedHidden = useSettings((s) => s.explorerHidden)
+  const order = useMemo(() => sectionOrder(savedOrder), [savedOrder])
+  const hidden = order.filter((id) => savedHidden.includes(id))
   const f = filter.trim().toLowerCase()
   const match = (name: string): boolean => !f || name.toLowerCase().includes(f)
   const isSelected = (id: Id): boolean => selectedIds.includes(id)
@@ -254,7 +410,13 @@ export function ExplorerPanel(): ReactNode {
     [links, modules, dependencies, paths]
   )
 
-  const shownViews = [GLOBAL, ...views].filter((v) => match(v.name))
+  // The Definitions view is always listed below Global.
+  const viewItems = [
+    ...(match(GLOBAL.name) ? [GLOBAL_VIEW] : []),
+    ...(match('Definitions') ? [DEFINITIONS_PANEL] : []),
+    ...views.filter((v) => match(v.name)).map((v) => v.id)
+  ]
+  const currentView = definitionsActive ? DEFINITIONS_PANEL : activeViewId
   const ownTypes = types.filter((t) => !t.dependency)
   const ownInterfaces = interfaces.filter((i) => !i.dependency)
   const shownTypes = ownTypes.filter((t) => match(t.name))
@@ -294,10 +456,7 @@ export function ExplorerPanel(): ReactNode {
   const interfaceIds = shownInterfaces.map((i) => i.id)
   const moduleIds = shownModules.map((x) => x.m.id)
   const linkIds = shownLinks.map((x) => x.l.id)
-  const viewStop = tabStop(
-    shownViews.map((v) => v.id),
-    (id) => id === activeViewId
-  )
+  const viewStop = tabStop(viewItems, (id) => id === currentView)
   const typeStop = tabStop(typeIds, isSelected)
   const interfaceStop = tabStop(interfaceIds, isSelected)
   const dependencyStop = tabStop(dependencyIds, isSelected)
@@ -309,22 +468,12 @@ export function ExplorerPanel(): ReactNode {
   )
   const linkStop = tabStop(linkIds, isSelected)
 
-  return (
-    <div className="explorer">
-      <div className="panel-filter">
-        <input
-          data-autofocus
-          type="search"
-          placeholder="Filter"
-          aria-label="Filter the explorer"
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-        />
-      </div>
-
+  const sections: Record<SectionId, ReactNode> = {
+    views: (
       <Section
+        id="views"
         title="Views"
-        count={views.length + 1}
+        count={views.length + 2}
         actions={
           <button type="button" className="icon" title="New view" onClick={newView}>
             <Icon name="plus" />
@@ -332,14 +481,33 @@ export function ExplorerPanel(): ReactNode {
         }
       >
         <EntityList label="Views">
-          {shownViews.map((v) => {
+          {viewItems.map((id) => {
+            if (id === DEFINITIONS_PANEL)
+              return (
+                <Item
+                  key={id}
+                  selected={id === currentView}
+                  tabStop={id === viewStop}
+                  className={id === currentView ? 'current' : ''}
+                  title="Every constant, type and interface"
+                  onClick={() => openDefinitions()}
+                  onContextMenu={definitionsMenu}
+                >
+                  <span className="kind-badge view">
+                    <Icon name="definitions" />
+                  </span>
+                  Definitions
+                  <small>{ownConsts.length + ownTypes.length + ownInterfaces.length}</small>
+                </Item>
+              )
+            const v = id === GLOBAL_VIEW ? GLOBAL : views.find((v) => v.id === id)!
             const root = modules.find((m) => m.id === v.rootModuleId)
             return (
               <Item
                 key={v.id}
-                selected={v.id === activeViewId}
+                selected={v.id === currentView}
                 tabStop={v.id === viewStop}
-                className={v.id === activeViewId ? 'current' : ''}
+                className={v.id === currentView ? 'current' : ''}
                 onClick={() => openView(v.id)}
                 onContextMenu={(e) => viewMenu(e, v)}
               >
@@ -356,8 +524,11 @@ export function ExplorerPanel(): ReactNode {
           })}
         </EntityList>
       </Section>
+    ),
 
+    dependencies: (
       <Section
+        id="dependencies"
         title="Dependencies"
         count={dependencies.length}
         actions={
@@ -436,8 +607,11 @@ export function ExplorerPanel(): ReactNode {
           {!dependencies.length && <Empty>No dependencies: Insert › Add dependency…</Empty>}
         </EntityList>
       </Section>
+    ),
 
+    binaries: (
       <Section
+        id="binaries"
         title="Binaries"
         count={binaries.length}
         actions={
@@ -488,8 +662,11 @@ export function ExplorerPanel(): ReactNode {
           )}
         </EntityList>
       </Section>
+    ),
 
+    types: (
       <Section
+        id="types"
         title="Types"
         count={ownTypes.length}
         actions={(['struct', 'enum', 'bitmask', 'union', 'exception', 'alias', 'primitive'] as const).map(
@@ -527,8 +704,11 @@ export function ExplorerPanel(): ReactNode {
           {!shownTypes.length && <Empty>{f ? 'No match' : 'No types yet'}</Empty>}
         </EntityList>
       </Section>
+    ),
 
+    interfaces: (
       <Section
+        id="interfaces"
         title="Interfaces"
         count={ownInterfaces.length}
         actions={
@@ -561,8 +741,11 @@ export function ExplorerPanel(): ReactNode {
           {!shownInterfaces.length && <Empty>{f ? 'No match' : 'No interfaces yet'}</Empty>}
         </EntityList>
       </Section>
+    ),
 
+    constants: (
       <Section
+        id="constants"
         title="Constants"
         count={ownConsts.length}
         actions={
@@ -604,8 +787,11 @@ export function ExplorerPanel(): ReactNode {
           {!shownConsts.length && <Empty>{f ? 'No match' : 'No constants yet'}</Empty>}
         </EntityList>
       </Section>
+    ),
 
+    modules: (
       <Section
+        id="modules"
         title="Modules"
         count={modules.length}
         actions={
@@ -653,8 +839,10 @@ export function ExplorerPanel(): ReactNode {
           {!shownModules.length && <Empty>{f ? 'No match' : 'No modules yet'}</Empty>}
         </EntityList>
       </Section>
+    ),
 
-      <Section title="Links" count={links.length}>
+    links: (
+      <Section id="links" title="Links" count={links.length}>
         <EntityList label="Links" multiselectable>
           {shownLinks.map(({ l, from, to }) => (
             <Item
@@ -679,6 +867,31 @@ export function ExplorerPanel(): ReactNode {
           {!shownLinks.length && <Empty>{f ? 'No match' : 'No links yet'}</Empty>}
         </EntityList>
       </Section>
+    )
+  }
+
+  return (
+    <div className="explorer">
+      <div className="panel-filter">
+        <input
+          data-autofocus
+          type="search"
+          placeholder="Filter"
+          aria-label="Filter the explorer"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+        />
+      </div>
+      {order
+        .filter((id) => !savedHidden.includes(id))
+        .map((id) => (
+          <Fragment key={id}>{sections[id]}</Fragment>
+        ))}
+      {hidden.length > 0 && (
+        <button type="button" className="explorer-hidden" onClick={(e) => hiddenMenu(e, hidden)}>
+          {hidden.length} hidden {hidden.length > 1 ? 'sections' : 'section'}
+        </button>
+      )}
     </div>
   )
 }

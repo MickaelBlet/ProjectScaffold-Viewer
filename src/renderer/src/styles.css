@@ -577,6 +577,7 @@ kbd {
 }
 .explorer-section > header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 4px;
   padding: 4px 8px;
@@ -587,13 +588,35 @@ kbd {
   letter-spacing: 0.04em;
   color: var(--muted);
 }
+.explorer-section.drop-before {
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+.explorer-section.drop-after {
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+/* Opens the menu of the hidden sections. */
+.explorer-hidden {
+  display: block;
+  margin: 4px 8px;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 11px;
+  color: var(--muted);
+}
+.explorer-hidden:hover:not(:disabled) {
+  border-color: transparent;
+  color: var(--text);
+  text-decoration: underline;
+}
 .explorer-section > header small {
   font-weight: normal;
 }
 /* Section toggle: the header's look, as a button. */
+/* Keeps its title whole: the actions wrap below it when they do not fit beside. */
 .explorer-toggle {
   display: flex;
-  flex: 1;
+  flex: 1 0 auto;
   align-items: center;
   gap: 4px;
   min-width: 0;
@@ -613,6 +636,8 @@ kbd {
 .explorer-actions {
   margin-left: auto;
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 2px;
 }
 /* Icon buttons beside inputs / selects: as tall as them. */
@@ -769,6 +794,83 @@ kbd {
 }
 .lib-detail {
   padding: 0 8px 12px;
+}
+/* Definitions tab: every constant, type and interface beside the editor of the chosen one. */
+.definitions-editor {
+  container-type: inline-size;
+  height: 100%;
+  overflow: hidden;
+  background: var(--panel);
+}
+.definitions {
+  display: grid;
+  grid-template-columns: minmax(220px, 320px) 1fr;
+  height: 100%;
+  min-height: 0;
+}
+.def-list {
+  overflow: auto;
+  border-right: 1px solid var(--border);
+}
+.def-list .row-inline input {
+  flex: 1;
+  min-width: 0;
+}
+.def-kinds {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  margin-top: 4px;
+  font-size: 12px;
+}
+.def-kinds button {
+  padding: 0 6px;
+  border-color: transparent;
+  background: none;
+  color: var(--muted);
+}
+.def-kinds button.on {
+  border-color: var(--border);
+  color: var(--text);
+}
+.def-kinds .check {
+  margin-left: auto;
+}
+.def-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.entity-list li .def-used {
+  margin-left: 0;
+  min-width: 2.5em;
+  text-align: right;
+}
+.def-used.unused {
+  opacity: 0.5;
+}
+.entity-list li.dependency .def-name {
+  font-style: italic;
+  color: var(--muted);
+}
+.def-main {
+  overflow: auto;
+  min-width: 0;
+}
+.def-main > * {
+  max-width: 760px;
+}
+@container (max-width: 560px) {
+  .definitions {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+  .def-list {
+    max-height: 40cqh;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
 }
 .lib-header {
   display: flex;
@@ -1972,6 +2074,10 @@ ul.plain {
 }
 .view-tab.drill .dv-default-tab-content::before {
   mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 3h4v4M13 3 9 7M7 13H3V9M3 13l4-4'/%3E%3C/svg%3E");
+}
+/* List outline of components/Icon.tsx */
+.definitions-tab .dv-default-tab-content::before {
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 4h.01M3 8h.01M3 12h.01M6 4h7M6 8h7M6 12h7'/%3E%3C/svg%3E");
 }
 /* Temporary view (opened from a module, not saved until kept), as VS Code's preview tabs */
 .view-tab.temporary .dv-default-tab-content {

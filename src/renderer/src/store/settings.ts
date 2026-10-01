@@ -31,6 +31,10 @@ export interface Settings {
   sourceWhitespace: boolean
   /** The element under the caret of the project text is selected and zoomed to. */
   sourceFollow: boolean
+  /** Explorer sections top to bottom; sections missing here keep their default place. */
+  explorerOrder: string[]
+  /** Explorer sections not shown. */
+  explorerHidden: string[]
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -47,7 +51,9 @@ export const DEFAULT_SETTINGS: Settings = {
   autoLayoutOnOpen: true,
   forceAnimations: false,
   sourceWhitespace: true,
-  sourceFollow: true
+  sourceFollow: true,
+  explorerOrder: [],
+  explorerHidden: []
 }
 
 const SETTINGS_KEY = 'project-scaffold:settings'

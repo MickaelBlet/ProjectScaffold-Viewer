@@ -482,6 +482,28 @@ export function openSource(options: { split?: boolean } = { split: true }): void
   })
 }
 
+export const DEFINITIONS_PANEL = 'definitions'
+
+/** Open the Definitions view: the constants, types and interfaces of the project in one tab. */
+export function openDefinitions(options: { split?: boolean } = {}): void {
+  if (IN_PANEL)
+    return sendToDiagram({ kind: 'command', id: options.split ? 'view.definitionsSplit' : 'view.definitions' })
+  if (!editor) return
+  const existing = editor.getPanel(DEFINITIONS_PANEL)
+  if (existing && !options.split) return existing.api.setActive()
+  existing?.api.close()
+  const active = editor.activePanel
+  editor.addPanel({
+    id: DEFINITIONS_PANEL,
+    component: 'definitions',
+    tabComponent: 'definitions',
+    title: 'Definitions',
+    position: active
+      ? { referencePanel: active.id, direction: options.split ? 'right' : 'within' }
+      : undefined
+  })
+}
+
 /** Open an entity editor as a tab of the editor area. */
 export function openEditor(kind: EditorKind, id: Id, options: { split?: boolean } = {}): void {
   if (IN_PANEL) {

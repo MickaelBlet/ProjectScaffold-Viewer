@@ -51,6 +51,7 @@ import { setSetting, useSettings, type Theme } from './store/settings'
 import { useUiStore, type ActionItem } from './store/ui'
 import {
   activeCanvas,
+  openDefinitions,
   openSource,
   openView,
   resetLayout,
@@ -457,6 +458,19 @@ const allCommands: Command[] = [
     category: 'View',
     keys: ['Alt+G'],
     run: () => openView(GLOBAL_VIEW)
+  },
+  {
+    id: 'view.definitions',
+    title: 'Open definitions view (constants, types, interfaces)',
+    category: 'View',
+    keys: ['Alt+T'],
+    run: () => openDefinitions()
+  },
+  {
+    id: 'view.definitionsSplit',
+    title: 'Open definitions view to the side',
+    category: 'View',
+    run: () => openDefinitions({ split: true })
   },
   {
     id: 'view.openModule',

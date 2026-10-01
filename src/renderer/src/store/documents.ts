@@ -32,6 +32,8 @@ export interface DocState {
   selectedIds: Id[]
   /** View of the focused canvas. */
   activeViewId: Id
+  /** The Definitions view is the active editor tab. */
+  definitionsActive: boolean
   viewports: Record<Id, Viewport>
   /** Serialized editor area (open views and editor tabs). */
   layout: unknown
@@ -83,6 +85,7 @@ export function createDoc(project: Project = emptyProject(), filePath: string | 
     selection: null,
     selectedIds: [],
     activeViewId: GLOBAL_VIEW,
+    definitionsActive: false,
     viewports: {},
     layout: null,
     viewEpoch: 1,
