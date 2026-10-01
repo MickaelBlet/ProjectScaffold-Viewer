@@ -669,7 +669,7 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
       item('edit.cut'),
       item('edit.copy'),
       { label: 'Paste into', run: () => void paste(undefined, { at, parent: node.id }) },
-      { label: 'Import another project into…', run: () => importProjectContent(node.id) },
+      { label: 'Import projects or IDL files into…', run: () => importProjectContent(node.id) },
       item('edit.duplicate'),
       'separator',
       item('edit.delete')
@@ -739,7 +739,7 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
           ]),
       'separator',
       { label: 'Link to another project…', run: () => linkOtherProject(at) },
-      { label: 'Import another project here…', run: () => importProjectContent(parent, at) },
+      { label: 'Import projects or IDL files here…', run: () => importProjectContent(parent, at) },
       'separator',
       { label: 'Paste here', keys: keyLabel('Ctrl+V'), run: () => void paste(undefined, { at, parent }) },
       'separator',

@@ -2,8 +2,13 @@
 import { align, distribute, sameSize, type AlignMode } from '@/model/align'
 import { arrange as arrangeProject, arrangeOptions } from '@/model/autoLayout'
 import { copyItems, copyProject, parseClip, pasteClip, type Clip } from '@/model/clipboard'
-import { addDependencyOf, type DependencyResult } from '@/model/dependencies'
-import { idlImport, parseIdlFiles, readIdlIncludes, type IdlFile } from '@/model/idl'
+import {
+  addDependencies,
+  addDependencyOf,
+  type DependencyResult,
+  type DependencySource
+} from '@/model/dependencies'
+import { idlImport, idlProject, parseIdlFiles, readIdlIncludes, type IdlFile } from '@/model/idl'
 import { binarySnapshot, settleBinaries } from '@/model/binaries'
 import {
   absolutePosition,
@@ -27,7 +32,14 @@ import {
 import { targetAt, type SourceTarget } from '@/components/sourceTarget'
 import { targetPath } from '@/model/locate'
 import type { ProblemTarget } from '@/model/validate'
-import { GLOBAL_VIEW, type Id, type Orientation, type Project, type Rect } from '@/model/types'
+import {
+  GLOBAL_VIEW,
+  type Dependency,
+  type Id,
+  type Orientation,
+  type Project,
+  type Rect
+} from '@/model/types'
 import {
   activeDoc,
   activateDoc,
@@ -37,7 +49,7 @@ import {
   type DocState
 } from '@/store/documents'
 import {
-  addDependencyFrom,
+  addDependenciesFrom,
   detachDependencyById,
   addModule,
   addNote,
@@ -57,10 +69,19 @@ import {
   setLocked,
   update
 } from '@/store/project'
-import { quickPick, select, setStatus, showDialog, useUiStore, type Selection } from '@/store/ui'
+import {
+  quickPick,
+  select,
+  setStatus,
+  showDialog,
+  useUiStore,
+  type PickEntry,
+  type Selection
+} from '@/store/ui'
 import { fileName } from '@/fileOps'
-import { relativeFile, sameFile } from '@/model/sync'
+import { normalizeFile, relativeFile, resolveRelative, sameFile } from '@/model/sync'
 import { formatFromPath, LoadError, loadText, toFile } from '@/model/serialize'
+import type { OpenResult } from '@/api'
 import { activeCanvas, openEditor, openView, showTool } from '@/shell/controllers'
 import { IN_PANEL, IN_VSCODE } from '@/host'
 import type { DiagramAction } from '../../../vscode/src/protocol'
@@ -377,14 +398,68 @@ interface OtherProject {
   file: string
 }
 
-function otherProjects(
+const SOURCE_FILES = { description: 'Projects and IDL files', extensions: ['yaml', 'yml', 'json', 'idl'] }
+const isIdl = (path: string): boolean => /\.idl$/i.test(path)
+
+/** Reads a file IDL files include: by absolute path, else relative to this document. */
+async function readInclude(path: string): Promise<string | null> {
+  if (/^([\\/]|[A-Za-z]:)/.test(path)) return (await window.api.readFile?.(path)) ?? null
+  return (await window.api.readSibling?.(path)) ?? null
+}
+
+/**
+ * The project a file stands for: a project file, or an IDL file whose includes are read by the
+ * host when it can, else looked up among `others` (IDL files by path). Throws when it cannot be read.
+ */
+async function projectOfFile(
+  path: string,
+  content: string,
+  others: ReadonlyMap<string, string> = new Map()
+): Promise<{ project: Project; warnings: string[] }> {
+  if (!isIdl(path)) return { project: loadText(content, formatFromPath(path)), warnings: [] }
+  let files = new Map([...others, [path, content]])
+  const host = !!(window.api.readFile || window.api.readSibling)
+  if (host) files = await readIdlIncludes(files, readInclude)
+  const { project, warnings, missing } = idlProject(path, files)
+  if (missing.length && !host) warnings.push('Pick the included files along with the IDL file to read them.')
+  return { project, warnings }
+}
+
+const problemsOf = (e: unknown): string[] =>
+  e instanceof LoadError ? e.problems : [e instanceof Error ? e.message : String(e)]
+
+/** Picked files as projects, and lines telling what could not be read or was approximated. */
+async function readPicked(picked: OpenResult[]): Promise<{ projects: OtherProject[]; lines: string[] }> {
+  const here = activeDoc().filePath
+  const idl = new Map(picked.filter((f) => isIdl(f.path)).map((f) => [f.path, f.content]))
+  const projects: OtherProject[] = []
+  const lines: string[] = []
+  for (const f of picked) {
+    const name = fileName(f.path)
+    try {
+      const { project, warnings } = await projectOfFile(f.path, f.content, idl)
+      projects.push({ project, file: relativeFile(here, f.path) })
+      lines.push(...warnings.map((w) => `${name}: ${w}`))
+    } catch (e) {
+      lines.push(...problemsOf(e).map((x) => `${name}: ${x}`))
+    }
+  }
+  return { projects, lines }
+}
+
+/** Name of a few projects, for messages. */
+const namesOf = (others: OtherProject[]): string =>
+  others.length === 1 ? others[0]!.file : `${others.length} projects`
+
+/** Open documents but this one, as projects to pick. `needFile`: unsaved ones are refused. */
+function openProjects(
   needFile = true,
   describe = (p: Project): string => `${p.modules.length} modules`
 ): { label: string; detail: string; get: () => Promise<OtherProject | null> }[] {
   const { docs, activeId } = useDocs.getState()
   // Dependencies name their file relative to this one.
   const here = activeDoc().filePath
-  const open = docs
+  return docs
     .filter((d) => d.id !== activeId)
     .map((d) => {
       const project = d.store.getState().project
@@ -404,24 +479,19 @@ function otherProjects(
         }
       }
     })
-  return [
-    ...open,
-    {
-      label: 'Open file…',
-      detail: 'read a project file',
-      get: async (): Promise<OtherProject | null> => {
-        const f = await window.api.openFile()
-        if (!f) return null
-        try {
-          return { project: loadText(f.content, formatFromPath(f.path)), file: relativeFile(here, f.path) }
-        } catch (e) {
-          showDialog(`Cannot read ${f.path}`, e instanceof LoadError ? e.problems : [String(e)])
-          return null
-        }
-      }
-    }
-  ]
 }
+
+/** Entry of a project pick reading files: project files and IDL files, several at once. */
+const filesEntry = (run: (files: OpenResult[]) => void): PickEntry => ({
+  key: 'files',
+  label: 'Open files…',
+  detail: 'read project files and IDL files, several at once',
+  kind: 'P',
+  run: () =>
+    void window.api.openFiles(SOURCE_FILES).then((files) => {
+      if (files.length) run(files)
+    })
+})
 
 /** Lines telling what a change of dependencies did, when there is more than the change itself. */
 function dependencyLines(r: DependencyResult): string[] {
@@ -433,26 +503,33 @@ function dependencyLines(r: DependencyResult): string[] {
   ]
 }
 
-/** Pick a module of `other` and place it on the canvas at `at`, depending on `other`. */
-function pickModuleOf(other: OtherProject, at: { x: number; y: number }): void {
-  const src = other.project
-  if (!src.modules.length) return setStatus('error', `${other.file} has no modules`)
-  quickPick(
-    `Module of ${other.file} to link to`,
-    src.modules.map((m) => ({
-      key: m.id,
-      label: modulePath(src, m.id),
-      detail: m.ports.map((pt) => `${pt.role} ${pt.name}`).join(', ') || 'no ports',
+/** Pick a module of `others` and place it on the canvas at `at`, depending on its project. */
+function pickModuleOf(others: OtherProject[], at: { x: number; y: number }, lines: string[] = []): void {
+  const entries = others.flatMap((other) =>
+    other.project.modules.map((m) => ({
+      key: `${other.file}:${m.id}`,
+      label: modulePath(other.project, m.id),
+      detail: [
+        others.length > 1 && other.file,
+        m.ports.map((pt) => `${pt.role} ${pt.name}`).join(', ') || 'no ports'
+      ]
+        .filter(Boolean)
+        .join(' · '),
       kind: 'M',
       run: () => {
         if (activeDoc().activeViewId !== GLOBAL_VIEW) openView(GLOBAL_VIEW)
-        const { id, result } = placeModuleFrom(src, other.file, m.id, at, selfFile())
+        const { id, result } = placeModuleFrom(other.project, other.file, m.id, at, selfFile())
         if (id) select({ kind: 'imported', id })
-        const lines = dependencyLines(result)
-        if (lines.length) showDialog(`Linking to ${other.file}`, lines)
+        const all = [...lines, ...dependencyLines(result)]
+        if (all.length) showDialog(`Linking to ${other.file}`, all)
       }
     }))
   )
+  if (!entries.length) {
+    if (lines.length) showDialog(`Read ${namesOf(others)}`, lines)
+    return setStatus('error', `${namesOf(others)} has no modules`)
+  }
+  quickPick(`Module of ${namesOf(others)} to link to`, entries)
 }
 
 /** The dependencies of this project, read from their files, as projects to pick from. */
@@ -477,20 +554,26 @@ function dependencyProjects(): { label: string; detail: string; get: () => Promi
 export function linkOtherProject(pos?: { x: number; y: number }): void {
   const at = pos ?? activeCanvas()?.center() ?? { x: 80, y: 80 }
   const deps = getProject().dependencies
-  const others = otherProjects().filter((o) => !deps.some((x) => sameFile(x.file, o.label)))
-  quickPick(
-    'Project to link to',
-    [...dependencyProjects(), ...others].map((o, i) => ({
+  const others = openProjects().filter((o) => !deps.some((x) => sameFile(x.file, o.label)))
+  quickPick('Project to link to', [
+    ...[...dependencyProjects(), ...others].map((o, i) => ({
       key: String(i),
       label: o.label,
       detail: o.detail,
       kind: 'P',
       run: () =>
         void o.get().then((other) => {
-          if (other) pickModuleOf(other, at)
+          if (other) pickModuleOf([other], at)
         })
-    }))
-  )
+    })),
+    filesEntry(
+      (files) =>
+        void readPicked(files).then(({ projects, lines }) => {
+          if (projects.length) pickModuleOf(projects, at, lines)
+          else showDialog(`Cannot read ${files.length === 1 ? fileName(files[0]!.path) : 'the files'}`, lines)
+        })
+    )
+  ])
 }
 
 /** Pick a module of a dependency and place it on the canvas. */
@@ -499,7 +582,7 @@ export function placeDependencyModule(id: Id, pos?: { x: number; y: number }): v
   if (!dep) return
   const at = pos ?? activeCanvas()?.center() ?? { x: 80, y: 80 }
   void importSource(dep.file).then((project) => {
-    if (project) pickModuleOf({ project, file: dep.file }, at)
+    if (project) pickModuleOf([{ project, file: dep.file }], at)
     else showDialog(`Cannot read ${dep.file}`, [cannotRead(dep.name, dep.file)])
   })
 }
@@ -510,136 +593,246 @@ function importParent(): Id | null {
   return sel?.kind === 'module' ? sel.id : viewParent()
 }
 
+/** File of a dependency `n` of `other`, relative to this project. */
+const fileOf = (other: OtherProject, n: Dependency): string =>
+  normalizeFile(resolveRelative(other.file, n.file))
+
+/** `others` with the ones others depend on first. */
+function dependenciesFirst(others: OtherProject[]): OtherProject[] {
+  const byFile = new Map(others.map((o) => [normalizeFile(o.file), o]))
+  const out: OtherProject[] = []
+  const seen = new Set<OtherProject>()
+  const visit = (o: OtherProject): void => {
+    if (seen.has(o)) return
+    seen.add(o)
+    for (const n of o.project.dependencies) {
+      const used = byFile.get(fileOf(o, n))
+      if (used) visit(used)
+    }
+    out.push(o)
+  }
+  others.forEach(visit)
+  return out
+}
+
 /**
- * Pick another project and copy its content into `parent` (a module, or the top level): its
- * modules with their links, its notes (top level only), and the types and interfaces this project
- * lacks (the others are matched by name). Nothing ties the copy to that project afterwards, but
- * the dependencies it uses are used here too.
+ * The projects the dependencies of `roots` use, transitively, that can be read (open, or next to
+ * this file): taken from their files rather than from the snapshots `roots` have of them.
+ */
+async function readableDependencies(roots: OtherProject[]): Promise<DependencySource[]> {
+  const seen = new Set(roots.map((r) => normalizeFile(r.file)))
+  const out: DependencySource[] = []
+  const queue = [...roots]
+  for (let r = queue.shift(); r; r = queue.shift())
+    for (const n of r.project.dependencies) {
+      const file = fileOf(r, n)
+      if (seen.has(file)) continue
+      seen.add(file)
+      const project = await importSource(file)
+      if (!project) continue
+      const source = { project, file, indirect: true }
+      out.push(source)
+      queue.push(source)
+    }
+  return out
+}
+
+/**
+ * Pick other projects and copy their content into `parent` (a module, or the top level): their
+ * modules with their links, their notes (top level only), and the types and interfaces this
+ * project lacks (the others are matched by name). Nothing ties the copy to those projects
+ * afterwards, but the dependencies they use are used here too. IDL files picked are imported too.
  */
 export function importProjectContent(
   parent: Id | null = importParent(),
   pos?: { x: number; y: number }
 ): void {
-  quickPick(
-    'Project to import',
-    otherProjects(false).map((o, i) => ({
+  quickPick('Projects to import', [
+    ...openProjects(false).map((o, i) => ({
       key: String(i),
       label: o.label,
       detail: o.detail,
       kind: 'P',
       run: () =>
         void o.get().then((other) => {
-          if (!other) return
-          const p = getProject()
-          const clip = copyProject(other.project, p, !parent)
-          if (!clip) return setStatus('error', `${other.file} is empty`)
-          let at = pos ?? activeCanvas()?.center() ?? { x: 80, y: 80 }
-          if (!pos && parent) {
-            // Below the module's current content, like a new submodule.
-            const origin = absolutePosition(p, parent)
-            at = { x: origin.x + LAYOUT_PAD, y: origin.y + belowContent(p, parent) }
-          }
-          let pasted: Id[] = []
-          let defs = 0
-          update((d) => {
-            // The dependencies of that project are used here too, not copied.
-            for (const n of other.project.dependencies)
-              if (!n.indirect) addDependencyOf(d, other.project, other.file, n.id)
-            const content = copyProject(other.project, d, !parent) ?? clip
-            defs = content.types.length + content.interfaces.length
-            pasted = pasteClip(d, content, { parent, at })
-          })
-          selectMany(pasted)
-          const modules = Object.keys(clip.rootParents).length
-          setStatus('info', `Imported ${modules} modules, ${defs} types and interfaces from ${other.file}`)
+          if (other) void importProjects([other], parent, pos)
         })
-    }))
-  )
+    })),
+    filesEntry((files) => {
+      const idl = files.filter((f) => isIdl(f.path))
+      const projects = files.filter((f) => !isIdl(f.path))
+      if (!projects.length) return void importIdlFiles(idl)
+      void (async () => {
+        // IDL files first, whole, then the projects below them.
+        const below = idl.length ? await importIdlFiles(idl, true) : []
+        const read = await readPicked(projects)
+        await importProjects(read.projects, parent, pos, read.lines, below)
+      })()
+    })
+  ])
 }
 
-const IDL_FILES = { description: 'IDL files', extensions: ['idl'] }
+/**
+ * Copy the content of projects (see `importProjectContent`), one below the other (below the
+ * modules `below`, when given). Those another one depends on come first: their content stands for
+ * that dependency.
+ */
+async function importProjects(
+  others: OtherProject[],
+  parent: Id | null,
+  pos?: { x: number; y: number },
+  lines: string[] = [],
+  below: Id[] = []
+): Promise<void> {
+  if (!others.length) {
+    if (lines.length) showDialog('Nothing imported', lines)
+    return
+  }
+  const picked = new Set(others.map((o) => normalizeFile(o.file)))
+  const uses = (o: OtherProject): Dependency[] =>
+    o.project.dependencies.filter((n) => !n.indirect && !picked.has(fileOf(o, n)))
+  // Dependencies read from their files; the others from the snapshots the projects have.
+  const direct = new Set(others.flatMap((o) => uses(o).map((n) => fileOf(o, n))))
+  const sources = (await readableDependencies(others)).map((s) => ({
+    ...s,
+    indirect: !direct.has(normalizeFile(s.file))
+  }))
+  const read = new Set(sources.map((s) => normalizeFile(s.file)))
+
+  const p = getProject()
+  let at = pos ?? activeCanvas()?.center() ?? { x: 80, y: 80 }
+  if (!pos && parent) {
+    // Below the module's current content, like a new submodule.
+    const origin = absolutePosition(p, parent)
+    at = { x: origin.x + LAYOUT_PAD, y: origin.y + belowContent(p, parent) }
+  }
+  const after = (d: Project, ids: Id[]): void => {
+    const modules = ids.filter((id) => d.modules.some((m) => m.id === id))
+    if (!modules.length) return
+    const b = boundsOf(modules.map((id) => absoluteRect(d, id)))
+    at = { x: at.x, y: b.y + b.height + IMPORT_GAP }
+  }
+  after(p, below)
+  const pasted: Id[] = []
+  const empty: string[] = []
+  let modules = 0
+  let defs = 0
+  update((d) => {
+    // The dependencies of those projects are used here too, not copied.
+    if (sources.length) lines.push(...dependencyLines(addDependencies(d, sources, selfFile())))
+    for (const o of others)
+      for (const n of uses(o))
+        if (!read.has(fileOf(o, n)))
+          lines.push(...dependencyLines(addDependencyOf(d, o.project, o.file, n.id)))
+    for (const o of dependenciesFirst(others)) {
+      const content = copyProject(o.project, d, !parent)
+      if (!content) {
+        empty.push(`${o.file} is empty`)
+        continue
+      }
+      modules += Object.keys(content.rootParents).length
+      defs += content.types.length + content.interfaces.length
+      const ids = pasteClip(d, content, { parent, at })
+      pasted.push(...ids)
+      after(d, ids)
+    }
+  })
+  selectMany(pasted)
+  lines.push(...empty)
+  const what = `Imported ${modules} modules, ${defs} types and interfaces from ${namesOf(others)}`
+  if (lines.length) showDialog(what, lines)
+  else setStatus('info', what)
+}
+
+const IMPORT_GAP = 60
 
 /**
- * Imports IDL files: their interfaces and components (one picked or all) with the types they use.
- * Included files are read by the host when it can, else looked up among the picked files.
+ * Imports IDL files: their interfaces and components (one picked or all, or all with `whole`)
+ * with the types they use. Included files are read by the host when it can, else looked up among
+ * the picked files. Resolves to the pasted entities (none while picking).
  */
-export function importIdl(): void {
-  void window.api.openFiles(IDL_FILES).then(async (picked) => {
-    if (!picked.length) return
-    const label = picked.length === 1 ? fileName(picked[0]!.path) : `${picked.length} IDL files`
-    let idl: IdlFile
-    try {
-      let files = new Map(picked.map((f) => [f.path, f.content]))
-      const read = window.api.readFile?.bind(window.api)
-      if (read) files = await readIdlIncludes(files, read)
-      idl = parseIdlFiles(files)
-    } catch (e) {
-      return showDialog(`Cannot read ${label}`, [e instanceof Error ? e.message : String(e)])
+async function importIdlFiles(picked: OpenResult[], whole = false): Promise<Id[]> {
+  const label = picked.length === 1 ? fileName(picked[0]!.path) : `${picked.length} IDL files`
+  let idl: IdlFile
+  try {
+    let files = new Map(picked.map((f) => [f.path, f.content]))
+    const read = window.api.readFile?.bind(window.api)
+    if (read) files = await readIdlIncludes(files, read)
+    idl = parseIdlFiles(files)
+  } catch (e) {
+    showDialog(`Cannot read ${label}`, problemsOf(e))
+    return []
+  }
+  if (!idl.interfaces.length && !idl.types.length && !idl.components.length) {
+    setStatus('error', `${label} defines no interfaces, components nor types`)
+    return []
+  }
+  const run = (only?: string[]): Id[] => {
+    const p = getProject()
+    const { clip, existing, unresolved } = idlImport(idl, p, only)
+    const kept = existing.length ? `, ${existing.join(', ')} already defined` : ''
+    if (!clip) {
+      setStatus('info', `Nothing to import from ${label}${kept}`)
+      return []
     }
-    if (!idl.interfaces.length && !idl.types.length && !idl.components.length)
-      return setStatus('error', `${label} defines no interfaces, components nor types`)
-    const run = (only?: string[]): void => {
-      const p = getProject()
-      const { clip, existing, unresolved } = idlImport(idl, p, only)
-      const kept = existing.length ? `, ${existing.join(', ')} already defined` : ''
-      if (!clip) return setStatus('info', `Nothing to import from ${label}${kept}`)
-      const at = clip.modules.length ? (activeCanvas()?.center() ?? { x: 80, y: 80 }) : undefined
-      let pasted: Id[] = []
-      update((d) => {
-        pasted = pasteClip(d, clip, { parent: null, at })
-      })
-      selectMany(pasted)
-      const counts = [
-        clip.modules.length && `${clip.modules.length} modules`,
-        `${clip.interfaces.length} interfaces`,
-        `${clip.types.length} types`
-      ].filter(Boolean)
-      setStatus('info', `Imported ${counts.join(', ')} from ${label}${kept}`)
-      const notes = [
-        ...idl.warnings,
-        ...unresolved.map((n) => `${n} is defined in none of the files: added empty`),
-        ...(idl.missing.length && !window.api.readFile
-          ? ['Pick the included files along with the IDL file to read their definitions.']
-          : [])
+    const at = clip.modules.length ? (activeCanvas()?.center() ?? { x: 80, y: 80 }) : undefined
+    let pasted: Id[] = []
+    update((d) => {
+      pasted = pasteClip(d, clip, { parent: null, at })
+    })
+    selectMany(pasted)
+    const counts = [
+      clip.modules.length && `${clip.modules.length} modules`,
+      `${clip.interfaces.length} interfaces`,
+      `${clip.types.length} types`
+    ].filter(Boolean)
+    setStatus('info', `Imported ${counts.join(', ')} from ${label}${kept}`)
+    const notes = [
+      ...idl.warnings,
+      ...unresolved.map((n) => `${n} is defined in none of the files: added empty`),
+      ...(idl.missing.length && !window.api.readFile
+        ? ['Pick the included files along with the IDL file to read their definitions.']
+        : [])
+    ]
+    if (notes.length) showDialog(`Imported from ${label}`, notes)
+    return pasted
+  }
+  const entries = idl.components.length + idl.interfaces.length
+  if (whole || entries < 2) return run()
+  quickPick('Component or interface to import', [
+    {
+      key: '*',
+      label: 'All',
+      detail: [
+        idl.components.length && `${idl.components.length} components`,
+        idl.interfaces.length && `${idl.interfaces.length} interfaces`
       ]
-      if (notes.length) showDialog(`Imported from ${label}`, notes)
-    }
-    const entries = idl.components.length + idl.interfaces.length
-    if (entries < 2) return run()
-    quickPick('Component or interface to import', [
-      {
-        key: '*',
-        label: 'All',
-        detail: [
-          idl.components.length && `${idl.components.length} components`,
-          idl.interfaces.length && `${idl.interfaces.length} interfaces`
-        ]
-          .filter(Boolean)
-          .join(', '),
-        kind: '*',
-        run: () => run()
-      },
-      ...idl.components.map((c) => ({
-        key: `c:${c.name}`,
-        label: c.name,
-        detail: `component, ${c.ports.length} ports`,
-        kind: 'M',
-        run: () => run([c.name])
-      })),
-      ...idl.interfaces.map((i) => ({
-        key: `i:${i.name}`,
-        label: i.name,
-        detail: `${i.messages.length} messages`,
-        kind: 'I',
-        run: () => run([i.name])
-      }))
-    ])
-  })
+        .filter(Boolean)
+        .join(', '),
+      kind: '*',
+      run: () => void run()
+    },
+    ...idl.components.map((c) => ({
+      key: `c:${c.name}`,
+      label: c.name,
+      detail: `component, ${c.ports.length} ports`,
+      kind: 'M',
+      run: () => void run([c.name])
+    })),
+    ...idl.interfaces.map((i) => ({
+      key: `i:${i.name}`,
+      label: i.name,
+      detail: `${i.messages.length} messages`,
+      kind: 'I',
+      run: () => void run([i.name])
+    }))
+  ])
+  return []
 }
 
 /**
  * Project of a dependency: from the open document of the same file name, else (VS Code) from the
- * file next to the document.
+ * file next to the document (an IDL file with the files it includes).
  */
 async function importSource(file: string): Promise<Project | null> {
   const doc = useDocs
@@ -649,7 +842,7 @@ async function importSource(file: string): Promise<Project | null> {
   const text = await window.api.readSibling?.(file)
   if (!text) return null
   try {
-    return loadText(text, formatFromPath(file))
+    return (await projectOfFile(file, text)).project
   } catch {
     return null
   }
@@ -658,7 +851,9 @@ async function importSource(file: string): Promise<Project | null> {
 const cannotRead = (name: string, file: string): string =>
   window.api.readSibling
     ? `${name}: cannot read ${file} next to this file`
-    : `${name}: open ${file} in a tab to read it`
+    : isIdl(file)
+      ? `${name}: add ${file} as a dependency again to read it`
+      : `${name}: open ${file} in a tab to read it`
 
 /** This project's file name: it cannot depend on itself. */
 const selfFile = (): string | null => {
@@ -667,15 +862,15 @@ const selfFile = (): string | null => {
 }
 
 /**
- * Pick another project and depend on it: its types and interfaces are used here, read-only, with
- * those of the projects it depends on, and its modules can be placed on the canvas to link to.
- * They are refreshed from that file (Refresh, or live while it is open).
+ * Pick other projects (project files or IDL files) and depend on them: their types and interfaces
+ * are used here, read-only, with those of the projects they depend on (read from their files when
+ * they can be, else as these projects last read them), and their modules can be placed on the
+ * canvas to link to. They are refreshed from their files (Refresh, or live while open).
  */
 export function pickDependency(): void {
   const deps = getProject().dependencies
-  quickPick(
-    'Project to depend on',
-    otherProjects(
+  quickPick('Projects to depend on', [
+    ...openProjects(
       true,
       (p) => `${p.types.length} types, ${p.interfaces.length} interfaces, ${p.modules.length} modules`
     )
@@ -687,16 +882,29 @@ export function pickDependency(): void {
         kind: 'P',
         run: () =>
           void o.get().then((other) => {
-            if (!other) return
-            const lines = dependencyLines(addDependencyFrom(other.project, other.file, selfFile()))
-            if (lines.length) return showDialog(`Depending on ${other.file}`, lines)
-            setStatus('info', `Depending on ${other.file}: its types and interfaces are read-only here`)
+            if (other) void dependOn([other])
           })
-      }))
+      })),
+    filesEntry((files) => void readPicked(files).then(({ projects, lines }) => dependOn(projects, lines)))
+  ])
+}
+
+async function dependOn(others: OtherProject[], lines: string[] = []): Promise<void> {
+  if (!others.length) {
+    if (lines.length) showDialog('No dependency added', lines)
+    return
+  }
+  const nested = await readableDependencies(others)
+  lines.push(...dependencyLines(addDependenciesFrom([...others, ...nested], selfFile())))
+  const what = `Depending on ${namesOf(others)}`
+  if (lines.length) return showDialog(what, lines)
+  setStatus(
+    'info',
+    `${what}: ${others.length === 1 ? 'its' : 'their'} types and interfaces are read-only here`
   )
 }
 
-/** Read dependencies again from their projects, when these can be read (all, or those of these ids). */
+/** Read dependencies again from their projects (all, or those of these ids). */
 export async function refreshDependencies(ids?: Id[]): Promise<void> {
   const lines: string[] = []
   const sources = new Map<Id, Project>()

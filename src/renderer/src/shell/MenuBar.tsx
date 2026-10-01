@@ -65,7 +65,6 @@ const MENUS: [Category, string[]][] = [
       'insert.frame',
       '-',
       'insert.projectContent',
-      'insert.idl',
       'insert.dependency',
       'insert.imported',
       'insert.refreshDependencies'

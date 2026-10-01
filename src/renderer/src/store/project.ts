@@ -21,7 +21,7 @@ import {
   uniqueName
 } from '@/model/project'
 import {
-  addDependency,
+  addDependencies,
   dependencyOf,
   detachDependency,
   followInterfaceRenames,
@@ -29,7 +29,8 @@ import {
   refreshDependencies,
   removeDependency,
   removePlaced,
-  type DependencyResult
+  type DependencyResult,
+  type DependencySource
 } from '@/model/dependencies'
 import { snapChanges } from '@/model/grid'
 import { binarySnapshot, settleBinaries } from '@/model/binaries'
@@ -327,12 +328,12 @@ export function placeModuleFrom(
 }
 
 /**
- * Depend on `source` (saved as `file`). `self`: this project's file name. Types and interfaces
+ * Depend on projects (see `addDependencies`). `self`: this project's file name. Types and interfaces
  * defined differently here are not taken: they are listed in the conflicts.
  */
-export function addDependencyFrom(source: Project, file: string, self: string | null): DependencyResult {
+export function addDependenciesFrom(sources: DependencySource[], self: string | null): DependencyResult {
   let result!: DependencyResult
-  update((d) => void (result = addDependency(d, source, file, self)))
+  update((d) => void (result = addDependencies(d, sources, self)))
   return result
 }
 
