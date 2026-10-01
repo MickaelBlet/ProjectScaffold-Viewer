@@ -433,6 +433,8 @@ button.link-button:hover {
   pointer-events: none;
 }
 .source-code textarea {
+  /* Sized by its insets, as the colored copy: its scrollbars cover the copy's. */
+  width: auto;
   resize: none;
   background: transparent;
   color: transparent;
