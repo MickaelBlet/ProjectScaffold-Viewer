@@ -134,8 +134,9 @@ function currentDoc(): OpenResult {
 
 const vscodeApi: Api = {
   openFile: () => request((id) => ({ type: 'openFile', id })),
-  // The page has a single document: one file at a time.
-  openFiles: async () => {
+  // The page has a single document: one project file at a time.
+  openFiles: async (filter) => {
+    if (filter) return request<OpenResult[]>((id) => ({ type: 'openFiles', id, filter }))
     const file = await request<OpenResult | null>((id) => ({ type: 'openFile', id }))
     return file ? [file] : []
   },
@@ -184,6 +185,7 @@ const vscodeApi: Api = {
   redo: IN_PREVIEW || IN_PANEL ? undefined : () => post({ type: 'redo' }),
   selected: (path) => post({ type: 'selected', path }),
   readSibling: (file) => request((id) => ({ type: 'readSibling', id, file })),
+  readFile: (path) => request((id) => ({ type: 'readFile', id, path })),
   openSibling: (file) => post({ type: 'openSibling', file }),
   onExternalChange: (cb) => {
     const off = listen(externalListeners, cb)

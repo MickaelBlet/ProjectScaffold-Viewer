@@ -55,10 +55,17 @@ export type ToHost =
   | { type: 'storage'; key: string; value: string | null }
   /** Save dialog then write; replies with the written path, or null when cancelled. */
   | { type: 'export'; id: number; name: string; data: string; encoding: 'utf8' | 'base64' }
-  /** Open dialog then read; replies with `{ path, content }`, or null when cancelled. */
+  /** Open dialog then read a project file; replies with `{ path, content }`, or null when cancelled. */
   | { type: 'openFile'; id: number }
+  /**
+   * Open dialog accepting several files with one of `extensions` (`description` names them), then
+   * read; replies with `{ path, content }[]`, empty when cancelled.
+   */
+  | { type: 'openFiles'; id: number; filter: { description: string; extensions: string[] } }
   /** Reads a file next to the document; replies with its content, or null when unreadable. */
   | { type: 'readSibling'; id: number; file: string }
+  /** Reads a file by absolute path; replies with its content, or null when unreadable. */
+  | { type: 'readFile'; id: number; path: string }
   /** Opens a project file next to the document in its own editor. */
   | { type: 'openSibling'; file: string }
   /**

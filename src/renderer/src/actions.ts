@@ -3,6 +3,7 @@ import { align, distribute, sameSize, type AlignMode } from '@/model/align'
 import { arrange as arrangeProject, arrangeOptions } from '@/model/autoLayout'
 import { copyItems, copyProject, parseClip, pasteClip, type Clip } from '@/model/clipboard'
 import { addDependencyOf, type DependencyResult } from '@/model/dependencies'
+import { idlImport, parseIdlFiles, readIdlIncludes, type IdlFile } from '@/model/idl'
 import { binarySnapshot, settleBinaries } from '@/model/binaries'
 import {
   absolutePosition,
@@ -553,6 +554,86 @@ export function importProjectContent(
         })
     }))
   )
+}
+
+const IDL_FILES = { description: 'IDL files', extensions: ['idl'] }
+
+/**
+ * Imports IDL files: their interfaces and components (one picked or all) with the types they use.
+ * Included files are read by the host when it can, else looked up among the picked files.
+ */
+export function importIdl(): void {
+  void window.api.openFiles(IDL_FILES).then(async (picked) => {
+    if (!picked.length) return
+    const label = picked.length === 1 ? fileName(picked[0]!.path) : `${picked.length} IDL files`
+    let idl: IdlFile
+    try {
+      let files = new Map(picked.map((f) => [f.path, f.content]))
+      const read = window.api.readFile?.bind(window.api)
+      if (read) files = await readIdlIncludes(files, read)
+      idl = parseIdlFiles(files)
+    } catch (e) {
+      return showDialog(`Cannot read ${label}`, [e instanceof Error ? e.message : String(e)])
+    }
+    if (!idl.interfaces.length && !idl.types.length && !idl.components.length)
+      return setStatus('error', `${label} defines no interfaces, components nor types`)
+    const run = (only?: string[]): void => {
+      const p = getProject()
+      const { clip, existing, unresolved } = idlImport(idl, p, only)
+      const kept = existing.length ? `, ${existing.join(', ')} already defined` : ''
+      if (!clip) return setStatus('info', `Nothing to import from ${label}${kept}`)
+      const at = clip.modules.length ? (activeCanvas()?.center() ?? { x: 80, y: 80 }) : undefined
+      let pasted: Id[] = []
+      update((d) => {
+        pasted = pasteClip(d, clip, { parent: null, at })
+      })
+      selectMany(pasted)
+      const counts = [
+        clip.modules.length && `${clip.modules.length} modules`,
+        `${clip.interfaces.length} interfaces`,
+        `${clip.types.length} types`
+      ].filter(Boolean)
+      setStatus('info', `Imported ${counts.join(', ')} from ${label}${kept}`)
+      const notes = [
+        ...idl.warnings,
+        ...unresolved.map((n) => `${n} is defined in none of the files: added empty`),
+        ...(idl.missing.length && !window.api.readFile
+          ? ['Pick the included files along with the IDL file to read their definitions.']
+          : [])
+      ]
+      if (notes.length) showDialog(`Imported from ${label}`, notes)
+    }
+    const entries = idl.components.length + idl.interfaces.length
+    if (entries < 2) return run()
+    quickPick('Component or interface to import', [
+      {
+        key: '*',
+        label: 'All',
+        detail: [
+          idl.components.length && `${idl.components.length} components`,
+          idl.interfaces.length && `${idl.interfaces.length} interfaces`
+        ]
+          .filter(Boolean)
+          .join(', '),
+        kind: '*',
+        run: () => run()
+      },
+      ...idl.components.map((c) => ({
+        key: `c:${c.name}`,
+        label: c.name,
+        detail: `component, ${c.ports.length} ports`,
+        kind: 'M',
+        run: () => run([c.name])
+      })),
+      ...idl.interfaces.map((i) => ({
+        key: `i:${i.name}`,
+        label: i.name,
+        detail: `${i.messages.length} messages`,
+        kind: 'I',
+        run: () => run([i.name])
+      }))
+    ])
+  })
 }
 
 /**

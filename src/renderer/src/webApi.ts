@@ -3,7 +3,7 @@
 // through a file input and a download. Paths are file names: browsers never expose real paths.
 // Recent documents live in IndexedDB: their last known content, and their file handle when
 // available so that reopening reads the file again and Save rewrites it.
-import type { Api, OpenResult, OutputDirRequest, SaveRequest, Session } from './api'
+import type { Api, FileFilter, OpenResult, OutputDirRequest, SaveRequest, Session } from './api'
 import type { OutputDir } from './codegen/run'
 
 type Permission = 'granted' | 'denied' | 'prompt'
@@ -58,11 +58,13 @@ function isAbort(e: unknown): boolean {
   return e instanceof DOMException && e.name === 'AbortError'
 }
 
-function pickWithInput(multiple: boolean): Promise<File[]> {
+const PROJECT_FILES: FileFilter = { description: 'Architecture', extensions: ['yaml', 'yml', 'json'] }
+
+function pickWithInput(multiple: boolean, filter: FileFilter): Promise<File[]> {
   return new Promise((done) => {
     const input = document.createElement('input')
     input.type = 'file'
-    input.accept = '.yaml,.yml,.json'
+    input.accept = filter.extensions.map((e) => `.${e}`).join(',')
     input.multiple = multiple
     input.onchange = () => done([...(input.files ?? [])])
     input.oncancel = () => done([])
@@ -114,15 +116,26 @@ async function changedOnDisk(path: string): Promise<string | null> {
   }
 }
 
-async function pickFiles(multiple: boolean): Promise<OpenResult[]> {
+/** Picks files; project files (no `filter`) go to the recent files. */
+async function pickFiles(multiple: boolean, filter?: FileFilter): Promise<OpenResult[]> {
+  const accept = filter ?? PROJECT_FILES
   if (fs.showOpenFilePicker) {
     try {
       const picked = await fs.showOpenFilePicker({
-        types: [{ description: 'Architecture', accept: { 'application/yaml': ['.yaml', '.yml', '.json'] } }],
+        types: [
+          {
+            description: accept.description,
+            accept: { [filter ? 'text/plain' : 'application/yaml']: accept.extensions.map((e) => `.${e}`) }
+          }
+        ],
         multiple
       })
       const files: OpenResult[] = []
       for (const handle of picked) {
+        if (filter) {
+          files.push({ path: handle.name, content: await (await handle.getFile()).text() })
+          continue
+        }
         handles.set(handle.name, handle)
         const content = await read(handle)
         await remember({ name: handle.name, content, handle })
@@ -135,9 +148,9 @@ async function pickFiles(multiple: boolean): Promise<OpenResult[]> {
     }
   }
   const files: OpenResult[] = []
-  for (const file of await pickWithInput(multiple)) {
+  for (const file of await pickWithInput(multiple, accept)) {
     const content = await file.text()
-    await remember({ name: file.name, content })
+    if (!filter) await remember({ name: file.name, content })
     files.push({ path: file.name, content })
   }
   return files
@@ -529,7 +542,7 @@ let dirty = false
 
 const webApi: Api = {
   openFile,
-  openFiles: () => pickFiles(true),
+  openFiles: (filter) => pickFiles(true, filter),
   initialFile: async () => {
     const [last] = await loadRecent()
     return last ? readRecent(last, false) : null

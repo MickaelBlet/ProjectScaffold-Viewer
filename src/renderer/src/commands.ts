@@ -16,6 +16,7 @@ import {
   exportImage,
   groupSelection,
   hideSelection,
+  importIdl,
   importProjectContent,
   linkOtherProject,
   newView,
@@ -361,6 +362,12 @@ const allCommands: Command[] = [
     title: 'Import another project…',
     category: 'Insert',
     run: () => importProjectContent()
+  },
+  {
+    id: 'insert.idl',
+    title: 'Import IDL files…',
+    category: 'Insert',
+    run: importIdl
   },
   {
     id: 'insert.dependency',

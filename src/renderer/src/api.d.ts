@@ -6,6 +6,13 @@ export interface OpenResult {
   content: string
 }
 
+/** Kind of file an open dialog asks for, in place of a project file. */
+export interface FileFilter {
+  description: string
+  /** Without the dot. */
+  extensions: string[]
+}
+
 export interface SaveRequest {
   /** Existing path; when null a save dialog is shown. */
   path: string | null
@@ -43,8 +50,11 @@ export interface Session {
 
 export interface Api {
   openFile(): Promise<OpenResult | null>
-  /** Open dialog accepting several files; empty when cancelled. */
-  openFiles(): Promise<OpenResult[]>
+  /**
+   * Open dialog accepting several project files, or files matching `filter` (not added to the
+   * recent files); empty when cancelled.
+   */
+  openFiles(filter?: FileFilter): Promise<OpenResult[]>
   /** File to open at startup: the last opened one. */
   initialFile(): Promise<OpenResult | null>
   /** Recently opened or saved project files, most recent first. */
@@ -91,6 +101,8 @@ export interface Api {
   redo?(): void
   /** Reads a project file next to the document; null when it cannot be read. */
   readSibling?(file: string): Promise<string | null>
+  /** Reads a file by absolute path (files an imported IDL file includes); null when unreadable. */
+  readFile?(path: string): Promise<string | null>
   /** Opens a project file next to the document in its own editor. */
   openSibling?(file: string): void
   /** The document text changed outside the page: undo, text editor, file changed on disk. */
