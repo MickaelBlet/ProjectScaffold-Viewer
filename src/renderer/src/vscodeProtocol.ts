@@ -3,11 +3,11 @@
 
 /**
  * Full diagram editor in place of the text, compact preview beside it, or one tool panel of the
- * ProjectScaffold side bar (following the active project document).
+ * ProjectScaffold views (following the active project document).
  */
 export type WebviewMode = 'editor' | 'preview' | 'panel'
 
-/** Tool panels of the ProjectScaffold side bar. */
+/** Tool panels of the ProjectScaffold views (VS Code's Explorer or the ProjectScaffold side bar). */
 export type SidePanel = 'explorer' | 'modules' | 'links' | 'dependencies' | 'settings'
 
 type DataPath = (string | number)[]
@@ -100,7 +100,7 @@ export type ToHost =
   | { type: 'inDiagram'; action: DiagramAction }
   /** A page shows a side panel; the Dependencies panel with one of them (by name). */
   | { type: 'showPanel'; panel: SidePanel; dependency?: string }
-  /** Side panel: listening for its document, sent again in reply. */
+  /** Side panel: listening for its document, sent again in reply. Diagram: listening for commands. */
   | { type: 'ready' }
 
 /** Extension → page. */

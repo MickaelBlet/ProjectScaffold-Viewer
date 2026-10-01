@@ -204,7 +204,12 @@ const vscodeApi: Api = {
     unheard = null
     return off
   },
-  onCommand: (cb) => listen(commandListeners, cb),
+  onCommand: (cb) => {
+    const off = listen(commandListeners, cb)
+    // A diagram runs the commands asked for before it was loaded (Generate Code from the text...).
+    if (!IN_PANEL) post({ type: 'ready' })
+    return off
+  },
   onReveal: (cb) => listen(revealListeners, cb),
   inDiagram: (action) => post({ type: 'inDiagram', action }),
   onDocument: (cb) => {
