@@ -51,6 +51,7 @@ import {
   addModuleAt,
   addNoteAt,
   importProjectContent,
+  keepView,
   linkOtherProject,
   navigate,
   openImportSource,
@@ -158,6 +159,16 @@ function Breadcrumbs({ view }: { view: View }): ReactNode {
             </span>
           ))}
         </>
+      )}
+      {view.temporary && (
+        <button
+          type="button"
+          className="link-button keep-view"
+          title="Save this view in the project (double-click its tab)"
+          onClick={() => keepView(view.id)}
+        >
+          Keep view
+        </button>
       )}
       {view.hidden.length > 0 && (
         <span className="hidden-chip">

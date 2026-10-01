@@ -2,13 +2,12 @@
 // Keyboard: arrows move (Left / Right collapse and expand), Enter selects.
 import { useMemo, useState, type KeyboardEvent, type ReactNode, type SyntheticEvent } from 'react'
 import { absolutePosition, belowContent, findView, LAYOUT_PAD, subtreeIds } from '@/model/project'
-import { GLOBAL_VIEW, type Id, type Module, type Project } from '@/model/types'
+import type { Id, Module, Project } from '@/model/types'
 import { activeDoc, patchDoc, useDoc } from '@/store/documents'
-import { addView, getProject, reparentModule, setHidden, useProjectStore } from '@/store/project'
+import { getProject, reparentModule, setHidden, useProjectStore } from '@/store/project'
 import { openContextMenu } from '@/store/ui'
 import { commandItem } from '@/commands'
-import { navigate, openModuleView } from '@/actions'
-import { openView } from '@/shell/controllers'
+import { navigate, openModuleView, storedViewFor } from '@/actions'
 import { Icon } from '@/components/Icon'
 import { onListKeyDown, tabStop } from '@/components/listKeys'
 
@@ -24,14 +23,9 @@ function canDrop(p: Project, dragged: Id, target: Id | null): boolean {
   return dragged !== target && !(target && subtreeIds(p, dragged).has(target))
 }
 
-/** Hide or show a module in the focused view (a stored copy of the global view is made first). */
+/** Hide or show a module in the focused view (stored first: see storedViewFor). */
 function toggleHidden(id: Id, hidden: boolean): void {
-  let viewId = activeDoc().activeViewId
-  if (viewId === GLOBAL_VIEW) {
-    viewId = addView('Filtered', null)
-    openView(viewId)
-  }
-  setHidden(viewId, [id], !hidden)
+  setHidden(storedViewFor(activeDoc().activeViewId), [id], !hidden)
 }
 
 /** Modules by parent (null: top level), in project order. */
@@ -197,7 +191,7 @@ export function ModulesPanel(): ReactNode {
     () => (f ? matching(children, (m) => m.name.toLowerCase().includes(f)) : null),
     [children, f]
   )
-  const hiddenIds = findView({ views }, viewId).hidden
+  const hiddenIds = findView({ views, modules }, viewId).hidden
   const hidden = useMemo(() => new Set(hiddenIds), [hiddenIds])
   const selected = useMemo(() => new Set(selectedIds), [selectedIds])
   const roots = children.get(null) ?? []

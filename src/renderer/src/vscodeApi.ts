@@ -8,7 +8,8 @@ import type {
   OutputDirReply,
   OutputFileReply,
   ToHost,
-  ToPage
+  ToPage,
+  ViewRef
 } from '../../../vscode/src/protocol'
 import type { Api, OpenResult, OutputDirRequest, Session, TemplateDirRequest } from './api'
 import type { OutputDir } from './codegen/run'
@@ -33,7 +34,7 @@ const externalListeners = new Set<(text: string) => void>()
 const commandListeners = new Set<(id: string) => void>()
 const revealListeners = new Set<(path: (string | number)[], names: (string | undefined)[]) => void>()
 const documentListeners = new Set<(file: OpenResult) => void>()
-const viewListeners = new Set<(view: string | null) => void>()
+const viewListeners = new Set<(view: ViewRef) => void>()
 const actionListeners = new Set<(action: DiagramAction) => void>()
 const dependencyListeners = new Set<(name: string) => void>()
 /** Latest text received while the document was still loading. */

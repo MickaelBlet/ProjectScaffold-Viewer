@@ -1,6 +1,7 @@
 // Command registry: toolbar menus, context menus, the command palette and keyboard shortcuts
 // all run the same commands.
 import {
+  activeViewTemporary,
   addModuleAt,
   addNoteAt,
   addPortToSelection,
@@ -17,6 +18,7 @@ import {
   groupSelection,
   hideSelection,
   importProjectContent,
+  keepView,
   linkOtherProject,
   newView,
   nudgeSelection,
@@ -470,6 +472,13 @@ const allCommands: Command[] = [
     category: 'View',
     enabled: moduleSelected,
     run: () => openModuleView(undefined, true)
+  },
+  {
+    id: 'view.keep',
+    title: 'Keep view',
+    category: 'View',
+    enabled: activeViewTemporary,
+    run: () => void keepView()
   },
   { id: 'view.new', title: 'New view', category: 'View', run: newView },
   {

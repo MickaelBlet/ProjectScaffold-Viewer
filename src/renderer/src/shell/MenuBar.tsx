@@ -77,6 +77,7 @@ const MENUS: [Category, string[]][] = [
       'view.global',
       'view.openModule',
       'view.openModuleSplit',
+      'view.keep',
       'view.new',
       'view.source',
       '-',

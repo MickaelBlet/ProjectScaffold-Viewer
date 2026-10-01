@@ -1842,6 +1842,9 @@ ul.plain {
   margin-left: 8px;
   color: var(--muted);
 }
+.keep-view {
+  margin-left: 8px;
+}
 
 /* Editor area and document tabs */
 .editor-area {
@@ -1969,6 +1972,10 @@ ul.plain {
 }
 .view-tab.drill .dv-default-tab-content::before {
   mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 3h4v4M13 3 9 7M7 13H3V9M3 13l4-4'/%3E%3C/svg%3E");
+}
+/* Temporary view (opened from a module, not saved until kept), as VS Code's preview tabs */
+.view-tab.temporary .dv-default-tab-content {
+  font-style: italic;
 }
 .entity-tab .dv-default-tab-content::before {
   content: attr(data-kind) ' ';

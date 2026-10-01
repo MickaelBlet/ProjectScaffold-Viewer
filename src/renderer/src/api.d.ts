@@ -1,4 +1,4 @@
-import type { DiagramAction, SidePanel } from '../../../vscode/src/protocol'
+import type { DiagramAction, SidePanel, ViewRef } from '../../../vscode/src/protocol'
 import type { OutputDir } from './codegen/run'
 
 export interface OpenResult {
@@ -130,10 +130,10 @@ export interface Api {
   inDiagram?(action: DiagramAction): void
   /** Side panel: another project document is active (path empty: none). */
   onDocument?(cb: (file: OpenResult) => void): () => void
-  /** Side panel: the view the diagram shows (by name, null: global). */
-  onView?(cb: (view: string | null) => void): () => void
-  /** Diagram: shows another view (by name, null: global), for the side panels. */
-  viewChanged?(view: string | null): void
+  /** Side panel: the view the diagram shows. */
+  onView?(cb: (view: ViewRef) => void): () => void
+  /** Diagram: shows another view, for the side panels. */
+  viewChanged?(view: ViewRef): void
   /** Diagram: actions asked by the side panels. */
   onAction?(cb: (action: DiagramAction) => void): () => void
   /** Shows a panel of the VS Code side bar; the Dependencies panel with a dependency (by name). */

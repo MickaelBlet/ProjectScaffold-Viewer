@@ -11,13 +11,13 @@ import {
 } from 'dockview-react'
 import { ReactFlowProvider } from '@xyflow/react'
 import { Canvas } from '@/canvas/Canvas'
-import { findView } from '@/model/project'
+import { findView, viewExists } from '@/model/project'
 import { GLOBAL_VIEW, type Id, type Project } from '@/model/types'
 import { formatFromPath } from '@/model/serialize'
 import { findDoc, patchDoc, useDoc, useDocs } from '@/store/documents'
 import { deleteView, renameView, useProjectStore } from '@/store/project'
 import { openContextMenu } from '@/store/ui'
-import { newView } from '@/actions'
+import { keepView, newView } from '@/actions'
 import { TypeInspector } from '@/panels/TypeInspector'
 import { InterfaceInspector } from '@/panels/InterfaceInspector'
 import { ModuleInspector } from '@/panels/ModuleInspector'
@@ -30,9 +30,7 @@ import { dockTheme } from './theme'
 
 function CanvasPanel(props: IDockviewPanelProps<{ viewId: Id }>): ReactNode {
   const { viewId } = props.params
-  const exists = useProjectStore(
-    (s) => viewId === GLOBAL_VIEW || s.project.views.some((v) => v.id === viewId)
-  )
+  const exists = useProjectStore((s) => viewExists(s.project, viewId))
   const name = useProjectStore((s) => findView(s.project, viewId).name)
   const { api } = props
   // Hidden tabs keep no canvas: nothing to measure or keep in sync off screen.
@@ -99,7 +97,8 @@ const KIND_ICON: Record<EditorKind | 'source', string> = {
 function ViewTab(props: IDockviewPanelHeaderProps<{ viewId: Id }>): ReactNode {
   const { viewId } = props.params
   const drill = useProjectStore((s) => !!findView(s.project, viewId).rootModuleId)
-  const stored = viewId !== GLOBAL_VIEW
+  const temporary = useProjectStore((s) => !!findView(s.project, viewId).temporary)
+  const stored = viewId !== GLOBAL_VIEW && !temporary
   const rename = (): void => {
     if (!stored) return
     const name = window.prompt('View name', props.api.title ?? '')
@@ -108,12 +107,14 @@ function ViewTab(props: IDockviewPanelHeaderProps<{ viewId: Id }>): ReactNode {
   return (
     <DockviewDefaultTab
       {...props}
-      className={`view-tab ${drill ? 'drill' : ''}`}
-      onDoubleClick={rename}
+      className={`view-tab ${drill ? 'drill' : ''} ${temporary ? 'temporary' : ''}`}
+      // A temporary view is kept by a double click, as VS Code's preview tabs.
+      onDoubleClick={temporary ? () => keepView(viewId) : rename}
       onContextMenu={(e) => {
         e.preventDefault()
         openContextMenu(e, [
           { label: 'Open to the side', run: () => (closeView(viewId), openView(viewId, { split: true })) },
+          { label: 'Keep view', disabled: !temporary, run: () => keepView(viewId) },
           { label: 'Rename…', disabled: !stored, run: rename },
           { label: 'Close', run: () => props.api.close() },
           'separator',

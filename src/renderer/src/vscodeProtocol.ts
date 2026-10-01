@@ -27,9 +27,12 @@ export interface WebviewInit {
   storage: Record<string, string>
 }
 
-/** Done by a diagram for a side panel. Entities by data path of the file, views by name (null: global). */
+/** A view: stored by name, temporary by the path of its module (`Core.Sensor`), null: global. */
+export type ViewRef = string | { module: string } | null
+
+/** Done by a diagram for a side panel. Entities by data path of the file, views by reference. */
 export type DiagramAction =
-  | { kind: 'openView'; view: string | null; split?: boolean }
+  | { kind: 'openView'; view: ViewRef; split?: boolean }
   | { kind: 'openEditor'; editor: 'type' | 'interface' | 'module' | 'link'; path: DataPath; split?: boolean }
   | { kind: 'command'; id: string }
 
@@ -91,8 +94,8 @@ export type ToHost =
     }
   /** The selection changed: data path of the selected entity in the file. */
   | { type: 'selected'; path: DataPath }
-  /** A diagram shows another view (by name, null: global). */
-  | { type: 'view'; view: string | null }
+  /** A diagram shows another view. */
+  | { type: 'view'; view: ViewRef }
   /** A side panel asks the diagram of its document for an action. */
   | { type: 'inDiagram'; action: DiagramAction }
   /** A page shows a side panel; the Dependencies panel with one of them (by name). */
@@ -113,7 +116,7 @@ export type ToPage =
   /** Shows the entity at a data path of the file, with the name of the list item at each index. */
   | { type: 'reveal'; path: DataPath; names: (string | undefined)[] }
   /** Side panel: the view the diagram shows. */
-  | { type: 'view'; view: string | null }
+  | { type: 'view'; view: ViewRef }
   /** Dependencies side panel: the dependency to show, by name. */
   | { type: 'dependency'; name: string }
   /** Diagram: an action asked by a side panel. */

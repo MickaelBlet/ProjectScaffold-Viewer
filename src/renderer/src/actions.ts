@@ -21,6 +21,7 @@ import {
   findView,
   growAncestors,
   isImportedId,
+  isolatedViewId,
   LAYOUT_PAD,
   contentBottom,
   contentTop,
@@ -82,9 +83,17 @@ import { fileName } from '@/fileOps'
 import { normalizeFile, relativeFile, resolveRelative, sameFile } from '@/model/sync'
 import { formatFromPath, LoadError, loadText, toFile } from '@/model/serialize'
 import type { OpenResult } from '@/api'
-import { activeCanvas, openEditor, openView, showTool } from '@/shell/controllers'
+import {
+  activeCanvas,
+  openEditor,
+  openView,
+  replaceView,
+  showTool,
+  viewOfRef,
+  viewRef
+} from '@/shell/controllers'
 import { IN_PANEL, IN_VSCODE } from '@/host'
-import type { DiagramAction } from '../../../vscode/src/protocol'
+import type { DiagramAction, ViewRef } from '../../../vscode/src/protocol'
 
 // Selection
 
@@ -192,31 +201,27 @@ export function installSelectionSync(): () => void {
   })
 }
 
-const viewName = (d: DocState): string | null =>
-  d.activeViewId === GLOBAL_VIEW
-    ? null
-    : (d.store.getState().project.views.find((v) => v.id === d.activeViewId)?.name ?? null)
+const activeViewRef = (d: DocState): ViewRef => viewRef(d.store.getState().project, d.activeViewId)
 
 /** VS Code diagram: the side panels follow the view it shows. */
 export function installViewSync(): () => void {
-  window.api.viewChanged?.(viewName(activeDoc()))
+  window.api.viewChanged?.(activeViewRef(activeDoc()))
   return useDocs.subscribe((s, prev) => {
     if (activeDoc(s).activeViewId !== activeDoc(prev).activeViewId)
-      window.api.viewChanged?.(viewName(activeDoc(s)))
+      window.api.viewChanged?.(activeViewRef(activeDoc(s)))
   })
 }
 
-/** VS Code side panel: the view the diagram shows, by name (null: global). */
-export function showDiagramView(name: string | null): void {
-  const view = name === null ? undefined : getProject().views.find((v) => v.name === name)
-  patchDoc({ activeViewId: view?.id ?? GLOBAL_VIEW })
+/** VS Code side panel: the view the diagram shows. */
+export function showDiagramView(ref: ViewRef): void {
+  patchDoc({ activeViewId: viewOfRef(getProject(), ref) ?? GLOBAL_VIEW })
 }
 
 /** VS Code diagram: an action asked by a side panel (commands: see runCommand). */
 export function runDiagramAction(action: Exclude<DiagramAction, { kind: 'command' }>): void {
   const p = getProject()
   if (action.kind === 'openView') {
-    const view = action.view === null ? GLOBAL_VIEW : p.views.find((v) => v.name === action.view)?.id
+    const view = viewOfRef(p, action.view)
     if (view) openView(view, { split: action.split })
     return
   }
@@ -1172,32 +1177,52 @@ export async function arrangeLayout(
 
 // Views
 
-/** Open the content of the selected module in its own view tab. */
+/**
+ * Open the content of the selected module in its own view tab: its stored view showing everything,
+ * else a temporary view (not saved until kept).
+ */
 export function openModuleView(moduleId?: Id, split = false): void {
   const p = getProject()
   const sel = activeDoc().selection
   const id = moduleId ?? (sel?.kind === 'module' ? sel.id : null)
-  if (!id) return
+  if (!id || !p.modules.some((m) => m.id === id)) return
   const existing = p.views.find((v) => v.rootModuleId === id && !v.hidden.length)
-  const viewId = existing?.id ?? addView(p.modules.find((m) => m.id === id)?.name ?? 'View', id)
-  openView(viewId, { split })
+  openView(existing?.id ?? isolatedViewId(id), { split })
 }
 
 export function newView(): void {
   openView(addView('View', null))
 }
 
-/** Hide the selected modules in the focused view (a stored copy of the global view is made first). */
+export function activeViewTemporary(): boolean {
+  return !!findView(getProject(), activeDoc().activeViewId).temporary
+}
+
+/** Store a temporary view in the project, in place of its tab; gives the id of the stored view. */
+export function keepView(viewId: Id = activeDoc().activeViewId): Id {
+  const view = findView(getProject(), viewId)
+  if (!view.temporary) return viewId
+  const id = addView(view.name, view.rootModuleId)
+  replaceView(viewId, id)
+  return id
+}
+
+/** A stored view to change in place of this one: a copy of the global view, or the temporary view kept. */
+export function storedViewFor(viewId: Id): Id {
+  if (viewId === GLOBAL_VIEW) {
+    const id = addView('Filtered', null)
+    openView(id)
+    return id
+  }
+  return keepView(viewId)
+}
+
+/** Hide the selected modules in the focused view (stored first: see storedViewFor). */
 export function hideSelection(): void {
   const p = getProject()
   const ids = selectedIds().filter((id) => p.modules.some((m) => m.id === id))
   if (!ids.length) return
-  let viewId = activeDoc().activeViewId
-  if (viewId === GLOBAL_VIEW) {
-    viewId = addView('Filtered', null)
-    openView(viewId)
-  }
-  setHidden(viewId, ids, true)
+  setHidden(storedViewFor(activeDoc().activeViewId), ids, true)
   select(null)
 }
 

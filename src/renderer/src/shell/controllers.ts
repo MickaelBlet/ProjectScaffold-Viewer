@@ -6,8 +6,8 @@ import {
   type IDockviewGroupPanel,
   type SerializedDockview
 } from 'dockview-react'
-import { findView } from '@/model/project'
-import { GLOBAL_VIEW, type Id, type Rect } from '@/model/types'
+import { findView, isolatedModuleId, isolatedViewId, modulePath } from '@/model/project'
+import { GLOBAL_VIEW, type Id, type Project, type Rect } from '@/model/types'
 import { activeDoc, patchDoc } from '@/store/documents'
 import { getProject } from '@/store/project'
 import { storage } from '@/storage'
@@ -15,7 +15,7 @@ import { IN_PANEL, IN_PREVIEW, IN_VSCODE } from '@/host'
 import { sendToDiagram } from '@/fileOps'
 import { targetPath } from '@/model/locate'
 import { toFile } from '@/model/serialize'
-import type { SidePanel } from '../../../../vscode/src/protocol'
+import type { SidePanel, ViewRef } from '../../../../vscode/src/protocol'
 
 export interface CanvasController {
   viewId: Id
@@ -405,28 +405,57 @@ export function viewPanelId(viewId: Id): string {
   return `view:${viewId}`
 }
 
+/** A view for another page of the document, where ids differ (see ViewRef). */
+export function viewRef(p: Project, viewId: Id): ViewRef {
+  const moduleId = isolatedModuleId(viewId)
+  if (moduleId) return p.modules.some((m) => m.id === moduleId) ? { module: modulePath(p, moduleId) } : null
+  return p.views.find((v) => v.id === viewId)?.name ?? null
+}
+
+/** Id of a view given by another page; undefined when it is not found. */
+export function viewOfRef(p: Project, ref: ViewRef): Id | undefined {
+  if (ref === null) return GLOBAL_VIEW
+  if (typeof ref === 'string') return p.views.find((v) => v.name === ref)?.id
+  const m = p.modules.find((m) => modulePath(p, m.id) === ref.module)
+  return m && isolatedViewId(m.id)
+}
+
 export function openView(viewId: Id = GLOBAL_VIEW, options: { split?: boolean } = {}): void {
   patchDoc({ activeViewId: viewId })
-  if (IN_PANEL) {
-    const view =
-      viewId === GLOBAL_VIEW ? null : (getProject().views.find((v) => v.id === viewId)?.name ?? null)
-    return sendToDiagram({ kind: 'openView', view, split: options.split })
-  }
+  if (IN_PANEL)
+    return sendToDiagram({ kind: 'openView', view: viewRef(getProject(), viewId), split: options.split })
   if (!editor) return
   const id = viewPanelId(viewId)
   const existing = editor.getPanel(id)
   if (existing) return existing.api.setActive()
   const active = editor.activePanel
-  editor.addPanel({
-    id,
+  addViewPanel(
+    viewId,
+    active ? { referencePanel: active.id, direction: options.split ? 'right' : 'within' } : undefined
+  )
+}
+
+function addViewPanel(
+  viewId: Id,
+  position?: { referencePanel: string; direction: 'right' | 'within' }
+): void {
+  editor?.addPanel({
+    id: viewPanelId(viewId),
     component: 'canvas',
     tabComponent: 'view',
     title: findView(getProject(), viewId).name,
     params: { viewId },
-    position: active
-      ? { referencePanel: active.id, direction: options.split ? 'right' : 'within' }
-      : undefined
+    position
   })
+}
+
+/** Show another view in place of a view's tab (e.g. a temporary view once stored). */
+export function replaceView(oldId: Id, newId: Id): void {
+  const old = editor?.getPanel(viewPanelId(oldId))
+  if (!editor || !old || editor.getPanel(viewPanelId(newId))) return openView(newId)
+  patchDoc({ activeViewId: newId })
+  addViewPanel(newId, { referencePanel: old.id, direction: 'within' })
+  old.api.close()
 }
 
 export function closeView(viewId: Id): void {
