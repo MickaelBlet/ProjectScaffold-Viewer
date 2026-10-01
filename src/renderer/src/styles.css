@@ -1213,8 +1213,8 @@ input.number {
   }
   /* Entries on several lines: a line between them tells them apart. */
   .field-list.has-value > .field-row:not(:first-child) {
-    margin-top: 2px;
-    padding-top: 2px;
+    margin-top: 3px;
+    padding-top: 3px;
     border-top: 1px solid var(--border);
   }
 }
@@ -1231,8 +1231,8 @@ input.number {
     grid-row: 3;
   }
   .field-row:not(:first-child) {
-    margin-top: 2px;
-    padding-top: 2px;
+    margin-top: 3px;
+    padding-top: 3px;
     border-top: 1px solid var(--border);
   }
 }
