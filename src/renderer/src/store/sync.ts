@@ -16,6 +16,7 @@ function carryRenames(docId: Id, prev: Project, next: Project): void {
   if (
     prev.types === next.types &&
     prev.interfaces === next.interfaces &&
+    prev.consts === next.consts &&
     prev.modules === next.modules &&
     prev.dependencies === next.dependencies
   )

@@ -25,9 +25,10 @@ export function targetPath(data: unknown, p: Project, target: ProblemTarget): Da
     case 'project':
       return ['project']
     case 'type':
-    case 'interface': {
-      const key = target.kind === 'type' ? 'types' : 'interfaces'
-      const e = [...p.types, ...p.interfaces].find((x) => x.id === target.id)
+    case 'interface':
+    case 'const': {
+      const key = target.kind === 'type' ? 'types' : target.kind === 'interface' ? 'interfaces' : 'constants'
+      const e = [...p.types, ...p.interfaces, ...p.consts].find((x) => x.id === target.id)
       const dep = e?.dependency && p.dependencies.find((x) => x.id === e.dependency)
       if (!dep) return named(key, file[key], e?.name)
       // A dependency's: dependencies.i.types.j

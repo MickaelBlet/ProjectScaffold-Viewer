@@ -18,6 +18,7 @@ export type OutlineKind =
   | 'field'
   | 'value'
   | 'interface'
+  | 'constant'
   | 'message'
   | 'module'
   | 'attribute'
@@ -204,12 +205,20 @@ const module: Make = (item, path, names) =>
     ]
   })
 
+const constant: Make = (item, path, names) => {
+  const node = item.get('value', true) as YamlNode | undefined
+  const type = typeText(item, 'type')
+  const detail = node === undefined ? type : `${type ?? ''} = ${formatValue(node.toJSON() as Value)}`
+  return entry(item, 'constant', path, names, { detail })
+}
+
 const dependency: Make = (item, path, names) =>
   entry(item, 'dependency', path, names, {
     detail: text(item, 'file'),
     children: [
       ...list(item, 'types', path, names, type),
       ...list(item, 'interfaces', path, names, iface),
+      ...list(item, 'constants', path, names, constant),
       ...list(item, 'modules', path, names, (m, p, n) =>
         entry(m, 'module', p, n, { name: text(m, 'module'), children: list(m, 'ports', p, n, port) })
       )
@@ -229,6 +238,7 @@ const link: Make = (item, path, names) =>
 const SECTIONS: [key: string, title: string, make: Make][] = [
   ['types', 'Types', type],
   ['interfaces', 'Interfaces', iface],
+  ['constants', 'Constants', constant],
   ['modules', 'Modules', module],
   ['dependencies', 'Dependencies', dependency],
   ['links', 'Links', link]

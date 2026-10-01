@@ -1,4 +1,4 @@
-// Views, dependencies, types, interfaces, modules and links of the active document. Click selects (Ctrl / Shift for several),
+// Views, dependencies, types, interfaces, constants, modules and links of the active document. Click selects (Ctrl / Shift for several),
 // double-click opens an editor tab, right click for more. Arrows move between items, Enter selects.
 import {
   useId,
@@ -11,12 +11,15 @@ import {
 } from 'react'
 import { endpointLabel, findView, modulePaths, newId, uniqueName } from '@/model/project'
 import { removeBinary } from '@/model/binaries'
+import { formatValue } from '@/model/defaults'
 import { GLOBAL_VIEW, type Id, type Module, type View } from '@/model/types'
 import { activeDoc, patchDoc, useDoc } from '@/store/documents'
 import {
+  addConst,
   addInterface,
   addType,
   addView,
+  deleteConst,
   deleteItems,
   deleteView,
   getProject,
@@ -213,6 +216,7 @@ const GLOBAL: View = { id: GLOBAL_VIEW, name: 'Global', rootModuleId: null, hidd
 export function ExplorerPanel(): ReactNode {
   const types = useProjectStore((s) => s.project.types)
   const interfaces = useProjectStore((s) => s.project.interfaces)
+  const consts = useProjectStore((s) => s.project.consts)
   const views = useProjectStore((s) => s.project.views)
   const modules = useProjectStore((s) => s.project.modules)
   const links = useProjectStore((s) => s.project.links)
@@ -247,6 +251,8 @@ export function ExplorerPanel(): ReactNode {
   const ownInterfaces = interfaces.filter((i) => !i.dependency)
   const shownTypes = ownTypes.filter((t) => match(t.name))
   const shownInterfaces = ownInterfaces.filter((i) => match(i.name))
+  const ownConsts = consts.filter((c) => !c.dependency)
+  const shownConsts = ownConsts.filter((c) => match(c.name))
   // Dependencies, each followed by its types, interfaces and placed modules (unless folded).
   const shownDependencies = dependencies.map((dep) => ({
     dep,
@@ -289,6 +295,10 @@ export function ExplorerPanel(): ReactNode {
   const dependencyStop = tabStop(dependencyIds, isSelected)
   const moduleStop = tabStop(moduleIds, isSelected)
   const binaryStop = tabStop(binaryIds, () => false)
+  const constStop = tabStop(
+    shownConsts.map((c) => c.id),
+    () => false
+  )
   const linkStop = tabStop(linkIds, isSelected)
 
   return (
@@ -539,6 +549,49 @@ export function ExplorerPanel(): ReactNode {
             </Item>
           ))}
           {!shownInterfaces.length && <Empty>{f ? 'No match' : 'No interfaces yet'}</Empty>}
+        </EntityList>
+      </Section>
+
+      <Section
+        title="Constants"
+        count={ownConsts.length}
+        actions={
+          <button
+            type="button"
+            className="icon"
+            title="New constant"
+            onClick={() => {
+              addConst()
+              select({ kind: 'project' })
+            }}
+          >
+            <Icon name="plus" />
+          </button>
+        }
+      >
+        <EntityList label="Constants">
+          {shownConsts.map((c) => (
+            <Item
+              key={c.id}
+              selected={false}
+              tabStop={c.id === constStop}
+              title={`${c.description ? `${c.description}\n` : ''}Edited in the project inspector.`}
+              onClick={() => select({ kind: 'project' })}
+              onContextMenu={(e) => {
+                e.preventDefault()
+                openContextMenu(e, [
+                  { label: 'Edit constants', run: () => select({ kind: 'project' }) },
+                  'separator',
+                  { label: 'Delete constant', danger: true, run: () => deleteConst(c.id) }
+                ])
+              }}
+            >
+              <span className="kind-badge const">C</span>
+              {c.name}
+              <small>{formatValue(c.value)}</small>
+            </Item>
+          ))}
+          {!shownConsts.length && <Empty>{f ? 'No match' : 'No constants yet'}</Empty>}
         </EntityList>
       </Section>
 

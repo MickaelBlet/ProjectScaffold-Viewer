@@ -390,6 +390,26 @@ export function addType(kind: TypeDef['kind']): Id {
   return id
 }
 
+/** Add a constant (shown in the project inspector). */
+export function addConst(): Id {
+  const id = newId()
+  update(
+    (d) =>
+      void d.consts.push({
+        id,
+        name: uniqueName('Constant', globalTypeNames(d)),
+        description: '',
+        type: { kind: 'primitive', name: 'uint32' },
+        value: 0
+      })
+  )
+  return id
+}
+
+export function deleteConst(id: Id): void {
+  update((d) => void (d.consts = d.consts.filter((c) => c.id !== id)))
+}
+
 /** Returns the usages that prevent deletion, or an empty list once deleted. */
 export function deleteType(id: Id): string[] {
   const dep = dependencyOf(getProject(), id)

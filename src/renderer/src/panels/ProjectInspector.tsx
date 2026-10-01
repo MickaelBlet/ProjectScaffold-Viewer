@@ -2,7 +2,9 @@ import type { ReactNode } from 'react'
 import { binaryError, newId, transportError, uniqueName } from '@/model/project'
 import { removeBinary } from '@/model/binaries'
 import { DEFAULT_BASE_PORT, DEFAULT_HOST } from '@/model/transports'
-import { TRANSPORTS, type RemoteDefaults } from '@/model/types'
+import { TRANSPORTS, type ConstDef, type RemoteDefaults } from '@/model/types'
+import { valueExample } from '@/model/defaults'
+import { DefaultInput, FieldList } from './TypeInspector'
 import { update, useProjectStore } from '@/store/project'
 import {
   ColorPicker,
@@ -39,6 +41,7 @@ function withRemoteDefaults(fn: (r: RemoteDefaults) => void): void {
 
 export function ProjectInspector(): ReactNode {
   const p = useProjectStore((s) => s.project)
+  const own = p.consts.filter((c) => !c.dependency)
   return (
     <>
       <h2>Project</h2>
@@ -48,6 +51,33 @@ export function ProjectInspector(): ReactNode {
       <TextArea value={p.description} onChange={(v) => update((d) => void (d.description = v))} />
       <Section title="Metadata">
         <MetadataEditor value={p.metadata} onChange={(fn) => update((d) => fn(d.metadata))} />
+      </Section>
+      <Section title={`Constants (${own.length})`}>
+        <FieldList<ConstDef>
+          fields={own}
+          addLabel="Add constant"
+          baseName="Constant"
+          extra={{ value: 0 }}
+          onChange={(fn) =>
+            update((d) => {
+              const list = d.consts.filter((c) => !c.dependency)
+              fn(list)
+              d.consts = [...list, ...d.consts.filter((c) => c.dependency)]
+            })
+          }
+          value={(c) => (
+            <DefaultInput
+              field={{ ...c, default: c.value }}
+              types={p.types}
+              onChange={(v) =>
+                update((d) => {
+                  const x = d.consts.find((y) => y.id === c.id)
+                  if (x) x.value = v ?? valueExample(x.type, d.types)
+                })
+              }
+            />
+          )}
+        />
       </Section>
       <Section
         title={`Transports (${p.transports.length})`}

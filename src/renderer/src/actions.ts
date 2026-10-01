@@ -102,7 +102,7 @@ export function selectAll(): void {
 /** Select an entity and bring it into view (zoomed on it with `zoom`). */
 export function navigate(target: ProblemTarget, { zoom = false }: { zoom?: boolean } = {}): void {
   const before = activeDoc().selection
-  if (target.kind === 'project') select({ kind: 'project' })
+  if (target.kind === 'project' || target.kind === 'const') select({ kind: 'project' })
   else
     select(target.kind === 'module' && isImportedId(target.id) ? { kind: 'imported', id: target.id } : target)
   // VS Code side panel: the diagram shows it (installSelectionSync tells it of a new selection).
@@ -111,7 +111,8 @@ export function navigate(target: ProblemTarget, { zoom = false }: { zoom?: boole
     return
   }
   if (target.kind === 'project') return
-  if (target.kind === 'type' || target.kind === 'interface') return showTool('inspector', false)
+  if (target.kind === 'type' || target.kind === 'interface' || target.kind === 'const')
+    return showTool('inspector', false)
   const p = getProject()
   const link = target.kind === 'link' ? p.links.find((l) => l.id === target.id) : undefined
   const ids = link ? [link.from.moduleId, link.to.moduleId] : [target.id]

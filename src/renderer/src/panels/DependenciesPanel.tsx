@@ -5,6 +5,7 @@ import { useMemo, useState, type KeyboardEvent, type MouseEvent, type ReactNode 
 import { typeUsageTargets } from '@/model/project'
 import { dependencyEntities } from '@/model/dependencies'
 import { printTypeRef } from '@/model/typeExpr'
+import { formatValue } from '@/model/defaults'
 import type { Dependency, Id, Interface, Message, Project, TypeDef, TypeRef } from '@/model/types'
 import { useDoc } from '@/store/documents'
 import { useProjectStore } from '@/store/project'
@@ -215,7 +216,9 @@ function Detail({ lib, filter }: { lib: Dependency; filter: string }): ReactNode
   const [collapsed, setCollapsed] = useState<ReadonlySet<Id>>(new Set())
   const f = filter.trim().toLowerCase()
 
-  const all = useMemo(() => dependencyEntities(project, lib.id), [project, lib.id])
+  const owned = useMemo(() => dependencyEntities(project, lib.id), [project, lib.id])
+  const all = useMemo(() => owned.filter((e): e is Entity => !('value' in e)), [owned])
+  const consts = owned.filter((e) => 'value' in e && (!f || e.name.toLowerCase().includes(f)))
   const print = useMemo(() => {
     const names = new Map([...project.types, ...project.interfaces].map((e) => [e.id, e.name]))
     return (t: TypeRef): string => printTypeRef(t, (id) => names.get(id))
@@ -365,6 +368,26 @@ function Detail({ lib, filter }: { lib: Dependency; filter: string }): ReactNode
           </li>
         )}
         {interfaces.map(item)}
+        {consts.length > 0 && (
+          <li className="lib-group" role="presentation">
+            Constants <small>{consts.length}</small>
+          </li>
+        )}
+        {consts.map(
+          (c) =>
+            'value' in c && (
+              <li key={c.id} role="treeitem" className="lib-entity" title={c.description}>
+                <div className="lib-entity-head">
+                  <span className="chevron" aria-hidden />
+                  <span className="kind-badge const">C</span>
+                  <span className="lib-entity-name">{c.name}</span>
+                  <small>
+                    {print(c.type)} = {formatValue(c.value)}
+                  </small>
+                </div>
+              </li>
+            )
+        )}
         <li className="lib-group" role="presentation">
           Modules on the canvas <small>{placed.length}</small>
           <button
@@ -413,9 +436,13 @@ export function DependenciesPanel(): ReactNode {
   const lib = dependencies.find((l) => l.id === chosen) ?? dependencies[0]
   const types = useProjectStore((s) => s.project.types)
   const interfaces = useProjectStore((s) => s.project.interfaces)
+  const consts = useProjectStore((s) => s.project.consts)
   const counts = useMemo(
-    () => new Map(dependencies.map((l) => [l.id, dependencyEntities({ types, interfaces }, l.id).length])),
-    [dependencies, types, interfaces]
+    () =>
+      new Map(
+        dependencies.map((l) => [l.id, dependencyEntities({ types, interfaces, consts }, l.id).length])
+      ),
+    [dependencies, types, interfaces, consts]
   )
 
   return (

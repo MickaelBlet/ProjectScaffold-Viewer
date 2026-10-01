@@ -683,6 +683,9 @@ kbd {
 .kind-badge.union {
   background: #3f8f3a;
 }
+.kind-badge.const {
+  background: #9a6b2f;
+}
 .kind-badge.alias {
   background: #2e9e8f;
 }
