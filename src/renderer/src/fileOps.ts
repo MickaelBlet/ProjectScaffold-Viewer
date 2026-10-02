@@ -36,6 +36,7 @@ import {
   type DocState
 } from '@/store/documents'
 import { useSettings } from '@/store/settings'
+import { dirtyFiles, dropDocTextFiles } from '@/store/textFiles'
 import { setStatus, showDialog, useUiStore } from '@/store/ui'
 import type { DiagramAction } from '../../../vscode/src/protocol'
 import type { OpenResult, Session } from './api'
@@ -50,8 +51,9 @@ export function isDirty(): boolean {
   return isDocDirty(activeDoc())
 }
 
+/** Some document or text file (template, generated file...) holds unsaved changes. */
 export function anyDirty(): boolean {
-  return useDocs.getState().docs.some(isDocDirty)
+  return useDocs.getState().docs.some(isDocDirty) || dirtyFiles().length > 0
 }
 
 /** Show a loaded project: in place of a pristine Untitled tab, else in a new tab. */
@@ -208,8 +210,11 @@ export async function openRecentProject(path: string): Promise<void> {
 export function closeDocument(id: string = useDocs.getState().activeId): void {
   const doc = findDoc(id)
   if (!doc) return
-  if (isDocDirty(doc) && !window.confirm(`Discard unsaved changes to ${docTitle(doc)}?`)) return
+  const files = dirtyFiles(id).map((f) => fileName(f.path))
+  const unsaved = [...(isDocDirty(doc) ? [docTitle(doc)] : []), ...files]
+  if (unsaved.length && !window.confirm(`Discard unsaved changes to ${unsaved.join(', ')}?`)) return
   removeDoc(id)
+  dropDocTextFiles(id)
 }
 
 export function closeOtherDocuments(id: string): void {

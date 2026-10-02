@@ -9,6 +9,7 @@ import { Inspector } from '@/panels/Inspector'
 import { ProblemsPanel, useProblemCounts } from '@/panels/ProblemsPanel'
 import { SearchPanel } from '@/panels/SearchPanel'
 import { SettingsPanel } from '@/panels/SettingsPanel'
+import { GenerationPanel } from '@/panels/GenerationPanel'
 import { EditorArea } from './EditorArea'
 import {
   EDITOR_AREA,
@@ -57,6 +58,7 @@ const components = {
   modules: tool('modules', ModulesPanel),
   links: tool('links', LinksPanel),
   dependencies: tool('dependencies', DependenciesPanel),
+  generation: tool('generation', GenerationPanel),
   inspector: tool('inspector', Inspector),
   problems: ProblemsToolPanel,
   search: tool('search', SearchPanel),

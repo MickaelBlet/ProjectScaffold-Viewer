@@ -8,7 +8,7 @@ import { dependencyName } from '@/model/dependencies'
 import { toFile } from '@/model/serialize'
 import { hasErrors, validate } from '@/model/validate'
 import type { TemplateDirRequest } from '@/api'
-import { activeDoc } from '@/store/documents'
+import { activeDoc, type DocState } from '@/store/documents'
 import { quickPick, setStatus, showDialog } from '@/store/ui'
 
 const BUILTIN = import.meta.glob<string>('../../../templates/cpp17/*', {
@@ -18,7 +18,7 @@ const BUILTIN = import.meta.glob<string>('../../../templates/cpp17/*', {
 })
 
 /** Files of the built-in template set, by name. */
-const builtinFiles = (): Record<string, string> =>
+export const builtinFiles = (): Record<string, string> =>
   Object.fromEntries(Object.entries(BUILTIN).map(([path, text]) => [path.split('/').pop()!, text]))
 
 /** The C++17 template set shipped with the app (templates/cpp17). */
@@ -34,6 +34,23 @@ async function folderTemplates(dir: OutputDir): Promise<TemplateSet> {
   } catch (e) {
     throw new Error(`templates ${dir.label}: ${e instanceof Error ? e.message : String(e)}`, { cause: e })
   }
+}
+
+/** Template folder chosen for a document (asking for access on first use); null when none. */
+export async function templateFolder(doc: DocState): Promise<OutputDir | null> {
+  return (await window.api.templateDir?.({ op: 'current', document: doc.filePath })) ?? null
+}
+
+/** Output directory a document generated into already (asking for access on first use); null when none. */
+export async function knownOutputDir(doc: DocState): Promise<OutputDir | null> {
+  const name = snake(dependencyName(doc.store.getState().project.name))
+  return (await window.api.outputDir?.({ pick: false, known: true, document: doc.filePath, name })) ?? null
+}
+
+/** Called after code was generated or other templates were chosen: the files to list changed. */
+export const codegenListeners = new Set<() => void>()
+const codegenChanged = (): void => {
+  for (const listener of codegenListeners) listener()
 }
 
 /** Whether the host can write generated files. */
@@ -70,6 +87,7 @@ export async function generateCode(pick: boolean): Promise<void> {
     const templates = await window.api.templateDir?.({ op: 'current', document: doc.filePath })
     const set = templates ? await folderTemplates(templates) : await templateSetFor(dir, builtinTemplates)
     const report = await generateInto(toFile(project, { editor: false }), set, dir)
+    codegenChanged()
     const summary = `Code generated into ${label} (templates ${templates ? templates.label : set.manifest.name}): ${report.written.length} written, ${report.unchanged.length} unchanged`
     if (report.conflicts.length || report.orphans.length || report.stale.length || report.warnings.length)
       showDialog(summary, formatReport(report, label, false).split('\n').slice(0, -1))
@@ -115,6 +133,7 @@ export async function chooseTemplates(): Promise<void> {
         for (const [name, text] of Object.entries(builtinFiles())) await dir.write(name, text)
       }
       const set = await folderTemplates(dir)
+      codegenChanged()
       setStatus(
         'info',
         `${copy ? 'Built-in templates copied into' : 'Code generation uses the templates of'} ${dir.label} (${set.manifest.name})`
@@ -131,7 +150,10 @@ export async function chooseTemplates(): Promise<void> {
       kind: 'T',
       run: () =>
         void templateDir('forget')
-          .then(() => setStatus('info', 'Code generation uses the default templates'))
+          .then(() => {
+            codegenChanged()
+            setStatus('info', 'Code generation uses the default templates')
+          })
           .catch((e: unknown) => fail('Cannot forget the template folder', e))
     },
     ...(current

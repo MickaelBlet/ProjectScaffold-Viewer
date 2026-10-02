@@ -18,7 +18,8 @@ export interface SaveRequest {
   path: string | null
   content: string
   defaultName: string
-  format: 'yaml' | 'json'
+  /** `text`: another kind of file (IDL), written as it is. */
+  format: 'yaml' | 'json' | 'text'
   title?: string
   /** Exports are not added to the recent documents. */
   export?: boolean
@@ -26,6 +27,8 @@ export interface SaveRequest {
 
 export interface OutputDirRequest {
   pick: boolean
+  /** Only a directory already used for the document: null rather than asking for one. */
+  known?: boolean
   /** File of the document; null for an unsaved project. */
   document: string | null
   /** Default directory name (the project's namespace). */

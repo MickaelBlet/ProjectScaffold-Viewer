@@ -22,6 +22,7 @@ import { installClipboard, installKeyboard, runCommand } from './commands'
 import { activeDoc, isDocDirty, useDoc, useDocs } from './store/documents'
 import { applyForceAnimations, applyPortStyle, applyTheme, useSettings } from './store/settings'
 import { useProjectStore } from './store/project'
+import { useTextFiles } from './store/textFiles'
 import { useUiStore } from './store/ui'
 import { Icon } from '@/components/Icon'
 import { IN_PANEL, IN_PREVIEW, IN_VSCODE, SIDE_PANEL } from './host'
@@ -122,6 +123,7 @@ function ToolbarButton({
 export function App(): ReactNode {
   const docs = useDocs((s) => s.docs)
   const project = useProjectStore((s) => s.project)
+  const textFiles = useTextFiles((s) => s.files)
   const theme = useSettings((s) => s.theme)
   const forceAnimations = useSettings((s) => s.forceAnimations)
   const portStyle = useSettings((s) => s.portStyle)
@@ -200,7 +202,7 @@ export function App(): ReactNode {
     const doc = activeDoc()
     window.api.setDirty(anyDirty())
     document.title = `${isDocDirty(doc) ? '• ' : ''}${docTitle(doc)} — ProjectScaffold`
-  }, [docs, project])
+  }, [docs, project, textFiles])
 
   useEffect(() => {
     if (!loaded) return

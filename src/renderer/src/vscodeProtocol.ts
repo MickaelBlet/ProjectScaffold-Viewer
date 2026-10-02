@@ -92,6 +92,8 @@ export type ToHost =
       op: 'read' | 'write' | 'remove'
       text?: string
     }
+  /** Opens a file of a directory given by `outputDir` / `templateDir` in its VS Code editor. */
+  | { type: 'openOutputFile'; dir: string; path: string }
   /** The selection changed: data path of the selected entity in the file. */
   | { type: 'selected'; path: DataPath }
   /** A diagram shows another view. */

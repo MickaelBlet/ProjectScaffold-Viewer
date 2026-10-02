@@ -46,6 +46,7 @@ import {
 } from './fileOps'
 import { canChooseTemplates, chooseTemplates, generateCode } from './generateCode'
 import { focusedEditorHistory, setPassedKeys } from './components/CodeEditor'
+import { openIdlText, saveActiveTextFile } from './textFileOps'
 import { activeDoc, cycleDoc, patchDoc, useDocs, activateDoc } from './store/documents'
 import { getProject, redo, undo } from './store/project'
 import { setSetting, useSettings, type Theme } from './store/settings'
@@ -142,7 +143,8 @@ const allCommands: Command[] = [
     category: 'File',
     keys: ['Ctrl+S'],
     global: true,
-    run: () => void saveProject()
+    // The text file of the active tab (template, generated file...), else the project.
+    run: () => void (saveActiveTextFile() || saveProject())
   },
   {
     id: 'file.saveAs',
@@ -221,6 +223,12 @@ const allCommands: Command[] = [
     title: 'Generate code into…',
     category: 'File',
     run: () => void generateCode(true)
+  },
+  {
+    id: 'file.openIdlText',
+    title: 'Open IDL file as text…',
+    category: 'File',
+    run: () => void openIdlText()
   },
   {
     id: 'file.codeTemplates',
@@ -709,6 +717,7 @@ const allCommands: Command[] = [
     run: tool('links')
   },
   { id: 'window.dependencies', title: 'Dependencies', category: 'Window', run: tool('dependencies') },
+  { id: 'window.generation', title: 'Code generation', category: 'Window', run: tool('generation') },
   {
     id: 'window.inspector',
     title: 'Inspector',
@@ -778,6 +787,8 @@ const allCommands: Command[] = [
 
 /** Documents are opened, saved as and closed by VS Code, one per editor. A preview has its text beside. */
 const DOCUMENT_COMMANDS = new Set([
+  // VS Code edits IDL files itself.
+  'file.openIdlText',
   'file.new',
   'file.open',
   'file.saveAs',
@@ -843,28 +854,33 @@ const VSCODE_PREVENTED = /^Ctrl\+(Shift\+)?[PFSZY]$/
 export function installKeyboard(): () => void {
   const byKey = new Map<string, Command>()
   for (const c of commands) for (const k of c.keys ?? []) byKey.set(k, c)
-  const listener = (e: KeyboardEvent): void => {
-    if (e.isComposing) return
+  /** Runs the command of a key event; whether it did. */
+  const run = (e: KeyboardEvent): boolean => {
+    if (e.isComposing) return false
     const key = keyOf(e)
-    if (e.defaultPrevented && !(IN_VSCODE && VSCODE_PREVENTED.test(key))) return
+    if (e.defaultPrevented && !(IN_VSCODE && VSCODE_PREVENTED.test(key))) return false
     const c = byKey.get(key)
-    if (!c) return
+    if (!c) return false
     // The full editor: VS Code runs these keys itself, on the document text.
-    if (IN_VSCODE && !IN_PREVIEW && !IN_PANEL && (c.id === 'edit.undo' || c.id === 'edit.redo')) return
+    if (IN_VSCODE && !IN_PREVIEW && !IN_PANEL && (c.id === 'edit.undo' || c.id === 'edit.redo')) return false
     // Clipboard shortcuts go through the copy / cut / paste events.
-    if (c.id === 'edit.copy' || c.id === 'edit.cut' || c.id === 'edit.paste') return
-    if (!c.global && isEditable(document.activeElement)) return
+    if (c.id === 'edit.copy' || c.id === 'edit.cut' || c.id === 'edit.paste') return false
+    if (!c.global && isEditable(document.activeElement)) return false
     // Modal UI (palette, menus) handles its own keys.
     const ui = useUiStore.getState()
-    if ((ui.palette || ui.contextMenu || ui.shortcutsOpen || ui.aboutOpen || ui.dialog) && !c.global) return
-    if (!(c.enabled?.() ?? true)) return
+    if ((ui.palette || ui.contextMenu || ui.shortcutsOpen || ui.aboutOpen || ui.dialog) && !c.global)
+      return false
+    if (!(c.enabled?.() ?? true)) return false
     e.preventDefault()
     c.run()
+    return true
   }
-  // Code editors leave the app's global shortcuts to it, but keep their own undo history.
+  const listener = (e: KeyboardEvent): void => void run(e)
+  // Code editors run the app's global shortcuts before their own keys (a key they handle never
+  // reaches the window), but keep their own undo history.
   setPassedKeys((e) => {
     const c = byKey.get(keyOf(e))
-    return !!c?.global && c.id !== 'edit.undo' && c.id !== 'edit.redo'
+    return !!c?.global && c.id !== 'edit.undo' && c.id !== 'edit.redo' && run(e)
   })
   window.addEventListener('keydown', listener)
   return () => {

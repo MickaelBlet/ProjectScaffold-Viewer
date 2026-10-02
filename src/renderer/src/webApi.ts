@@ -53,7 +53,8 @@ interface FsAccessWindow {
 
 const TYPES: Record<SaveRequest['format'], PickerType> = {
   yaml: { description: 'YAML', accept: { 'application/yaml': ['.yaml', '.yml'] } },
-  json: { description: 'JSON', accept: { 'application/json': ['.json'] } }
+  json: { description: 'JSON', accept: { 'application/json': ['.json'] } },
+  text: { description: 'Text', accept: { 'text/plain': ['.idl', '.txt'] } }
 }
 
 const fs = window as unknown as FsAccessWindow
@@ -91,7 +92,7 @@ function downloadUrl(name: string, url: string): void {
 }
 
 function download(name: string, content: string, format: SaveRequest['format']): void {
-  const type = format === 'json' ? 'application/json' : 'application/yaml'
+  const type = format === 'json' ? 'application/json' : format === 'text' ? 'text/plain' : 'application/yaml'
   const url = URL.createObjectURL(new Blob([content], { type }))
   downloadUrl(name, url)
   setTimeout(() => URL.revokeObjectURL(url), 1000)
@@ -143,11 +144,12 @@ async function pickFiles(multiple: boolean, filter?: FileFilter): Promise<OpenRe
       })
       const files: OpenResult[] = []
       for (const handle of picked) {
+        // Other files (IDL) can be saved again, but are no recent documents.
+        handles.set(handle.name, handle)
         if (filter) {
-          files.push({ path: handle.name, content: await (await handle.getFile()).text() })
+          files.push({ path: handle.name, content: await read(handle) })
           continue
         }
-        handles.set(handle.name, handle)
         const content = await read(handle)
         await remember({ name: handle.name, content, handle })
         files.push({ path: handle.name, content })
@@ -174,7 +176,7 @@ async function openFile(): Promise<OpenResult | null> {
 
 async function saveFile(req: SaveRequest): Promise<string | null> {
   const path = await writeFile(req)
-  if (path && !req.export) {
+  if (path && !req.export && req.format !== 'text') {
     await remember({ name: path, content: req.content, handle: handles.get(path) })
     await updateWorkspaceFile(path, req.content)
   }
@@ -620,6 +622,8 @@ function handleDir(root: DirHandle): OutputDir {
 async function outputDir(req: OutputDirRequest): Promise<OutputDir | null> {
   const key = outputKey(req.document)
   const previous = await rememberedDir(key)
+  // Asked for without a user gesture (listing its files): access is asked for on first use.
+  if (req.known) return previous && !req.pick ? askingDir(previous) : null
   let handle = req.pick ? undefined : previous
   if (handle && !(await granted(handle, true))) handle = undefined
   if (!handle) {

@@ -13,6 +13,7 @@ import { getProject } from '@/store/project'
 import { storage } from '@/storage'
 import { IN_PANEL, IN_PREVIEW, IN_VSCODE } from '@/host'
 import { sendToDiagram } from '@/fileOps'
+import { fileBaseName, type TextFileRef } from '@/store/textFiles'
 import { targetPath } from '@/model/locate'
 import { toFile } from '@/model/serialize'
 import type { SidePanel, ViewRef } from '../../../../vscode/src/protocol'
@@ -49,13 +50,22 @@ export function activeCanvas(): CanvasController | undefined {
 // Dock layouts
 
 export type ToolId =
-  'explorer' | 'modules' | 'links' | 'dependencies' | 'inspector' | 'problems' | 'search' | 'settings'
+  | 'explorer'
+  | 'modules'
+  | 'links'
+  | 'dependencies'
+  | 'generation'
+  | 'inspector'
+  | 'problems'
+  | 'search'
+  | 'settings'
 
 export const TOOL_TITLES: Record<ToolId, string> = {
   explorer: 'Explorer',
   modules: 'Modules',
   links: 'Links',
   dependencies: 'Dependencies',
+  generation: 'Code generation',
   inspector: 'Inspector',
   problems: 'Problems',
   search: 'Search',
@@ -68,6 +78,7 @@ const TOOL_SIZES: Record<ToolId, number> = {
   modules: 250,
   links: 250,
   dependencies: 280,
+  generation: 280,
   inspector: 380,
   settings: 380,
   problems: 170,
@@ -348,6 +359,11 @@ const TOOL_PLACES: Record<ToolId, Place[]> = {
     ['search', 'within'],
     ['problems', 'within'],
     [EDITOR_AREA, 'below']
+  ],
+  generation: [
+    ['explorer', 'within'],
+    ['modules', 'within'],
+    [null, 'left']
   ]
 }
 
@@ -480,6 +496,36 @@ export function openSource(options: { split?: boolean } = { split: true }): void
       ? { referencePanel: active.id, direction: options.split ? 'right' : 'within' }
       : undefined
   })
+}
+
+/** Tab of a text file (template, generated file, IDL file), see store/textFiles.ts. */
+export const filePanelId = (ref: TextFileRef): string => `file:${ref.source}:${ref.path}`
+
+/** Open a text file in a tab of the editor area, beside the focused one with `split`. */
+export function openFilePanel(ref: TextFileRef, options: { split?: boolean } = {}): void {
+  if (!editor) return
+  const id = filePanelId(ref)
+  const existing = editor.getPanel(id)
+  if (existing) return existing.api.setActive()
+  const active = editor.activePanel
+  editor.addPanel({
+    id,
+    component: 'file',
+    tabComponent: 'file',
+    title: fileBaseName(ref.path),
+    params: { source: ref.source, path: ref.path },
+    position: active
+      ? { referencePanel: active.id, direction: options.split ? 'right' : 'within' }
+      : undefined
+  })
+}
+
+/** The text file of the active editor tab, if it is one. */
+export function activeFilePanel(): TextFileRef | null {
+  const params = editor?.activePanel?.params as Partial<TextFileRef> | undefined
+  return editor?.activePanel?.id.startsWith('file:') && params?.source && params.path
+    ? { source: params.source, path: params.path }
+    : null
 }
 
 /** Open an entity editor as a tab of the editor area. */

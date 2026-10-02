@@ -31,6 +31,10 @@ import { InterfaceInspector } from '@/panels/InterfaceInspector'
 import { ModuleInspector } from '@/panels/ModuleInspector'
 import { LinkInspector } from '@/panels/LinkInspector'
 import { SourcePanel } from '@/panels/SourcePanel'
+import { FilePanel } from '@/panels/FilePanel'
+import { languageOf, type LanguageId } from '@/components/codeLanguages'
+import { dropTextFile, isFileDirty, textFileKey, useTextFiles, type TextFileRef } from '@/store/textFiles'
+import { confirmCloseTextFile } from '@/textFileOps'
 import { DocTabs } from './DocTabs'
 import { IN_VSCODE } from '@/host'
 import { closeView, editorApi, openView, setEditorApi, type EditorKind } from './controllers'
@@ -154,9 +158,52 @@ function EntityTab(props: IDockviewPanelHeaderProps<{ kind: EditorKind | 'source
   )
 }
 
+const FILE_ICON: Record<LanguageId, string> = {
+  yaml: '{}',
+  json: '{}',
+  cpp: 'C',
+  python: 'Py',
+  cmake: 'Mk',
+  idl: 'I',
+  liquid: '{%',
+  text: '¶'
+}
+
+const fileRefOf = (params: unknown): TextFileRef | null => {
+  const p = params as Partial<TextFileRef> | undefined
+  return p?.source && p.path ? { source: p.source, path: p.path } : null
+}
+
+/** Closes a tab, asking first when it holds a text file with unsaved edits. */
+function closePanel(id: string): void {
+  const panel = editorApi()?.getPanel(id)
+  if (!panel) return
+  const ref = id.startsWith('file:') ? fileRefOf(panel.params) : null
+  if (!ref || confirmCloseTextFile(ref)) panel.api.close()
+}
+
+function FileTab(props: IDockviewPanelHeaderProps<TextFileRef>): ReactNode {
+  const { id } = props.api
+  return (
+    <DockviewDefaultTab
+      {...props}
+      data-tab="entity"
+      style={{ '--tab-kind': `'${FILE_ICON[languageOf(props.params.path).id]} '` } as CSSProperties}
+      closeActionOverride={() => closePanel(id)}
+      onContextMenu={(e) => {
+        e.preventDefault()
+        openContextMenu(e, [
+          { label: 'Close', run: () => closePanel(id) },
+          { label: 'Close others', run: () => closeOthers(id) }
+        ])
+      }}
+    />
+  )
+}
+
 function closeOthers(keep: string): void {
   const api = editorApi()
-  for (const p of api?.panels ?? []) if (p.id !== keep) p.api.close()
+  for (const p of api?.panels ?? []) if (p.id !== keep) closePanel(p.id)
 }
 
 function Watermark(): ReactNode {
@@ -173,9 +220,10 @@ function Watermark(): ReactNode {
 const components = {
   canvas: CanvasPanel,
   entity: EntityPanel,
-  source: SourceEditor
+  source: SourceEditor,
+  file: FilePanel
 }
-const tabComponents = { view: ViewTab, entity: EntityTab }
+const tabComponents = { view: ViewTab, entity: EntityTab, file: FileTab }
 
 /** Editor tabs of one document, restored from and saved to its state. */
 function DocEditor({ docId }: { docId: Id }): ReactNode {
@@ -201,6 +249,13 @@ function DocEditor({ docId }: { docId: Id }): ReactNode {
       if (!e.api.totalPanels) openView(GLOBAL_VIEW)
       e.api.onDidLayoutChange(() => {
         if (alive.current) patchDoc({ layout: e.api.toJSON() }, docId)
+      })
+      // A text file tab closed otherwise than by its close button: its edits, if any, are kept for
+      // when it opens again.
+      e.api.onDidRemovePanel((p) => {
+        const ref = alive.current && p.id.startsWith('file:') ? fileRefOf(p.params) : null
+        if (ref && !isFileDirty(useTextFiles.getState().files[textFileKey(docId, ref)]))
+          dropTextFile(docId, ref)
       })
       e.api.onDidActivePanelChange((ev) => {
         const viewId = (ev.panel?.params as { viewId?: Id } | undefined)?.viewId

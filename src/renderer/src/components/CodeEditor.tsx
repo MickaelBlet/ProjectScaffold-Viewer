@@ -113,11 +113,12 @@ export function languageSupport(fileName: string): Extension {
   return liquid({ tags: LIQUID_TAGS, ...(base ? { base } : {}) })
 }
 
-// Application shortcuts the editor leaves to the app (save, palette...): set by the keyboard setup.
+// Application shortcuts (save, palette...), run before the editor's own keys: set by the keyboard
+// setup. True when it ran one.
 let passKey: (e: KeyboardEvent) => boolean = () => false
 
-export function setPassedKeys(test: (e: KeyboardEvent) => boolean): void {
-  passKey = test
+export function setPassedKeys(run: (e: KeyboardEvent) => boolean): void {
+  passKey = run
 }
 
 /** Runs undo / redo in the focused code editor; false when no code editor has the focus. */

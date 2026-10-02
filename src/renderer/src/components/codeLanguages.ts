@@ -27,6 +27,18 @@ const BY_EXTENSION: Record<string, Exclude<LanguageId, 'liquid'>> = {
   idl: 'idl'
 }
 
+/** Letter of a language's badge in file lists. */
+export const LANGUAGE_BADGES: Record<LanguageId, string> = {
+  yaml: 'Y',
+  json: 'J',
+  cpp: 'C',
+  python: 'P',
+  cmake: 'M',
+  idl: 'I',
+  liquid: 'L',
+  text: 'T'
+}
+
 function plainLanguage(name: string): Exclude<LanguageId, 'liquid'> {
   const base = name.slice(name.lastIndexOf('/') + 1)
   if (base === 'CMakeLists.txt') return 'cmake'
