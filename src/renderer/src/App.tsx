@@ -256,6 +256,13 @@ export function App(): ReactNode {
         <ToolbarButton command="edit.redo" title="Redo (Ctrl+Y)">
           <Icon name="redo" />
         </ToolbarButton>
+        <span className="sep" />
+        <ToolbarButton command="view.back" title="Previous selection (Alt+Left)">
+          <Icon name="arrow-left" />
+        </ToolbarButton>
+        <ToolbarButton command="view.forward" title="Next selection (Alt+Right)">
+          <Icon name="arrow-right" />
+        </ToolbarButton>
         {IN_PREVIEW && (
           <button type="button" title="Show or hide the Inspector" onClick={() => toggleTool('inspector')}>
             Inspector
@@ -271,16 +278,6 @@ export function App(): ReactNode {
           Go to… <kbd>Ctrl+P</kbd>
         </button>
         <span className="spacer" />
-        {!IN_PREVIEW && (
-          <>
-            <ToolbarButton command="file.exportYaml" title="Export YAML (Ctrl+E)" className="primary">
-              Export YAML
-            </ToolbarButton>
-            <ToolbarButton command="file.exportJson" title="Export JSON (Ctrl+Shift+E)" className="primary">
-              Export JSON
-            </ToolbarButton>
-          </>
-        )}
         <WindowControls />
       </header>
       <DockShell />

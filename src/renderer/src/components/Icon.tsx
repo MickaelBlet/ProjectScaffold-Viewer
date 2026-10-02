@@ -8,6 +8,7 @@ const PATHS = {
   dot: 'M8 5a3 3 0 1 0 0 6 3 3 0 1 0 0-6z',
   'chevron-right': 'M6 4l4 4-4 4',
   'chevron-down': 'M4 6l4 4 4-4',
+  'arrow-left': 'M13 8H3M7 4 3 8l4 4',
   'arrow-right': 'M3 8h10M9 4l4 4-4 4',
   'arrow-left-right': 'M2 8h12M5 5 2 8l3 3M11 5l3 3-3 3',
   'arrow-up': 'M8 13V3M4 7l4-4 4 4',
