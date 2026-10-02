@@ -375,6 +375,8 @@ export function ExplorerPanel(): ReactNode {
   const binaries = useProjectStore((s) => s.project.binaries)
   const [collapsed, setCollapsed] = useState<Set<Id>>(new Set())
   const selectedIds = useDoc((d) => d.selectedIds)
+  // A single selected link is kept in `selection` only (`selectedIds` holds canvas nodes).
+  const selectedLink = useDoc((d) => (d.selection?.kind === 'link' ? d.selection.id : null))
   const activeViewId = useDoc((d) => d.activeViewId)
   const [filter, setFilter] = useState('')
   const savedOrder = useSettings((s) => s.explorerOrder)
@@ -383,7 +385,7 @@ export function ExplorerPanel(): ReactNode {
   const hidden = order.filter((id) => savedHidden.includes(id))
   const f = filter.trim().toLowerCase()
   const match = (name: string): boolean => !f || name.toLowerCase().includes(f)
-  const isSelected = (id: Id): boolean => selectedIds.includes(id)
+  const isSelected = (id: Id): boolean => selectedIds.includes(id) || id === selectedLink
 
   // Paths and link ends change with modules and links only, not with every edit.
   const paths = useMemo(() => modulePaths({ modules, dependencies }), [modules, dependencies])
