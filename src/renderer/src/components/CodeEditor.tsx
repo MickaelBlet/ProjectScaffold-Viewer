@@ -158,6 +158,19 @@ export function goToLine(view: EditorView, line: number): void {
   })
 }
 
+/** Puts the caret at the start of a line (from 1), scrolled into view if outside, keeping the focus. */
+export function revealLine(view: EditorView, line: number): void {
+  const l = view.state.doc.line(Math.max(1, Math.min(line, view.state.doc.lines)))
+  const at = l.from + /^\s*/.exec(l.text)![0].length
+  const box = view.scrollDOM.getBoundingClientRect()
+  const coords = view.coordsAtPos(at)
+  const inside = coords !== null && coords.top >= box.top && coords.bottom <= box.bottom
+  view.dispatch({
+    selection: { anchor: at },
+    effects: inside ? [] : EditorView.scrollIntoView(at, { y: 'center' })
+  })
+}
+
 const showSpaces = (on: boolean): Extension =>
   on ? [highlightWhitespace(), highlightTrailingWhitespace()] : []
 

@@ -1,6 +1,6 @@
 // The project as file text, edited in place: valid edits replace the project (one undo step each),
 // and changes made elsewhere (canvas, inspector, undo, file changed on disk) rewrite the text.
-import { useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { z } from 'zod'
 import { insertCompletionText, startCompletion, type CompletionSource } from '@codemirror/autocomplete'
 import { setDiagnostics, type Diagnostic } from '@codemirror/lint'
@@ -8,11 +8,21 @@ import type { EditorState } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import { FileProjectSchema } from '@/model/schema'
 import { modulePaths } from '@/model/project'
-import { LoadError, reloadText, sameContent, saveText, type Format, type LoadIssue } from '@/model/serialize'
+import { targetPath } from '@/model/locate'
+import {
+  LoadError,
+  lineOfPath,
+  parseText,
+  reloadText,
+  sameContent,
+  saveText,
+  type Format,
+  type LoadIssue
+} from '@/model/serialize'
 import type { Project } from '@/model/types'
-import { useDoc } from '@/store/documents'
+import { useDoc, useDocs, type Selection } from '@/store/documents'
 import { setSetting, useSettings } from '@/store/settings'
-import { CodeEditor, goToLine, setText } from '@/components/CodeEditor'
+import { CodeEditor, goToLine, revealLine, setText } from '@/components/CodeEditor'
 import { navigate, navigateToNote } from '@/actions'
 import { targetAt } from '@/components/sourceTarget'
 import {
@@ -66,6 +76,26 @@ interface Handlers {
 
 const noop = (): void => {}
 
+/** Option of the header: a pill, muted when off, accent when on. */
+function Toggle(props: {
+  label: string
+  title: string
+  on: boolean
+  onChange: (on: boolean) => void
+}): ReactNode {
+  return (
+    <button
+      type="button"
+      className={`qualifier ${props.on ? 'on' : ''}`}
+      aria-pressed={props.on}
+      title={props.title}
+      onClick={() => props.onChange(!props.on)}
+    >
+      {props.label}
+    </button>
+  )
+}
+
 export function SourcePanel({ format }: { format: Format }): ReactNode {
   const store = useDoc((d) => d.store)
   const [editorData, setEditorData] = useState(false)
@@ -74,9 +104,6 @@ export function SourcePanel({ format }: { format: Format }): ReactNode {
   const [stale, setStale] = useState(false)
   const [view, setView] = useState<EditorView | null>(null)
   const handlers = useRef<Handlers>({ flush: noop, revert: noop, input: noop, caret: noop, focus: noop })
-  const checkId = useId()
-  const wsId = useId()
-  const followId = useId()
   const whitespace = useSettings((s) => s.sourceWhitespace)
   const followCaret = useSettings((s) => s.sourceFollow)
 
@@ -164,11 +191,43 @@ export function SourcePanel({ format }: { format: Format }): ReactNode {
       }, FOLLOW_MS)
     }
 
+    // The caret goes to the entity selected elsewhere (canvas, lists...).
+    const reveal = (selection: Selection): void => {
+      if (format !== 'yaml' || !selection || view.hasFocus || !useSettings.getState().sourceFollow) return
+      const p = store.getState().project
+      const text = view.state.doc.toString()
+      let data: unknown
+      try {
+        data = parseText(text, format)
+      } catch {
+        return
+      }
+      let path: (string | number)[]
+      if (selection.kind === 'note') {
+        const i = p.notes.findIndex((n) => n.id === selection.id)
+        if (!editorData || i < 0) return
+        path = ['editor', 'notes', i]
+      } else {
+        const target =
+          selection.kind === 'imported' ? { kind: 'module' as const, id: selection.id } : selection
+        path = targetPath(data, p, target)
+      }
+      const line = lineOfPath(text, path)
+      if (line !== undefined) revealLine(view, line)
+    }
+    const selectionOf = (s: ReturnType<typeof useDocs.getState>): Selection =>
+      s.docs.find((d) => d.store === store)?.selection ?? null
+
     show()
+    reveal(selectionOf(useDocs.getState()))
     const off = store.subscribe(({ project }) => {
       if (project === shown) return
       if (invalid || timer !== undefined) setStale(true)
       else show()
+    })
+    const offSelection = useDocs.subscribe((s, prev) => {
+      const selection = selectionOf(s)
+      if (selection !== selectionOf(prev)) reveal(selection)
     })
     handlers.current = {
       flush: () => void (timer !== undefined && apply()),
@@ -183,6 +242,7 @@ export function SourcePanel({ format }: { format: Format }): ReactNode {
     }
     return () => {
       off()
+      offSelection()
       clearTimeout(followTimer)
       if (timer !== undefined) apply()
       handlers.current = { flush: noop, revert: noop, input: noop, caret: noop, focus: noop }
@@ -192,34 +252,25 @@ export function SourcePanel({ format }: { format: Format }): ReactNode {
   return (
     <section className="source-editor">
       <header>
-        <label htmlFor={checkId} title="Layout, views, notes and styles (kept when hidden)">
-          <input
-            id={checkId}
-            type="checkbox"
-            checked={editorData}
-            onChange={(e) => setEditorData(e.target.checked)}
-          />{' '}
-          Editor data
-        </label>
-        <label htmlFor={wsId} title="Indentation, trailing spaces and tabs">
-          <input
-            id={wsId}
-            type="checkbox"
-            checked={whitespace}
-            onChange={(e) => setSetting('sourceWhitespace', e.target.checked)}
-          />{' '}
-          Whitespace
-        </label>
+        <Toggle
+          label="Editor data"
+          title="Layout, views, notes and styles (kept when hidden)"
+          on={editorData}
+          onChange={setEditorData}
+        />
+        <Toggle
+          label="Whitespace"
+          title="Indentation, trailing spaces and tabs"
+          on={whitespace}
+          onChange={(on) => setSetting('sourceWhitespace', on)}
+        />
         {format === 'yaml' ? (
-          <label htmlFor={followId} title="Select and zoom to the element under the cursor">
-            <input
-              id={followId}
-              type="checkbox"
-              checked={followCaret}
-              onChange={(e) => setSetting('sourceFollow', e.target.checked)}
-            />{' '}
-            Follow cursor
-          </label>
+          <Toggle
+            label="Sync selection"
+            title="Select the element under the cursor, move the cursor to the selected element"
+            on={followCaret}
+            onChange={(on) => setSetting('sourceFollow', on)}
+          />
         ) : null}
         <span className="spacer" />
         {issues.length ? <span className="source-state error">Not applied</span> : null}
