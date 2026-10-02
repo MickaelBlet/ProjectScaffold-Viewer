@@ -45,6 +45,7 @@ import {
   saveWorkspace
 } from './fileOps'
 import { canChooseTemplates, chooseTemplates, generateCode } from './generateCode'
+import { focusedEditorHistory, setPassedKeys } from './components/CodeEditor'
 import { activeDoc, cycleDoc, patchDoc, useDocs, activateDoc } from './store/documents'
 import { getProject, redo, undo } from './store/project'
 import { setSetting, useSettings, type Theme } from './store/settings'
@@ -237,7 +238,9 @@ const allCommands: Command[] = [
     keys: ['Ctrl+Z'],
     global: true,
     // Inside a text field, undo the typing instead of the model.
-    run: () => (isEditable(document.activeElement) ? document.execCommand('undo') : undoModel())
+    run: () =>
+      focusedEditorHistory('undo') ||
+      (isEditable(document.activeElement) ? document.execCommand('undo') : undoModel())
   },
   {
     id: 'edit.redo',
@@ -245,7 +248,9 @@ const allCommands: Command[] = [
     category: 'Edit',
     keys: ['Ctrl+Y', 'Ctrl+Shift+Z'],
     global: true,
-    run: () => (isEditable(document.activeElement) ? document.execCommand('redo') : redoModel())
+    run: () =>
+      focusedEditorHistory('redo') ||
+      (isEditable(document.activeElement) ? document.execCommand('redo') : redoModel())
   },
   // Ctrl+X / C / V go through the clipboard events (see installClipboard); listed for menus.
   {
@@ -856,8 +861,16 @@ export function installKeyboard(): () => void {
     e.preventDefault()
     c.run()
   }
+  // Code editors leave the app's global shortcuts to it, but keep their own undo history.
+  setPassedKeys((e) => {
+    const c = byKey.get(keyOf(e))
+    return !!c?.global && c.id !== 'edit.undo' && c.id !== 'edit.redo'
+  })
   window.addEventListener('keydown', listener)
-  return () => window.removeEventListener('keydown', listener)
+  return () => {
+    setPassedKeys(() => false)
+    window.removeEventListener('keydown', listener)
+  }
 }
 
 /** Copy / cut / paste of canvas and explorer items through the system clipboard. */

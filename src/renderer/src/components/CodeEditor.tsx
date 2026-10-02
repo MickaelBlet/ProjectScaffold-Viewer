@@ -1,0 +1,312 @@
+// Code editor (CodeMirror) for the project text and the other text files: IDL, templates,
+// generated code.
+import { useEffect, useLayoutEffect, useRef, type ReactNode } from 'react'
+import {
+  autocompletion,
+  closeBrackets,
+  closeBracketsKeymap,
+  completionKeymap,
+  type CompletionSource
+} from '@codemirror/autocomplete'
+import { defaultKeymap, history, historyKeymap, indentWithTab, redo, undo } from '@codemirror/commands'
+import { cpp } from '@codemirror/lang-cpp'
+import { json } from '@codemirror/lang-json'
+import { liquid } from '@codemirror/lang-liquid'
+import { python } from '@codemirror/lang-python'
+import { yaml } from '@codemirror/lang-yaml'
+import {
+  bracketMatching,
+  foldGutter,
+  foldKeymap,
+  indentOnInput,
+  indentUnit,
+  LanguageSupport,
+  StreamLanguage,
+  type StringStream
+} from '@codemirror/language'
+import { clike } from '@codemirror/legacy-modes/mode/clike'
+import { cmake } from '@codemirror/legacy-modes/mode/cmake'
+import { lintGutter, lintKeymap } from '@codemirror/lint'
+import { highlightSelectionMatches, searchKeymap } from '@codemirror/search'
+import { Annotation, Compartment, EditorState, Prec, type Extension } from '@codemirror/state'
+import {
+  crosshairCursor,
+  drawSelection,
+  dropCursor,
+  EditorView,
+  highlightActiveLine,
+  highlightActiveLineGutter,
+  highlightSpecialChars,
+  highlightTrailingWhitespace,
+  highlightWhitespace,
+  keymap,
+  lineNumbers,
+  rectangularSelection
+} from '@codemirror/view'
+import { useSettings } from '@/store/settings'
+import { languageOf, type FileLanguage } from './codeLanguages'
+import { codeTheme } from './codeTheme'
+
+const INDENT = '  '
+
+const words = (list: string): Record<string, true> =>
+  Object.fromEntries(list.split(' ').map((w) => [w, true]))
+
+/** OMG IDL: C-like, with preprocessor lines and annotations. */
+const idl = clike({
+  name: 'idl',
+  keywords: words(
+    'module interface struct union switch case default enum bitmask bitset bitfield typedef const exception ' +
+      'attribute readonly in out inout oneway raises getraises setraises valuetype eventtype abstract local ' +
+      'custom truncatable supports private public factory component connector porttype port mirrorport ' +
+      'provides uses multiple home manages primarykey finder emits publishes consumes import typeid typeprefix'
+  ),
+  types: words(
+    'void boolean char wchar octet short long float double int8 uint8 int16 uint16 int32 uint32 int64 ' +
+      'uint64 unsigned string wstring sequence map fixed any Object ValueBase native'
+  ),
+  atoms: words('TRUE FALSE'),
+  blockKeywords: words('module interface struct union enum valuetype eventtype component connector home'),
+  hooks: {
+    '#': (stream: StringStream, state: { startOfLine: boolean }) => {
+      if (!state.startOfLine) return false
+      stream.skipToEnd()
+      return 'meta'
+    },
+    '@': (stream: StringStream) => {
+      stream.eatWhile(/[\w:]/)
+      return 'meta'
+    }
+  }
+})
+
+function plainSupport(id: Exclude<FileLanguage['id'], 'liquid'>): LanguageSupport | null {
+  switch (id) {
+    case 'yaml':
+      return yaml()
+    case 'json':
+      return json()
+    case 'cpp':
+      return cpp()
+    case 'python':
+      return python()
+    case 'cmake':
+      return new LanguageSupport(StreamLanguage.define(cmake))
+    case 'idl':
+      return new LanguageSupport(StreamLanguage.define(idl))
+    case 'text':
+      return null
+  }
+}
+
+/** The `user` tag of the templates (`codegen/sections.ts`). */
+const LIQUID_TAGS = [
+  { label: 'user', type: 'keyword', detail: 'user section' },
+  { label: 'enduser', type: 'keyword' }
+]
+
+/** Syntax support of a file, by its name. */
+export function languageSupport(fileName: string): Extension {
+  const lang = languageOf(fileName)
+  if (lang.id !== 'liquid') return plainSupport(lang.id) ?? []
+  const base = lang.base && plainSupport(lang.base)
+  return liquid({ tags: LIQUID_TAGS, ...(base ? { base } : {}) })
+}
+
+// Application shortcuts the editor leaves to the app (save, palette...): set by the keyboard setup.
+let passKey: (e: KeyboardEvent) => boolean = () => false
+
+export function setPassedKeys(test: (e: KeyboardEvent) => boolean): void {
+  passKey = test
+}
+
+/** Runs undo / redo in the focused code editor; false when no code editor has the focus. */
+export function focusedEditorHistory(op: 'undo' | 'redo'): boolean {
+  const el = document.activeElement
+  const view = el instanceof HTMLElement ? EditorView.findFromDOM(el) : null
+  if (!view) return false
+  return (op === 'undo' ? undo : redo)(view)
+}
+
+/** Marks changes made by `setText`: not reported as edits. */
+const External = Annotation.define<boolean>()
+
+/** Replaces the text, keeping the selection where the text did not change. */
+export function setText(view: EditorView, text: string): void {
+  const old = view.state.doc.toString()
+  if (old === text) return
+  let from = 0
+  const max = Math.min(old.length, text.length)
+  while (from < max && old.charCodeAt(from) === text.charCodeAt(from)) from++
+  let end = 0
+  while (end < max - from && old.charCodeAt(old.length - 1 - end) === text.charCodeAt(text.length - 1 - end))
+    end++
+  view.dispatch({
+    changes: { from, to: old.length - end, insert: text.slice(from, text.length - end) },
+    annotations: External.of(true)
+  })
+}
+
+/** Selects a line (from 1) and scrolls it into view. */
+export function goToLine(view: EditorView, line: number): void {
+  const l = view.state.doc.line(Math.max(1, Math.min(line, view.state.doc.lines)))
+  view.focus()
+  view.dispatch({
+    selection: { anchor: l.from, head: l.to },
+    effects: EditorView.scrollIntoView(l.from, { y: 'center' })
+  })
+}
+
+const showSpaces = (on: boolean): Extension =>
+  on ? [highlightWhitespace(), highlightTrailingWhitespace()] : []
+
+const NONE: Extension = []
+
+const baseSetup: Extension = [
+  lineNumbers(),
+  highlightActiveLineGutter(),
+  highlightSpecialChars(),
+  history(),
+  foldGutter(),
+  drawSelection(),
+  dropCursor(),
+  EditorState.allowMultipleSelections.of(true),
+  indentOnInput(),
+  bracketMatching(),
+  closeBrackets(),
+  autocompletion(),
+  rectangularSelection(),
+  crosshairCursor(),
+  highlightActiveLine(),
+  highlightSelectionMatches(),
+  lintGutter(),
+  indentUnit.of(INDENT),
+  EditorState.tabSize.of(2),
+  // High, not highest: editors flush their pending edits first (highest), shortcuts then see them.
+  Prec.high(EditorView.domEventHandlers({ keydown: (e) => passKey(e) })),
+  keymap.of([
+    ...closeBracketsKeymap,
+    ...defaultKeymap,
+    ...searchKeymap,
+    ...historyKeymap,
+    ...foldKeymap,
+    ...completionKeymap,
+    ...lintKeymap,
+    indentWithTab
+  ]),
+  codeTheme
+]
+
+export interface CodeEditorProps {
+  /** Text shown; when it changes to something else than the edited text, it replaces it. */
+  value?: string
+  /** Name of the file: its language. */
+  fileName: string
+  label: string
+  readOnly?: boolean
+  /** Completions, in place of the language's own. */
+  completion?: CompletionSource
+  /** More extensions; replaced when another value is given. */
+  extensions?: Extension
+  /** Edits of the user (not `value` or `setText` changes). */
+  onChange?: (text: string) => void
+  /** Before the editor handles the key. */
+  onKeyDown?: (e: KeyboardEvent) => void
+  onFocus?: () => void
+  onBlur?: () => void
+  /** The caret or selection moved while the editor has the focus. */
+  onCaret?: (view: EditorView) => void
+  /** The editor once created, null when gone. */
+  onView?: (view: EditorView | null) => void
+}
+
+type Callbacks = Pick<CodeEditorProps, 'onChange' | 'onKeyDown' | 'onFocus' | 'onBlur' | 'onCaret' | 'onView'>
+
+const completionOf = (source: CompletionSource | undefined): Extension =>
+  source ? EditorState.languageData.of(() => [{ autocomplete: source }]) : []
+
+export function CodeEditor({
+  value,
+  fileName,
+  label,
+  readOnly = false,
+  completion,
+  extensions = NONE,
+  ...handlers
+}: CodeEditorProps): ReactNode {
+  const host = useRef<HTMLDivElement>(null)
+  const view = useRef<EditorView | null>(null)
+  const parts = useRef({
+    language: new Compartment(),
+    completion: new Compartment(),
+    readOnly: new Compartment(),
+    whitespace: new Compartment(),
+    extra: new Compartment()
+  })
+  const callbacks = useRef<Callbacks>(handlers)
+  useLayoutEffect(() => {
+    callbacks.current = handlers
+  })
+  const whitespace = useSettings((s) => s.sourceWhitespace)
+
+  // Created once; the props below reconfigure it.
+  useLayoutEffect(() => {
+    const p = parts.current
+    const v = new EditorView({
+      parent: host.current!,
+      state: EditorState.create({
+        doc: value ?? '',
+        extensions: [
+          baseSetup,
+          p.language.of(languageSupport(fileName)),
+          p.completion.of(completionOf(completion)),
+          p.readOnly.of(EditorState.readOnly.of(readOnly)),
+          p.whitespace.of(showSpaces(useSettings.getState().sourceWhitespace)),
+          p.extra.of(extensions),
+          EditorView.contentAttributes.of({ 'aria-label': label }),
+          Prec.highest(
+            EditorView.domEventHandlers({
+              keydown: (e) => void callbacks.current.onKeyDown?.(e),
+              focus: () => void callbacks.current.onFocus?.(),
+              blur: () => void callbacks.current.onBlur?.()
+            })
+          ),
+          EditorView.updateListener.of((u) => {
+            if (u.docChanged && !u.transactions.some((tr) => tr.annotation(External)))
+              callbacks.current.onChange?.(u.state.doc.toString())
+            if (u.selectionSet && u.view.hasFocus) callbacks.current.onCaret?.(u.view)
+          })
+        ]
+      })
+    })
+    view.current = v
+    callbacks.current.onView?.(v)
+    return () => {
+      callbacks.current.onView?.(null)
+      view.current = null
+      v.destroy()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    if (view.current && value !== undefined) setText(view.current, value)
+  }, [value])
+  useEffect(() => {
+    view.current?.dispatch({ effects: parts.current.language.reconfigure(languageSupport(fileName)) })
+  }, [fileName])
+  useEffect(() => {
+    view.current?.dispatch({ effects: parts.current.completion.reconfigure(completionOf(completion)) })
+  }, [completion])
+  useEffect(() => {
+    view.current?.dispatch({ effects: parts.current.readOnly.reconfigure(EditorState.readOnly.of(readOnly)) })
+  }, [readOnly])
+  useEffect(() => {
+    view.current?.dispatch({ effects: parts.current.whitespace.reconfigure(showSpaces(whitespace)) })
+  }, [whitespace])
+  useEffect(() => {
+    view.current?.dispatch({ effects: parts.current.extra.reconfigure(extensions) })
+  }, [extensions])
+
+  return <div ref={host} className="code-editor" />
+}
