@@ -50,6 +50,7 @@ import { openIdlText, saveActiveTextFile } from './textFileOps'
 import { activeDoc, cycleDoc, patchDoc, useDocs, activateDoc } from './store/documents'
 import { getProject, redo, undo } from './store/project'
 import { setSetting, useSettings, type Theme } from './store/settings'
+import { clearOutput } from './store/output'
 import { useUiStore, type ActionItem } from './store/ui'
 import {
   activeCanvas,
@@ -734,6 +735,15 @@ const allCommands: Command[] = [
     global: true,
     run: tool('problems')
   },
+  {
+    id: 'window.output',
+    title: 'Output',
+    category: 'Window',
+    keys: ['Ctrl+Shift+U'],
+    global: true,
+    run: tool('output')
+  },
+  { id: 'window.clearOutput', title: 'Clear output', category: 'Window', run: clearOutput },
   {
     id: 'window.search',
     title: 'Search',

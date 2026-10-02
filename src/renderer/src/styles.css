@@ -1719,6 +1719,36 @@ ul.plain {
   cursor: default;
 }
 
+/* Output */
+.output ul {
+  flex: 1;
+}
+.output li {
+  cursor: default;
+  padding: 0 10px;
+  font:
+    12px ui-monospace,
+    'SF Mono',
+    Consolas,
+    monospace;
+}
+.output li time {
+  color: var(--muted);
+  flex: none;
+}
+.output li.empty {
+  font: inherit;
+}
+.output .output-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  text-align: left;
+  font: inherit;
+}
+.output li.error .output-text:not(.link-button) {
+  color: var(--danger);
+}
+
 /* Modal */
 .modal-backdrop {
   position: fixed;

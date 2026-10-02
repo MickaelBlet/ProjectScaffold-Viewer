@@ -10,6 +10,7 @@ import { ProblemsPanel, useProblemCounts } from '@/panels/ProblemsPanel'
 import { SearchPanel } from '@/panels/SearchPanel'
 import { SettingsPanel } from '@/panels/SettingsPanel'
 import { GenerationPanel } from '@/panels/GenerationPanel'
+import { OutputPanel } from '@/panels/OutputPanel'
 import { EditorArea } from './EditorArea'
 import {
   EDITOR_AREA,
@@ -61,6 +62,7 @@ const components = {
   generation: tool('generation', GenerationPanel),
   inspector: tool('inspector', Inspector),
   problems: ProblemsToolPanel,
+  output: tool('output', OutputPanel),
   search: tool('search', SearchPanel),
   settings: tool('settings', SettingsPanel)
 }

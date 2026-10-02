@@ -102,6 +102,8 @@ export type ToHost =
   | { type: 'inDiagram'; action: DiagramAction }
   /** A page shows a side panel; the Dependencies panel with one of them (by name). */
   | { type: 'showPanel'; panel: SidePanel; dependency?: string }
+  /** A line of the page's Output log, for the ProjectScaffold Output channel. */
+  | { type: 'log'; line: string }
   /** Side panel: listening for its document, sent again in reply. Diagram: listening for commands. */
   | { type: 'ready' }
 

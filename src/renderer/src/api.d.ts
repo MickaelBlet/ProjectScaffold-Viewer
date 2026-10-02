@@ -143,6 +143,8 @@ export interface Api {
   showPanel?(panel: SidePanel, dependency?: string): void
   /** Dependencies side panel: the dependency another page shows (by name). */
   onDependency?(cb: (name: string) => void): () => void
+  /** Appends a line of the Output log to the host's own log (ProjectScaffold Output channel). */
+  log?(line: string): void
 }
 
 /** Window edge or corner a resize starts from. */

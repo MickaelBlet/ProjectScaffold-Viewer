@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { create } from 'zustand'
 import type { Id } from '@/model/types'
 import { patchDoc, useDoc, type Selection } from './documents'
+import { log } from './output'
 
 export type { Selection } from './documents'
 
@@ -66,11 +67,20 @@ export const select = (selection: Selection): void =>
 
 export const useSelection = (): Selection => useDoc((d) => d.selection)
 
-export const setStatus = (kind: 'info' | 'error', text: string): void =>
+/** Shows a message in the status bar, logged to the Output panel. */
+export function setStatus(kind: 'info' | 'error', text: string): void {
+  log(kind, 'app', text)
   useUiStore.setState({ status: { kind, text } })
+}
 
-export const showDialog = (title: string, lines: string[]): void =>
+/** Shows a dialog, logged to the Output panel unless `logged` (the caller logged it its own way). */
+export function showDialog(title: string, lines: string[], options: { logged?: boolean } = {}): void {
+  if (!options.logged) {
+    log('error', 'app', title)
+    for (const line of lines) log('error', 'app', `  ${line}`)
+  }
   useUiStore.setState({ dialog: { title, lines } })
+}
 
 /** Let the user pick one of `entries` in the command palette. */
 export const quickPick = (placeholder: string, entries: PickEntry[]): void =>

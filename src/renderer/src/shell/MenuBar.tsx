@@ -137,6 +137,7 @@ const MENUS: [Category, string[]][] = [
       'window.generation',
       'window.inspector',
       'window.problems',
+      'window.output',
       'window.search',
       'window.settings',
       '-',

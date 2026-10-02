@@ -2,14 +2,16 @@
 // for the document, else the output directory's own template set (see codegen/run.ts), else the
 // built-in C++17 one, into a directory the host gives.
 import { snake } from '@/codegen/filters'
-import { formatReport, generateInto, templateSetFor, type OutputDir } from '@/codegen/run'
+import { formatReport, generateInto, reportEntries, templateSetFor, type OutputDir } from '@/codegen/run'
 import { loadTemplateSet, MANIFEST, parseManifest, type TemplateSet } from '@/codegen/templateSet'
 import { dependencyName } from '@/model/dependencies'
 import { toFile } from '@/model/serialize'
 import { hasErrors, validate } from '@/model/validate'
 import type { TemplateDirRequest } from '@/api'
 import { activeDoc, type DocState } from '@/store/documents'
-import { quickPick, setStatus, showDialog } from '@/store/ui'
+import { log } from '@/store/output'
+import { showTool } from '@/shell/controllers'
+import { quickPick, setStatus, showDialog, useUiStore } from '@/store/ui'
 
 const BUILTIN = import.meta.glob<string>('../../../templates/cpp17/*', {
   query: '?raw',
@@ -69,10 +71,10 @@ export async function generateCode(pick: boolean): Promise<void> {
   }
   const problems = validate(project)
   if (hasErrors(problems)) {
-    showDialog(
-      'Code generation blocked: fix these errors first',
-      problems.filter((p) => p.severity === 'error').map((p) => p.message)
-    )
+    const errors = problems.filter((p) => p.severity === 'error').map((p) => p.message)
+    log('error', 'generation', `Code generation of ${project.name} blocked by ${errors.length} error(s):`)
+    for (const e of errors) log('error', 'generation', `  ${e}`)
+    showDialog('Code generation blocked: fix these errors first', errors, { logged: true })
     return
   }
   let label = ''
@@ -84,19 +86,41 @@ export async function generateCode(pick: boolean): Promise<void> {
     })
     if (!dir) return
     label = dir.label
+    const start = performance.now()
     const templates = await window.api.templateDir?.({ op: 'current', document: doc.filePath })
     const set = templates ? await folderTemplates(templates) : await templateSetFor(dir, builtinTemplates)
+    const templatesLabel = templates ? templates.label : set.manifest.name
+    log('info', 'generation', `Generating ${project.name} into ${label} (templates ${templatesLabel})`)
     const report = await generateInto(toFile(project, { editor: false }), set, dir)
     codegenChanged()
-    const summary = `Code generated into ${label} (templates ${templates ? templates.label : set.manifest.name}): ${report.written.length} written, ${report.unchanged.length} unchanged`
-    if (report.conflicts.length || report.orphans.length || report.stale.length || report.warnings.length)
-      showDialog(summary, formatReport(report, label, false).split('\n').slice(0, -1))
-    else setStatus('info', summary)
+    for (const e of reportEntries(report))
+      log(e.level, 'generation', `  ${e.text}`, { path: e.path, doc: doc.id })
+    const summary = `Code generated into ${label} (templates ${templatesLabel}): ${report.written.length} written, ${report.unchanged.length} unchanged`
+    if (report.conflicts.length || report.orphans.length || report.stale.length || report.warnings.length) {
+      log('warning', 'generation', `${summary} in ${Math.round(performance.now() - start)} ms`)
+      showTool('output', false)
+      showDialog(summary, formatReport(report, label, false).split('\n').slice(0, -1), { logged: true })
+    } else {
+      log('info', 'generation', `${summary} in ${Math.round(performance.now() - start)} ms`)
+      useUiStore.setState({ status: { kind: 'info', text: summary } })
+    }
   } catch (e) {
-    showDialog(`Code generation failed${label ? ` in ${label}` : ''}`, [
-      e instanceof Error ? e.message : String(e)
-    ])
+    const title = `Code generation failed${label ? ` in ${label}` : ''}`
+    const lines = errorLines(e)
+    log('error', 'generation', title)
+    for (const line of lines) log('error', 'generation', `  ${line}`)
+    showTool('output', false)
+    showDialog(title, lines, { logged: true })
   }
+}
+
+/** Message of an error, then of each of its causes not already part of it. */
+function errorLines(e: unknown): string[] {
+  if (!(e instanceof Error)) return [String(e)]
+  const lines: string[] = []
+  for (let c: unknown = e; c instanceof Error && lines.length < 10; c = c.cause)
+    if (!lines.some((l) => l.includes(c.message))) lines.push(c.message)
+  return lines
 }
 
 /** Whether the host can give template folders. */

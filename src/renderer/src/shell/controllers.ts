@@ -57,6 +57,7 @@ export type ToolId =
   | 'generation'
   | 'inspector'
   | 'problems'
+  | 'output'
   | 'search'
   | 'settings'
 
@@ -68,6 +69,7 @@ export const TOOL_TITLES: Record<ToolId, string> = {
   generation: 'Code generation',
   inspector: 'Inspector',
   problems: 'Problems',
+  output: 'Output',
   search: 'Search',
   settings: 'Settings'
 }
@@ -82,6 +84,7 @@ const TOOL_SIZES: Record<ToolId, number> = {
   inspector: 380,
   settings: 380,
   problems: 170,
+  output: 170,
   search: 170
 }
 
@@ -176,6 +179,13 @@ export function buildDefaultLayout(api: DockviewApi): void {
     title: TOOL_TITLES.dependencies,
     inactive: true,
     position: { referencePanel: 'search', direction: 'within' }
+  })
+  api.addPanel({
+    id: 'output',
+    component: 'output',
+    title: TOOL_TITLES.output,
+    inactive: true,
+    position: { referencePanel: 'dependencies', direction: 'within' }
   })
   api.getPanel('explorer')?.api.setActive()
   lockEditorArea(api)
@@ -353,6 +363,11 @@ const TOOL_PLACES: Record<ToolId, Place[]> = {
   ],
   search: [
     ['problems', 'within'],
+    [EDITOR_AREA, 'below']
+  ],
+  output: [
+    ['problems', 'within'],
+    ['search', 'within'],
     [EDITOR_AREA, 'below']
   ],
   dependencies: [
