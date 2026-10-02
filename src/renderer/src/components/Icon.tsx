@@ -17,6 +17,7 @@ const PATHS = {
   binary: 'M2.5 3.5h11v9h-11zM2.5 6h11M5 8.5l1.5 1.5L5 11.5M8 11.5h3',
   'level-up': 'M13 13H8a3 3 0 0 1-3-3V3M2 6l3-3 3 3',
   'open-tab': 'M12 9v3.5H3.5V4H7M9 3h4v4M13 3 8 8',
+  code: 'M5.5 4 2 8l3.5 4M10.5 4 14 8l-3.5 4M9 3 7 13',
   expand: 'M9 3h4v4M13 3 9 7M7 13H3V9M3 13l4-4',
   undo: 'M6 3 3 6l3 3M3 6h6.5a3.5 3.5 0 0 1 0 7H7',
   redo: 'M10 3l3 3-3 3M13 6H6.5a3.5 3.5 0 0 0 0 7H9',

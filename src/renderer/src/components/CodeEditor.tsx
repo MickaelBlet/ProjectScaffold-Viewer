@@ -12,7 +12,6 @@ import { defaultKeymap, history, historyKeymap, indentWithTab, redo, undo } from
 import { cpp } from '@codemirror/lang-cpp'
 import { json } from '@codemirror/lang-json'
 import { python } from '@codemirror/lang-python'
-import { yaml } from '@codemirror/lang-yaml'
 import {
   bracketMatching,
   foldGutter,
@@ -45,6 +44,7 @@ import {
 import { useSettings } from '@/store/settings'
 import { languageOf, type FileLanguage } from './codeLanguages'
 import { fixedLiquid } from './liquidSyntax'
+import { richYaml } from './yamlSyntax'
 import { codeTheme } from './codeTheme'
 
 const INDENT = '  '
@@ -83,7 +83,7 @@ const idl = clike({
 function plainSupport(id: Exclude<FileLanguage['id'], 'liquid'>): LanguageSupport | null {
   switch (id) {
     case 'yaml':
-      return yaml()
+      return richYaml()
     case 'json':
       return json()
     case 'cpp':

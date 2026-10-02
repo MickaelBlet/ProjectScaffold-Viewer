@@ -4,6 +4,7 @@ import {
   ConnectionMode,
   Controls,
   MiniMap,
+  Panel,
   ReactFlow,
   ViewportPortal,
   getViewportForBounds,
@@ -62,7 +63,8 @@ import {
   selectionOf,
   showAllInView
 } from '@/actions'
-import { commandItem as item, keyLabel } from '@/commands'
+import { commandItem as item, commands, keyLabel, runCommand } from '@/commands'
+import { Icon } from '@/components/Icon'
 import { fileName } from '@/fileOps'
 import { openView, registerCanvas } from '@/shell/controllers'
 import { EXTERNAL } from './constants'
@@ -863,6 +865,19 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
       >
         <Background gap={settings.gridSize} />
         <Controls />
+        {/* Not in the VS Code preview: the text editor is beside it. */}
+        {viewId === GLOBAL_VIEW && commands.some((c) => c.id === 'view.source') && (
+          <Panel position="top-right">
+            <button
+              type="button"
+              className="canvas-source"
+              title={`Edit as text (YAML) (${keyLabel('Alt+U')})`}
+              onClick={() => runCommand('view.source')}
+            >
+              <Icon name="code" /> YAML
+            </button>
+          </Panel>
+        )}
         {settings.minimap && <MiniMap pannable zoomable nodeColor={(n) => colors.get(n.id) ?? ''} />}
         <ViewportPortal>
           {guides.map((g, i) =>
