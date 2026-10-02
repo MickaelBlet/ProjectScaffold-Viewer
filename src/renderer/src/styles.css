@@ -528,8 +528,10 @@ kbd {
   width: 100%;
 }
 .explorer-section > header {
-  display: flex;
-  flex-wrap: wrap;
+  /* Title left, actions right on one row: the actions take all the width they need (wrapping
+     only when it runs out), the title the rest, truncated. */
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 4px;
   padding: 4px 8px;
@@ -565,10 +567,8 @@ kbd {
   font-weight: normal;
 }
 /* Section toggle: the header's look, as a button. */
-/* Keeps its title whole: the actions wrap below it when they do not fit beside. */
 .explorer-toggle {
   display: flex;
-  flex: 1 0 auto;
   align-items: center;
   gap: 4px;
   min-width: 0;
@@ -580,6 +580,14 @@ kbd {
   letter-spacing: inherit;
   text-transform: inherit;
   text-align: left;
+}
+.explorer-toggle .explorer-title {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.explorer-toggle > :not(.explorer-title) {
+  flex-shrink: 0;
 }
 .explorer-toggle:hover:not(:disabled) {
   border-color: transparent;
