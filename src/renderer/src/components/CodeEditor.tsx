@@ -11,7 +11,6 @@ import {
 import { defaultKeymap, history, historyKeymap, indentWithTab, redo, undo } from '@codemirror/commands'
 import { cpp } from '@codemirror/lang-cpp'
 import { json } from '@codemirror/lang-json'
-import { liquid } from '@codemirror/lang-liquid'
 import { python } from '@codemirror/lang-python'
 import { yaml } from '@codemirror/lang-yaml'
 import {
@@ -45,6 +44,7 @@ import {
 } from '@codemirror/view'
 import { useSettings } from '@/store/settings'
 import { languageOf, type FileLanguage } from './codeLanguages'
+import { fixedLiquid } from './liquidSyntax'
 import { codeTheme } from './codeTheme'
 
 const INDENT = '  '
@@ -110,7 +110,7 @@ export function languageSupport(fileName: string): Extension {
   const lang = languageOf(fileName)
   if (lang.id !== 'liquid') return plainSupport(lang.id) ?? []
   const base = lang.base && plainSupport(lang.base)
-  return liquid({ tags: LIQUID_TAGS, ...(base ? { base } : {}) })
+  return fixedLiquid({ tags: LIQUID_TAGS, ...(base ? { base } : {}) })
 }
 
 // Application shortcuts (save, palette...), run before the editor's own keys: set by the keyboard
