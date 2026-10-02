@@ -19,17 +19,17 @@ import type { SidePanel, ViewRef } from '../../../../vscode/src/protocol'
 
 export interface CanvasController {
   viewId: Id
-  /** Fit the given modules / notes, or everything when empty. */
+  /** Fit the given modules / notes / links, or everything when empty. */
   fit(ids?: Id[]): void
   /** Flow position of the middle of the visible area. */
   center(): { x: number; y: number }
-  /** Pan to modules / notes without changing the zoom much, zooming out if they do not fit. */
+  /** Pan to modules / notes / links without changing the zoom much, zooming out if they do not fit. */
   reveal(ids: Id[]): void
   zoomBy(factor: number): void
   zoomTo(zoom: number): void
   exportImage(format: 'png' | 'svg'): Promise<void>
-  /** Absolute flow rect of a node as drawn. */
-  nodeRect(id: Id): Rect | null
+  /** Absolute flow rect of a module / note (or its stand-in) or a link as drawn. */
+  rect(id: Id): Rect | null
 }
 
 const canvases = new Map<Id, CanvasController>()

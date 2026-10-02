@@ -271,41 +271,55 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
     [getInternalNode]
   )
 
+  /** Rect of a node, of its stand-in outside a drill-down view, or of a link's path as drawn. */
+  const rectOf = useCallback(
+    (id: string) => {
+      const r = nodeRect(id) ?? nodeRect(EXTERNAL + id)
+      if (r) return r
+      const path = container.current?.querySelector<SVGPathElement>(
+        `.react-flow__edge[data-id="${CSS.escape(id)}"] .react-flow__edge-path`
+      )
+      if (!path) return null
+      const { x, y, width, height } = path.getBBox()
+      return { x, y, width, height }
+    },
+    [nodeRect]
+  )
+
+  /** Center on `ids` at the zoom `pick` chooses from the one fitting them. */
+  const centerOn = useCallback(
+    (ids: Id[], pick: (fit: number) => number, duration: number) => {
+      const rects = ids.map(rectOf).filter((r) => !!r)
+      if (!rects.length) return
+      const x = Math.min(...rects.map((r) => r.x))
+      const y = Math.min(...rects.map((r) => r.y))
+      const width = Math.max(...rects.map((r) => r.x + r.width)) - x
+      const height = Math.max(...rects.map((r) => r.y + r.height)) - y
+      const box = container.current?.getBoundingClientRect()
+      const fit = box ? Math.min((box.width * 0.85) / width, (box.height * 0.85) / height) : Infinity
+      void flow.setCenter(x + width / 2, y + height / 2, { zoom: Math.max(pick(fit), 0.1), duration })
+    },
+    [flow, rectOf]
+  )
+
   // Canvas controller for commands.
   useEffect(
     () =>
       registerCanvas({
         viewId,
         fit: (ids) =>
-          void fitView({
-            nodes: ids?.length ? ids.map((id) => ({ id })) : undefined,
-            padding: 0.15,
-            duration: 200,
-            maxZoom: 1.5
-          }),
+          ids?.length
+            ? centerOn(ids, (fit) => Math.min(fit, 1.5), 200)
+            : void fitView({ padding: 0.15, duration: 200, maxZoom: 1.5 }),
         center: () => {
           const r = container.current?.getBoundingClientRect()
           return r ? screenToFlowPosition({ x: r.x + r.width / 2, y: r.y + r.height / 2 }) : { x: 80, y: 80 }
         },
-        reveal: (ids) => {
-          // A module outside a drill-down view shows as its stand-in.
-          const rects = ids.map((id) => nodeRect(id) ?? nodeRect(EXTERNAL + id)).filter((r) => !!r)
-          if (!rects.length) return
-          const x = Math.min(...rects.map((r) => r.x))
-          const y = Math.min(...rects.map((r) => r.y))
-          const width = Math.max(...rects.map((r) => r.x + r.width)) - x
-          const height = Math.max(...rects.map((r) => r.y + r.height)) - y
-          const box = container.current?.getBoundingClientRect()
-          // Keep the zoom unless the target does not fit.
-          const fit = box ? Math.min((box.width * 0.85) / width, (box.height * 0.85) / height) : Infinity
-          void flow.setCenter(x + width / 2, y + height / 2, {
-            zoom: Math.max(Math.min(Math.max(flow.getZoom(), 0.8), fit), 0.1),
-            duration: 250
-          })
-        },
+        // Keep the zoom unless the target does not fit.
+        reveal: (ids) => centerOn(ids, (fit) => Math.min(Math.max(flow.getZoom(), 0.8), fit), 250),
         zoomBy: (f) => void flow.zoomTo(flow.getZoom() * f, { duration: 150 }),
         zoomTo: (z) => void flow.zoomTo(z, { duration: 150 }),
-        nodeRect,
+        rect: rectOf,
         exportImage: async (format) => {
           const el = container.current?.querySelector<HTMLElement>('.react-flow__viewport')
           if (!el) return
@@ -333,7 +347,7 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
           if (saved) setStatus('info', `Exported ${saved}`)
         }
       }),
-    [viewId, view.name, flow, fitView, screenToFlowPosition, nodeRect]
+    [viewId, view.name, flow, fitView, screenToFlowPosition, centerOn, rectOf]
   )
 
   useEffect(() => {

@@ -157,7 +157,8 @@ export function navigate(target: ProblemTarget, { zoom = false }: { zoom?: boole
     const hiddenAncestors = view.hidden.filter((h) => ids.some((id) => subtreeIds(p, h).has(id)))
     if (hiddenAncestors.length) setHidden(view.id, hiddenAncestors, false)
   }
-  revealWhenDrawn(ids, zoom)
+  // A link: its path as drawn, or its ends until then.
+  revealWhenDrawn(link ? [link.id] : ids, zoom, ids)
 }
 
 /** Selection shown for the text cursor: not sent back to move it. */
@@ -249,14 +250,17 @@ export function travelSelection(delta: -1 | 1): void {
   )
 }
 
-/** Reveal once the canvas shows the nodes (a view just opened or unhidden needs a few frames). */
-function revealWhenDrawn(ids: Id[], zoom = false, tries = 10): void {
+/**
+ * Reveal once the canvas draws `ids` (a view just opened or unhidden needs a few frames), else
+ * `fallback`.
+ */
+function revealWhenDrawn(ids: Id[], zoom = false, fallback = ids, tries = 10): void {
   requestAnimationFrame(() => {
     const canvas = activeCanvas()
-    const show = (): void => (zoom ? canvas?.fit(ids) : canvas?.reveal(ids))
-    if (canvas && ids.some((id) => canvas.nodeRect(id))) return show()
-    if (tries > 0) revealWhenDrawn(ids, zoom, tries - 1)
-    else show()
+    const show = (shown: Id[]): void => (zoom ? canvas?.fit(shown) : canvas?.reveal(shown))
+    if (canvas && ids.some((id) => canvas.rect(id))) return show(ids)
+    if (tries > 0) revealWhenDrawn(ids, zoom, fallback, tries - 1)
+    else show(fallback)
   })
 }
 
