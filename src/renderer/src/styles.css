@@ -406,8 +406,9 @@ button.link-button:hover {
   background: color-mix(in srgb, var(--ok) 16%, transparent);
 }
 /* Code generation panel. */
-.generation-section > header .spacer {
-  flex: 1;
+.generation-section > header {
+  /* Title, listing label (truncated), actions. */
+  grid-template-columns: auto minmax(0, 1fr) auto;
 }
 .generation-section > header .link {
   padding: 0 2px;

@@ -117,9 +117,8 @@ function Section(props: {
     <section className="explorer-section generation-section">
       <header>
         <span>{props.title}</span>
-        {loaded && 'listing' in loaded && loaded.listing ? <small>{loaded.listing.label}</small> : null}
-        <span className="spacer" />
-        {props.actions}
+        <small>{loaded && 'listing' in loaded && loaded.listing ? loaded.listing.label : null}</small>
+        <span className="explorer-actions">{props.actions}</span>
       </header>
       {!loaded ? (
         <p className="muted empty">Reading…</p>
