@@ -528,10 +528,9 @@ kbd {
   width: 100%;
 }
 .explorer-section > header {
-  /* Title left, actions right on one row: the actions take all the width they need (wrapping
-     only when it runs out), the title the rest, truncated. */
+  /* Title left, whole; actions in the rest of the row, on the right, wrapping there. */
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: 4px;
   padding: 4px 8px;
@@ -580,14 +579,6 @@ kbd {
   letter-spacing: inherit;
   text-transform: inherit;
   text-align: left;
-}
-.explorer-toggle .explorer-title {
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-.explorer-toggle > :not(.explorer-title) {
-  flex-shrink: 0;
 }
 .explorer-toggle:hover:not(:disabled) {
   border-color: transparent;
