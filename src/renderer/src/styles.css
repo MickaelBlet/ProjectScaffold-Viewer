@@ -806,122 +806,6 @@ kbd {
 .lib-detail {
   padding: 0 8px 12px;
 }
-/* Definitions tab: every definition but the views, beside the editor of the chosen one. */
-.definitions-editor {
-  container-type: inline-size;
-  height: 100%;
-  overflow: hidden;
-  background: var(--panel);
-}
-.definitions {
-  display: grid;
-  /* The stored width, shrunk when the tab is narrower so the editor keeps some room. */
-  grid-template-columns: min(var(--def-list-width, 280px), max(180px, calc(100% - 240px))) auto minmax(0, 1fr);
-  height: 100%;
-  min-height: 0;
-}
-.def-list {
-  overflow: auto;
-  min-width: 0;
-}
-/* Drag handle between the list and the editor: a thin line, wider to grab. */
-.def-splitter {
-  position: relative;
-  width: 1px;
-  background: var(--border);
-  cursor: col-resize;
-  touch-action: none;
-}
-.def-splitter::before {
-  content: '';
-  position: absolute;
-  inset: 0 -3px;
-  z-index: 2;
-}
-.def-splitter:hover,
-.def-splitter:active,
-.def-splitter:focus-visible {
-  outline: none;
-  background: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent);
-}
-.def-filter {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  border-bottom: 1px solid var(--border);
-}
-.def-search {
-  display: flex;
-  gap: 4px;
-}
-.def-search input {
-  flex: 1;
-  min-width: 0;
-}
-.def-search button {
-  flex: none;
-}
-.def-kinds {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  font-size: 12px;
-}
-.def-kinds button {
-  padding: 1px 8px;
-  border-radius: 10px;
-  border-color: var(--border);
-  background: none;
-  color: var(--muted);
-}
-.def-kinds button:hover {
-  color: var(--text);
-}
-.def-kinds button.on {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-  color: var(--text);
-}
-.def-filter .def-from {
-  margin: 0;
-  font-size: 12px;
-  color: var(--muted);
-}
-.def-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.entity-list li .def-used {
-  margin-left: 0;
-  min-width: 2.5em;
-  text-align: right;
-}
-.def-used.unused {
-  opacity: 0.5;
-}
-.entity-list li.dependency .def-name {
-  font-style: italic;
-  color: var(--muted);
-}
-.def-main {
-  overflow: auto;
-  min-width: 0;
-}
-@container (max-width: 560px) {
-  .definitions {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto 1fr;
-  }
-  .def-list {
-    max-height: 40cqh;
-    border-bottom: 1px solid var(--border);
-  }
-  .def-splitter {
-    display: none;
-  }
-}
 .lib-header {
   display: flex;
   align-items: center;
@@ -2207,8 +2091,7 @@ ul.plain {
   color: var(--muted);
 }
 /* Editor tabs by data-tab (EditorArea.tsx). Same outlines as the view / expand icons of components/Icon.tsx */
-.dv-default-tab:is([data-tab='view'], [data-tab='drill'], [data-tab='definitions'])
-  .dv-default-tab-content::before {
+.dv-default-tab:is([data-tab='view'], [data-tab='drill']) .dv-default-tab-content::before {
   content: '';
   display: inline-block;
   width: var(--icon-size);
@@ -2221,10 +2104,6 @@ ul.plain {
 }
 .dv-default-tab[data-tab='drill'] .dv-default-tab-content::before {
   mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 3h4v4M13 3 9 7M7 13H3V9M3 13l4-4'/%3E%3C/svg%3E");
-}
-/* List outline of components/Icon.tsx */
-.dv-default-tab[data-tab='definitions'] .dv-default-tab-content::before {
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 4h.01M3 8h.01M3 12h.01M6 4h7M6 8h7M6 12h7'/%3E%3C/svg%3E");
 }
 /* Temporary view (opened from a module, not saved until kept), as VS Code's preview tabs */
 .dv-default-tab[data-temporary] .dv-default-tab-content {

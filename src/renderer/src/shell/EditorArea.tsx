@@ -31,18 +31,9 @@ import { InterfaceInspector } from '@/panels/InterfaceInspector'
 import { ModuleInspector } from '@/panels/ModuleInspector'
 import { LinkInspector } from '@/panels/LinkInspector'
 import { SourcePanel } from '@/panels/SourcePanel'
-import { DefinitionsPanel } from '@/panels/DefinitionsPanel'
 import { DocTabs } from './DocTabs'
 import { IN_VSCODE } from '@/host'
-import {
-  closeView,
-  DEFINITIONS_PANEL,
-  editorApi,
-  openDefinitions,
-  openView,
-  setEditorApi,
-  type EditorKind
-} from './controllers'
+import { closeView, editorApi, openView, setEditorApi, type EditorKind } from './controllers'
 import { dockTheme } from './theme'
 
 function CanvasPanel(props: IDockviewPanelProps<{ viewId: Id }>): ReactNode {
@@ -103,14 +94,6 @@ function SourceEditor({ api }: IDockviewPanelProps): ReactNode {
   return <SourcePanel format={format} />
 }
 
-function DefinitionsEditor(): ReactNode {
-  return (
-    <div className="definitions-editor" data-panel="definitions">
-      <DefinitionsPanel />
-    </div>
-  )
-}
-
 const KIND_ICON: Record<EditorKind | 'source', string> = {
   type: 'T',
   interface: 'I',
@@ -147,24 +130,6 @@ function ViewTab(props: IDockviewPanelHeaderProps<{ viewId: Id }>): ReactNode {
           'separator',
           { label: 'New view', run: newView },
           { label: 'Delete view', danger: true, disabled: !stored, run: () => deleteView(viewId) }
-        ])
-      }}
-    />
-  )
-}
-
-/** The Definitions view: always there, neither renamed nor deleted. */
-function DefinitionsTab(props: IDockviewPanelHeaderProps): ReactNode {
-  return (
-    <DockviewDefaultTab
-      {...props}
-      data-tab="definitions"
-      onContextMenu={(e) => {
-        e.preventDefault()
-        openContextMenu(e, [
-          { label: 'Open to the side', run: () => openDefinitions({ split: true }) },
-          { label: 'Close', run: () => props.api.close() },
-          { label: 'Close others', run: () => closeOthers(props.api.id) }
         ])
       }}
     />
@@ -208,10 +173,9 @@ function Watermark(): ReactNode {
 const components = {
   canvas: CanvasPanel,
   entity: EntityPanel,
-  source: SourceEditor,
-  definitions: DefinitionsEditor
+  source: SourceEditor
 }
-const tabComponents = { view: ViewTab, definitions: DefinitionsTab, entity: EntityTab }
+const tabComponents = { view: ViewTab, entity: EntityTab }
 
 /** Editor tabs of one document, restored from and saved to its state. */
 function DocEditor({ docId }: { docId: Id }): ReactNode {
@@ -241,7 +205,6 @@ function DocEditor({ docId }: { docId: Id }): ReactNode {
       e.api.onDidActivePanelChange((ev) => {
         const viewId = (ev.panel?.params as { viewId?: Id } | undefined)?.viewId
         if (viewId) patchDoc({ activeViewId: viewId }, docId)
-        patchDoc({ definitionsActive: ev.panel?.id === DEFINITIONS_PANEL }, docId)
       })
     },
     [docId]

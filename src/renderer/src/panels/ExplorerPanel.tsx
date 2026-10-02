@@ -44,7 +44,7 @@ import {
 } from '@/actions'
 import { dependencyMenu } from './DependenciesPanel'
 import { childrenByParent, matching } from './ModulesPanel'
-import { DEFINITIONS_PANEL, openDefinitions, openEditor, openView } from '@/shell/controllers'
+import { openEditor, openView } from '@/shell/controllers'
 import { Icon } from '@/components/Icon'
 import { onListKeyDown, tabStop } from '@/components/listKeys'
 
@@ -364,14 +364,6 @@ function viewMenu(e: MouseEvent, v: View): void {
 
 const GLOBAL: View = { id: GLOBAL_VIEW, name: 'Global', rootModuleId: null, hidden: [] }
 
-function definitionsMenu(e: MouseEvent): void {
-  e.preventDefault()
-  openContextMenu(e, [
-    { label: 'Open', run: () => openDefinitions() },
-    { label: 'Open to the side', run: () => openDefinitions({ split: true }) }
-  ])
-}
-
 export function ExplorerPanel(): ReactNode {
   const types = useProjectStore((s) => s.project.types)
   const interfaces = useProjectStore((s) => s.project.interfaces)
@@ -384,7 +376,6 @@ export function ExplorerPanel(): ReactNode {
   const [collapsed, setCollapsed] = useState<Set<Id>>(new Set())
   const selectedIds = useDoc((d) => d.selectedIds)
   const activeViewId = useDoc((d) => d.activeViewId)
-  const definitionsActive = useDoc((d) => d.definitionsActive)
   const [filter, setFilter] = useState('')
   const savedOrder = useSettings((s) => s.explorerOrder)
   const savedHidden = useSettings((s) => s.explorerHidden)
@@ -410,13 +401,10 @@ export function ExplorerPanel(): ReactNode {
     [links, modules, dependencies, paths]
   )
 
-  // The Definitions view is always listed below Global.
   const viewItems = [
     ...(match(GLOBAL.name) ? [GLOBAL_VIEW] : []),
-    ...(match('Definitions') ? [DEFINITIONS_PANEL] : []),
     ...views.filter((v) => match(v.name)).map((v) => v.id)
   ]
-  const currentView = definitionsActive ? DEFINITIONS_PANEL : activeViewId
   const ownTypes = types.filter((t) => !t.dependency)
   const ownInterfaces = interfaces.filter((i) => !i.dependency)
   const shownTypes = ownTypes.filter((t) => match(t.name))
@@ -456,7 +444,7 @@ export function ExplorerPanel(): ReactNode {
   const interfaceIds = shownInterfaces.map((i) => i.id)
   const moduleIds = shownModules.map((x) => x.m.id)
   const linkIds = shownLinks.map((x) => x.l.id)
-  const viewStop = tabStop(viewItems, (id) => id === currentView)
+  const viewStop = tabStop(viewItems, (id) => id === activeViewId)
   const typeStop = tabStop(typeIds, isSelected)
   const interfaceStop = tabStop(interfaceIds, isSelected)
   const dependencyStop = tabStop(dependencyIds, isSelected)
@@ -473,7 +461,7 @@ export function ExplorerPanel(): ReactNode {
       <Section
         id="views"
         title="Views"
-        count={views.length + 2}
+        count={views.length + 1}
         actions={
           <button type="button" className="icon" title="New view" onClick={newView}>
             <Icon name="plus" />
@@ -482,40 +470,14 @@ export function ExplorerPanel(): ReactNode {
       >
         <EntityList label="Views">
           {viewItems.map((id) => {
-            if (id === DEFINITIONS_PANEL)
-              return (
-                <Item
-                  key={id}
-                  selected={id === currentView}
-                  tabStop={id === viewStop}
-                  className={id === currentView ? 'current' : ''}
-                  title="Every dependency, binary, type, interface, constant, module and link"
-                  onClick={() => openDefinitions()}
-                  onContextMenu={definitionsMenu}
-                >
-                  <span className="kind-badge view">
-                    <Icon name="definitions" />
-                  </span>
-                  Definitions
-                  <small>
-                    {dependencies.length +
-                      binaries.length +
-                      ownTypes.length +
-                      ownInterfaces.length +
-                      ownConsts.length +
-                      modules.length +
-                      links.length}
-                  </small>
-                </Item>
-              )
             const v = id === GLOBAL_VIEW ? GLOBAL : views.find((v) => v.id === id)!
             const root = modules.find((m) => m.id === v.rootModuleId)
             return (
               <Item
                 key={v.id}
-                selected={v.id === currentView}
+                selected={v.id === activeViewId}
                 tabStop={v.id === viewStop}
-                className={v.id === currentView ? 'current' : ''}
+                className={v.id === activeViewId ? 'current' : ''}
                 onClick={() => openView(v.id)}
                 onContextMenu={(e) => viewMenu(e, v)}
               >

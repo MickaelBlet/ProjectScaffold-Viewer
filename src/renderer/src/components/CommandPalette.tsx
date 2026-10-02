@@ -8,7 +8,7 @@ import { getProject } from '@/store/project'
 import { storage } from '@/storage'
 import { useUiStore, type PickEntry } from '@/store/ui'
 import { navigate } from '@/actions'
-import { DEFINITIONS_PANEL, openDefinitions, openView } from '@/shell/controllers'
+import { openView } from '@/shell/controllers'
 import { Icon } from './Icon'
 
 interface Entry extends PickEntry {
@@ -84,7 +84,6 @@ function entityEntries(): Entry[] {
       run: () => navigate({ kind: 'link', id: l.id })
     })),
     { key: GLOBAL_VIEW, label: 'Global', detail: 'view', kind: 'V', run: () => openView(GLOBAL_VIEW) },
-    { key: DEFINITIONS_PANEL, label: 'Definitions', detail: 'view', kind: 'V', run: () => openDefinitions() },
     ...p.views.map((v) => ({
       key: v.id,
       label: v.name,
