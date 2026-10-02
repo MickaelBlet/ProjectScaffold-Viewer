@@ -4,8 +4,10 @@ import { removeBinary } from '@/model/binaries'
 import { DEFAULT_BASE_PORT, DEFAULT_HOST } from '@/model/transports'
 import { TRANSPORTS, type ConstDef, type RemoteDefaults } from '@/model/types'
 import { valueExample } from '@/model/defaults'
+import { DEFAULT_TEMPLATE_SET, TEMPLATE_SETS } from '@/model/templateSets'
 import { DefaultInput, FieldList } from './TypeInspector'
 import { update, useProjectStore } from '@/store/project'
+import { setTemplateSet } from '@/generateCode'
 import {
   ColorPicker,
   CommitInput,
@@ -51,6 +53,25 @@ export function ProjectInspector(): ReactNode {
       <TextArea value={p.description} onChange={(v) => update((d) => void (d.description = v))} />
       <Section title="Metadata">
         <MetadataEditor value={p.metadata} onChange={(fn) => update((d) => fn(d.metadata))} />
+      </Section>
+      <Section title="Code generation">
+        <Row label="Templates">
+          <select
+            value={p.templates ?? DEFAULT_TEMPLATE_SET}
+            onChange={(e) => setTemplateSet(e.target.value)}
+            aria-label="Built-in template set generating the code"
+          >
+            {[...new Set([...TEMPLATE_SETS, p.templates ?? DEFAULT_TEMPLATE_SET])].map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+        </Row>
+        <p className="muted">
+          Built-in template set, unless a template folder is chosen for the document or the output directory
+          holds its own (.scaffold/templates).
+        </p>
       </Section>
       <Section title={`Constants (${own.length})`}>
         <FieldList<ConstDef>

@@ -44,7 +44,7 @@ import {
   saveProject,
   saveWorkspace
 } from './fileOps'
-import { canChooseTemplates, chooseTemplates, generateCode } from './generateCode'
+import { chooseTemplates, generateCode } from './generateCode'
 import { focusedEditorHistory, setPassedKeys } from './components/CodeEditor'
 import { openIdlText, saveActiveTextFile } from './textFileOps'
 import { activeDoc, cycleDoc, patchDoc, useDocs, activateDoc } from './store/documents'
@@ -235,7 +235,6 @@ const allCommands: Command[] = [
     id: 'file.codeTemplates',
     title: 'Code templates…',
     category: 'File',
-    enabled: canChooseTemplates,
     run: () => void chooseTemplates()
   },
 

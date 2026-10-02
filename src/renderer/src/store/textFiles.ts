@@ -1,7 +1,7 @@
 // Text files edited in tabs beside a document's views: its templates, its generated files, IDL files.
 import { create } from 'zustand'
 import type { OutputDir } from '@/codegen/run'
-import { builtinFiles, knownOutputDir, templateFolder } from '@/generateCode'
+import { builtinFile, knownOutputDir, templateFolder } from '@/generateCode'
 import type { Id } from '@/model/types'
 import { findDoc, type DocState } from './documents'
 
@@ -67,7 +67,7 @@ export async function sourceDir(doc: DocState, source: TextSource): Promise<Outp
 async function read(doc: DocState, ref: TextFileRef): Promise<string | null> {
   switch (ref.source) {
     case 'builtin':
-      return builtinFiles()[ref.path] ?? null
+      return builtinFile(ref.path)
     case 'file':
       return window.api.changedOnDisk(ref.path)
     default: {

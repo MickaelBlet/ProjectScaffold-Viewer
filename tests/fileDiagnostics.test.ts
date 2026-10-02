@@ -1,11 +1,13 @@
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { idlProblems, liquidProblems, userSections } from '@/components/fileDiagnostics'
+import { TEMPLATE_SETS } from '@/model/templateSets'
 
 describe('liquidProblems', () => {
   it('accepts the built-in templates', () => {
-    for (const f of ['interface.hpp.liquid', '_value.liquid', 'CMakeLists.txt.liquid'])
-      expect(liquidProblems(readFileSync(`templates/cpp17/${f}`, 'utf8'))).toEqual([])
+    for (const set of TEMPLATE_SETS)
+      for (const f of readdirSync(`templates/${set}`).filter((f) => f.endsWith('.liquid')))
+        expect(liquidProblems(readFileSync(`templates/${set}/${f}`, 'utf8')), `${set}/${f}`).toEqual([])
   })
 
   it('gives the line of an unclosed tag', () => {

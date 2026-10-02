@@ -7,15 +7,16 @@ import { LANGUAGE_BADGES, languageOf } from '@/components/codeLanguages'
 import { onListKeyDown } from '@/components/listKeys'
 import {
   builtinTemplates,
-  canChooseTemplates,
   canGenerate,
   chooseTemplates,
   codegenListeners,
   generateCode,
   knownOutputDir,
+  projectTemplateSet,
   templateFolder
 } from '@/generateCode'
 import { activeDoc, useDocs, type DocState } from '@/store/documents'
+import { useProjectStore } from '@/store/project'
 import type { TextSource } from '@/store/textFiles'
 import { openTextFile } from '@/textFileOps'
 
@@ -53,11 +54,12 @@ async function templateListing(doc: DocState): Promise<Listing> {
       prefix: `${LOCAL_TEMPLATES}/`,
       files: sorted(templateFiles(parseManifest(local)))
     }
-  const builtin = builtinTemplates().manifest
+  const set = projectTemplateSet(doc.store.getState().project)
+  const builtin = builtinTemplates(set).manifest
   return {
     label: `built-in ${builtin.name}`,
     source: 'builtin',
-    prefix: '',
+    prefix: `${set}/`,
     files: sorted(templateFiles(builtin))
   }
 }
@@ -140,6 +142,7 @@ function Section(props: {
 
 export function GenerationPanel(): ReactNode {
   const docId = useDocs((s) => s.activeId)
+  const templateSet = useProjectStore((s) => s.project.templates)
   const [templates, setTemplates] = useState<Loaded | null>(null)
   const [generated, setGenerated] = useState<Loaded | null>(null)
   const [query, setQuery] = useState('')
@@ -154,7 +157,7 @@ export function GenerationPanel(): ReactNode {
     refresh()
     codegenListeners.add(refresh)
     return () => void codegenListeners.delete(refresh)
-  }, [docId, refresh])
+  }, [docId, templateSet, refresh])
 
   return (
     <div className="generation-panel">
@@ -175,11 +178,9 @@ export function GenerationPanel(): ReactNode {
         retry={refresh}
         empty={null}
         actions={
-          canChooseTemplates() ? (
-            <button type="button" className="link" onClick={() => void chooseTemplates()}>
-              Change…
-            </button>
-          ) : null
+          <button type="button" className="link" onClick={() => void chooseTemplates()}>
+            Change…
+          </button>
         }
       />
       <Section
