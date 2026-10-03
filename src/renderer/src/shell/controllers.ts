@@ -71,13 +71,13 @@ export const TOOL_TITLES: Record<ToolId, string> = {
 
 /** Width of the side tools, height of the bottom ones, when first opened. */
 const TOOL_SIZES: Record<ToolId, number> = {
-  explorer: 250,
-  generation: 280,
-  inspector: 380,
-  settings: 380,
+  explorer: 300,
+  generation: 300,
+  inspector: 440,
+  settings: 440,
   problems: 170,
   output: 170,
-  search: 170
+  search: 300
 }
 
 let outer: DockviewApi | null = null
@@ -124,6 +124,14 @@ export function buildDefaultLayout(api: DockviewApi): void {
     initialWidth: TOOL_SIZES.explorer,
     position: { referencePanel: EDITOR_AREA, direction: 'left' }
   })
+  for (const id of ['generation', 'search'] as const)
+    api.addPanel({
+      id,
+      component: id,
+      title: TOOL_TITLES[id],
+      inactive: true,
+      position: { referencePanel: 'explorer', direction: 'within' }
+    })
   api.addPanel({
     id: 'inspector',
     component: 'inspector',
@@ -146,18 +154,11 @@ export function buildDefaultLayout(api: DockviewApi): void {
     position: { referencePanel: EDITOR_AREA, direction: 'below' }
   })
   api.addPanel({
-    id: 'search',
-    component: 'search',
-    title: TOOL_TITLES.search,
-    inactive: true,
-    position: { referencePanel: 'problems', direction: 'within' }
-  })
-  api.addPanel({
     id: 'output',
     component: 'output',
     title: TOOL_TITLES.output,
     inactive: true,
-    position: { referencePanel: 'search', direction: 'within' }
+    position: { referencePanel: 'problems', direction: 'within' }
   })
   api.getPanel('explorer')?.api.setActive()
   lockEditorArea(api)
@@ -310,6 +311,17 @@ type Place = [ref: string, direction: Direction] | [ref: null, direction: Exclud
 const TOOL_PLACES: Record<ToolId, Place[]> = {
   explorer: [
     ['generation', 'within'],
+    ['search', 'within'],
+    [null, 'left']
+  ],
+  generation: [
+    ['explorer', 'within'],
+    ['search', 'within'],
+    [null, 'left']
+  ],
+  search: [
+    ['explorer', 'within'],
+    ['generation', 'within'],
     [null, 'left']
   ],
   inspector: [
@@ -321,21 +333,12 @@ const TOOL_PLACES: Record<ToolId, Place[]> = {
     [null, 'right']
   ],
   problems: [
-    ['search', 'within'],
-    [EDITOR_AREA, 'below']
-  ],
-  search: [
-    ['problems', 'within'],
+    ['output', 'within'],
     [EDITOR_AREA, 'below']
   ],
   output: [
     ['problems', 'within'],
-    ['search', 'within'],
     [EDITOR_AREA, 'below']
-  ],
-  generation: [
-    ['explorer', 'within'],
-    [null, 'left']
   ]
 }
 
