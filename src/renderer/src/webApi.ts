@@ -42,8 +42,18 @@ interface DirHandle {
 }
 
 interface FsAccessWindow {
-  showOpenFilePicker?(opts: { types: PickerType[]; multiple?: boolean }): Promise<FileHandle[]>
-  showSaveFilePicker?(opts: { suggestedName: string; types: PickerType[] }): Promise<FileHandle>
+  showOpenFilePicker?(opts: {
+    id?: string
+    types: PickerType[]
+    multiple?: boolean
+    startIn?: DirHandle | FileHandle
+  }): Promise<FileHandle[]>
+  showSaveFilePicker?(opts: {
+    id?: string
+    suggestedName: string
+    types: PickerType[]
+    startIn?: DirHandle | FileHandle
+  }): Promise<FileHandle>
   showDirectoryPicker?(opts: {
     id?: string
     mode: 'readwrite'
@@ -134,6 +144,8 @@ async function pickFiles(multiple: boolean, filter?: FileFilter): Promise<OpenRe
   if (fs.showOpenFilePicker) {
     try {
       const picked = await fs.showOpenFilePicker({
+        id: 'project',
+        startIn: await lastFile(),
         types: [
           {
             description: accept.description,
@@ -192,6 +204,8 @@ async function writeFile(req: SaveRequest): Promise<string | null> {
   if (fs.showSaveFilePicker) {
     try {
       const handle = await fs.showSaveFilePicker({
+        id: 'project',
+        startIn: await lastFile(),
         suggestedName: req.defaultName,
         types: [TYPES[req.format]]
       })
@@ -281,6 +295,11 @@ async function remember(entry: RecentEntry): Promise<void> {
   const previous = list.find((e) => e.name === entry.name)
   const handle = entry.handle ?? previous?.handle
   await storeRecent([{ ...entry, handle }, ...list.filter((e) => e !== previous)].slice(0, MAX_RECENT))
+}
+
+/** Handle of the most recent project file: pickers start in its folder. */
+async function lastFile(): Promise<FileHandle | undefined> {
+  return (await loadRecent()).find((e) => e.handle)?.handle
 }
 
 /** Reads the entry's file again when permitted, else falls back to the stored content. */
