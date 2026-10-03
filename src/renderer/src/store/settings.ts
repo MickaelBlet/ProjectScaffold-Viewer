@@ -80,7 +80,7 @@ export interface Settings {
 
 export const DEFAULT_SETTINGS: Settings = {
   theme: 'system',
-  snapToGrid: false,
+  snapToGrid: true,
   gridSize: 20,
   guides: true,
   selectToMove: true,
@@ -92,7 +92,7 @@ export const DEFAULT_SETTINGS: Settings = {
   inheritance: true,
   autoLayoutOnOpen: true,
   revealInspector: true,
-  forceAnimations: false,
+  forceAnimations: true,
   editorFontSize: 12,
   editorFontFamily: '',
   editorLineHeight: 1.5,
