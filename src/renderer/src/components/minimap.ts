@@ -1,9 +1,10 @@
 // Minimap of the code editors, like VS Code's: the text drawn small on the right of the editor with
 // its syntax colors, a slider over the lines in view, the caret lines, selections, search and
-// selection matches, problems and section headers. The editor's scrollbar stays on its right, over
-// an overview ruler marking them across the whole text.
+// selection matches, problems, changes since the last save (unified merge view) and section headers.
+// The editor's scrollbar stays on its right, over an overview ruler marking them across the whole text.
 import { foldedRanges, syntaxTree } from '@codemirror/language'
 import { forEachDiagnostic } from '@codemirror/lint'
+import { getChunks } from '@codemirror/merge'
 import { getSearchQuery, SearchCursor, searchPanelOpen } from '@codemirror/search'
 import { countColumn, Facet, type EditorState, type Extension } from '@codemirror/state'
 import { EditorView, ViewPlugin, type ViewUpdate } from '@codemirror/view'
@@ -79,6 +80,12 @@ interface Mark {
   to: number
 }
 type Severity = 'error' | 'warning' | 'info'
+/** Lines of a changed chunk; a deletion marks the line it was before. */
+interface Change {
+  first: number
+  last: number
+  deleted: boolean
+}
 
 interface Colors {
   text: string
@@ -88,6 +95,7 @@ interface Colors {
   accent: string
   danger: string
   warning: string
+  ok: string
 }
 
 interface Measured {
@@ -128,6 +136,8 @@ class Minimap {
   colors: Colors | null = null
   diagnostics = new Map<number, Severity>()
   diagnosticsDirty = true
+  changes: Change[] = []
+  changesDirty = true
   searchMarks: Mark[] = []
   searchDirty = true
   selectionMarks: Mark[] = []
@@ -195,6 +205,7 @@ class Minimap {
     if (foldedRanges(u.state) !== foldedRanges(u.startState)) this.rowsDirty = true
     if (u.docChanged || u.selectionSet) this.selectionDirty = true
     if (u.transactions.some((tr) => tr.effects.length > 0)) this.diagnosticsDirty = this.searchDirty = true
+    if (getChunks(u.state)?.chunks !== getChunks(u.startState)?.chunks) this.changesDirty = true
     this.schedule()
   }
 
@@ -292,6 +303,14 @@ class Minimap {
       })
       this.diagnosticsDirty = false
     }
+    if (this.changesDirty) {
+      this.changes = (getChunks(state)?.chunks ?? []).map((c) => {
+        const first = doc.lineAt(c.fromB).number
+        const deleted = c.fromB === c.toB
+        return { first, last: deleted ? first : doc.lineAt(Math.max(c.fromB, c.toB - 1)).number, deleted }
+      })
+      this.changesDirty = false
+    }
     if (this.searchDirty) {
       const query = searchPanelOpen(state) ? getSearchQuery(state) : null
       this.searchMarks = query?.valid ? marks(state, query.getCursor(state)) : []
@@ -333,7 +352,8 @@ class Minimap {
       muted: css('--muted'),
       accent: css('--accent'),
       danger: css('--danger'),
-      warning: css('--warning')
+      warning: css('--warning'),
+      ok: css('--ok')
     }
     probe.remove()
     return this.colors
@@ -514,6 +534,17 @@ class Minimap {
       }
     }
 
+    // Changes since the last save: a bar on the left edge.
+    for (const c of this.changes) {
+      const from = Math.max(startRow, rowOfLine(rows, c.first))
+      if (c.deleted) {
+        if (from < endRow) fill(colors.danger, 1, 0, rowY(from) - 1, 2, 2)
+        continue
+      }
+      for (let row = from; row < endRow && rows[row]! <= c.last; row++)
+        fill(colors.ok, 1, 0, rowY(row), 2, ROW)
+    }
+
     // Matches, over the text.
     for (const mark of this.selectionMarks)
       lineRows(mark.line, (row) => fillColumns(row, mark.from, mark.to, colors.accent, 0.7))
@@ -550,6 +581,8 @@ class Minimap {
       this.ruler.style.top = `${m.top}px`
       this.ruler.style.width = `${rulerWidth}px`
       this.ruler.style.height = `${mapHeight}px`
+      const rowTop = (line: number): number =>
+        rows.length ? (rowOfLine(rows, line) / rows.length) * mapHeight : 0
       const mark = (
         color: string,
         alpha: number,
@@ -560,14 +593,22 @@ class Minimap {
       ): void => {
         rc.globalAlpha = alpha
         rc.fillStyle = color
-        rc.fillRect(x, rows.length ? (rowOfLine(rows, line) / rows.length) * mapHeight : 0, width, height)
+        rc.fillRect(x, rowTop(line), width, height)
       }
-      const half = rulerWidth / 2
-      for (const sm of this.selectionMarks) mark(colors.accent, 0.8, 0, sm.line, half, 2)
-      for (const sm of this.searchMarks) mark(colors.warning, 0.9, 0, sm.line, half, 2)
+      // Lanes, as VS Code's: changes on the left, matches in the middle, problems on the right.
+      const lane = rulerWidth / 3
+      for (const c of this.changes) {
+        const top = rowTop(c.first)
+        const bottom = c.deleted ? top : rowTop(c.last) + mapHeight / Math.max(1, rows.length)
+        rc.globalAlpha = 1
+        rc.fillStyle = c.deleted ? colors.danger : colors.ok
+        rc.fillRect(0, c.deleted ? top - 1 : top, lane, Math.max(2, bottom - top))
+      }
+      for (const sm of this.selectionMarks) mark(colors.accent, 0.8, lane, sm.line, lane, 2)
+      for (const sm of this.searchMarks) mark(colors.warning, 0.9, lane, sm.line, lane, 2)
       for (const [line, severity] of this.diagnostics)
         if (severity !== 'info')
-          mark(severity === 'error' ? colors.danger : colors.warning, 1, half, line, half, 3)
+          mark(severity === 'error' ? colors.danger : colors.warning, 1, 2 * lane, line, lane, 3)
       for (const r of state.selection.ranges)
         mark(colors.text, 0.8, 0, doc.lineAt(r.head).number, rulerWidth, 2)
       rc.globalAlpha = 1

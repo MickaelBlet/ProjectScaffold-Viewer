@@ -113,7 +113,7 @@ export const DEFAULT_SETTINGS: Settings = {
   editorMinimap: true,
   editorMinimapRender: 'characters',
   sourceFollow: true,
-  sourceChanges: false,
+  sourceChanges: true,
   explorerOrder: [],
   explorerHidden: [],
   generationOrder: [],
