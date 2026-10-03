@@ -433,7 +433,7 @@ export function ExplorerPanel(): ReactNode {
                 onContextMenu={(e) => viewMenu(e, v)}
               >
                 <span className={`kind-badge view ${root ? 'drill' : ''}`}>
-                  {root ? <Icon name="expand" /> : 'V'}
+                  <Icon name={root ? 'expand' : 'view'} />
                 </span>
                 {v.name}
                 <small>
