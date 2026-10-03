@@ -1,4 +1,5 @@
-// Geometry of the code editor minimap (`minimap.ts`): one row per line not hidden in a fold, the
+// Geometry of the code editor minimap (`minimap.ts`): rows of the lines not hidden in folds (one
+// per line, or per wrapped part of it), the
 // rows scrolled with the editor when they do not all fit, the slider over the rows shown.
 
 /** Lines (from 1) shown as rows: all but those hidden in folds, given as sorted [first, last] ranges. */
@@ -17,7 +18,32 @@ export function visibleLines(lineCount: number, hidden: readonly (readonly [numb
   return rows
 }
 
-/** Row of a line: its own, or the row of the line folding it. */
+/**
+ * Columns where the rows of a wrapped line start, as the editor wraps it `width` columns wide: after
+ * the last space that fits, else anywhere. Rows go on from column 0.
+ */
+export function wrapColumns(text: string, width: number, tabSize: number): number[] {
+  const starts = [0]
+  if (width <= 0) return starts
+  let start = 0
+  let col = 0
+  /** Column after the last space of the row. */
+  let space = -1
+  for (let i = 0; i < text.length; i++) {
+    const c = text.charCodeAt(i)
+    const blank = c === 32 || c === 9
+    const w = c === 9 ? tabSize - (col % tabSize) : 1
+    if (!blank && col + w - start > width) {
+      start = space > start ? space : col
+      starts.push(start)
+    }
+    col += w
+    if (blank) space = col
+  }
+  return starts
+}
+
+/** First row of a line, or of the line folding it; `rows` holds the line of each row. */
 export function rowOfLine(rows: readonly number[], line: number): number {
   let lo = 0
   let hi = rows.length - 1
@@ -26,7 +52,14 @@ export function rowOfLine(rows: readonly number[], line: number): number {
     if (rows[mid]! <= line) lo = mid
     else hi = mid - 1
   }
-  return Math.max(0, lo)
+  const shown = rows[lo]
+  let first = 0
+  while (first < lo) {
+    const mid = (first + lo) >> 1
+    if (rows[mid]! < shown!) first = mid + 1
+    else lo = mid
+  }
+  return first
 }
 
 export interface MapInput {

@@ -7,6 +7,7 @@ import {
   rulerRow,
   scrollForDrag,
   visibleLines,
+  wrapColumns,
   type MapInput
 } from '@/components/minimapGeometry'
 
@@ -28,6 +29,25 @@ describe('minimap rows', () => {
     expect(rowOfLine(rows, 3)).toBe(0)
     expect(rowOfLine(rows, 5)).toBe(2)
     expect(rowOfLine(rows, 9)).toBe(3)
+  })
+
+  it('maps a wrapped line to its first row', () => {
+    const rows = [1, 2, 2, 2, 3, 5, 5]
+    expect(rowOfLine(rows, 1)).toBe(0)
+    expect(rowOfLine(rows, 2)).toBe(1)
+    expect(rowOfLine(rows, 3)).toBe(4)
+    expect(rowOfLine(rows, 4)).toBe(4)
+    expect(rowOfLine(rows, 5)).toBe(5)
+    expect(rowOfLine(rows, 6)).toBe(5)
+  })
+
+  it('wraps lines after spaces, else anywhere', () => {
+    expect(wrapColumns('short', 10, 2)).toEqual([0])
+    expect(wrapColumns('long line', 0, 2)).toEqual([0])
+    expect(wrapColumns('aaaa bbbb cccc', 10, 2)).toEqual([0, 10])
+    expect(wrapColumns('aaaa bbbbbb', 8, 2)).toEqual([0, 5])
+    expect(wrapColumns('abcdefghij', 4, 2)).toEqual([0, 4, 8])
+    expect(wrapColumns('\tab cd', 4, 4)).toEqual([0, 4, 7])
   })
 })
 

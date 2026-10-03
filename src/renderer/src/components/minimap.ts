@@ -17,6 +17,7 @@ import {
   rulerRow,
   scrollForDrag,
   visibleLines,
+  wrapColumns,
   type MapGeometry,
   type MapInput
 } from './minimapGeometry'
@@ -96,8 +97,13 @@ interface Measured {
   scrollTop: number
   scrollHeight: number
   clientHeight: number
+  /** Lines at the top and bottom of the viewport, and how far down them (0 to 1). */
   firstLine: number
+  firstPart: number
   lastLine: number
+  lastPart: number
+  /** Columns of the wrapped lines, 0 without wrapping. */
+  wrap: number
 }
 
 class Minimap {
@@ -106,8 +112,11 @@ class Minimap {
   slider: HTMLDivElement
   hidden = true
   opts: MinimapOptions
+  /** Line of each row, and the column where the row starts (wrapped lines have several rows). */
   rows: number[] = []
+  rowStarts: number[] = []
   rowsDirty = true
+  wrap = 0
   /** Drawn segments of lines, by line number. */
   segments = new Map<number, Segment[]>()
   classColors = new Map<string, string>()
@@ -195,6 +204,13 @@ class Minimap {
     const s = view.scrollDOM
     const top = s.getBoundingClientRect().top - view.documentTop
     const doc = view.state.doc
+    const at = (y: number): [number, number] => {
+      const block = view.lineBlockAtHeight(y)
+      const part = block.height > 0 ? (y - block.top) / block.height : 0
+      return [doc.lineAt(block.from).number, Math.max(0, Math.min(0.999, part))]
+    }
+    const [firstLine, firstPart] = at(top)
+    const [lastLine, lastPart] = at(top + s.clientHeight)
     return {
       top: s.offsetTop,
       height: s.clientHeight,
@@ -203,9 +219,21 @@ class Minimap {
       scrollTop: s.scrollTop,
       scrollHeight: s.scrollHeight,
       clientHeight: s.clientHeight,
-      firstLine: doc.lineAt(view.lineBlockAtHeight(top).from).number,
-      lastLine: doc.lineAt(view.lineBlockAtHeight(top + s.clientHeight).from).number
+      firstLine,
+      firstPart,
+      lastLine,
+      lastPart,
+      wrap: view.lineWrapping ? this.wrapWidth() : 0
     }
+  }
+
+  /** Columns the editor wraps lines at. */
+  wrapWidth(): number {
+    const line = this.view.contentDOM.querySelector('.cm-line')
+    if (!(line instanceof HTMLElement)) return 0
+    const style = getComputedStyle(line)
+    const width = line.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)
+    return Math.max(1, Math.floor(width / this.view.defaultCharacterWidth))
   }
 
   // Data, recomputed when drawn after the changes that affect it.
@@ -219,7 +247,14 @@ class Minimap {
         const last = doc.lineAt(to).number
         if (last >= first) hidden.push([first, last])
       })
-      this.rows = visibleLines(doc.lines, hidden)
+      this.rows = []
+      this.rowStarts = []
+      for (const line of visibleLines(doc.lines, hidden)) {
+        for (const start of wrapColumns(doc.line(line).text, this.wrap, state.tabSize)) {
+          this.rows.push(line)
+          this.rowStarts.push(start)
+        }
+      }
       this.rowsDirty = false
     }
     if (this.diagnosticsDirty) {
@@ -315,7 +350,8 @@ class Minimap {
     let cur: Segment | null = null
     let col = 0
     let span = 0
-    for (let i = 0; i < text.length && col < COLUMNS; i++) {
+    const columns = this.wrap ? Infinity : COLUMNS
+    for (let i = 0; i < text.length && col < columns; i++) {
       const c = text.charCodeAt(i)
       if (c === 9 || c === 32) {
         col += c === 9 ? tabSize - (col % tabSize) : 1
@@ -347,9 +383,14 @@ class Minimap {
       return
     }
     const state = view.state
+    if (m.wrap !== this.wrap) {
+      this.wrap = m.wrap
+      this.rowsDirty = true
+      this.segments.clear()
+    }
     this.refresh(state)
     const colors = this.resolveColors()
-    const { rows } = this
+    const { rows, rowStarts } = this
     const mapHeight = m.height
     this.dom.style.top = `${m.top}px`
     this.dom.style.height = `${mapHeight}px`
@@ -366,8 +407,8 @@ class Minimap {
       rowCount: rows.length,
       rowHeight: ROW,
       mapHeight,
-      firstRow: rowOfLine(rows, m.firstLine),
-      lastRow: rowOfLine(rows, m.lastLine),
+      firstRow: this.rowIn(m.firstLine, m.firstPart),
+      lastRow: this.rowIn(m.lastLine, m.lastPart),
       scrollTop: m.scrollTop,
       scrollHeight: m.scrollHeight,
       clientHeight: m.clientHeight
@@ -378,9 +419,10 @@ class Minimap {
     const startRow = Math.floor(offset / ROW)
     const endRow = Math.min(rows.length, Math.ceil((offset + mapHeight) / ROW))
     const rowY = (row: number): number => row * ROW - offset
-    const visible = (line: number): number | null => {
-      const row = rowOfLine(rows, line)
-      return row >= startRow && row < endRow && rows[row] === line ? row : null
+    /** Rows of a line in view (none when folded away). */
+    const lineRows = (line: number, f: (row: number) => void): void => {
+      for (let row = rowOfLine(rows, line); row < endRow && rows[row] === line; row++)
+        if (row >= startRow) f(row)
     }
     const fill = (
       color: string,
@@ -395,6 +437,17 @@ class Minimap {
       ctx.fillRect(x, y, width, height)
     }
     const colX = (col: number): number => PAD + Math.min(col, COLUMNS) * COLUMN
+    /** Columns `from` to `to` (Infinity: the end) of a row's line, within the row. */
+    const fillColumns = (row: number, from: number, to: number, color: string, alpha: number): void => {
+      const start = rowStarts[row]!
+      const end = rows[row + 1] === rows[row] ? rowStarts[row + 1]! : Infinity
+      const a = Math.max(from, start)
+      const b = Math.min(to, end)
+      if (b <= a) return
+      const x = colX(a - start)
+      const right = b === Infinity ? TEXT_WIDTH : colX(b - start)
+      fill(color, alpha, x, rowY(row), Math.max(COLUMN, right - x), ROW)
+    }
 
     // Line backgrounds: problems, caret lines, selections.
     for (let row = startRow; row < endRow; row++) {
@@ -416,52 +469,37 @@ class Minimap {
       return countColumn(line.text.slice(0, pos - line.from), tabSize)
     }
     for (const r of state.selection.ranges) {
-      const head = visible(doc.lineAt(r.head).number)
-      if (head !== null) fill(colors.accent, 0.2, 0, rowY(head), TEXT_WIDTH, ROW)
+      lineRows(doc.lineAt(r.head).number, (row) => fill(colors.accent, 0.2, 0, rowY(row), TEXT_WIDTH, ROW))
       if (r.empty) continue
       const first = doc.lineAt(r.from).number
       const last = doc.lineAt(r.to).number
       for (let row = Math.max(startRow, rowOfLine(rows, first)); row < endRow; row++) {
         const line = rows[row]!
         if (line > last) break
-        const from = line === first ? colX(column(r.from)) : 0
-        const to = line === last ? colX(column(r.to)) : TEXT_WIDTH
-        fill(colors.accent, 0.45, from, rowY(row), Math.max(COLUMN, to - from), ROW)
+        const from = line === first ? column(r.from) : 0
+        const to = line === last ? column(r.to) : Infinity
+        fillColumns(row, from, to, colors.accent, 0.45)
       }
     }
 
     // Text.
     for (let row = startRow; row < endRow; row++) {
       const y = rowY(row) + ROW * 0.125
-      for (const s of this.lineSegments(state, rows[row]!))
-        fill(s.color, s.alpha, PAD + s.x * COLUMN, y, s.w * COLUMN, ROW * 0.75)
+      const start = rowStarts[row]!
+      const end = Math.min(rows[row + 1] === rows[row] ? rowStarts[row + 1]! : Infinity, start + COLUMNS)
+      for (const s of this.lineSegments(state, rows[row]!)) {
+        if (s.x >= end) break
+        const a = Math.max(s.x, start)
+        const b = Math.min(s.x + s.w, end)
+        if (b > a) fill(s.color, s.alpha, PAD + (a - start) * COLUMN, y, (b - a) * COLUMN, ROW * 0.75)
+      }
     }
 
     // Matches, over the text.
-    for (const mark of this.selectionMarks) {
-      const row = visible(mark.line)
-      if (row !== null)
-        fill(
-          colors.accent,
-          0.7,
-          colX(mark.from),
-          rowY(row),
-          Math.max(COLUMN, colX(mark.to) - colX(mark.from)),
-          ROW
-        )
-    }
-    for (const mark of this.searchMarks) {
-      const row = visible(mark.line)
-      if (row !== null)
-        fill(
-          colors.warning,
-          0.9,
-          colX(mark.from),
-          rowY(row),
-          Math.max(COLUMN, colX(mark.to) - colX(mark.from)),
-          ROW
-        )
-    }
+    for (const mark of this.selectionMarks)
+      lineRows(mark.line, (row) => fillColumns(row, mark.from, mark.to, colors.accent, 0.7))
+    for (const mark of this.searchMarks)
+      lineRows(mark.line, (row) => fillColumns(row, mark.from, mark.to, colors.warning, 0.9))
 
     // Section headers: a rule and the name over the lines below it, names kept apart.
     ctx.font = '600 8px system-ui, sans-serif'
@@ -514,12 +552,29 @@ class Minimap {
 
   // Pointer: click a line to center it, drag the slider, wheel scrolls the editor.
 
-  centerLine(line: number): void {
-    const { view } = this
+  /** Row `part` (0 to 1) down a line's rows. */
+  rowIn(line: number, part: number): number {
+    const first = rowOfLine(this.rows, line)
+    if (this.rows[first] !== line) return first
+    return first + Math.floor(part * this.rowCount(first))
+  }
+
+  rowCount(first: number): number {
+    let n = 1
+    while (this.rows[first + n] === this.rows[first]) n++
+    return n
+  }
+
+  centerRow(row: number): void {
+    const { view, rows } = this
+    const line = rows[row]
+    if (line === undefined) return
+    const first = rowOfLine(rows, line)
     const s = view.scrollDOM
     const block = view.lineBlockAt(view.state.doc.line(line).from)
+    const y = block.top + (block.height * (row - first + 0.5)) / this.rowCount(first)
     const docTop = view.documentTop - s.getBoundingClientRect().top + s.scrollTop
-    s.scrollTop = docTop + block.top + block.height / 2 - s.clientHeight / 2
+    s.scrollTop = docTop + y - s.clientHeight / 2
   }
 
   onPointerDown = (e: PointerEvent): void => {
@@ -529,11 +584,11 @@ class Minimap {
     const x = e.clientX - box.left
     const y = e.clientY - box.top
     if (x >= TEXT_WIDTH) {
-      this.centerLine(this.rows[rulerRow(y, input.mapHeight, this.rows.length)] ?? 1)
+      this.centerRow(rulerRow(y, input.mapHeight, this.rows.length))
       return
     }
     if (y < geometry.sliderTop || y > geometry.sliderTop + geometry.sliderHeight)
-      this.centerLine(this.rows[rowAt(y, geometry.offset, ROW, this.rows.length)] ?? 1)
+      this.centerRow(rowAt(y, geometry.offset, ROW, this.rows.length))
     this.drag = { y: e.clientY, scrollTop: this.view.scrollDOM.scrollTop, input }
     this.dom.setPointerCapture(e.pointerId)
     this.dom.classList.add('cm-minimap-dragging')
