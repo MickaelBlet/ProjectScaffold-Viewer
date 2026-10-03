@@ -27,6 +27,8 @@ export interface Settings {
   inheritance: boolean
   /** Arrange files without editor layout with ELK when opening them. */
   autoLayoutOnOpen: boolean
+  /** Selecting on the canvas or in the Explorer brings the Inspector to the front. */
+  revealInspector: boolean
   /** Keep animations even when the system asks for reduced motion. */
   forceAnimations: boolean
   /** Dots and arrows for the indentation, trailing spaces and tabs of the project text. */
@@ -56,6 +58,7 @@ export const DEFAULT_SETTINGS: Settings = {
   autoOrientLinks: true,
   inheritance: true,
   autoLayoutOnOpen: true,
+  revealInspector: true,
   forceAnimations: false,
   sourceWhitespace: true,
   sourceFollow: true,

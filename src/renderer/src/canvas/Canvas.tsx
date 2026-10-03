@@ -66,7 +66,7 @@ import {
 import { commandItem as item, commands, keyLabel, runCommand } from '@/commands'
 import { Icon } from '@/components/Icon'
 import { fileName } from '@/fileOps'
-import { openView, registerCanvas } from '@/shell/controllers'
+import { openView, registerCanvas, revealInspector } from '@/shell/controllers'
 import { EXTERNAL } from './constants'
 import { endOf, externalNodes, linkEnds, standIns, toEdges, toNodes } from './flowGraph'
 import { INHERIT } from './inheritEdges'
@@ -390,6 +390,7 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
       selectedIds: list,
       selection: shown ? selectionOf(p, shown) : doc.selection?.kind === 'link' ? doc.selection : null
     })
+    if (added) revealInspector()
   }, [])
 
   /** Smallest size of a resizable node. */
@@ -824,7 +825,9 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
         onNodeDragStart={onNodeDragStart}
         onNodeDragStop={onNodeDragStop}
         onNodeClick={(e, n) => {
-          if (n.id.startsWith(EXTERNAL) || e.shiftKey || e.ctrlKey || e.metaKey) return
+          if (n.id.startsWith(EXTERNAL)) return
+          revealInspector()
+          if (e.shiftKey || e.ctrlKey || e.metaKey) return
           // A click on an already selected node keeps the group but shows that node.
           const doc = activeDoc()
           if (!doc.selection || !('id' in doc.selection) || doc.selection.id !== n.id)
@@ -835,9 +838,10 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
           const dep = n.type === 'imported' ? findImported(getProject(), n.id)?.dep : undefined
           if (dep) openImportSource(dep.file)
         }}
-        onEdgeClick={(_, e) =>
+        onEdgeClick={(_, e) => {
           select(e.type === 'inherit' ? { kind: 'module', id: e.source } : { kind: 'link', id: e.id })
-        }
+          revealInspector()
+        }}
         onPaneClick={() => select(null)}
         onNodeContextMenu={nodeMenu}
         onEdgeContextMenu={edgeMenu}

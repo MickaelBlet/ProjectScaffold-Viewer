@@ -11,6 +11,7 @@ import { GLOBAL_VIEW, type Id, type Project, type Rect } from '@/model/types'
 import { activeDoc, patchDoc } from '@/store/documents'
 import { getProject } from '@/store/project'
 import { storage } from '@/storage'
+import { useSettings } from '@/store/settings'
 import { IN_PANEL, IN_PREVIEW, IN_VSCODE } from '@/host'
 import { sendToDiagram } from '@/fileOps'
 import { fileBaseName, type TextFileRef } from '@/store/textFiles'
@@ -417,6 +418,12 @@ export function toggleTool(id: ToolId): void {
   const panel = outer?.getPanel(id)
   if (panel) panel.api.close()
   else showTool(id)
+}
+
+/** After a selection on the canvas or in the Explorer: bring the Inspector to the front (setting). */
+export function revealInspector(): void {
+  if (IN_PANEL || !useSettings.getState().revealInspector) return
+  showTool('inspector', false)
 }
 
 export const isToolOpen = (id: ToolId): boolean => !!outer?.getPanel(id)

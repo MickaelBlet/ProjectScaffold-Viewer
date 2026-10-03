@@ -104,6 +104,12 @@ export function SettingsPanel(): ReactNode {
           onChange={(v) => setSetting('guides', v)}
         />
         <Check
+          label="Show the Inspector on selection"
+          hint="Selecting on the canvas or in the Explorer brings the Inspector to the front"
+          value={s.revealInspector}
+          onChange={(v) => setSetting('revealInspector', v)}
+        />
+        <Check
           label="Arrange files without layout when opening"
           value={s.autoLayoutOnOpen}
           onChange={(v) => setSetting('autoLayoutOnOpen', v)}

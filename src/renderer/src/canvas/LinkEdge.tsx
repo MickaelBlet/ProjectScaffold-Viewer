@@ -17,6 +17,7 @@ import { linkOrigin } from '@/model/project'
 import { setLinkRoute, useProjectStore } from '@/store/project'
 import { useSettings } from '@/store/settings'
 import { openContextMenu, select } from '@/store/ui'
+import { revealInspector } from '@/shell/controllers'
 import type { LinkRoute, Orientation } from '@/model/types'
 import { EXTERNAL, OPPOSITE, PERF_COLORS, POSITION, SIDE } from './constants'
 import { orientLinkEnds } from './linkEnds'
@@ -354,7 +355,10 @@ export const LinkEdge = memo(function LinkEdge(props: EdgeProps): ReactNode {
         <div
           className={`edge-label nodrag nopan ${props.selected ? 'selected' : ''} ${edgeBadges ? '' : 'compact'}`}
           style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}
-          onClick={() => select({ kind: 'link', id: link.id })}
+          onClick={() => {
+            select({ kind: 'link', id: link.id })
+            revealInspector()
+          }}
           title={link.name}
         >
           {edgeBadges ? (

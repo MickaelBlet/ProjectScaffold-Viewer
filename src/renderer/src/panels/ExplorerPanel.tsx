@@ -52,7 +52,7 @@ import {
 } from '@/actions'
 import { dependencyMenu } from './DependenciesPanel'
 import { childrenByParent, matching } from './ModulesPanel'
-import { openEditor, openView } from '@/shell/controllers'
+import { openEditor, openView, revealInspector } from '@/shell/controllers'
 import { Icon } from '@/components/Icon'
 import { FoldSection, placed, sectionOrder } from '@/components/FoldSection'
 import { onListKeyDown, tabStop } from '@/components/listKeys'
@@ -274,6 +274,7 @@ function addBinary(): void {
 
 /** Click with Ctrl toggles, with Shift extends the selection over the list. */
 function clickItem(e: MouseEvent, id: Id, list: Id[]): void {
+  revealInspector()
   const doc = activeDoc()
   if (e.ctrlKey || e.metaKey) {
     const ids = doc.selectedIds.includes(id)
@@ -680,12 +681,13 @@ export function ExplorerPanel(): ReactNode {
                 selected={false}
                 tabStop={b.id === binaryStop}
                 title={`${b.description ? `${b.description}\n` : ''}Click: select its modules. Double-click: edit the binaries.`}
-                onClick={() =>
+                onClick={() => {
                   patchDoc({
                     selectedIds: inside.map((m) => m.id),
                     selection: inside.length ? { kind: 'module', id: inside[0]!.id } : null
                   })
-                }
+                  if (inside.length) revealInspector()
+                }}
                 onDoubleClick={() => select({ kind: 'project' })}
                 onContextMenu={(e) => {
                   e.preventDefault()
@@ -820,7 +822,10 @@ export function ExplorerPanel(): ReactNode {
               selected={false}
               tabStop={c.id === constStop}
               title={`${c.description ? `${c.description}\n` : ''}Edited in the project inspector.`}
-              onClick={() => select({ kind: 'project' })}
+              onClick={() => {
+                select({ kind: 'project' })
+                revealInspector()
+              }}
               onContextMenu={(e) => {
                 e.preventDefault()
                 openContextMenu(e, [
