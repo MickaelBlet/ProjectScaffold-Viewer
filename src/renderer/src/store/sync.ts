@@ -9,9 +9,17 @@ import { docTitle } from '@/fileOps'
 import { findDoc, projectListeners, useDocs } from './documents'
 import { setStatus } from './ui'
 
+/** Documents whose last push to their dependents left conflicts, shown in the status bar. */
+const conflicted = new Set<Id>()
+
 function carryRenames(docId: Id, prev: Project, next: Project): void {
-  const file = findDoc(docId)?.filePath ?? null
-  if (!file) return
+  // A dependent dropping or changing its dependencies may resolve conflicts of other documents.
+  if (prev.dependencies !== next.dependencies)
+    for (const id of conflicted) {
+      const doc = id !== docId ? findDoc(id) : null
+      if (doc) pushToDependents(id, null, doc.store.getState().project)
+      else if (id !== docId) conflicted.delete(id)
+    }
   // What dependents read: definitions, modules and ports, and the dependencies carried along.
   if (
     prev.types === next.types &&
@@ -21,14 +29,20 @@ function carryRenames(docId: Id, prev: Project, next: Project): void {
     prev.dependencies === next.dependencies
   )
     return
+  pushToDependents(docId, prev, next)
+}
+
+/** Update the open documents depending on `docId`, carrying its renames since `prev` when given. */
+function pushToDependents(docId: Id, prev: Project | null, next: Project): void {
+  const file = findDoc(docId)?.filePath ?? null
+  if (!file) return void conflicted.delete(docId)
   const linked = useDocs
     .getState()
     .docs.filter(
       (d) => d.id !== docId && d.store.getState().project.dependencies.some((x) => sameFile(x.file, file))
     )
-  if (!linked.length) return
 
-  const renames = diffRenames(prev, next)
+  const renames = prev && linked.length ? diffRenames(prev, next) : null
   const updated: string[] = []
   const conflicts: string[] = []
   for (const d of linked) {
@@ -43,8 +57,14 @@ function carryRenames(docId: Id, prev: Project, next: Project): void {
     d.store.setState({ project: q })
     updated.push(docTitle(d))
   }
-  if (conflicts.length) return setStatus('error', `Not taken from this project: ${conflicts.join('; ')}`)
-  if (updated.length && renames) setStatus('info', `Renamed in dependent documents: ${updated.join(', ')}`)
+  if (conflicts.length) {
+    conflicted.add(docId)
+    return setStatus('error', `Not taken from this project: ${conflicts.join('; ')}`)
+  }
+  if (conflicted.delete(docId))
+    setStatus('info', `No more conflicts with the documents using ${baseName(file)}`)
+  else if (updated.length && renames)
+    setStatus('info', `Renamed in dependent documents: ${updated.join(', ')}`)
 }
 
 /** Carry renames to the linked documents from now on. */
