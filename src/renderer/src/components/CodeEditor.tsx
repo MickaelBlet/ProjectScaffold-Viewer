@@ -192,7 +192,6 @@ type EditorPrefs = Pick<
   | 'editorScrollPastEnd'
   | 'editorMinimap'
   | 'editorMinimapRender'
-  | 'editorMinimapSlider'
 >
 
 const selectPrefs = (s: Settings): EditorPrefs => ({
@@ -212,8 +211,7 @@ const selectPrefs = (s: Settings): EditorPrefs => ({
   editorSelectionMatches: s.editorSelectionMatches,
   editorScrollPastEnd: s.editorScrollPastEnd,
   editorMinimap: s.editorMinimap,
-  editorMinimapRender: s.editorMinimapRender,
-  editorMinimapSlider: s.editorMinimapSlider
+  editorMinimapRender: s.editorMinimapRender
 })
 
 /** The parts of the editor its settings turn on or off; YAML is always indented with spaces. */
@@ -235,7 +233,6 @@ function prefsSetup(p: EditorPrefs, fileName: string): Extension {
     p.editorMinimap
       ? minimap({
           render: p.editorMinimapRender,
-          slider: p.editorMinimapSlider,
           selectionMatches: p.editorSelectionMatches,
           sections: lang === 'yaml' || lang === 'json' ? lang : 'comments'
         })

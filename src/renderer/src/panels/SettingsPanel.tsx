@@ -5,7 +5,6 @@ import {
   useSettings,
   type EdgeStyle,
   type MinimapRender,
-  type MinimapSlider,
   type PortStyle,
   type Theme,
   type WhitespaceShown
@@ -252,16 +251,6 @@ export function SettingsPanel(): ReactNode {
               { value: 'blocks' as MinimapRender, label: 'blocks' }
             ]}
             onChange={(v) => setSetting('editorMinimapRender', v)}
-          />
-        </Row>
-        <Row label="Minimap slider">
-          <Select
-            value={s.editorMinimapSlider}
-            options={[
-              { value: 'mouse-over' as MinimapSlider, label: 'on hover' },
-              { value: 'always' as MinimapSlider, label: 'always' }
-            ]}
-            onChange={(v) => setSetting('editorMinimapSlider', v)}
           />
         </Row>
       </Section>

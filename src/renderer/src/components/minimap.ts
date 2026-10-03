@@ -23,8 +23,6 @@ import {
 export interface MinimapOptions {
   /** Characters shaded by their ink, or solid blocks. */
   render: 'characters' | 'blocks'
-  /** Slider always shown, or only while the pointer is over the minimap. */
-  slider: 'always' | 'mouse-over'
   /** Occurrences of the selected text marked. */
   selectionMatches: boolean
   /** Lines shown as section headers: top-level keys (YAML, JSON), or `MARK:` / `#region` comments. */
@@ -136,7 +134,6 @@ class Minimap {
     this.slider.className = 'cm-minimap-slider'
     this.dom.append(this.canvas, this.slider)
     view.dom.appendChild(this.dom)
-    this.applyOptions()
 
     this.dom.addEventListener('mousedown', (e) => e.preventDefault())
     this.dom.addEventListener('pointerdown', this.onPointerDown)
@@ -158,7 +155,6 @@ class Minimap {
     const opts = u.state.facet(config)
     if (opts && opts !== u.startState.facet(config)) {
       this.opts = opts
-      this.applyOptions()
       this.segments.clear()
       this.selectionDirty = this.headersDirty = true
     }
@@ -178,10 +174,6 @@ class Minimap {
     this.view.scrollDOM.removeEventListener('scroll', this.schedule)
     this.view.scrollDOM.style.marginRight = ''
     this.dom.remove()
-  }
-
-  applyOptions(): void {
-    this.dom.classList.toggle('cm-minimap-hover', this.opts.slider === 'mouse-over')
   }
 
   themeChanged = (): void => {
@@ -588,18 +580,14 @@ const theme = EditorView.theme({
     position: 'absolute',
     left: 0,
     width: `${TEXT_WIDTH}px`,
-    backgroundColor: 'color-mix(in srgb, var(--text) 10%, transparent)',
-    transition: 'opacity 150ms'
+    backgroundColor: 'color-mix(in srgb, var(--text) 7%, transparent)',
+    transition: 'background-color 150ms'
   },
   '.cm-minimap:hover .cm-minimap-slider': {
-    backgroundColor: 'color-mix(in srgb, var(--text) 15%, transparent)'
+    backgroundColor: 'color-mix(in srgb, var(--text) 16%, transparent)'
   },
   '.cm-minimap.cm-minimap-dragging .cm-minimap-slider': {
-    backgroundColor: 'color-mix(in srgb, var(--text) 22%, transparent)'
-  },
-  '.cm-minimap-hover .cm-minimap-slider': { opacity: 0 },
-  '.cm-minimap-hover:hover .cm-minimap-slider, .cm-minimap-hover.cm-minimap-dragging .cm-minimap-slider': {
-    opacity: 1
+    backgroundColor: 'color-mix(in srgb, var(--text) 24%, transparent)'
   }
 })
 

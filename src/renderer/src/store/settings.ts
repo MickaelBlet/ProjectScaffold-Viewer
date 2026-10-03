@@ -12,8 +12,6 @@ export type PortStyle = 'dots' | 'arrows' | 'hollow' | 'shapes'
 export type WhitespaceShown = 'all' | 'trailing' | 'none'
 /** Code editor minimap: characters shaded by their ink, or solid blocks. */
 export type MinimapRender = 'characters' | 'blocks'
-/** Code editor minimap slider: always shown, or while the pointer is over the minimap. */
-export type MinimapSlider = 'always' | 'mouse-over'
 
 export interface Settings {
   theme: Theme
@@ -68,7 +66,6 @@ export interface Settings {
   /** Code editors: minimap on the right (hidden in narrow editors). */
   editorMinimap: boolean
   editorMinimapRender: MinimapRender
-  editorMinimapSlider: MinimapSlider
   /** The element under the caret of the project text is selected and zoomed to. */
   sourceFollow: boolean
   /** Explorer sections top to bottom; sections missing here keep their default place. */
@@ -113,7 +110,6 @@ export const DEFAULT_SETTINGS: Settings = {
   editorScrollPastEnd: false,
   editorMinimap: true,
   editorMinimapRender: 'characters',
-  editorMinimapSlider: 'mouse-over',
   sourceFollow: true,
   explorerOrder: [],
   explorerHidden: [],
