@@ -145,9 +145,12 @@ const ALIGN_PX = 6
 function follow(e: React.PointerEvent, move: (ev: PointerEvent) => void, end: () => void): void {
   e.preventDefault()
   e.stopPropagation()
+  // Grabbing cursor wherever the pointer goes until released.
+  document.documentElement.classList.add('grabbing')
   const up = (): void => {
     window.removeEventListener('pointermove', move)
     window.removeEventListener('pointerup', up)
+    document.documentElement.classList.remove('grabbing')
     end()
   }
   window.addEventListener('pointermove', move)

@@ -114,6 +114,7 @@ export function FoldSection(props: {
   const [open, setOpen] = useState(true)
   const [drop, setDrop] = useState<'before' | 'after' | null>(null)
   const body = useId()
+  const toggle = useRef<HTMLButtonElement>(null)
   const dropSide = (e: DragEvent): 'before' | 'after' => {
     // A section without a box of its own (display: contents) spans its children.
     const el = e.currentTarget
@@ -151,8 +152,14 @@ export function FoldSection(props: {
           e.dataTransfer.effectAllowed = 'move'
         }}
         onContextMenu={props.onContextMenu}
+        onClick={(e) => {
+          // The whole header folds the section, but for its controls.
+          const target = e.target as Element
+          if (!target.closest('button, input, select, a, label')) toggle.current?.click()
+        }}
       >
         <button
+          ref={toggle}
           type="button"
           className="explorer-toggle"
           aria-expanded={open}

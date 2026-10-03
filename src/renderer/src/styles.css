@@ -204,6 +204,18 @@ button:disabled {
   opacity: 0.4;
   cursor: default;
 }
+/* Cursors: pointer on what a click acts on, default once disabled; grab / grabbing on what drags on the
+ * canvas. */
+select,
+input:is([type='checkbox'], [type='radio'], [type='color']),
+label:has(> input:is([type='checkbox'], [type='radio'])),
+summary {
+  cursor: pointer;
+}
+:is(select, input):disabled,
+label:has(> input:disabled) {
+  cursor: default;
+}
 button.primary {
   background: var(--accent);
   border-color: var(--accent);
@@ -392,7 +404,6 @@ button.link-button:hover {
   font: inherit;
   font-weight: 600;
   text-decoration: underline;
-  cursor: pointer;
 }
 .source-problems {
   margin: 0;
@@ -430,7 +441,6 @@ button.link-button:hover {
   color: var(--accent);
   font: inherit;
   text-decoration: underline;
-  cursor: pointer;
 }
 .code-editor .cm-userSection {
   background: color-mix(in srgb, var(--ok) 9%, transparent);
@@ -521,7 +531,6 @@ button.link-button:hover {
   color: var(--accent);
   font: inherit;
   text-decoration: underline;
-  cursor: pointer;
 }
 .file-list .result-label {
   overflow: hidden;
@@ -616,6 +625,7 @@ kbd {
 .explorer-section > header {
   /* Title left, whole; actions in the rest of the row, on the right, wrapping there. */
   display: grid;
+  cursor: pointer;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: 4px;
@@ -666,6 +676,7 @@ kbd {
   text-transform: inherit;
   text-align: left;
 }
+.explorer-section > header:not(:has(.explorer-actions button:hover)):hover .explorer-toggle,
 .explorer-toggle:hover:not(:disabled) {
   border-color: transparent;
   color: var(--text);
@@ -1626,7 +1637,7 @@ ul.plain {
   stroke: transparent;
   stroke-width: 12;
   pointer-events: stroke;
-  cursor: copy;
+  cursor: grab;
 }
 .route-handle {
   position: absolute;
@@ -1637,7 +1648,7 @@ ul.plain {
   box-sizing: border-box;
   border: 1.5px solid var(--accent);
   background: var(--panel);
-  cursor: move;
+  cursor: grab;
   user-select: none;
   touch-action: none;
 }
@@ -1645,8 +1656,8 @@ ul.plain {
   border-radius: 50%;
   background: var(--accent);
 }
-.route-handle.end {
-  cursor: crosshair;
+:root.grabbing * {
+  cursor: grabbing !important;
 }
 .route-handle.end.set {
   background: var(--accent);
