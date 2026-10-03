@@ -3,8 +3,7 @@
   --bg: #f6f7f9;
   --panel: #ffffff;
   --panel-2: #f0f2f5;
-  --row-odd: #f3f5f8;
-  --row-even: #e6e6e6;
+  --row: #f3f5f8;
   --border: #d9dde3;
   --text: #1d2330;
   --muted: #6b7384;
@@ -32,8 +31,7 @@
     --bg: #15181e;
     --panel: #1c2028;
     --panel-2: #232833;
-    --row-odd: #262b36;
-    --row-even: #222731;
+    --row: #262b36;
     --border: #363c49;
     --text: #e3e7ef;
     --muted: #8b93a5;
@@ -56,8 +54,7 @@
   --bg: #15181e;
   --panel: #1c2028;
   --panel-2: #232833;
-  --row-odd: #262b36;
-  --row-even: #222731;
+  --row: #262b36;
   --border: #363c49;
   --text: #e3e7ef;
   --muted: #8b93a5;
@@ -81,8 +78,7 @@
   --bg: var(--vscode-editor-background);
   --panel: var(--vscode-sideBar-background, var(--vscode-editor-background));
   --panel-2: var(--vscode-editorGroupHeader-tabsBackground, var(--vscode-editorWidget-background));
-  --row-even: var(--panel);
-  --row-odd: color-mix(in srgb, var(--text) 5%, var(--panel));
+  --row: color-mix(in srgb, var(--text) 5%, var(--panel));
   --border: var(--vscode-panel-border, var(--vscode-editorGroup-border, var(--vscode-widget-border)));
   --text: var(--vscode-foreground);
   --muted: var(--vscode-descriptionForeground);
@@ -1114,10 +1110,10 @@ input.number {
   padding: 8px 2px;
   vertical-align: top;
   border-block: 1px solid var(--border);
-  background: var(--row-odd);
+  background: var(--row);
 }
 .grid tr:nth-child(even) > td {
-  background: var(--row-odd);
+  background: var(--row);
 }
 .grid td:first-child {
   padding-left: 8px;
@@ -1166,13 +1162,13 @@ ul.plain > li {
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 6px;
-  background: var(--row-odd);
+  background: var(--row);
 }
 .field-row:nth-child(even of .field-row),
 .metadata .kv:nth-child(even of .kv),
 .binary-item:nth-child(even of .binary-item),
 ul.plain > li:nth-child(even) {
-  background: var(--row-odd);
+  background: var(--row);
 }
 ul.plain > li + li {
   margin-top: 4px;
