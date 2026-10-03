@@ -54,7 +54,7 @@ import { dependencyMenu } from './DependenciesPanel'
 import { childrenByParent, matching } from './ModulesPanel'
 import { openEditor, openView, revealInspector } from '@/shell/controllers'
 import { Icon } from '@/components/Icon'
-import { FoldSection, placed, sectionOrder } from '@/components/FoldSection'
+import { FoldSection, placed, sectionOrder, StackedSections } from '@/components/FoldSection'
 import { onListKeyDown, tabStop } from '@/components/listKeys'
 
 const KIND_BADGE = {
@@ -181,7 +181,6 @@ function sectionMenu(e: MouseEvent, id: SectionId): void {
 /** Collapsible section; its header drags to reorder, right click for the section menu. */
 function Section(props: {
   id: SectionId
-  stack: { index: number; count: number }
   title: string
   count?: number
   actions?: ReactNode
@@ -191,7 +190,6 @@ function Section(props: {
     <FoldSection
       id={props.id}
       dragType={SECTION_DRAG}
-      stack={props.stack}
       title={
         <>
           <span className="explorer-title">{props.title}</span>
@@ -605,12 +603,10 @@ export function ExplorerPanel(): ReactNode {
   }
 
   const shownSections = order.filter((id) => !savedHidden.includes(id))
-  const stack = (id: SectionId) => ({ index: shownSections.indexOf(id), count: shownSections.length })
   const sections: Record<SectionId, ReactNode> = {
     views: (
       <Section
         id="views"
-        stack={stack('views')}
         title="Views"
         count={views.length + 1}
         actions={
@@ -650,7 +646,6 @@ export function ExplorerPanel(): ReactNode {
     dependencies: (
       <Section
         id="dependencies"
-        stack={stack('dependencies')}
         title="Dependencies"
         count={dependencies.length}
         actions={
@@ -671,7 +666,6 @@ export function ExplorerPanel(): ReactNode {
     binaries: (
       <Section
         id="binaries"
-        stack={stack('binaries')}
         title="Binaries"
         count={binaries.length}
         actions={
@@ -728,7 +722,6 @@ export function ExplorerPanel(): ReactNode {
     types: (
       <Section
         id="types"
-        stack={stack('types')}
         title="Types"
         count={ownTypes.length}
         actions={(['struct', 'enum', 'bitmask', 'union', 'exception', 'alias', 'primitive'] as const).map(
@@ -771,7 +764,6 @@ export function ExplorerPanel(): ReactNode {
     interfaces: (
       <Section
         id="interfaces"
-        stack={stack('interfaces')}
         title="Interfaces"
         count={ownInterfaces.length}
         actions={
@@ -809,7 +801,6 @@ export function ExplorerPanel(): ReactNode {
     constants: (
       <Section
         id="constants"
-        stack={stack('constants')}
         title="Constants"
         count={ownConsts.length}
         actions={
@@ -859,7 +850,6 @@ export function ExplorerPanel(): ReactNode {
     modules: (
       <Section
         id="modules"
-        stack={stack('modules')}
         title="Modules"
         count={modules.length}
         actions={
@@ -910,7 +900,7 @@ export function ExplorerPanel(): ReactNode {
     ),
 
     links: (
-      <Section id="links" stack={stack('links')} title="Links" count={links.length}>
+      <Section id="links" title="Links" count={links.length}>
         <EntityList label="Links" multiselectable>
           {shownLinks.map(({ l, from, to }) => (
             <Item
@@ -950,7 +940,7 @@ export function ExplorerPanel(): ReactNode {
           onChange={(e) => setFilter(e.target.value)}
         />
       </div>
-      <div className="stacked-sections">
+      <StackedSections>
         {shownSections.map((id) => (
           <Fragment key={id}>{sections[id]}</Fragment>
         ))}
@@ -959,7 +949,7 @@ export function ExplorerPanel(): ReactNode {
             {hidden.length} hidden {hidden.length > 1 ? 'sections' : 'section'}
           </button>
         )}
-      </div>
+      </StackedSections>
     </div>
   )
 }

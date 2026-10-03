@@ -405,45 +405,35 @@ button.link-button:hover {
 .code-editor .cm-userMarker {
   background: color-mix(in srgb, var(--ok) 16%, transparent);
 }
-/* Explorer and Code generation panel: the filter stays on top, the sections scroll under it. Stacked sections
+/* Explorer and Code generation panel: the filter stays on top, the sections scroll under it. Sections there
    have no box of their own, so every header sticks in the whole list: always in view, stacked at its top
-   or bottom (--above / --below: headers before / after it, set by FoldSection). */
+   or bottom (top / bottom offsets set by StackedSections). */
 :is(.explorer, .generation-panel) {
   display: flex;
   flex-direction: column;
   height: 100%;
 }
 .stacked-sections {
-  --section-header: 24px;
   flex: 1;
   min-height: 0;
   overflow: auto;
 }
-.explorer-section.stacked {
+.stacked-sections > .explorer-section {
   display: contents;
 }
-.explorer-section.stacked > header {
+.stacked-sections > .explorer-section > header {
   position: sticky;
-  top: calc(var(--above) * var(--section-header));
-  bottom: calc(var(--below) * var(--section-header));
   z-index: 1;
-  box-sizing: border-box;
-  height: var(--section-header);
   background: var(--panel);
 }
-.explorer-section.stacked.drop-before > header {
+.stacked-sections > .explorer-section.drop-before > header {
   box-shadow: inset 0 2px 0 var(--accent);
 }
-.explorer-section.stacked.drop-after > :last-child {
+.stacked-sections > .explorer-section.drop-after > :last-child {
   box-shadow: inset 0 -2px 0 var(--accent);
 }
-.side-panel .explorer-section.stacked > header {
+.side-panel .stacked-sections > .explorer-section > header {
   background: var(--vscode-sideBar-background, var(--panel));
-}
-/* Fixed header height: the actions stay on one row, cut when the panel is too narrow for them. */
-.explorer-section.stacked .explorer-actions {
-  flex-wrap: nowrap;
-  overflow: hidden;
 }
 .generation-section > header {
   /* The toggle (title, listing label truncated) takes the row. */

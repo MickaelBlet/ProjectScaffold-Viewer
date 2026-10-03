@@ -14,7 +14,7 @@ import {
 import { generatedFiles, LOCAL_TEMPLATES } from '@/codegen/run'
 import { MANIFEST, parseManifest, templateFiles } from '@/codegen/templateSet'
 import { LANGUAGE_BADGES, languageOf } from '@/components/codeLanguages'
-import { FoldSection, placed, sectionOrder } from '@/components/FoldSection'
+import { FoldSection, placed, sectionOrder, StackedSections } from '@/components/FoldSection'
 import { Icon, type IconName } from '@/components/Icon'
 import { onListKeyDown } from '@/components/listKeys'
 import {
@@ -261,7 +261,6 @@ function FileList(props: {
 
 function Section(props: {
   id: SectionId
-  stack: { index: number; count: number }
   title: string
   loaded: Loaded | null
   empty: ReactNode
@@ -277,7 +276,6 @@ function Section(props: {
       id={id}
       dragType={SECTION_DRAG}
       className="generation-section"
-      stack={props.stack}
       title={
         <>
           <span className="explorer-title">{props.title}</span>
@@ -410,13 +408,12 @@ export function GenerationPanel(): ReactNode {
           onChange={(e) => setQuery(e.target.value)}
         />
       </div>
-      <div className="stacked-sections">
-        {order.map((id, index) =>
+      <StackedSections>
+        {order.map((id) =>
           id === 'templates' ? (
             <Section
               key={id}
               id={id}
-              stack={{ index, count: order.length }}
               title="Templates"
               loaded={templates}
               filter={filter}
@@ -430,7 +427,6 @@ export function GenerationPanel(): ReactNode {
             <Section
               key={id}
               id={id}
-              stack={{ index, count: order.length }}
               title="Generated"
               loaded={generated}
               filter={filter}
@@ -442,7 +438,7 @@ export function GenerationPanel(): ReactNode {
             />
           )
         )}
-      </div>
+      </StackedSections>
     </div>
   )
 }

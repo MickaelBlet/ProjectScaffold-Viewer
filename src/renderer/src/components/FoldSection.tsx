@@ -1,6 +1,14 @@
 // Collapsible panel section whose header drags to reorder it among the sections of the same drag type
 // (Alt+Up / Alt+Down on its toggle as well). Used by the Explorer and the Code generation panel.
-import { useId, useState, type CSSProperties, type DragEvent, type MouseEvent, type ReactNode } from 'react'
+import {
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type DragEvent,
+  type MouseEvent,
+  type ReactNode
+} from 'react'
 import { Icon } from './Icon'
 
 /** Saved order of `all`; sections it lacks (added later) go after the section preceding them by default. */
@@ -42,6 +50,48 @@ function revealBody(header: HTMLElement, body: HTMLElement): boolean {
   return true
 }
 
+/** Scrolling list of fold sections whose headers all stay in view: each sticks below the headers before it
+ * and above the headers after it, offsets measured as headers wrap or sections move. */
+export function StackedSections({ children }: { children: ReactNode }): ReactNode {
+  const list = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    const el = list.current
+    if (!el) return
+    const headers = (): HTMLElement[] => [...el.querySelectorAll<HTMLElement>(':scope > section > header')]
+    const place = (): void => {
+      const all = headers()
+      let top = 0
+      for (const h of all) {
+        h.style.top = `${top}px`
+        top += h.offsetHeight
+      }
+      let bottom = 0
+      for (const h of all.reverse()) {
+        h.style.bottom = `${bottom}px`
+        bottom += h.offsetHeight
+      }
+    }
+    const resized = new ResizeObserver(place)
+    const observe = (): void => {
+      resized.disconnect()
+      headers().forEach((h) => resized.observe(h))
+      place()
+    }
+    const moved = new MutationObserver(observe)
+    moved.observe(el, { childList: true })
+    observe()
+    return () => {
+      resized.disconnect()
+      moved.disconnect()
+    }
+  }, [])
+  return (
+    <div ref={list} className="stacked-sections">
+      {children}
+    </div>
+  )
+}
+
 export function FoldSection(props: {
   id: string
   /** Data type of the header drag: sections take drops of their own type only. */
@@ -50,9 +100,6 @@ export function FoldSection(props: {
   title: ReactNode
   actions?: ReactNode
   className?: string
-  /** Place among the sections of a `.stacked-sections` list: the header sticks below the headers before it
-   * and above the headers after it. */
-  stack?: { index: number; count: number }
   /** Puts section `from` before or after this one. */
   onPlace: (from: string, after: boolean) => void
   /** Moves this section past its neighbor above (-1) or below (1). */
@@ -74,11 +121,9 @@ export function FoldSection(props: {
       r.height || !el.lastElementChild ? r.bottom : el.lastElementChild.getBoundingClientRect().bottom
     return e.clientY < (top + bottom) / 2 ? 'before' : 'after'
   }
-  const { stack } = props
   return (
     <section
-      className={`explorer-section ${props.className ?? ''} ${stack ? 'stacked' : ''} ${open ? 'open' : ''} ${drop ? `drop-${drop}` : ''}`}
-      style={stack && ({ '--above': stack.index, '--below': stack.count - 1 - stack.index } as CSSProperties)}
+      className={`explorer-section ${props.className ?? ''} ${open ? 'open' : ''} ${drop ? `drop-${drop}` : ''}`}
       onDragOver={(e) => {
         if (!e.dataTransfer.types.includes(props.dragType)) return
         e.preventDefault()
