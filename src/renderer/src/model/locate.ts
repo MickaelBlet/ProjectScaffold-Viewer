@@ -3,7 +3,7 @@ import { findImported, modulePath } from './project'
 import type { FileProject } from './schema'
 import { LoadError, lineOfPath, loadText, parseText, type Format } from './serialize'
 import type { Project } from './types'
-import { validate, type ProblemTarget, type Severity } from './validate'
+import { validate, type Problem, type ProblemTarget, type Severity } from './validate'
 
 export interface LocatedProblem {
   severity: Severity
@@ -74,8 +74,19 @@ export function locateProblems(text: string, format: Format): LocatedProblem[] {
     const issues = e instanceof LoadError ? e.issues : [{ message: String(e), line: undefined }]
     return issues.map((i) => ({ severity: 'error', message: i.message, line: i.line ?? 1 }))
   }
+  return locateValidation(text, format, project, validate(project))
+}
+
+/** Validation problems of the project read from the text, on the lines of their entities. */
+export function locateValidation(
+  text: string,
+  format: Format,
+  project: Project,
+  problems: readonly Problem[]
+): LocatedProblem[] {
+  if (!problems.length) return []
   const data = parseText(text, format)
-  return validate(project).map((pb) => ({
+  return problems.map((pb) => ({
     severity: pb.severity,
     message: pb.message,
     line: lineOfPath(text, targetPath(data, project, pb.target)) ?? 1

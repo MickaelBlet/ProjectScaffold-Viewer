@@ -3,9 +3,8 @@
   --bg: #f6f7f9;
   --panel: #ffffff;
   --panel-2: #f0f2f5;
-  /* Alternating entries of field lists. */
-  --row-even: #e6e6e6;
   --row-odd: #f3f5f8;
+  --row-even: #e6e6e6;
   --border: #d9dde3;
   --text: #1d2330;
   --muted: #6b7384;
@@ -33,7 +32,7 @@
     --bg: #15181e;
     --panel: #1c2028;
     --panel-2: #232833;
-    --row-odd: #25303d;
+    --row-odd: #262b36;
     --row-even: #222731;
     --border: #363c49;
     --text: #e3e7ef;
@@ -57,7 +56,7 @@
   --bg: #15181e;
   --panel: #1c2028;
   --panel-2: #232833;
-  --row-odd: #25303d;
+  --row-odd: #262b36;
   --row-even: #222731;
   --border: #363c49;
   --text: #e3e7ef;
@@ -416,6 +415,33 @@ button.link-button:hover {
 }
 .source-problems li.warning {
   color: var(--warning);
+}
+/* Project text: severity icons in place of bullets, error / warning counts in the header. */
+.source-problems.with-icons {
+  list-style: none;
+  padding-left: 8px;
+}
+.source-problems.with-icons .ico {
+  margin-right: 6px;
+  vertical-align: -2px;
+}
+.source-editor .source-counts {
+  display: inline-flex;
+  gap: 8px;
+  border-color: transparent;
+  background: none;
+}
+.source-editor .source-counts.on {
+  border-color: var(--border);
+}
+.source-counts .error {
+  color: var(--danger);
+}
+.source-counts .warning {
+  color: var(--warning);
+}
+.source-counts .zero {
+  color: var(--muted);
 }
 /* Text file tabs (templates, generated files, IDL files). */
 .file-editor .file-path {

@@ -68,6 +68,8 @@ export interface Settings {
   editorMinimapRender: MinimapRender
   /** The element under the caret of the project text is selected and zoomed to. */
   sourceFollow: boolean
+  /** The project text shows its changes since the last save. */
+  sourceChanges: boolean
   /** Explorer sections top to bottom; sections missing here keep their default place. */
   explorerOrder: string[]
   /** Explorer sections not shown. */
@@ -111,6 +113,7 @@ export const DEFAULT_SETTINGS: Settings = {
   editorMinimap: true,
   editorMinimapRender: 'characters',
   sourceFollow: true,
+  sourceChanges: false,
   explorerOrder: [],
   explorerHidden: [],
   generationOrder: [],

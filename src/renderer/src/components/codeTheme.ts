@@ -83,7 +83,25 @@ const theme = EditorView.theme({
   '.cm-lintRange-error': { backgroundImage: 'none', textDecoration: 'underline wavy var(--danger)' },
   '.cm-lintRange-warning': { backgroundImage: 'none', textDecoration: 'underline wavy var(--warning)' },
   '.cm-diagnostic-error': { borderLeftColor: 'var(--danger)' },
-  '.cm-diagnostic-warning': { borderLeftColor: 'var(--warning)' }
+  '.cm-diagnostic-warning': { borderLeftColor: 'var(--warning)' },
+  // Changes since the last save (unified merge view): the base theme's colors follow no app theme.
+  '&.cm-merge-b .cm-changedLine': { backgroundColor: 'color-mix(in srgb, var(--ok) 10%, transparent)' },
+  '&.cm-merge-b .cm-changedText': {
+    background: 'color-mix(in srgb, var(--ok) 28%, transparent)'
+  },
+  '.cm-deletedChunk': { backgroundColor: 'color-mix(in srgb, var(--danger) 10%, transparent)' },
+  '.cm-deletedChunk .cm-deletedText': {
+    background: 'color-mix(in srgb, var(--danger) 28%, transparent)'
+  },
+  '&.cm-merge-b .cm-changedLineGutter': { background: 'var(--ok)' },
+  '.cm-deletedLineGutter': { background: 'var(--danger)' },
+  '.cm-deletedChunk button[name=reject]': {
+    fontSize: '11px',
+    color: 'var(--text)',
+    background: 'var(--panel-2)',
+    border: '1px solid var(--border)',
+    borderRadius: '4px'
+  }
 })
 
 /** Syntax colors; also read by the minimap. */

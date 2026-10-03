@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { locateProblems, targetPath } from '@/model/locate'
+import { locateProblems, locateValidation, targetPath } from '@/model/locate'
 import { lineOfPath, loadText, toFile } from '@/model/serialize'
+import { validate } from '@/model/validate'
 
 const robot = readFileSync('examples/robot.scaffold.yaml', 'utf8')
 const lineOf = (text: string, needle: string): number =>
@@ -46,6 +47,21 @@ describe('locateProblems', () => {
     const problems = locateProblems('schemaVersion: 1\nproject:\n  name: [', 'yaml')
     expect(problems).toHaveLength(1)
     expect(problems[0]!.severity).toBe('error')
+  })
+})
+
+describe('locateValidation', () => {
+  it('places the given problems of the project read from the text, as locateProblems', () => {
+    // A port without interface: a warning on its module.
+    const text = robot.replace('interface: Telemetry', 'interface: null')
+    const p = loadText(text, 'yaml')
+    const problems = validate(p)
+    expect(problems.length).toBeGreaterThan(0)
+    expect(locateValidation(text, 'yaml', p, problems)).toEqual(locateProblems(text, 'yaml'))
+  })
+
+  it('reads nothing without problems', () => {
+    expect(locateValidation('not: [yaml', 'yaml', loadText(robot, 'yaml'), [])).toEqual([])
   })
 })
 

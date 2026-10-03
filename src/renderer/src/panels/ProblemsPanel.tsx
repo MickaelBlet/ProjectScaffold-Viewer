@@ -9,7 +9,8 @@ import { onListKeyDown } from '@/components/listKeys'
 
 const validated = new WeakMap<Project, Problem[]>()
 
-function problemsOf(project: Project): Problem[] {
+/** Problems of a project, validated once per project version. */
+export function problemsOf(project: Project): Problem[] {
   let problems = validated.get(project)
   if (!problems) validated.set(project, (problems = validate(project)))
   return problems

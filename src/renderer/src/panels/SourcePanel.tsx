@@ -4,11 +4,12 @@ import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'reac
 import { z } from 'zod'
 import { insertCompletionText, startCompletion, type CompletionSource } from '@codemirror/autocomplete'
 import { setDiagnostics, type Diagnostic } from '@codemirror/lint'
-import type { EditorState } from '@codemirror/state'
+import { getChunks, unifiedMergeView } from '@codemirror/merge'
+import type { EditorState, Extension } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import { FileProjectSchema } from '@/model/schema'
 import { modulePaths } from '@/model/project'
-import { targetPath } from '@/model/locate'
+import { locateValidation, targetPath } from '@/model/locate'
 import {
   LoadError,
   lineOfPath,
@@ -22,7 +23,11 @@ import {
 import type { Project } from '@/model/types'
 import { useDoc, useDocs, type Selection } from '@/store/documents'
 import { setSetting, useSettings } from '@/store/settings'
+import { IN_VSCODE } from '@/host'
 import { CodeEditor, goToLine, revealLine, setText } from '@/components/CodeEditor'
+import type { TextProblem } from '@/components/fileDiagnostics'
+import { Icon } from '@/components/Icon'
+import { problemsOf } from '@/panels/ProblemsPanel'
 import { navigate, navigateToNote } from '@/actions'
 import { targetAt } from '@/components/sourceTarget'
 import {
@@ -54,14 +59,41 @@ function projectNames(p: Project): ProjectNames {
   }
 }
 
-/** Problems of the text as editor diagnostics, on their lines. */
-function diagnostics(state: EditorState, issues: LoadIssue[]): Diagnostic[] {
-  return issues.flatMap((i) => {
-    if (!i.line || i.line > state.doc.lines) return []
-    const line = state.doc.line(i.line)
-    return [{ from: line.from, to: line.to, severity: 'error' as const, message: i.message }]
+/** Problems of the text as editor diagnostics, on their lines (from the first non-blank character). */
+function diagnostics(state: EditorState, problems: TextProblem[]): Diagnostic[] {
+  return problems.flatMap((p) => {
+    if (!p.line || p.line > state.doc.lines) return []
+    const line = state.doc.line(p.line)
+    const from = line.from + /^\s*/.exec(line.text)![0].length
+    return [{ from, to: Math.max(from, line.to), severity: p.severity, message: p.message }]
   })
 }
+
+/** Validation problems of the project shown by the text, on their lines. */
+function validationProblems(text: string, format: Format, project: Project): TextProblem[] {
+  try {
+    return locateValidation(text, format, project, problemsOf(project))
+  } catch {
+    return []
+  }
+}
+
+/** Per-chunk button of the changes view: revert only, accepting would hide a change not saved yet. */
+function revertButton(type: 'accept' | 'reject', action: (e: MouseEvent) => void): HTMLElement {
+  const button = document.createElement('button')
+  if (type === 'accept') {
+    button.hidden = true
+    return button
+  }
+  button.type = 'button'
+  button.name = 'reject'
+  button.textContent = 'Revert'
+  button.title = 'Revert to the saved text'
+  button.onmousedown = action
+  return button
+}
+
+const NO_EXTENSIONS: Extension = []
 
 /** Handlers of the editor, set up by the effect binding it to the project. */
 interface Handlers {
@@ -98,12 +130,35 @@ function Toggle(props: {
 
 export function SourcePanel({ format }: { format: Format }): ReactNode {
   const store = useDoc((d) => d.store)
-  const [issues, setIssues] = useState<LoadIssue[]>([])
+  const [problems, setProblems] = useState<TextProblem[]>([])
+  /** The text cannot be read: the problems are its load errors. */
+  const [unreadable, setUnreadable] = useState(false)
+  const [listOpen, setListOpen] = useState(true)
   /** The project changed elsewhere while the text holds edits it cannot take. */
   const [stale, setStale] = useState(false)
   const [view, setView] = useState<EditorView | null>(null)
   const handlers = useRef<Handlers>({ flush: noop, revert: noop, input: noop, caret: noop, focus: noop })
   const followCaret = useSettings((s) => s.sourceFollow)
+  const changesOn = useSettings((s) => s.sourceChanges)
+  const savedProject = useDoc((d) => d.savedProject)
+  /** Text as last saved: what the changes are shown against (none before the first save). */
+  const savedText = useMemo(
+    () => (savedProject ? saveText(savedProject, format, { editor: true }) : null),
+    [savedProject, format]
+  )
+  // VS Code shows the changes of its documents itself, and the page's saved project is the text's.
+  const showChanges = changesOn && !IN_VSCODE && savedText !== null
+  const [changeCount, setChangeCount] = useState(0)
+  const changes = useMemo(
+    (): Extension =>
+      showChanges
+        ? [
+            unifiedMergeView({ original: savedText, mergeControls: revertButton, gutter: true }),
+            EditorView.updateListener.of((u) => setChangeCount(getChunks(u.state)?.chunks.length ?? 0))
+          ]
+        : NO_EXTENSIONS,
+    [showChanges, savedText]
+  )
 
   /** Keys and values the schema allows at the caret, and names of the project. */
   const completion = useMemo((): CompletionSource | undefined => {
@@ -133,9 +188,11 @@ export function SourcePanel({ format }: { format: Format }): ReactNode {
 
   useLayoutEffect(() => {
     if (!view) return
-    const report = (list: LoadIssue[]): void => {
+    const report = (list: TextProblem[], loadErrors = false): void => {
       view.dispatch(setDiagnostics(view.state, diagnostics(view.state, list)))
-      setIssues(list)
+      setProblems(list)
+      setUnreadable(loadErrors)
+      if (loadErrors) setListOpen(true)
     }
     /** Project the text stands for. */
     let shown = store.getState().project
@@ -149,24 +206,30 @@ export function SourcePanel({ format }: { format: Format }): ReactNode {
       cancel()
       shown = store.getState().project
       invalid = false
-      setText(view, saveText(shown, format, { editor: true }))
-      report([])
+      const text = saveText(shown, format, { editor: true })
+      setText(view, text)
+      report(validationProblems(text, format, shown))
       setStale(false)
     }
     const apply = (): void => {
       cancel()
       const current = store.getState().project
+      const text = view.state.doc.toString()
       try {
-        const next = reloadText(view.state.doc.toString(), format, current)
+        const next = reloadText(text, format, current)
         invalid = false
-        report([])
         setStale(false)
         // Layout-only or formatting edits that change nothing are no undo step.
         shown = sameContent(next, current) ? current : next
+        report(validationProblems(text, format, shown))
         if (shown !== current) store.setState({ project: next })
       } catch (e) {
         invalid = true
-        report(e instanceof LoadError ? e.issues : [{ message: String(e) }])
+        const issues: LoadIssue[] = e instanceof LoadError ? e.issues : [{ message: String(e) }]
+        report(
+          issues.map((i) => ({ line: i.line ?? null, message: i.message, severity: 'error' as const })),
+          true
+        )
       }
     }
 
@@ -247,6 +310,13 @@ export function SourcePanel({ format }: { format: Format }): ReactNode {
     }
   }, [view, store, format])
 
+  const errors = problems.filter((p) => p.severity === 'error').length
+  const warnings = problems.length - errors
+  const changesTitle =
+    savedText === null
+      ? 'Not saved yet: no changes to show'
+      : 'Show the changes since the last save, each with a button to revert it'
+
   return (
     <section className="source-editor">
       <header>
@@ -258,9 +328,37 @@ export function SourcePanel({ format }: { format: Format }): ReactNode {
             onChange={(on) => setSetting('sourceFollow', on)}
           />
         ) : null}
+        {IN_VSCODE ? null : (
+          <button
+            type="button"
+            className={`qualifier ${showChanges ? 'on' : ''}`}
+            aria-pressed={showChanges}
+            disabled={savedText === null}
+            title={changesTitle}
+            onClick={() => setSetting('sourceChanges', !changesOn)}
+          >
+            Changes{showChanges ? ` ${changeCount}` : ''}
+          </button>
+        )}
         <span className="spacer" />
-        {issues.length ? <span className="source-state error">Not applied</span> : null}
-        {stale || issues.length ? (
+        {unreadable ? <span className="source-state error">Not applied</span> : null}
+        {problems.length ? (
+          <button
+            type="button"
+            className={`source-counts ${listOpen ? 'on' : ''}`}
+            aria-pressed={listOpen}
+            title={listOpen ? 'Hide the problems' : 'Show the problems'}
+            onClick={() => setListOpen((o) => !o)}
+          >
+            <span className={`error ${errors ? '' : 'zero'}`}>
+              <Icon name="error" /> {errors}
+            </span>
+            <span className={`warning ${warnings ? '' : 'zero'}`}>
+              <Icon name="warning" /> {warnings}
+            </span>
+          </button>
+        ) : null}
+        {stale || unreadable ? (
           <button type="button" onClick={() => handlers.current.revert()}>
             Discard edits
           </button>
@@ -271,6 +369,7 @@ export function SourcePanel({ format }: { format: Format }): ReactNode {
         fileName={`project.${format}`}
         label={`Project ${format.toUpperCase()}`}
         completion={completion}
+        extensions={changes}
         onChange={() => handlers.current.input()}
         // Shortcuts (save, export...) see the text as typed.
         onKeyDown={(e) => (e.ctrlKey || e.metaKey) && handlers.current.flush()}
@@ -279,16 +378,17 @@ export function SourcePanel({ format }: { format: Format }): ReactNode {
         onCaret={(v) => handlers.current.caret(v)}
         onView={setView}
       />
-      {issues.length ? (
-        <ul className="source-problems" role="alert">
-          {issues.map((issue, i) => (
-            <li key={i}>
-              {issue.line ? (
-                <button type="button" className="link" onClick={() => view && goToLine(view, issue.line!)}>
-                  Line {issue.line}
+      {problems.length && listOpen ? (
+        <ul className="source-problems with-icons" role={unreadable ? 'alert' : undefined}>
+          {problems.map((p, i) => (
+            <li key={i} className={p.severity}>
+              <Icon name={p.severity} title={p.severity} />
+              {p.line ? (
+                <button type="button" className="link" onClick={() => view && goToLine(view, p.line!)}>
+                  Line {p.line}
                 </button>
               ) : null}
-              {issue.message}
+              {p.message}
             </li>
           ))}
         </ul>
