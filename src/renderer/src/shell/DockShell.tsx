@@ -1,6 +1,13 @@
 // Outer layout: tool panels docked, tabbed or floating around the editor area.
-import { useCallback, useEffect, type ReactNode } from 'react'
-import { DockviewReact, type DockviewReadyEvent, type IDockviewPanelProps } from 'dockview-react'
+import { useCallback, useEffect, useSyncExternalStore, type ReactNode } from 'react'
+import {
+  DockviewReact,
+  type DockviewReadyEvent,
+  type IDockviewPanelHeaderProps,
+  type IDockviewPanelProps
+} from 'dockview-react'
+import { Icon, type IconName } from '@/components/Icon'
+import { openContextMenu } from '@/store/ui'
 import { ExplorerPanel } from '@/panels/ExplorerPanel'
 import { Inspector } from '@/panels/Inspector'
 import { ProblemsPanel, useProblemCounts } from '@/panels/ProblemsPanel'
@@ -15,7 +22,8 @@ import {
   loadOuterLayout,
   lockEditorArea,
   saveOuterLayout,
-  setOuterApi
+  setOuterApi,
+  type ToolId
 } from './controllers'
 import { dockTheme } from './theme'
 
@@ -50,6 +58,54 @@ function ProblemsToolPanel(props: IDockviewPanelProps): ReactNode {
   )
 }
 
+const TOOL_ICONS: Record<ToolId, IconName> = {
+  explorer: 'tree',
+  generation: 'code',
+  inspector: 'info',
+  problems: 'warning',
+  output: 'terminal',
+  search: 'search',
+  settings: 'sliders'
+}
+
+function ProblemsBadge(): ReactNode {
+  const { errors, warnings } = useProblemCounts()
+  if (!errors && !warnings) return null
+  return <span className={`tool-tab-badge ${errors ? 'error' : 'warning'}`}>{errors || warnings}</span>
+}
+
+/** Tool tabs show an icon, the title is the tooltip; middle click or the context menu closes them. */
+function ToolTab({ api }: IDockviewPanelHeaderProps): ReactNode {
+  const title = useSyncExternalStore(
+    useCallback(
+      (onChange: () => void) => {
+        const d = api.onDidTitleChange(onChange)
+        return () => d.dispose()
+      },
+      [api]
+    ),
+    () => api.title ?? ''
+  )
+  const icon = TOOL_ICONS[api.id as ToolId] as IconName | undefined
+  return (
+    <div
+      className="dv-default-tab tool-tab"
+      title={title}
+      aria-label={title}
+      onPointerUp={(e) => {
+        if (e.button === 1) api.close()
+      }}
+      onContextMenu={(e) => {
+        e.preventDefault()
+        openContextMenu(e, [{ label: 'Close', run: () => api.close() }])
+      }}
+    >
+      <span className="dv-default-tab-content">{icon ? <Icon name={icon} /> : title}</span>
+      {api.id === 'problems' && <ProblemsBadge />}
+    </div>
+  )
+}
+
 const components = {
   editorArea: EditorArea,
   explorer: tool('explorer', ExplorerPanel),
@@ -77,5 +133,13 @@ export function DockShell(): ReactNode {
       })
     })
   }, [])
-  return <DockviewReact className="dock" components={components} onReady={onReady} theme={dockTheme} />
+  return (
+    <DockviewReact
+      className="dock"
+      components={components}
+      defaultTabComponent={ToolTab}
+      onReady={onReady}
+      theme={dockTheme}
+    />
+  )
 }
