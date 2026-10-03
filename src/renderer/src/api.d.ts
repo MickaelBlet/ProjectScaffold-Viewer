@@ -139,10 +139,8 @@ export interface Api {
   viewChanged?(view: ViewRef): void
   /** Diagram: actions asked by the side panels. */
   onAction?(cb: (action: DiagramAction) => void): () => void
-  /** Shows a panel of the VS Code side bar; the Dependencies panel with a dependency (by name). */
-  showPanel?(panel: SidePanel, dependency?: string): void
-  /** Dependencies side panel: the dependency another page shows (by name). */
-  onDependency?(cb: (name: string) => void): () => void
+  /** Shows a panel of the VS Code side bar. */
+  showPanel?(panel: SidePanel): void
   /** Appends an entry of the Output log to the host's own log (ProjectScaffold Output channel). */
   log?(level: LogLevel, text: string): void
 }

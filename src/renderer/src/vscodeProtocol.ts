@@ -8,7 +8,7 @@
 export type WebviewMode = 'editor' | 'preview' | 'panel'
 
 /** Tool panels of the ProjectScaffold views (the ProjectScaffold side bar). */
-export type SidePanel = 'explorer' | 'modules' | 'links' | 'dependencies' | 'settings'
+export type SidePanel = 'explorer' | 'settings'
 
 type DataPath = (string | number)[]
 
@@ -103,8 +103,8 @@ export type ToHost =
   | { type: 'view'; view: ViewRef }
   /** A side panel asks the diagram of its document for an action. */
   | { type: 'inDiagram'; action: DiagramAction }
-  /** A page shows a side panel; the Dependencies panel with one of them (by name). */
-  | { type: 'showPanel'; panel: SidePanel; dependency?: string }
+  /** A page shows a side panel. */
+  | { type: 'showPanel'; panel: SidePanel }
   /** A line of the page's Output log, for the ProjectScaffold Output channel (which adds the time). */
   | { type: 'log'; level: LogLevel; text: string }
   /** Side panel: listening for its document, sent again in reply. Diagram: listening for commands. */
@@ -124,8 +124,6 @@ export type ToPage =
   | { type: 'reveal'; path: DataPath; names: (string | undefined)[] }
   /** Side panel: the view the diagram shows. */
   | { type: 'view'; view: ViewRef }
-  /** Dependencies side panel: the dependency to show, by name. */
-  | { type: 'dependency'; name: string }
   /** Diagram: an action asked by a side panel. */
   | { type: 'action'; action: DiagramAction }
   | { type: 'reply'; id: number; result: unknown }

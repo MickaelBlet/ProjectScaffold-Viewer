@@ -52,9 +52,6 @@ export function activeCanvas(): CanvasController | undefined {
 
 export type ToolId =
   | 'explorer'
-  | 'modules'
-  | 'links'
-  | 'dependencies'
   | 'generation'
   | 'inspector'
   | 'problems'
@@ -64,9 +61,6 @@ export type ToolId =
 
 export const TOOL_TITLES: Record<ToolId, string> = {
   explorer: 'Explorer',
-  modules: 'Modules',
-  links: 'Links',
-  dependencies: 'Dependencies',
   generation: 'Code generation',
   inspector: 'Inspector',
   problems: 'Problems',
@@ -78,9 +72,6 @@ export const TOOL_TITLES: Record<ToolId, string> = {
 /** Width of the side tools, height of the bottom ones, when first opened. */
 const TOOL_SIZES: Record<ToolId, number> = {
   explorer: 250,
-  modules: 250,
-  links: 250,
-  dependencies: 280,
   generation: 280,
   inspector: 380,
   settings: 380,
@@ -105,7 +96,7 @@ const LAYOUT_KEY = IN_PREVIEW
     : 'project-scaffold:layout'
 
 /** Tools of the VS Code side bar (see vscode/package.json). */
-const SIDE_TOOLS = new Set<ToolId>(['explorer', 'modules', 'links', 'dependencies', 'settings'])
+const SIDE_TOOLS = new Set<ToolId>(['explorer', 'settings'])
 const inSideBar = (id: ToolId): id is SidePanel => IN_VSCODE && SIDE_TOOLS.has(id)
 
 /**
@@ -132,19 +123,6 @@ export function buildDefaultLayout(api: DockviewApi): void {
     title: TOOL_TITLES.explorer,
     initialWidth: TOOL_SIZES.explorer,
     position: { referencePanel: EDITOR_AREA, direction: 'left' }
-  })
-  api.addPanel({
-    id: 'modules',
-    component: 'modules',
-    title: TOOL_TITLES.modules,
-    position: { referencePanel: 'explorer', direction: 'below' }
-  })
-  api.addPanel({
-    id: 'links',
-    component: 'links',
-    title: TOOL_TITLES.links,
-    inactive: true,
-    position: { referencePanel: 'modules', direction: 'within' }
   })
   api.addPanel({
     id: 'inspector',
@@ -175,18 +153,11 @@ export function buildDefaultLayout(api: DockviewApi): void {
     position: { referencePanel: 'problems', direction: 'within' }
   })
   api.addPanel({
-    id: 'dependencies',
-    component: 'dependencies',
-    title: TOOL_TITLES.dependencies,
-    inactive: true,
-    position: { referencePanel: 'search', direction: 'within' }
-  })
-  api.addPanel({
     id: 'output',
     component: 'output',
     title: TOOL_TITLES.output,
     inactive: true,
-    position: { referencePanel: 'dependencies', direction: 'within' }
+    position: { referencePanel: 'search', direction: 'within' }
   })
   api.getPanel('explorer')?.api.setActive()
   lockEditorArea(api)
@@ -207,8 +178,10 @@ export function saveOuterLayout(): void {
 export function loadOuterLayout(api: DockviewApi): void {
   try {
     const saved = storage.getItem(LAYOUT_KEY)
-    if (saved) {
-      api.fromJSON(JSON.parse(saved) as SerializedDockview)
+    const layout = saved && (JSON.parse(saved) as SerializedDockview)
+    // A layout with panels no longer there (removed tools) is dropped for the default one.
+    if (layout && Object.keys(layout.panels).every((id) => id === EDITOR_AREA || id in TOOL_TITLES)) {
+      api.fromJSON(layout)
       if (api.getPanel(EDITOR_AREA)) return lockEditorArea(api)
     }
   } catch {
@@ -336,18 +309,7 @@ type Place = [ref: string, direction: Direction] | [ref: null, direction: Exclud
 /** Where a closed tool goes back: beside the first open reference, else on an edge of the window. */
 const TOOL_PLACES: Record<ToolId, Place[]> = {
   explorer: [
-    ['modules', 'above'],
-    ['links', 'above'],
-    [null, 'left']
-  ],
-  modules: [
-    ['links', 'within'],
-    ['explorer', 'below'],
-    [null, 'left']
-  ],
-  links: [
-    ['modules', 'within'],
-    ['explorer', 'below'],
+    ['generation', 'within'],
     [null, 'left']
   ],
   inspector: [
@@ -371,14 +333,8 @@ const TOOL_PLACES: Record<ToolId, Place[]> = {
     ['search', 'within'],
     [EDITOR_AREA, 'below']
   ],
-  dependencies: [
-    ['search', 'within'],
-    ['problems', 'within'],
-    [EDITOR_AREA, 'below']
-  ],
   generation: [
     ['explorer', 'within'],
-    ['modules', 'within'],
     [null, 'left']
   ]
 }

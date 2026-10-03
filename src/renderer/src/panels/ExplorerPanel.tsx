@@ -1,11 +1,13 @@
 // Views, binaries, dependencies, constants, types, interfaces, modules and links of the active document. Click selects (Ctrl / Shift for several),
 // double-click opens an editor tab, right click for more. Arrows move between items, Enter selects.
+// Modules: the eye hides one in the focused view, drag one onto another (or the list) to re-parent it.
 // Sections can be reordered (drag their header, Alt+Up / Alt+Down) and hidden; kept in the settings.
 import {
   Fragment,
   useMemo,
   useState,
   type CSSProperties,
+  type DragEvent,
   type KeyboardEvent,
   type MouseEvent,
   type ReactNode
@@ -50,8 +52,8 @@ import {
   selectionOf,
   showDependency
 } from '@/actions'
-import { dependencyMenu } from './DependenciesPanel'
-import { childrenByParent, matching } from './ModulesPanel'
+import { dependencyMenu } from './DependencyDetail'
+import { childrenByParent, dropModule, matching, MODULE_DRAG, toggleHidden } from './moduleTree'
 import { openEditor, openView, revealInspector } from '@/shell/controllers'
 import { Icon } from '@/components/Icon'
 import { FoldSection, placed, sectionOrder, StackedSections } from '@/components/FoldSection'
@@ -208,14 +210,26 @@ function Section(props: {
 }
 
 /** Selectable entities of one kind: arrows move, Enter / Space select as a click does. */
-function EntityList(props: { label: string; multiselectable?: boolean; children: ReactNode }): ReactNode {
+/** Drop target of a dragged module. */
+type DropHandlers = {
+  onDragOver?: (e: DragEvent) => void
+  onDragLeave?: () => void
+  onDrop?: (e: DragEvent) => void
+}
+
+function EntityList(
+  props: { label: string; multiselectable?: boolean; className?: string; children: ReactNode } & DropHandlers
+): ReactNode {
   return (
     <ul
-      className="entity-list"
+      className={`entity-list ${props.className ?? ''}`}
       role="listbox"
       aria-label={props.label}
       aria-multiselectable={props.multiselectable}
       onKeyDown={onListKeyDown}
+      onDragOver={props.onDragOver}
+      onDragLeave={props.onDragLeave}
+      onDrop={props.onDrop}
     >
       {props.children}
     </ul>
@@ -232,8 +246,9 @@ function Item(props: {
   onKeyDown?: (e: KeyboardEvent) => void
   onDoubleClick?: () => void
   onContextMenu: (e: MouseEvent) => void
+  onDragStart?: (e: DragEvent) => void
   children: ReactNode
-}): ReactNode {
+} & DropHandlers): ReactNode {
   return (
     <li
       data-item
@@ -247,6 +262,11 @@ function Item(props: {
       onKeyDown={props.onKeyDown}
       onDoubleClick={props.onDoubleClick}
       onContextMenu={props.onContextMenu}
+      draggable={!!props.onDragStart}
+      onDragStart={props.onDragStart}
+      onDragOver={props.onDragOver}
+      onDragLeave={props.onDragLeave}
+      onDrop={props.onDrop}
     >
       {props.children}
     </li>
@@ -300,7 +320,7 @@ function clickItem(e: MouseEvent, id: Id, list: Id[]): void {
   select(sel)
 }
 
-function entityMenu(e: MouseEvent, kind: 'type' | 'interface' | 'module' | 'link', id: Id): void {
+function entityMenu(e: MouseEvent, kind: 'type' | 'interface' | 'link', id: Id): void {
   e.preventDefault()
   if (!activeDoc().selectedIds.includes(id)) select({ kind, id })
   openContextMenu(e, [
@@ -314,6 +334,35 @@ function entityMenu(e: MouseEvent, kind: 'type' | 'interface' | 'module' | 'link
     'separator',
     commandItem('edit.delete')
   ])
+}
+
+function moduleMenu(e: MouseEvent, id: Id, hidden: boolean): void {
+  e.preventDefault()
+  if (!activeDoc().selectedIds.includes(id)) select({ kind: 'module', id })
+  openContextMenu(e, [
+    { label: 'Open in a tab', run: () => openEditor('module', id) },
+    { label: 'Open to the side', run: () => openEditor('module', id, { split: true }) },
+    commandItem('view.openModule'),
+    commandItem('view.openModuleSplit'),
+    { label: hidden ? 'Show in view' : 'Hide in view', run: () => toggleHidden(id, hidden) },
+    'separator',
+    commandItem('edit.rename'),
+    commandItem('insert.submodule'),
+    commandItem('edit.cut'),
+    commandItem('edit.copy'),
+    commandItem('edit.paste'),
+    commandItem('edit.duplicate'),
+    'separator',
+    commandItem('edit.delete')
+  ])
+}
+
+/** Accepts a dragged module over a drop target. */
+function dragOver(e: DragEvent): boolean {
+  if (!e.dataTransfer.types.includes(MODULE_DRAG)) return false
+  e.preventDefault()
+  e.stopPropagation()
+  return true
 }
 
 function viewMenu(e: MouseEvent, v: View): void {
@@ -360,6 +409,9 @@ export function ExplorerPanel(): ReactNode {
   const selectedDependency = useDoc((d) => (d.selection?.kind === 'dependency' ? d.selection.id : null))
   const activeViewId = useDoc((d) => d.activeViewId)
   const [filter, setFilter] = useState('')
+  /** Module a dragged module would go into (null: top level). */
+  const [dropTarget, setDropTarget] = useState<Id | null | undefined>(undefined)
+  const hiddenIds = findView({ views, modules }, activeViewId).hidden
   const savedOrder = useSettings((s) => s.explorerOrder)
   const savedHidden = useSettings((s) => s.explorerHidden)
   const order = useMemo(() => sectionOrder(savedOrder, SECTIONS), [savedOrder])
@@ -435,7 +487,7 @@ export function ExplorerPanel(): ReactNode {
     if (!next.delete(id)) next.add(id)
     setCollapsed(next)
   }
-  // Modules as in Modules: nested under their parent, in project order (all open while filtering).
+  // Modules nested under their parent, in project order (all open while filtering).
   const shownModules: { m: Module; depth: number; parent: boolean; open: boolean }[] = []
   const walk = (list: Module[], depth: number): void => {
     for (const m of list) {
@@ -466,7 +518,7 @@ export function ExplorerPanel(): ReactNode {
   )
   const linkStop = tabStop(linkIds, isSelected)
 
-  /** Right expands, Left collapses a dependency or a group, as in Modules. */
+  /** Right expands, Left collapses a dependency or a group, as a module. */
   const foldKeys = (key: string, open: boolean) => (e: KeyboardEvent) => {
     if (f || e.key !== (open ? 'ArrowLeft' : 'ArrowRight')) return
     e.preventDefault()
@@ -495,7 +547,7 @@ export function ExplorerPanel(): ReactNode {
               select({ kind: 'dependency', id: r.dep.id })
             }}
             onKeyDown={foldKeys(r.key, r.open)}
-            onDoubleClick={() => showDependency(r.dep.id)}
+            onDoubleClick={() => openImportSource(r.dep.file)}
             onContextMenu={(e) => dependencyMenu(e, r.dep)}
           >
             <span
@@ -537,14 +589,16 @@ export function ExplorerPanel(): ReactNode {
             key={r.key}
             tabStop={stop}
             selected={false}
-            title={`${r.c.description ? `${r.c.description}\n` : ''}Double-click: show in Dependencies.`}
+            title={`${r.c.description ? `${r.c.description}\n` : ''}Shown with its dependency in the Inspector.`}
             style={indent(2)}
-            onClick={() => undefined}
-            onDoubleClick={() => showDependency(r.dep.id)}
+            onClick={() => {
+              revealInspector()
+              showDependency(r.dep.id)
+            }}
             onContextMenu={(e) => {
               e.preventDefault()
               openContextMenu(e, [
-                { label: 'Show in Dependencies', run: () => showDependency(r.dep.id) },
+                { label: 'Show its dependency', run: () => showDependency(r.dep.id) },
                 { label: `Open ${r.dep.file}`, run: () => openImportSource(r.dep.file) }
               ])
             }}
@@ -871,24 +925,43 @@ export function ExplorerPanel(): ReactNode {
           </button>
         }
       >
-        <EntityList label="Modules" multiselectable>
+        <EntityList
+          label="Modules"
+          multiselectable
+          className={dropTarget === null ? 'drop' : ''}
+          onDragOver={(e) => dragOver(e) && setDropTarget(null)}
+          onDragLeave={() => setDropTarget(undefined)}
+          onDrop={(e) => {
+            setDropTarget(undefined)
+            dropModule(e.dataTransfer.getData(MODULE_DRAG), null)
+          }}
+        >
           {shownModules.map(({ m, depth, parent, open }) => (
             <Item
               key={m.id}
               selected={isSelected(m.id)}
               tabStop={m.id === moduleStop}
-              className={isSelected(m.id) ? 'active' : ''}
+              className={`${isSelected(m.id) ? 'active' : ''} ${hiddenIds.includes(m.id) ? 'is-hidden' : ''} ${dropTarget === m.id ? 'drop' : ''}`}
               title={paths.get(m.id)}
               style={indent(depth)}
               onClick={(e) => clickItem(e, m.id, moduleIds)}
+              onDragStart={(e) => e.dataTransfer.setData(MODULE_DRAG, m.id)}
+              onDragOver={(e) => dragOver(e) && setDropTarget(m.id)}
+              onDragLeave={() => setDropTarget(undefined)}
+              onDrop={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                setDropTarget(undefined)
+                dropModule(e.dataTransfer.getData(MODULE_DRAG), m.id)
+              }}
               onKeyDown={(e) => {
-                // Right expands, Left collapses, as in Modules.
+                // Right expands, Left collapses.
                 if (!parent || moduleMatches || e.key !== (open ? 'ArrowLeft' : 'ArrowRight')) return
                 e.preventDefault()
                 toggle(m.id)
               }}
               onDoubleClick={() => openEditor('module', m.id)}
-              onContextMenu={(e) => entityMenu(e, 'module', m.id)}
+              onContextMenu={(e) => moduleMenu(e, m.id, hiddenIds.includes(m.id))}
             >
               <span
                 className="chevron"
@@ -903,8 +976,21 @@ export function ExplorerPanel(): ReactNode {
               <span className="kind-badge mod" style={m.color ? { background: m.color } : undefined}>
                 M
               </span>
-              {m.name}
+              <span className="tree-name">{m.name}</span>
               <small>{m.ports.length ? `${m.ports.length}p` : ''}</small>
+              <button
+                type="button"
+                className="icon eye"
+                tabIndex={-1}
+                title={hiddenIds.includes(m.id) ? 'Show in view' : 'Hide in view'}
+                aria-label={`${hiddenIds.includes(m.id) ? 'Show' : 'Hide'} ${m.name} in view`}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  toggleHidden(m.id, hiddenIds.includes(m.id))
+                }}
+              >
+                <Icon name={hiddenIds.includes(m.id) ? 'eye-off' : 'eye'} />
+              </button>
             </Item>
           ))}
           {!shownModules.length && <Empty>{f ? 'No match' : 'No modules yet'}</Empty>}

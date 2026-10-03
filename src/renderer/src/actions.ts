@@ -92,7 +92,7 @@ import {
   viewOfRef,
   viewRef
 } from '@/shell/controllers'
-import { IN_PANEL, IN_VSCODE } from '@/host'
+import { IN_PANEL } from '@/host'
 import type { DiagramAction, ViewRef } from '../../../vscode/src/protocol'
 
 // Selection
@@ -962,19 +962,9 @@ export function detachDependencyAction(id: Id): void {
   else setStatus('info', `Types and interfaces of ${dep.name} are now this project's own`)
 }
 
-/** Show a dependency's content in the Dependencies panel. */
+/** Show a dependency's content in the Inspector. */
 export function showDependency(id: Id): void {
-  useUiStore.setState({ dependency: id })
-  // VS Code: the Dependencies panel is a page of the side bar, told which one by name.
-  const dep = getProject().dependencies.find((x) => x.id === id)
-  if (IN_VSCODE && dep) return window.api.showPanel?.('dependencies', dep.name)
-  showTool('dependencies')
-}
-
-/** VS Code Dependencies side panel: the dependency another page shows, by name. */
-export function showDependencyNamed(name: string): void {
-  const dep = getProject().dependencies.find((x) => x.name === name)
-  if (dep) useUiStore.setState({ dependency: dep.id })
+  navigate({ kind: 'dependency', id })
 }
 
 /** Show the project of a dependency in its tab when it is open (VS Code: in its editor). */

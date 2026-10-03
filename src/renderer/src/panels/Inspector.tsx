@@ -13,7 +13,7 @@ import { LinkInspector } from './LinkInspector'
 import { TypeInspector } from './TypeInspector'
 import { InterfaceInspector } from './InterfaceInspector'
 import { ImportedInspector } from './ImportedInspector'
-import { DependencyDetail } from './DependenciesPanel'
+import { DependencyDetail } from './DependencyDetail'
 import { Icon, type IconName } from '@/components/Icon'
 
 function CommandButton({ id, icon, label }: { id: string; icon?: IconName; label: string }): ReactNode {
@@ -190,7 +190,7 @@ function NoteInspector({ id }: { id: string }): ReactNode {
   )
 }
 
-/** A dependency, as the Dependencies panel shows it. */
+/** A dependency: its relations and content. */
 function DependencyInspector({ id }: { id: string }): ReactNode {
   const dep = useProjectStore((s) => s.project.dependencies.find((d) => d.id === id))
   const [filter, setFilter] = useState('')
@@ -206,7 +206,7 @@ function DependencyInspector({ id }: { id: string }): ReactNode {
           onChange={(e) => setFilter(e.target.value)}
         />
       </div>
-      <DependencyDetail lib={dep} filter={filter} onChoose={(d) => select({ kind: 'dependency', id: d })} />
+      <DependencyDetail lib={dep} filter={filter} />
     </>
   )
 }

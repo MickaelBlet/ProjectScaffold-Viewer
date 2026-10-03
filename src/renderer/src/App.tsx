@@ -31,14 +31,10 @@ import {
   installViewSync,
   navigateToPath,
   runDiagramAction,
-  showDependencyNamed,
   showDiagramView
 } from './actions'
 import { toggleTool } from './shell/controllers'
 import { ExplorerPanel } from './panels/ExplorerPanel'
-import { ModulesPanel } from './panels/ModulesPanel'
-import { LinksPanel } from './panels/LinksPanel'
-import { DependenciesPanel } from './panels/DependenciesPanel'
 import { SettingsPanel } from './panels/SettingsPanel'
 import type { SidePanel } from '../../../vscode/src/protocol'
 
@@ -76,9 +72,6 @@ function Dialog(): ReactNode {
 
 const SIDE_PANELS: Record<SidePanel, () => ReactNode> = {
   explorer: ExplorerPanel,
-  modules: ModulesPanel,
-  links: LinksPanel,
-  dependencies: DependenciesPanel,
   settings: SettingsPanel
 }
 
@@ -172,8 +165,7 @@ export function App(): ReactNode {
       ...(IN_PANEL
         ? [
             window.api.onDocument!(showHostDocument),
-            window.api.onView!(showDiagramView),
-            window.api.onDependency!(showDependencyNamed)
+            window.api.onView!(showDiagramView)
           ]
         : [
             window.api.onAction!((a) => (a.kind === 'command' ? runCommand(a.id) : runDiagramAction(a))),

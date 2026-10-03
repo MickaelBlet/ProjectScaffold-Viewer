@@ -779,6 +779,27 @@ kbd {
 .kind-badge.binary {
   background: #3b6b5a;
 }
+/* Explorer modules: hidden in the focused view (eye), drop target of a dragged module. */
+.entity-list li.is-hidden .tree-name {
+  opacity: 0.45;
+  text-decoration: line-through;
+}
+.entity-list li .tree-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.entity-list li .eye {
+  opacity: 0;
+  padding: 0 4px;
+}
+.entity-list li:is(:hover, :focus-visible, .is-hidden) .eye {
+  opacity: 1;
+}
+.entity-list li.drop,
+.entity-list.drop {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
 /* Explorer: group of the content of a dependency (Constants, Types…). */
 .entity-list li.dependency-group {
   font-size: 11px;
@@ -790,53 +811,8 @@ kbd {
 .actions[hidden] {
   display: none;
 }
-/* Dependencies panel: the list of dependencies beside the content of the chosen one (stacked when narrow). */
-.tool-panel[data-panel='dependencies'] {
-  container-type: inline-size;
-  overflow: hidden;
-}
-.libraries {
-  display: grid;
-  grid-template-columns: minmax(140px, 200px) 1fr;
-  height: 100%;
-  min-height: 0;
-}
-.lib-list {
-  overflow: auto;
-  border-right: 1px solid var(--border);
-}
-.lib-list > header {
-  display: flex;
-  align-items: center;
-  padding: 6px 8px;
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--muted);
-}
-.lib-list li > span:not(.kind-badge) {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.lib-main {
-  overflow: auto;
-  min-width: 0;
-}
-@container (max-width: 420px) {
-  .libraries {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto 1fr;
-  }
-  .lib-list {
-    max-height: 30cqh;
-    border-right: none;
-    border-bottom: 1px solid var(--border);
-  }
-}
 .lib-detail {
-  padding: 0 8px 12px;
+  padding: 0 0 12px;
 }
 .lib-header {
   display: flex;
@@ -2466,59 +2442,6 @@ ul.plain {
   color: var(--muted);
 }
 
-/* Modules & search */
-.tree {
-  list-style: none;
-  margin: 0;
-  padding: 0 4px 8px;
-}
-.tree ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-.tree-row {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 2px 6px;
-  border-radius: 4px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-.tree-row:hover {
-  background: var(--panel-2);
-}
-.tree-row.active {
-  background: var(--accent-soft);
-}
-.tree-row.drop,
-.modules-panel.drop {
-  box-shadow: inset 0 0 0 2px var(--accent);
-}
-.tree-row.is-hidden .tree-name {
-  opacity: 0.45;
-  text-decoration: line-through;
-}
-.tree-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.tree-row small {
-  color: var(--muted);
-  margin-left: auto;
-}
-.tree-row .eye {
-  opacity: 0;
-  padding: 0 4px;
-}
-.tree-row:hover .eye,
-.tree-row.is-hidden .eye {
-  opacity: 1;
-}
-.modules-panel {
-  min-height: 100%;
-}
 .hint {
   padding: 0 10px;
   font-size: 11px;
@@ -2546,10 +2469,6 @@ ul.plain {
 }
 .results li.active {
   background: var(--accent-soft);
-}
-.links-panel .count {
-  margin: 0 10px 4px;
-  font-size: 12px;
 }
 .results small {
   color: var(--muted);
@@ -2851,16 +2770,9 @@ mark {
 /* Keyboard focus on list, tree and tab items (see listKeys.ts). */
 :is(.entity-list, .results, .problems ul) > li[data-item]:focus-visible,
 .doc-tab:focus-visible,
-.explorer-toggle:focus-visible,
-.tree [data-item]:focus-visible > .tree-row {
+.explorer-toggle:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
-}
-.tree [data-item]:focus-visible {
-  outline: none;
-}
-.tree [data-item]:focus-visible > .tree-row .eye {
-  opacity: 1;
 }
 
 /* Inheritance: UML generalization (solid) or realization of an interface (dashed), hollow triangle on the base. */

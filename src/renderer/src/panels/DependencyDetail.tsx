@@ -1,6 +1,7 @@
-// Dependencies of the active document, one at a time: where it comes from, the dependencies it
-// uses and is used by, its types and interfaces with their members, and its modules placed here. Click selects (the Inspector shows
-// it), double-click opens an editor tab, Right / Left expand and collapse.
+// A dependency of the active document, shown in the Inspector: where it comes from, the dependencies
+// it uses and is used by, its types and interfaces with their members, and its modules placed here.
+// Click selects (the Inspector shows it), double-click opens an editor tab, Right / Left expand and
+// collapse.
 import { useMemo, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
 import { typeUsageTargets } from '@/model/project'
 import { dependencyEntities } from '@/model/dependencies'
@@ -9,11 +10,10 @@ import { formatValue } from '@/model/defaults'
 import type { Dependency, Id, Interface, Message, Project, TypeDef, TypeRef } from '@/model/types'
 import { useDoc } from '@/store/documents'
 import { useProjectStore } from '@/store/project'
-import { openContextMenu, select, useUiStore } from '@/store/ui'
+import { openContextMenu, select } from '@/store/ui'
 import {
   detachDependencyAction,
   openImportSource,
-  pickDependency,
   placeDependencyModule,
   refreshDependencies,
   removeDependencyAction
@@ -183,18 +183,14 @@ export function dependencyMenu(e: MouseEvent, dep: Dependency): void {
   ])
 }
 
-const choose = (id: Id): void => useUiStore.setState({ dependency: id })
-
 function Chips({
   label,
   names,
-  dependencies,
-  onChoose
+  dependencies
 }: {
   label: string
   names: string[]
   dependencies: Dependency[]
-  onChoose: (id: Id) => void
 }): ReactNode {
   return (
     <div className="lib-relation">
@@ -208,7 +204,7 @@ function Chips({
               type="button"
               className="lib-chip"
               disabled={!target}
-              onClick={() => target && onChoose(target.id)}
+              onClick={() => target && select({ kind: 'dependency', id: target.id })}
             >
               {n}
             </button>
@@ -221,19 +217,8 @@ function Chips({
   )
 }
 
-/**
- * A dependency: its relations, types, interfaces, constants and placed modules. `onChoose` shows
- * another dependency (a chip of Uses / Used by).
- */
-export function DependencyDetail({
-  lib,
-  filter,
-  onChoose = choose
-}: {
-  lib: Dependency
-  filter: string
-  onChoose?: (id: Id) => void
-}): ReactNode {
+/** A dependency: its relations, types, interfaces, constants and placed modules. */
+export function DependencyDetail({ lib, filter }: { lib: Dependency; filter: string }): ReactNode {
   const project = useProjectStore((s) => s.project)
   const selectedIds = useDoc((d) => d.selectedIds)
   const [collapsed, setCollapsed] = useState<ReadonlySet<Id>>(new Set())
@@ -367,8 +352,8 @@ export function DependencyDetail({
       <p className="lib-file muted" title={lib.file}>
         {lib.file}
       </p>
-      <Chips label="Uses" names={lib.uses} dependencies={project.dependencies} onChoose={onChoose} />
-      <Chips label="Used by" names={usedBy} dependencies={project.dependencies} onChoose={onChoose} />
+      <Chips label="Uses" names={lib.uses} dependencies={project.dependencies} />
+      <Chips label="Used by" names={usedBy} dependencies={project.dependencies} />
       {lib.shared.length > 0 && (
         <p className="lib-file muted">Also defines, like another dependency: {lib.shared.join(', ')}</p>
       )}
@@ -448,89 +433,6 @@ export function DependencyDetail({
           </li>
         )}
       </ul>
-    </div>
-  )
-}
-
-export function DependenciesPanel(): ReactNode {
-  const dependencies = useProjectStore((s) => s.project.dependencies)
-  const chosen = useUiStore((s) => s.dependency)
-  const [filter, setFilter] = useState('')
-  const lib = dependencies.find((l) => l.id === chosen) ?? dependencies[0]
-  const types = useProjectStore((s) => s.project.types)
-  const interfaces = useProjectStore((s) => s.project.interfaces)
-  const consts = useProjectStore((s) => s.project.consts)
-  const counts = useMemo(
-    () =>
-      new Map(
-        dependencies.map((l) => [l.id, dependencyEntities({ types, interfaces, consts }, l.id).length])
-      ),
-    [dependencies, types, interfaces, consts]
-  )
-
-  return (
-    <div className="libraries">
-      <aside className="lib-list">
-        <header>
-          <span className="explorer-title">Dependencies</span>
-          <span className="explorer-actions">
-            <button type="button" className="icon" title="Add dependency…" onClick={() => pickDependency()}>
-              <Icon name="plus" />
-            </button>
-            <button
-              type="button"
-              className="icon"
-              title="Refresh all from their files"
-              disabled={!dependencies.length}
-              onClick={() => void refreshDependencies(dependencies.map((l) => l.id))}
-            >
-              <Icon name="refresh" />
-            </button>
-          </span>
-        </header>
-        <ul className="entity-list" role="listbox" aria-label="Dependencies" onKeyDown={onListKeyDown}>
-          {dependencies.map((l) => (
-            <li
-              key={l.id}
-              data-item
-              role="option"
-              aria-selected={l === lib}
-              tabIndex={l === lib ? 0 : -1}
-              className={l === lib ? 'active' : ''}
-              title={`${l.file}${l.indirect ? ' (used by another dependency)' : ''}`}
-              onClick={() => choose(l.id)}
-              onDoubleClick={() => openImportSource(l.file)}
-              onContextMenu={(e) => dependencyMenu(e, l)}
-            >
-              <span className="kind-badge dependency">D</span>
-              <span className={l.indirect ? 'muted' : ''}>{l.name}</span>
-              <small>{counts.get(l.id)}</small>
-            </li>
-          ))}
-          {!dependencies.length && (
-            <li className="empty" role="presentation">
-              No dependencies: Insert › Add dependency…
-            </li>
-          )}
-        </ul>
-      </aside>
-      <div className="lib-main">
-        <div className="panel-filter">
-          <input
-            data-autofocus
-            type="search"
-            placeholder="Filter types, interfaces, members and modules"
-            aria-label="Filter the dependency"
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-          />
-        </div>
-        {lib ? (
-          <DependencyDetail key={lib.id} lib={lib} filter={filter} />
-        ) : (
-          <p className="muted lib-none">No dependency selected.</p>
-        )}
-      </div>
     </div>
   )
 }

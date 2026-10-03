@@ -732,23 +732,6 @@ const allCommands: Command[] = [
 
   // Window
   { id: 'window.explorer', title: 'Explorer', category: 'Window', run: tool('explorer') },
-  {
-    id: 'window.modules',
-    title: 'Modules',
-    category: 'Window',
-    keys: ['Ctrl+Shift+O'],
-    global: true,
-    run: tool('modules')
-  },
-  {
-    id: 'window.links',
-    title: 'Links',
-    category: 'Window',
-    keys: ['Ctrl+Shift+L'],
-    global: true,
-    run: tool('links')
-  },
-  { id: 'window.dependencies', title: 'Dependencies', category: 'Window', run: tool('dependencies') },
   { id: 'window.generation', title: 'Code generation', category: 'Window', run: tool('generation') },
   {
     id: 'window.inspector',

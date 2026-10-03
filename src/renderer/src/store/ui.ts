@@ -41,8 +41,6 @@ interface UiState {
   renaming: Id | null
   /** Zoom of the focused canvas, for the status bar. */
   zoom: number
-  /** Dependency shown in the Dependencies panel (the first one when unset). */
-  dependency: Id | null
 }
 
 export const useUiStore = create<UiState>(() => ({
@@ -54,8 +52,7 @@ export const useUiStore = create<UiState>(() => ({
   shortcutsOpen: false,
   aboutOpen: false,
   renaming: null,
-  zoom: 1,
-  dependency: null
+  zoom: 1
 }))
 
 /** Show an entity in the inspector; it also becomes the selection that copy / delete act on. */
