@@ -1,6 +1,6 @@
 // Collapsible panel section whose header drags to reorder it among the sections of the same drag type
 // (Alt+Up / Alt+Down on its toggle as well). Used by the Explorer and the Code generation panel.
-import { useId, useState, type DragEvent, type MouseEvent, type ReactNode } from 'react'
+import { useId, useState, type CSSProperties, type DragEvent, type MouseEvent, type ReactNode } from 'react'
 import { Icon } from './Icon'
 
 /** Saved order of `all`; sections it lacks (added later) go after the section preceding them by default. */
@@ -50,6 +50,9 @@ export function FoldSection(props: {
   title: ReactNode
   actions?: ReactNode
   className?: string
+  /** Place among the sections of a `.stacked-sections` list: the header sticks below the headers before it
+   * and above the headers after it. */
+  stack?: { index: number; count: number }
   /** Puts section `from` before or after this one. */
   onPlace: (from: string, after: boolean) => void
   /** Moves this section past its neighbor above (-1) or below (1). */
@@ -71,9 +74,11 @@ export function FoldSection(props: {
       r.height || !el.lastElementChild ? r.bottom : el.lastElementChild.getBoundingClientRect().bottom
     return e.clientY < (top + bottom) / 2 ? 'before' : 'after'
   }
+  const { stack } = props
   return (
     <section
-      className={`explorer-section ${props.className ?? ''} ${open ? 'open' : ''} ${drop ? `drop-${drop}` : ''}`}
+      className={`explorer-section ${props.className ?? ''} ${stack ? 'stacked' : ''} ${open ? 'open' : ''} ${drop ? `drop-${drop}` : ''}`}
+      style={stack && ({ '--above': stack.index, '--below': stack.count - 1 - stack.index } as CSSProperties)}
       onDragOver={(e) => {
         if (!e.dataTransfer.types.includes(props.dragType)) return
         e.preventDefault()

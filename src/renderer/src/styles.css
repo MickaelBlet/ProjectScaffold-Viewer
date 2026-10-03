@@ -405,47 +405,45 @@ button.link-button:hover {
 .code-editor .cm-userMarker {
   background: color-mix(in srgb, var(--ok) 16%, transparent);
 }
-/* Code generation panel: the filter stays on top, the sections scroll under it. Sections have no box of
-   their own, so every header sticks in the whole list: always in view, stacked at its top or bottom. */
-.generation-panel {
+/* Explorer and Code generation panel: the filter stays on top, the sections scroll under it. Stacked sections
+   have no box of their own, so every header sticks in the whole list: always in view, stacked at its top
+   or bottom (--above / --below: headers before / after it, set by FoldSection). */
+:is(.explorer, .generation-panel) {
   display: flex;
   flex-direction: column;
   height: 100%;
 }
-.generation-sections {
+.stacked-sections {
+  --section-header: 24px;
   flex: 1;
   min-height: 0;
   overflow: auto;
 }
-.generation-sections {
-  --section-header: 24px;
-}
-.generation-section {
+.explorer-section.stacked {
   display: contents;
 }
-.generation-section > header {
+.explorer-section.stacked > header {
   position: sticky;
-  top: 0;
-  bottom: 0;
+  top: calc(var(--above) * var(--section-header));
+  bottom: calc(var(--below) * var(--section-header));
   z-index: 1;
+  box-sizing: border-box;
   height: var(--section-header);
   background: var(--panel);
 }
-/* Two sections: the second's header below the first's at the top, the first's above it at the bottom. */
-.generation-section:not(:first-child) > header {
-  top: var(--section-header);
-}
-.generation-section:not(:last-child) > header {
-  bottom: var(--section-header);
-}
-.generation-section.drop-before > header {
+.explorer-section.stacked.drop-before > header {
   box-shadow: inset 0 2px 0 var(--accent);
 }
-.generation-section.drop-after > :last-child {
+.explorer-section.stacked.drop-after > :last-child {
   box-shadow: inset 0 -2px 0 var(--accent);
 }
-.side-panel .generation-section > header {
+.side-panel .explorer-section.stacked > header {
   background: var(--vscode-sideBar-background, var(--panel));
+}
+/* Fixed header height: the actions stay on one row, cut when the panel is too narrow for them. */
+.explorer-section.stacked .explorer-actions {
+  flex-wrap: nowrap;
+  overflow: hidden;
 }
 .generation-section > header {
   /* The toggle (title, listing label truncated) takes the row. */

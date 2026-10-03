@@ -261,6 +261,7 @@ function FileList(props: {
 
 function Section(props: {
   id: SectionId
+  stack: { index: number; count: number }
   title: string
   loaded: Loaded | null
   empty: ReactNode
@@ -276,6 +277,7 @@ function Section(props: {
       id={id}
       dragType={SECTION_DRAG}
       className="generation-section"
+      stack={props.stack}
       title={
         <>
           <span className="explorer-title">{props.title}</span>
@@ -408,12 +410,13 @@ export function GenerationPanel(): ReactNode {
           onChange={(e) => setQuery(e.target.value)}
         />
       </div>
-      <div className="generation-sections">
-        {order.map((id) =>
+      <div className="stacked-sections">
+        {order.map((id, index) =>
           id === 'templates' ? (
             <Section
               key={id}
               id={id}
+              stack={{ index, count: order.length }}
               title="Templates"
               loaded={templates}
               filter={filter}
@@ -427,6 +430,7 @@ export function GenerationPanel(): ReactNode {
             <Section
               key={id}
               id={id}
+              stack={{ index, count: order.length }}
               title="Generated"
               loaded={generated}
               filter={filter}
