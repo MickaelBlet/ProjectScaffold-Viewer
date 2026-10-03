@@ -148,7 +148,7 @@ const MENUS: [Category, string[]][] = [
       'window.resetLayout'
     ]
   ],
-  ['Help', ['help.shortcuts', 'view.palette', 'help.about']]
+  ['Help', ['help.shortcuts', 'view.palette', '-', 'help.resetData', '-', 'help.about']]
 ]
 
 // Every listed command must exist.

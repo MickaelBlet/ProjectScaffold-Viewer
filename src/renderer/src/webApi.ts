@@ -337,7 +337,11 @@ const SESSION_KEY = 'project-scaffold:session'
 /** Single unsaved document of earlier versions. */
 const LEGACY_DRAFT_KEY = 'project-scaffold:draft'
 
+/** Set once the stored data is cleared: the page reloads without writing its session back. */
+let cleared = false
+
 function saveSession(session: Session): void {
+  if (cleared) return
   try {
     localStorage.setItem(SESSION_KEY, JSON.stringify(session))
     localStorage.removeItem(LEGACY_DRAFT_KEY)
@@ -706,6 +710,37 @@ async function templateDir(req: TemplateDirRequest): Promise<OutputDir | null> {
 
 let dirty = false
 
+function deleteDatabase(name: string): Promise<void> {
+  return new Promise((done) => {
+    const req = indexedDB.deleteDatabase(name)
+    req.onsuccess = req.onerror = req.onblocked = () => done()
+  })
+}
+
+async function clearStorage(): Promise<void> {
+  cleared = true
+  dirty = false
+  try {
+    localStorage.clear()
+    sessionStorage.clear()
+  } catch {
+    // Blocked storage: nothing stored.
+  }
+  try {
+    const dbs = indexedDB.databases ? await indexedDB.databases() : [{ name: DB_NAME }]
+    await Promise.all(dbs.flatMap((db) => (db.name ? [deleteDatabase(db.name)] : [])))
+  } catch {
+    // IndexedDB unavailable.
+  }
+  try {
+    if ('caches' in window) await Promise.all((await caches.keys()).map((key) => caches.delete(key)))
+    const workers = (await navigator.serviceWorker?.getRegistrations()) ?? []
+    await Promise.all(workers.map((w) => w.unregister()))
+  } catch {
+    // Opaque origin (file://): no caches.
+  }
+}
+
 const webApi: Api = {
   openFile,
   openFiles: (filter) => pickFiles(true, filter),
@@ -738,6 +773,7 @@ const webApi: Api = {
   },
   saveSession,
   loadSession,
+  clearStorage,
   readWorkspace,
   saveImage: (name, dataUrl) => {
     downloadUrl(name, dataUrl)

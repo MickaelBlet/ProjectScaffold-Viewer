@@ -135,6 +135,15 @@ const docCommands: Command[] = Array.from({ length: 9 }, (_, i) => ({
   }
 }))
 
+/** Clears everything the page stores in the browser, then reloads it. */
+async function resetAppData(): Promise<void> {
+  const message =
+    'Reset all data stored in this browser (settings, panel layout, recent files, open documents) and reload? Unsaved changes are lost.'
+  if (!window.confirm(message)) return
+  await window.api.clearStorage?.()
+  location.reload()
+}
+
 const allCommands: Command[] = [
   // File
   { id: 'file.new', title: 'New project', category: 'File', keys: ['Alt+N'], global: true, run: newProject },
@@ -802,6 +811,12 @@ const allCommands: Command[] = [
     run: () => useUiStore.setState({ shortcutsOpen: true })
   },
   {
+    id: 'help.resetData',
+    title: 'Reset app data…',
+    category: 'Help',
+    run: () => void resetAppData()
+  },
+  {
     id: 'help.about',
     title: 'About ProjectScaffold',
     category: 'Help',
@@ -822,7 +837,9 @@ const DOCUMENT_COMMANDS = new Set([
   'file.close',
   'window.nextDoc',
   'window.prevDoc',
-  ...docCommands.map((c) => c.id)
+  ...docCommands.map((c) => c.id),
+  // VS Code keeps the preferences in its own state.
+  'help.resetData'
 ])
 
 export const commands: Command[] = IN_VSCODE

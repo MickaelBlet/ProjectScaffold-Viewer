@@ -96,6 +96,11 @@ export interface Api {
   /** The open documents of the previous page load. */
   loadSession(): Promise<Session | null>
   /**
+   * Deletes everything the page stores (preferences, recent files, session, caches) and stops
+   * storing the session until the page reloads. Absent when the host keeps the data (VS Code).
+   */
+  clearStorage?(): Promise<void>
+  /**
    * Reads the project files a workspace file lists, relative to its folder (asking for the folder
    * when needed): each file, or null when it cannot be read. Null when cancelled. Absent when the
    * host opens documents one by one (VS Code).
