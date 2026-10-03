@@ -84,3 +84,18 @@ export function rowAt(y: number, offset: number, rowHeight: number, rowCount: nu
 export function rulerRow(y: number, mapHeight: number, rowCount: number): number {
   return mapHeight > 0 ? clamp(Math.floor((y / mapHeight) * rowCount), 0, Math.max(0, rowCount - 1)) : 0
 }
+
+/**
+ * Tops of section header labels `height` tall at sorted `tops`: each pushed below the one above it,
+ * left out (null) when pushed down to the next header.
+ */
+export function placeLabels(tops: readonly number[], height: number): (number | null)[] {
+  let bottom = -Infinity
+  return tops.map((top, i) => {
+    const at = Math.max(top, bottom)
+    const next = tops[i + 1]
+    if (next !== undefined && at >= next) return null
+    bottom = at + height
+    return at
+  })
+}

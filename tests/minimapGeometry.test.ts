@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   mapGeometry,
+  placeLabels,
   rowAt,
   rowOfLine,
   rulerRow,
@@ -76,5 +77,13 @@ describe('minimap geometry', () => {
     expect(rowAt(1000, 0, 2, 100)).toBe(99)
     expect(rulerRow(200, 400, 1000)).toBe(500)
     expect(rulerRow(400, 400, 1000)).toBe(999)
+  })
+})
+
+describe('minimap section labels', () => {
+  it('keeps labels apart', () => {
+    expect(placeLabels([0, 40, 100], 10)).toEqual([0, 40, 100])
+    expect(placeLabels([0, 4, 100], 10)).toEqual([0, 10, 100])
+    expect(placeLabels([0, 4, 8, 12], 10)).toEqual([0, null, 10, 20])
   })
 })

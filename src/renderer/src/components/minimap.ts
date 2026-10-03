@@ -11,6 +11,7 @@ import { highlightTree } from '@lezer/highlight'
 import { highlight } from './codeTheme'
 import {
   mapGeometry,
+  placeLabels,
   rowAt,
   rowOfLine,
   rulerRow,
@@ -42,6 +43,8 @@ const WIDTH = TEXT_WIDTH + RULER
 const COLUMNS = Math.floor((TEXT_WIDTH - PAD) / COLUMN)
 /** Narrower editors have no minimap. */
 const MIN_EDITOR_WIDTH = 360
+/** Section header label, its rule above. */
+const LABEL_HEIGHT = 11
 /** Matches marked at most. */
 const MAX_MATCHES = 5000
 
@@ -460,20 +463,28 @@ class Minimap {
         )
     }
 
-    // Section headers: a rule and the name over the lines below it.
+    // Section headers: a rule and the name over the lines below it, names kept apart.
     ctx.font = '600 8px system-ui, sans-serif'
     ctx.textBaseline = 'top'
-    for (const { line, label } of this.headers) {
+    const headers = this.headers.filter(({ line }) => rows[rowOfLine(rows, line)] === line)
+    const places = placeLabels(
+      headers.map(({ line }) => rowOfLine(rows, line) * ROW),
+      LABEL_HEIGHT
+    )
+    for (const { line } of headers) {
       const row = rowOfLine(rows, line)
-      if (rows[row] !== line || row < startRow - 6 || row >= endRow) continue
-      const y = rowY(row)
-      fill(colors.muted, 0.6, 0, y, TEXT_WIDTH, 1)
+      if (row >= startRow && row < endRow) fill(colors.muted, 0.6, 0, rowY(row), TEXT_WIDTH, 1)
+    }
+    headers.forEach(({ label }, i) => {
+      const at = places[i]
+      if (at == null || at + LABEL_HEIGHT <= offset || at >= offset + mapHeight) return
+      const y = at - offset
       const width = Math.min(TEXT_WIDTH - PAD, ctx.measureText(label).width + 4)
-      fill(colors.panel, 0.85, PAD - 2, y + 1, width, 10)
+      fill(colors.panel, 0.85, PAD - 2, y + 1, width, LABEL_HEIGHT - 1)
       ctx.globalAlpha = 1
       ctx.fillStyle = colors.text
       ctx.fillText(label, PAD, y + 2, TEXT_WIDTH - 2 * PAD)
-    }
+    })
 
     // Overview ruler: the whole text.
     const rulerY = (line: number): number =>
