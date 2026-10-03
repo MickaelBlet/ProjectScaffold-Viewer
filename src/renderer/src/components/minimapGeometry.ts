@@ -127,3 +127,21 @@ export function placeLabels(tops: readonly number[], height: number): (number | 
     return at
   })
 }
+
+/** Row at a height of the overview ruler, which spans all rows. */
+export function rulerRow(y: number, mapHeight: number, rowCount: number): number {
+  return mapHeight > 0 ? clamp(Math.floor((y / mapHeight) * rowCount), 0, Math.max(0, rowCount - 1)) : 0
+}
+
+/** Top and height of the thumb of a scrollbar `track` long, at least `minLength`. */
+export function scrollbarThumb(
+  track: number,
+  scrollTop: number,
+  scrollHeight: number,
+  clientHeight: number,
+  minLength: number
+): [number, number] {
+  if (scrollHeight <= clientHeight) return [0, track]
+  const height = Math.min(track, Math.max(minLength, (track * clientHeight) / scrollHeight))
+  return [(track - height) * clamp(scrollTop / (scrollHeight - clientHeight), 0, 1), height]
+}

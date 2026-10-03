@@ -4,6 +4,8 @@ import {
   placeLabels,
   rowAt,
   rowOfLine,
+  rulerRow,
+  scrollbarThumb,
   scrollForDrag,
   visibleLines,
   wrapColumns,
@@ -94,6 +96,8 @@ describe('minimap geometry', () => {
     expect(rowAt(11, 0, 2, 100)).toBe(5)
     expect(rowAt(11, 100, 2, 100)).toBe(55)
     expect(rowAt(1000, 0, 2, 100)).toBe(99)
+    expect(rulerRow(200, 400, 1000)).toBe(500)
+    expect(rulerRow(400, 400, 1000)).toBe(999)
   })
 })
 
@@ -102,5 +106,14 @@ describe('minimap section labels', () => {
     expect(placeLabels([0, 40, 100], 10)).toEqual([0, 40, 100])
     expect(placeLabels([0, 4, 100], 10)).toEqual([0, 10, 100])
     expect(placeLabels([0, 4, 8, 12], 10)).toEqual([0, null, 10, 20])
+  })
+})
+
+describe('scrollbar thumb', () => {
+  it('spans the track in proportion to the view', () => {
+    expect(scrollbarThumb(400, 0, 400, 400, 10)).toEqual([0, 400])
+    expect(scrollbarThumb(400, 0, 1600, 400, 10)).toEqual([0, 100])
+    expect(scrollbarThumb(400, 1200, 1600, 400, 10)).toEqual([300, 100])
+    expect(scrollbarThumb(400, 50000, 100400, 400, 10)).toEqual([195, 10])
   })
 })

@@ -14,7 +14,9 @@ import {
   placeLabels,
   rowAt,
   rowOfLine,
+  rulerRow,
   scrollForDrag,
+  scrollbarThumb,
   visibleLines,
   wrapColumns,
   type MapGeometry,
@@ -44,6 +46,9 @@ const MIN_EDITOR_WIDTH = 360
 const LABEL_HEIGHT = 11
 /** Matches marked at most. */
 const MAX_MATCHES = 5000
+/** Least length of a scrollbar thumb, and room around it left to the native scrollbar. */
+const THUMB_MIN = 10
+const THUMB_SLACK = 2
 
 const HEADERS = {
   yaml: /^([A-Za-z_][\w-]*)\s*:/,
@@ -132,6 +137,7 @@ class Minimap {
   /** Last drawn layout, for the pointer. */
   layout: { input: MapInput; geometry: MapGeometry } | null = null
   drag: { y: number; scrollTop: number; input: MapInput } | null = null
+  rulerDrag: { y: number; scrollTop: number; track: number } | null = null
   observer: MutationObserver
   dark = window.matchMedia('(prefers-color-scheme: dark)')
 
@@ -156,6 +162,15 @@ class Minimap {
     this.dom.addEventListener('pointerup', this.onPointerUp)
     this.dom.addEventListener('pointercancel', this.onPointerUp)
     this.dom.addEventListener('wheel', this.onWheel, { passive: false })
+    // The ruler takes clicks on the scrollbar's track, to scroll to its marks; the thumb stays native.
+    this.ruler.addEventListener('mousedown', (e) => e.preventDefault())
+    this.ruler.addEventListener('pointerdown', this.onRulerDown)
+    this.ruler.addEventListener('pointermove', this.onRulerMove)
+    this.ruler.addEventListener('pointerup', this.onRulerUp)
+    this.ruler.addEventListener('pointercancel', this.onRulerUp)
+    this.ruler.addEventListener('wheel', this.onWheel, { passive: false })
+    view.dom.addEventListener('pointermove', this.onHover)
+    view.dom.addEventListener('pointerleave', this.onHover)
     view.scrollDOM.addEventListener('scroll', this.schedule)
     // Theme changes: the app's theme attribute, VS Code's body classes, the system scheme.
     this.observer = new MutationObserver(this.themeChanged)
@@ -187,6 +202,8 @@ class Minimap {
     this.observer.disconnect()
     this.dark.removeEventListener('change', this.themeChanged)
     this.view.scrollDOM.removeEventListener('scroll', this.schedule)
+    this.view.dom.removeEventListener('pointermove', this.onHover)
+    this.view.dom.removeEventListener('pointerleave', this.onHover)
     this.view.scrollDOM.style.paddingRight = ''
     this.dom.remove()
     this.ruler.remove()
@@ -610,6 +627,44 @@ class Minimap {
     this.drag = null
     this.dom.releasePointerCapture(e.pointerId)
     this.dom.classList.remove('cm-minimap-dragging')
+  }
+
+  /** Over the scrollbar's track the ruler takes the pointer, over its thumb the scrollbar does. */
+  onHover = (e: PointerEvent): void => {
+    if (this.rulerDrag) return
+    const r = this.ruler.getBoundingClientRect()
+    const y = e.clientY - r.top
+    let take =
+      e.type === 'pointermove' && e.clientX >= r.left && e.clientX < r.right && y >= 0 && y < r.height
+    if (take) {
+      const s = this.view.scrollDOM
+      const [top, height] = scrollbarThumb(r.height, s.scrollTop, s.scrollHeight, s.clientHeight, THUMB_MIN)
+      take = y < top - THUMB_SLACK || y > top + height + THUMB_SLACK
+    }
+    this.ruler.style.pointerEvents = take ? 'auto' : ''
+  }
+
+  /** Clicking the track centers the line of the marks there, dragging on scrolls like the thumb. */
+  onRulerDown = (e: PointerEvent): void => {
+    if (e.button !== 0) return
+    const r = this.ruler.getBoundingClientRect()
+    this.centerRow(rulerRow(e.clientY - r.top, r.height, this.rows.length))
+    this.rulerDrag = { y: e.clientY, scrollTop: this.view.scrollDOM.scrollTop, track: r.height }
+    this.ruler.setPointerCapture(e.pointerId)
+  }
+
+  onRulerMove = (e: PointerEvent): void => {
+    const drag = this.rulerDrag
+    if (!drag || drag.track <= 0) return
+    const s = this.view.scrollDOM
+    s.scrollTop = drag.scrollTop + ((e.clientY - drag.y) * s.scrollHeight) / drag.track
+  }
+
+  onRulerUp = (e: PointerEvent): void => {
+    if (!this.rulerDrag) return
+    this.rulerDrag = null
+    this.ruler.releasePointerCapture(e.pointerId)
+    this.onHover(e)
   }
 
   onWheel = (e: WheelEvent): void => {
