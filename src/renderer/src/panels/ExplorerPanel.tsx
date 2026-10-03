@@ -13,7 +13,17 @@ import {
 import { endpointLabel, findView, modulePaths, newId, uniqueName } from '@/model/project'
 import { removeBinary } from '@/model/binaries'
 import { formatValue } from '@/model/defaults'
-import { GLOBAL_VIEW, type Id, type Module, type View } from '@/model/types'
+import {
+  GLOBAL_VIEW,
+  type ConstDef,
+  type Dependency,
+  type Id,
+  type ImportedModule,
+  type Interface,
+  type Module,
+  type TypeDef,
+  type View
+} from '@/model/types'
 import { activeDoc, patchDoc, useDoc } from '@/store/documents'
 import {
   addConst,
@@ -81,6 +91,25 @@ const SECTION_TITLES: Record<SectionId, string> = {
 const SECTION_DRAG = 'application/x-explorer-section'
 
 const isSection = (s: string): s is SectionId => (SECTIONS as readonly string[]).includes(s)
+
+/** Groups of the content of a dependency, shown in the order of the sections of the same name. */
+const DEPENDENCY_GROUPS = ['constants', 'types', 'interfaces', 'modules'] as const
+type DependencyGroup = (typeof DEPENDENCY_GROUPS)[number]
+const isDependencyGroup = (s: SectionId): s is DependencyGroup =>
+  (DEPENDENCY_GROUPS as readonly string[]).includes(s)
+
+/** Row of the Dependencies section; `key` is the id of the entity it shows. */
+type DependencyRow = { key: string } & (
+  | { kind: 'dependency'; dep: Dependency; open: boolean }
+  | { kind: 'group'; dep: Dependency; group: DependencyGroup; count: number; open: boolean }
+  | { kind: 'const'; dep: Dependency; c: ConstDef }
+  | { kind: 'type'; e: TypeDef }
+  | { kind: 'interface'; e: Interface }
+  | { kind: 'module'; dep: Dependency; m: ImportedModule }
+)
+
+/** Left padding of a row of a tree at `depth`. */
+const indent = (depth: number): CSSProperties => ({ paddingLeft: 6 + depth * 14 })
 
 function shownSections(): SectionId[] {
   const { explorerOrder, explorerHidden } = useSettings.getState()
@@ -322,7 +351,7 @@ export function ExplorerPanel(): ReactNode {
   const links = useProjectStore((s) => s.project.links)
   const dependencies = useProjectStore((s) => s.project.dependencies)
   const binaries = useProjectStore((s) => s.project.binaries)
-  const [collapsed, setCollapsed] = useState<Set<Id>>(new Set())
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const selectedIds = useDoc((d) => d.selectedIds)
   // A single selected link is kept in `selection` only (`selectedIds` holds canvas nodes).
   const selectedLink = useDoc((d) => (d.selection?.kind === 'link' ? d.selection.id : null))
@@ -362,16 +391,43 @@ export function ExplorerPanel(): ReactNode {
   const shownInterfaces = ownInterfaces.filter((i) => match(i.name))
   const ownConsts = consts.filter((c) => !c.dependency)
   const shownConsts = ownConsts.filter((c) => match(c.name))
-  // Dependencies, each followed by its types, interfaces and placed modules (unless folded).
-  const shownDependencies = dependencies.map((dep) => ({
-    dep,
-    entities: [...types, ...interfaces].filter((e) => e.dependency === dep.id && match(e.name)),
-    placed: dep.modules.filter((m) => match(m.path))
-  }))
-  const dependencyIds = shownDependencies.flatMap(({ dep, entities, placed }) =>
-    collapsed.has(dep.id) ? [dep.id] : [dep.id, ...entities.map((e) => e.id), ...placed.map((m) => m.id)]
-  )
-  const toggle = (id: Id): void => {
+  // Dependencies, each with its constants, types, interfaces and placed modules in groups ordered as
+  // the sections; a dependency or a group folds (all open while filtering).
+  const isOpen = (key: string): boolean => !!f || !collapsed.has(key)
+  const dependencyRows: DependencyRow[] = []
+  for (const dep of dependencies) {
+    const all = match(dep.name)
+    const pick = <T,>(list: T[], name: (x: T) => string): T[] =>
+      all ? list : list.filter((x) => match(name(x)))
+    const groups: { [G in DependencyGroup]: DependencyRow[] } = {
+      constants: pick(
+        consts.filter((c) => c.dependency === dep.id),
+        (c) => c.name
+      ).map((c) => ({ kind: 'const', key: c.id, dep, c })),
+      types: pick(
+        types.filter((t) => t.dependency === dep.id),
+        (t) => t.name
+      ).map((e) => ({ kind: 'type', key: e.id, e })),
+      interfaces: pick(
+        interfaces.filter((i) => i.dependency === dep.id),
+        (i) => i.name
+      ).map((e) => ({ kind: 'interface', key: e.id, e })),
+      modules: pick(dep.modules, (m) => m.path).map((m) => ({ kind: 'module', key: m.id, dep, m }))
+    }
+    const shown = order.filter(isDependencyGroup).filter((g) => groups[g].length)
+    if (f && !all && !shown.length) continue
+    const open = isOpen(dep.id)
+    dependencyRows.push({ kind: 'dependency', key: dep.id, dep, open })
+    if (!open) continue
+    for (const group of shown) {
+      const key = `${dep.id}/${group}`
+      const groupOpen = isOpen(key)
+      dependencyRows.push({ kind: 'group', key, dep, group, count: groups[group].length, open: groupOpen })
+      if (groupOpen) dependencyRows.push(...groups[group])
+    }
+  }
+  const dependencyIds = dependencyRows.map((r) => r.key)
+  const toggle = (id: string): void => {
     const next = new Set(collapsed)
     if (!next.delete(id)) next.add(id)
     setCollapsed(next)
@@ -406,6 +462,143 @@ export function ExplorerPanel(): ReactNode {
     () => false
   )
   const linkStop = tabStop(linkIds, isSelected)
+
+  /** Right expands, Left collapses a dependency or a group, as in Modules. */
+  const foldKeys = (key: string, open: boolean) => (e: KeyboardEvent) => {
+    if (f || e.key !== (open ? 'ArrowLeft' : 'ArrowRight')) return
+    e.preventDefault()
+    toggle(key)
+  }
+  const chevron = (open: boolean): ReactNode => (
+    <span className="chevron" aria-hidden>
+      <Icon name={open ? 'chevron-down' : 'chevron-right'} />
+    </span>
+  )
+  const leaf = <span className="chevron" aria-hidden />
+  const dependencyRow = (r: DependencyRow): ReactNode => {
+    const stop = r.key === dependencyStop
+    switch (r.kind) {
+      case 'dependency':
+        return (
+          <Item
+            key={r.key}
+            tabStop={stop}
+            selected={false}
+            className="dependency"
+            title={`${r.dep.file}${r.dep.indirect ? ' (used by another dependency)' : ''}${r.dep.uses.length ? `\nUses ${r.dep.uses.join(', ')}` : ''}`}
+            style={indent(0)}
+            onClick={() => toggle(r.key)}
+            onKeyDown={foldKeys(r.key, r.open)}
+            onDoubleClick={() => showDependency(r.dep.id)}
+            onContextMenu={(e) => dependencyMenu(e, r.dep)}
+          >
+            {chevron(r.open)}
+            <span className="kind-badge dependency">D</span>
+            {r.dep.name}
+            <small>{r.dep.indirect ? 'indirect' : r.dep.file}</small>
+          </Item>
+        )
+      case 'group':
+        return (
+          <Item
+            key={r.key}
+            tabStop={stop}
+            selected={false}
+            className="dependency-group"
+            title={r.group === 'modules' ? 'Its modules placed on the canvas' : undefined}
+            style={indent(1)}
+            onClick={() => toggle(r.key)}
+            onKeyDown={foldKeys(r.key, r.open)}
+            onContextMenu={(e) => dependencyMenu(e, r.dep)}
+          >
+            {chevron(r.open)}
+            {SECTION_TITLES[r.group]}
+            <small>{r.count}</small>
+          </Item>
+        )
+      case 'const':
+        return (
+          <Item
+            key={r.key}
+            tabStop={stop}
+            selected={false}
+            title={`${r.c.description ? `${r.c.description}\n` : ''}Double-click: show in Dependencies.`}
+            style={indent(2)}
+            onClick={() => undefined}
+            onDoubleClick={() => showDependency(r.dep.id)}
+            onContextMenu={(e) => {
+              e.preventDefault()
+              openContextMenu(e, [
+                { label: 'Show in Dependencies', run: () => showDependency(r.dep.id) },
+                { label: `Open ${r.dep.file}`, run: () => openImportSource(r.dep.file) }
+              ])
+            }}
+          >
+            {leaf}
+            <span className="kind-badge const">C</span>
+            {r.c.name}
+            <small>{formatValue(r.c.value)}</small>
+          </Item>
+        )
+      case 'type':
+      case 'interface': {
+        const { kind, e } = r
+        return (
+          <Item
+            key={r.key}
+            tabStop={stop}
+            selected={isSelected(e.id)}
+            className={isSelected(e.id) ? 'active' : ''}
+            style={indent(2)}
+            onClick={(ev) => clickItem(ev, e.id, dependencyIds)}
+            onDoubleClick={() => openEditor(kind, e.id)}
+            onContextMenu={(ev) => entityMenu(ev, kind, e.id)}
+          >
+            {leaf}
+            {r.kind === 'interface' ? (
+              <span className="kind-badge interface">I</span>
+            ) : (
+              <span className={`kind-badge ${r.e.kind}`} title={r.e.kind}>
+                {KIND_BADGE[r.e.kind]}
+              </span>
+            )}
+            {e.name}
+            {r.kind === 'interface' && <small>{r.e.messages.length} msg</small>}
+          </Item>
+        )
+      }
+      case 'module': {
+        const { dep, m } = r
+        return (
+          <Item
+            key={r.key}
+            tabStop={stop}
+            selected={isSelected(m.id)}
+            className={isSelected(m.id) ? 'active' : ''}
+            title={`${m.path}, placed on the canvas`}
+            style={indent(2)}
+            onClick={(ev) => clickItem(ev, m.id, dependencyIds)}
+            onDoubleClick={() => navigate({ kind: 'module', id: m.id })}
+            onContextMenu={(ev) => {
+              ev.preventDefault()
+              select({ kind: 'imported', id: m.id })
+              openContextMenu(ev, [
+                { label: 'Show on the canvas', run: () => navigate({ kind: 'module', id: m.id }) },
+                { label: `Open ${dep.file}`, run: () => openImportSource(dep.file) },
+                'separator',
+                { label: 'Remove from this project', danger: true, run: () => deleteItems([m.id]) }
+              ])
+            }}
+          >
+            {leaf}
+            <span className="kind-badge mod">M</span>
+            {m.path}
+            <small>{m.ports.length ? `${m.ports.length}p` : ''}</small>
+          </Item>
+        )
+      }
+    }
+  }
 
   const sections: Record<SectionId, ReactNode> = {
     views: (
@@ -459,73 +652,10 @@ export function ExplorerPanel(): ReactNode {
         }
       >
         <EntityList label="Dependencies" multiselectable>
-          {shownDependencies.map(({ dep, entities, placed }) => [
-            <Item
-              key={dep.id}
-              selected={false}
-              tabStop={dep.id === dependencyStop}
-              className="dependency"
-              title={`${dep.file}${dep.indirect ? ' (used by another dependency)' : ''}${dep.uses.length ? `\nUses ${dep.uses.join(', ')}` : ''}`}
-              onClick={() => toggle(dep.id)}
-              onDoubleClick={() => showDependency(dep.id)}
-              onContextMenu={(e) => dependencyMenu(e, dep)}
-            >
-              <Icon name={collapsed.has(dep.id) ? 'chevron-right' : 'chevron-down'} />
-              <span className="kind-badge dependency">D</span>
-              {dep.name}
-              <small>{dep.indirect ? 'indirect' : dep.file}</small>
-            </Item>,
-            ...(collapsed.has(dep.id) ? [] : entities).map((e) => {
-              const kind = 'messages' in e ? 'interface' : 'type'
-              return (
-                <Item
-                  key={e.id}
-                  selected={isSelected(e.id)}
-                  tabStop={e.id === dependencyStop}
-                  className={`nested ${isSelected(e.id) ? 'active' : ''}`}
-                  onClick={(ev) => clickItem(ev, e.id, dependencyIds)}
-                  onDoubleClick={() => openEditor(kind, e.id)}
-                  onContextMenu={(ev) => entityMenu(ev, kind, e.id)}
-                >
-                  {'messages' in e ? (
-                    <span className="kind-badge interface">I</span>
-                  ) : (
-                    <span className={`kind-badge ${e.kind}`} title={e.kind}>
-                      {KIND_BADGE[e.kind]}
-                    </span>
-                  )}
-                  {e.name}
-                  {'messages' in e && <small>{e.messages.length} msg</small>}
-                </Item>
-              )
-            }),
-            ...(collapsed.has(dep.id) ? [] : placed).map((m) => (
-              <Item
-                key={m.id}
-                selected={isSelected(m.id)}
-                tabStop={m.id === dependencyStop}
-                className={`nested ${isSelected(m.id) ? 'active' : ''}`}
-                title={`${m.path}, placed on the canvas`}
-                onClick={(ev) => clickItem(ev, m.id, dependencyIds)}
-                onDoubleClick={() => navigate({ kind: 'module', id: m.id })}
-                onContextMenu={(ev) => {
-                  ev.preventDefault()
-                  select({ kind: 'imported', id: m.id })
-                  openContextMenu(ev, [
-                    { label: 'Show on the canvas', run: () => navigate({ kind: 'module', id: m.id }) },
-                    { label: `Open ${dep.file}`, run: () => openImportSource(dep.file) },
-                    'separator',
-                    { label: 'Remove from this project', danger: true, run: () => deleteItems([m.id]) }
-                  ])
-                }}
-              >
-                <span className="kind-badge mod">M</span>
-                {m.path}
-                <small>on canvas</small>
-              </Item>
-            ))
-          ])}
-          {!dependencies.length && <Empty>No dependencies: Insert › Add dependency…</Empty>}
+          {dependencyRows.map(dependencyRow)}
+          {!dependencyRows.length && (
+            <Empty>{dependencies.length ? 'No match' : 'No dependencies: Insert › Add dependency…'}</Empty>
+          )}
         </EntityList>
       </Section>
     ),
@@ -729,7 +859,7 @@ export function ExplorerPanel(): ReactNode {
               tabStop={m.id === moduleStop}
               className={isSelected(m.id) ? 'active' : ''}
               title={paths.get(m.id)}
-              style={{ paddingLeft: 6 + depth * 14 }}
+              style={indent(depth)}
               onClick={(e) => clickItem(e, m.id, moduleIds)}
               onKeyDown={(e) => {
                 // Right expands, Left collapses, as in Modules.
