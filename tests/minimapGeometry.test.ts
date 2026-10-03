@@ -4,7 +4,6 @@ import {
   placeLabels,
   rowAt,
   rowOfLine,
-  rulerRow,
   scrollForDrag,
   visibleLines,
   wrapColumns,
@@ -95,8 +94,6 @@ describe('minimap geometry', () => {
     expect(rowAt(11, 0, 2, 100)).toBe(5)
     expect(rowAt(11, 100, 2, 100)).toBe(55)
     expect(rowAt(1000, 0, 2, 100)).toBe(99)
-    expect(rulerRow(200, 400, 1000)).toBe(500)
-    expect(rulerRow(400, 400, 1000)).toBe(999)
   })
 })
 

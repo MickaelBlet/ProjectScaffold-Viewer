@@ -1,7 +1,7 @@
 // Minimap of the code editors, like VS Code's: the text drawn small on the right of the editor with
 // its syntax colors, a slider over the lines in view, the caret lines, selections, search and
-// selection matches, problems and section headers. An overview ruler on its right edge spans the
-// whole text.
+// selection matches, problems and section headers. The editor's scrollbar stays on its right, over
+// an overview ruler marking them across the whole text.
 import { foldedRanges, syntaxTree } from '@codemirror/language'
 import { forEachDiagnostic } from '@codemirror/lint'
 import { getSearchQuery, SearchCursor, searchPanelOpen } from '@codemirror/search'
@@ -14,7 +14,6 @@ import {
   placeLabels,
   rowAt,
   rowOfLine,
-  rulerRow,
   scrollForDrag,
   visibleLines,
   wrapColumns,
@@ -37,10 +36,7 @@ const config = Facet.define<MinimapOptions, MinimapOptions | null>({ combine: (v
 const ROW = 2
 const COLUMN = 1
 const PAD = 4
-/** Text area, overview ruler on its right. */
 const TEXT_WIDTH = 96
-const RULER = 6
-const WIDTH = TEXT_WIDTH + RULER
 const COLUMNS = Math.floor((TEXT_WIDTH - PAD) / COLUMN)
 /** Narrower editors have no minimap. */
 const MIN_EDITOR_WIDTH = 360
@@ -104,11 +100,15 @@ interface Measured {
   lastPart: number
   /** Columns of the wrapped lines, 0 without wrapping. */
   wrap: number
+  /** Width of the editor's vertical scrollbar, where the overview ruler goes. */
+  scrollbar: number
 }
 
 class Minimap {
   dom: HTMLDivElement
   canvas: HTMLCanvasElement
+  /** Overview ruler, under the editor's scrollbar; lets the pointer through to it. */
+  ruler: HTMLCanvasElement
   slider: HTMLDivElement
   hidden = true
   opts: MinimapOptions
@@ -145,7 +145,10 @@ class Minimap {
     this.slider = document.createElement('div')
     this.slider.className = 'cm-minimap-slider'
     this.dom.append(this.canvas, this.slider)
-    view.dom.appendChild(this.dom)
+    this.ruler = document.createElement('canvas')
+    this.ruler.className = 'cm-minimap-ruler'
+    this.ruler.setAttribute('aria-hidden', 'true')
+    view.dom.append(this.dom, this.ruler)
 
     this.dom.addEventListener('mousedown', (e) => e.preventDefault())
     this.dom.addEventListener('pointerdown', this.onPointerDown)
@@ -184,8 +187,9 @@ class Minimap {
     this.observer.disconnect()
     this.dark.removeEventListener('change', this.themeChanged)
     this.view.scrollDOM.removeEventListener('scroll', this.schedule)
-    this.view.scrollDOM.style.marginRight = ''
+    this.view.scrollDOM.style.paddingRight = ''
     this.dom.remove()
+    this.ruler.remove()
   }
 
   themeChanged = (): void => {
@@ -223,7 +227,8 @@ class Minimap {
       firstPart,
       lastLine,
       lastPart,
-      wrap: view.lineWrapping ? this.wrapWidth() : 0
+      wrap: view.lineWrapping ? this.wrapWidth() : 0,
+      scrollbar: s.offsetWidth - s.clientWidth
     }
   }
 
@@ -376,8 +381,10 @@ class Minimap {
     if (hide !== this.hidden) {
       this.hidden = hide
       this.dom.style.display = hide ? 'none' : ''
-      view.scrollDOM.style.marginRight = hide ? '' : `${WIDTH}px`
+      // The text stops before the minimap, the scrollbar stays at the editor's right edge.
+      view.scrollDOM.style.paddingRight = hide ? '' : `${TEXT_WIDTH}px`
     }
+    this.ruler.style.display = hide || m.scrollbar <= 0 ? 'none' : ''
     if (hide) {
       this.layout = null
       return
@@ -394,14 +401,9 @@ class Minimap {
     const mapHeight = m.height
     this.dom.style.top = `${m.top}px`
     this.dom.style.height = `${mapHeight}px`
-    const w = Math.round(WIDTH * m.dpr)
-    const h = Math.round(mapHeight * m.dpr)
-    if (this.canvas.width !== w) this.canvas.width = w
-    if (this.canvas.height !== h) this.canvas.height = h
-    const ctx = this.canvas.getContext('2d')
+    this.dom.style.right = `${m.scrollbar}px`
+    const ctx = context(this.canvas, TEXT_WIDTH, mapHeight, m.dpr)
     if (!ctx) return
-    ctx.setTransform(m.dpr, 0, 0, m.dpr, 0, 0)
-    ctx.clearRect(0, 0, WIDTH, mapHeight)
 
     const input: MapInput = {
       rowCount: rows.length,
@@ -524,26 +526,35 @@ class Minimap {
       ctx.fillText(label, PAD, y + 2, TEXT_WIDTH - 2 * PAD)
     })
 
-    // Overview ruler: the whole text.
-    const rulerY = (line: number): number =>
-      rows.length ? (rowOfLine(rows, line) / rows.length) * mapHeight : 0
-    fill(colors.border, 1, TEXT_WIDTH, 0, 1, mapHeight)
-    const half = (RULER - 1) / 2
-    for (const mark of this.selectionMarks)
-      fill(colors.accent, 0.8, TEXT_WIDTH + 1, rulerY(mark.line), half, 2)
-    for (const mark of this.searchMarks) fill(colors.warning, 0.9, TEXT_WIDTH + 1, rulerY(mark.line), half, 2)
-    for (const [line, severity] of this.diagnostics)
-      if (severity !== 'info')
-        fill(
-          severity === 'error' ? colors.danger : colors.warning,
-          1,
-          TEXT_WIDTH + 1 + half,
-          rulerY(line),
-          half,
-          3
-        )
-    for (const r of state.selection.ranges)
-      fill(colors.text, 0.8, TEXT_WIDTH + 1, rulerY(doc.lineAt(r.head).number), RULER - 1, 2)
+    // Overview ruler: the whole text, under the scrollbar.
+    const rulerWidth = m.scrollbar
+    const rc = rulerWidth > 0 ? context(this.ruler, rulerWidth, mapHeight, m.dpr) : null
+    if (rc) {
+      this.ruler.style.top = `${m.top}px`
+      this.ruler.style.width = `${rulerWidth}px`
+      this.ruler.style.height = `${mapHeight}px`
+      const mark = (
+        color: string,
+        alpha: number,
+        x: number,
+        line: number,
+        width: number,
+        height: number
+      ): void => {
+        rc.globalAlpha = alpha
+        rc.fillStyle = color
+        rc.fillRect(x, rows.length ? (rowOfLine(rows, line) / rows.length) * mapHeight : 0, width, height)
+      }
+      const half = rulerWidth / 2
+      for (const sm of this.selectionMarks) mark(colors.accent, 0.8, 0, sm.line, half, 2)
+      for (const sm of this.searchMarks) mark(colors.warning, 0.9, 0, sm.line, half, 2)
+      for (const [line, severity] of this.diagnostics)
+        if (severity !== 'info')
+          mark(severity === 'error' ? colors.danger : colors.warning, 1, half, line, half, 3)
+      for (const r of state.selection.ranges)
+        mark(colors.text, 0.8, 0, doc.lineAt(r.head).number, rulerWidth, 2)
+      rc.globalAlpha = 1
+    }
     ctx.globalAlpha = 1
 
     this.slider.style.top = `${geometry.sliderTop}px`
@@ -580,13 +591,7 @@ class Minimap {
   onPointerDown = (e: PointerEvent): void => {
     if (e.button !== 0 || !this.layout) return
     const { input, geometry } = this.layout
-    const box = this.dom.getBoundingClientRect()
-    const x = e.clientX - box.left
-    const y = e.clientY - box.top
-    if (x >= TEXT_WIDTH) {
-      this.centerRow(rulerRow(y, input.mapHeight, this.rows.length))
-      return
-    }
+    const y = e.clientY - this.dom.getBoundingClientRect().top
     if (y < geometry.sliderTop || y > geometry.sliderTop + geometry.sliderHeight)
       this.centerRow(rowAt(y, geometry.offset, ROW, this.rows.length))
     this.drag = { y: e.clientY, scrollTop: this.view.scrollDOM.scrollTop, input }
@@ -615,6 +620,24 @@ class Minimap {
   }
 }
 
+/** 2D context of a canvas sized `width` × `height` CSS pixels, cleared. */
+function context(
+  canvas: HTMLCanvasElement,
+  width: number,
+  height: number,
+  dpr: number
+): CanvasRenderingContext2D | null {
+  const w = Math.round(width * dpr)
+  const h = Math.round(height * dpr)
+  if (canvas.width !== w) canvas.width = w
+  if (canvas.height !== h) canvas.height = h
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return null
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+  ctx.clearRect(0, 0, width, height)
+  return ctx
+}
+
 /** Columns of matches, at most MAX_MATCHES. */
 function marks(state: EditorState, cursor: Iterator<{ from: number; to: number }>): Mark[] {
   const doc = state.doc
@@ -629,19 +652,23 @@ function marks(state: EditorState, cursor: Iterator<{ from: number; to: number }
   return out
 }
 
-const plugin = ViewPlugin.fromClass(Minimap)
+const plugin = ViewPlugin.fromClass(Minimap, {
+  // Keeps the caret out from under the minimap when scrolling to it.
+  provide: (p) =>
+    EditorView.scrollMargins.of((view) => (view.plugin(p)?.hidden === false ? { right: TEXT_WIDTH } : null))
+})
 
 const theme = EditorView.theme({
   '.cm-minimap': {
     position: 'absolute',
-    right: 0,
-    width: `${WIDTH}px`,
+    width: `${TEXT_WIDTH}px`,
     backgroundColor: 'var(--panel)',
     cursor: 'default',
     userSelect: 'none',
     touchAction: 'none'
   },
   '.cm-minimap canvas': { position: 'absolute', inset: 0, width: '100%', height: '100%' },
+  '.cm-minimap-ruler': { position: 'absolute', right: 0, pointerEvents: 'none' },
   '.cm-minimap-slider': {
     position: 'absolute',
     left: 0,
