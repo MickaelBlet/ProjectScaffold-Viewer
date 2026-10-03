@@ -40,6 +40,8 @@ const PATHS = {
   play: 'M5 3.5v9l7-4.5z',
   'collapse-all': 'M2.5 2.5h11v11h-11zM5.5 8h5',
   'expand-all': 'M2.5 2.5h11v11h-11zM5.5 8h5M8 5.5v5',
+  'fold-all': 'M2.5 8h11M5 2.5l3 3 3-3M5 13.5l3-3 3 3',
+  'unfold-all': 'M2.5 8h11M5 5.5l3-3 3 3M5 10.5l3 3 3-3',
   'align-left': 'M2.5 2v12M5 4.5h7v3H5zM5 9.5h4v3H5z',
   'align-hcenter': 'M8 2v2.5M8 7.5v2M8 12.5V14M4 4.5h8v3H4zM5.5 9.5h5v3h-5z',
   'align-right': 'M13.5 2v12M4 4.5h7v3H4zM7 9.5h4v3H7z',

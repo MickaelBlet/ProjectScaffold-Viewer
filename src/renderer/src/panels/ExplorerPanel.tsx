@@ -487,6 +487,13 @@ export function ExplorerPanel(): ReactNode {
     if (!next.delete(id)) next.add(id)
     setCollapsed(next)
   }
+  // Folds every module with submodules, dependency and dependency group, or unfolds them all.
+  const foldable = [
+    ...modules.filter((m) => moduleChildren.has(m.id)).map((m) => m.id),
+    ...dependencies.flatMap((d) => [d.id, ...DEPENDENCY_GROUPS.map((g) => `${d.id}/${g}`)])
+  ]
+  const someOpen = foldable.some((key) => !collapsed.has(key))
+  const foldAll = (): void => setCollapsed(new Set(someOpen ? foldable : []))
   // Modules nested under their parent, in project order (all open while filtering).
   const shownModules: { m: Module; depth: number; parent: boolean; open: boolean }[] = []
   const walk = (list: Module[], depth: number): void => {
@@ -1043,6 +1050,18 @@ export function ExplorerPanel(): ReactNode {
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
         />
+        {foldable.length > 0 && (
+          <button
+            type="button"
+            className="icon"
+            title={someOpen ? 'Fold all modules and dependencies' : 'Unfold all modules and dependencies'}
+            aria-label={someOpen ? 'Fold all' : 'Unfold all'}
+            disabled={!!f}
+            onClick={foldAll}
+          >
+            <Icon name={someOpen ? 'fold-all' : 'unfold-all'} />
+          </button>
+        )}
       </div>
       <StackedSections>
         {shownSections.map((id) => (

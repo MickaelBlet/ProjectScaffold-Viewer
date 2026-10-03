@@ -622,6 +622,21 @@ kbd {
 .panel-filter input {
   width: 100%;
 }
+/* Fold all button on the right of the filter. */
+.explorer .panel-filter {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.explorer .panel-filter input {
+  flex: 1;
+  min-width: 0;
+}
+.explorer .panel-filter button.icon {
+  flex: none;
+  padding: 0 4px;
+  color: var(--text);
+}
 /* Full width of the inspector, aligned with its content. */
 .inspector .panel-filter {
   margin: 0 -12px 8px;
