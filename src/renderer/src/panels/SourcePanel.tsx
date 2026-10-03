@@ -98,7 +98,6 @@ function Toggle(props: {
 
 export function SourcePanel({ format }: { format: Format }): ReactNode {
   const store = useDoc((d) => d.store)
-  const [editorData, setEditorData] = useState(false)
   const [issues, setIssues] = useState<LoadIssue[]>([])
   /** The project changed elsewhere while the text holds edits it cannot take. */
   const [stale, setStale] = useState(false)
@@ -150,7 +149,7 @@ export function SourcePanel({ format }: { format: Format }): ReactNode {
       cancel()
       shown = store.getState().project
       invalid = false
-      setText(view, saveText(shown, format, { editor: editorData }))
+      setText(view, saveText(shown, format, { editor: true }))
       report([])
       setStale(false)
     }
@@ -204,7 +203,7 @@ export function SourcePanel({ format }: { format: Format }): ReactNode {
       let path: (string | number)[]
       if (selection.kind === 'note') {
         const i = p.notes.findIndex((n) => n.id === selection.id)
-        if (!editorData || i < 0) return
+        if (i < 0) return
         path = ['editor', 'notes', i]
       } else {
         const target =
@@ -246,17 +245,11 @@ export function SourcePanel({ format }: { format: Format }): ReactNode {
       if (timer !== undefined) apply()
       handlers.current = { flush: noop, revert: noop, input: noop, caret: noop, focus: noop }
     }
-  }, [view, store, format, editorData])
+  }, [view, store, format])
 
   return (
     <section className="source-editor">
       <header>
-        <Toggle
-          label="Editor data"
-          title="Layout, views, notes and styles (kept when hidden)"
-          on={editorData}
-          onChange={setEditorData}
-        />
         {format === 'yaml' ? (
           <Toggle
             label="Sync selection"
