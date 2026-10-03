@@ -19,6 +19,29 @@ export function placed<T extends string>(order: readonly T[], id: T, target: T, 
   return rest
 }
 
+function scrollParent(el: HTMLElement): HTMLElement | null {
+  for (let p = el.parentElement; p; p = p.parentElement)
+    if (/auto|scroll/.test(getComputedStyle(p).overflowY)) return p
+  return null
+}
+
+/** Scrolls the body of the section headed by `header` just under it when none of it shows (between this
+ * header and the next section's, sticky or not); false when some of it shows. */
+function revealBody(header: HTMLElement, body: HTMLElement): boolean {
+  const scroller = scrollParent(header)
+  if (!scroller) return false
+  const view = scroller.getBoundingClientRect()
+  const h = header.getBoundingClientRect()
+  const b = body.getBoundingClientRect()
+  const next = header.parentElement?.nextElementSibling?.querySelector(':scope > header')
+  const top = Math.max(b.top, h.bottom, view.top)
+  const bottom = Math.min(b.bottom, next?.getBoundingClientRect().top ?? Infinity, view.bottom)
+  if (bottom - top > 1) return false
+  const stuck = parseFloat(getComputedStyle(header).top) || 0
+  scroller.scrollBy({ top: b.top - (view.top + stuck + h.height) })
+  return true
+}
+
 export function FoldSection(props: {
   id: string
   /** Data type of the header drag: sections take drops of their own type only. */
@@ -32,14 +55,21 @@ export function FoldSection(props: {
   /** Moves this section past its neighbor above (-1) or below (1). */
   onStep: (step: -1 | 1) => void
   onContextMenu?: (e: MouseEvent) => void
+  /** A click on the header of an open section none of whose content shows scrolls to it, not folds it. */
+  revealOnClick?: boolean
   children: ReactNode
 }): ReactNode {
   const [open, setOpen] = useState(true)
   const [drop, setDrop] = useState<'before' | 'after' | null>(null)
   const body = useId()
   const dropSide = (e: DragEvent): 'before' | 'after' => {
-    const r = e.currentTarget.getBoundingClientRect()
-    return e.clientY < r.top + r.height / 2 ? 'before' : 'after'
+    // A section without a box of its own (display: contents) spans its children.
+    const el = e.currentTarget
+    const r = el.getBoundingClientRect()
+    const top = r.height || !el.firstElementChild ? r.top : el.firstElementChild.getBoundingClientRect().top
+    const bottom =
+      r.height || !el.lastElementChild ? r.bottom : el.lastElementChild.getBoundingClientRect().bottom
+    return e.clientY < (top + bottom) / 2 ? 'before' : 'after'
   }
   return (
     <section
@@ -75,7 +105,12 @@ export function FoldSection(props: {
           className="explorer-toggle"
           aria-expanded={open}
           aria-controls={body}
-          onClick={() => setOpen(!open)}
+          onClick={(e) => {
+            const header = e.currentTarget.parentElement
+            const content = document.getElementById(body)
+            if (open && props.revealOnClick && header && content && revealBody(header, content)) return
+            setOpen(!open)
+          }}
           onKeyDown={(e) => {
             // Alt+Up / Alt+Down move the section; focus stays on its toggle.
             if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return

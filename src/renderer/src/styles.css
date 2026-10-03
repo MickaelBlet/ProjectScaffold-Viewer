@@ -405,8 +405,8 @@ button.link-button:hover {
 .code-editor .cm-userMarker {
   background: color-mix(in srgb, var(--ok) 16%, transparent);
 }
-/* Code generation panel: the filter stays on top, the sections scroll under it, each header held at the
-   top while its section is in view. */
+/* Code generation panel: the filter stays on top, the sections scroll under it. Sections have no box of
+   their own, so every header sticks in the whole list: always in view, stacked at its top or bottom. */
 .generation-panel {
   display: flex;
   flex-direction: column;
@@ -417,11 +417,32 @@ button.link-button:hover {
   min-height: 0;
   overflow: auto;
 }
+.generation-sections {
+  --section-header: 24px;
+}
+.generation-section {
+  display: contents;
+}
 .generation-section > header {
   position: sticky;
   top: 0;
+  bottom: 0;
   z-index: 1;
+  height: var(--section-header);
   background: var(--panel);
+}
+/* Two sections: the second's header below the first's at the top, the first's above it at the bottom. */
+.generation-section:not(:first-child) > header {
+  top: var(--section-header);
+}
+.generation-section:not(:last-child) > header {
+  bottom: var(--section-header);
+}
+.generation-section.drop-before > header {
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+.generation-section.drop-after > :last-child {
+  box-shadow: inset 0 -2px 0 var(--accent);
 }
 .side-panel .generation-section > header {
   background: var(--vscode-sideBar-background, var(--panel));

@@ -169,6 +169,7 @@ function Section(props: {
       onPlace={(from, after) => isSection(from) && placeSection(from, id, after)}
       onStep={(step) => stepSection(id, step)}
       onContextMenu={(e) => sectionMenu(e, id)}
+      revealOnClick
     >
       {!loaded ? (
         <p className="muted empty">Reading…</p>
