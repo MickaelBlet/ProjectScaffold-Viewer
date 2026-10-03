@@ -97,6 +97,9 @@ const MENUS: [Category, string[]][] = [
       'view.autoOrient',
       'view.inheritance',
       '-',
+      'view.wordWrap',
+      'view.whitespace',
+      '-',
       'view.themeSystem',
       'view.themeLight',
       'view.themeDark'

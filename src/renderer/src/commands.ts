@@ -105,7 +105,14 @@ function nudgeStep(far: boolean): number {
 }
 
 type Toggle =
-  'snapToGrid' | 'guides' | 'minimap' | 'edgeBadges' | 'autoOrientLinks' | 'inheritance' | 'forceAnimations'
+  | 'snapToGrid'
+  | 'guides'
+  | 'minimap'
+  | 'edgeBadges'
+  | 'autoOrientLinks'
+  | 'inheritance'
+  | 'forceAnimations'
+  | 'editorWordWrap'
 const setting =
   <K extends Toggle>(key: K) =>
   (): boolean =>
@@ -550,6 +557,23 @@ const allCommands: Command[] = [
     category: 'View',
     checked: setting('forceAnimations'),
     run: toggle('forceAnimations')
+  },
+  {
+    id: 'view.wordWrap',
+    title: 'Word wrap',
+    category: 'View',
+    keys: ['Alt+Z'],
+    global: true,
+    checked: setting('editorWordWrap'),
+    run: toggle('editorWordWrap')
+  },
+  {
+    id: 'view.whitespace',
+    title: 'Show whitespace',
+    category: 'View',
+    checked: () => useSettings.getState().editorWhitespace !== 'none',
+    run: () =>
+      setSetting('editorWhitespace', useSettings.getState().editorWhitespace === 'none' ? 'all' : 'none')
   },
   {
     id: 'view.themeSystem',

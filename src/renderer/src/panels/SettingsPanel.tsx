@@ -5,11 +5,35 @@ import {
   useSettings,
   type EdgeStyle,
   type PortStyle,
-  type Theme
+  type Theme,
+  type WhitespaceShown
 } from '@/store/settings'
 import { IN_VSCODE } from '@/host'
 import { Row, Section, Select } from '@/components/fields'
 import { resetLayout } from '@/shell/controllers'
+
+/** Number field kept within its bounds; empty or invalid input gives the default. */
+function NumberField(props: {
+  value: number
+  min: number
+  max: number
+  step: number
+  fallback: number
+  onChange: (v: number) => void
+}): ReactNode {
+  return (
+    <input
+      type="number"
+      min={props.min}
+      max={props.max}
+      step={props.step}
+      value={props.value}
+      onChange={(e) =>
+        props.onChange(Math.max(props.min, Math.min(props.max, Number(e.target.value) || props.fallback)))
+      }
+    />
+  )
+}
 
 function Check(props: {
   label: string
@@ -83,13 +107,13 @@ export function SettingsPanel(): ReactNode {
       <Section title="Editing">
         <Check label="Snap to grid" value={s.snapToGrid} onChange={(v) => setSetting('snapToGrid', v)} />
         <Row label="Grid size">
-          <input
-            type="number"
+          <NumberField
+            value={s.gridSize}
             min={5}
             max={100}
             step={5}
-            value={s.gridSize}
-            onChange={(e) => setSetting('gridSize', Math.max(5, Math.min(100, Number(e.target.value) || 20)))}
+            fallback={DEFAULT_SETTINGS.gridSize}
+            onChange={(v) => setSetting('gridSize', v)}
           />
         </Row>
         <Check
@@ -113,6 +137,104 @@ export function SettingsPanel(): ReactNode {
           label="Arrange files without layout when opening"
           value={s.autoLayoutOnOpen}
           onChange={(v) => setSetting('autoLayoutOnOpen', v)}
+        />
+      </Section>
+      <Section title="Text editor">
+        <Row label="Font size">
+          <NumberField
+            value={s.editorFontSize}
+            min={8}
+            max={32}
+            step={1}
+            fallback={DEFAULT_SETTINGS.editorFontSize}
+            onChange={(v) => setSetting('editorFontSize', v)}
+          />
+        </Row>
+        <Row label="Font family">
+          <input
+            type="text"
+            placeholder="monospace (default)"
+            value={s.editorFontFamily}
+            onChange={(e) => setSetting('editorFontFamily', e.target.value)}
+          />
+        </Row>
+        <Row label="Line height">
+          <NumberField
+            value={s.editorLineHeight}
+            min={1}
+            max={3}
+            step={0.1}
+            fallback={DEFAULT_SETTINGS.editorLineHeight}
+            onChange={(v) => setSetting('editorLineHeight', v)}
+          />
+        </Row>
+        <Row label="Tab size">
+          <Select
+            value={String(s.editorTabSize)}
+            options={['2', '4', '8']}
+            onChange={(v) => setSetting('editorTabSize', Number(v))}
+          />
+        </Row>
+        <Row label="Whitespace">
+          <Select
+            value={s.editorWhitespace}
+            options={[
+              { value: 'all' as WhitespaceShown, label: 'all' },
+              { value: 'trailing' as WhitespaceShown, label: 'trailing only' },
+              { value: 'none' as WhitespaceShown, label: 'none' }
+            ]}
+            onChange={(v) => setSetting('editorWhitespace', v)}
+          />
+        </Row>
+        <Check
+          label="Indent with tabs"
+          hint="Tab and new lines indent with tabs, except in YAML where tabs are invalid"
+          value={s.editorIndentTabs}
+          onChange={(v) => setSetting('editorIndentTabs', v)}
+        />
+        <Check label="Word wrap" value={s.editorWordWrap} onChange={(v) => setSetting('editorWordWrap', v)} />
+        <Check
+          label="Line numbers"
+          value={s.editorLineNumbers}
+          onChange={(v) => setSetting('editorLineNumbers', v)}
+        />
+        <Check
+          label="Folding"
+          hint="Fold markers in the gutter (Ctrl+Shift+[ / ] fold and unfold anyway)"
+          value={s.editorFolding}
+          onChange={(v) => setSetting('editorFolding', v)}
+        />
+        <Check
+          label="Highlight the current line"
+          value={s.editorActiveLine}
+          onChange={(v) => setSetting('editorActiveLine', v)}
+        />
+        <Check
+          label="Highlight matching brackets"
+          value={s.editorBracketMatching}
+          onChange={(v) => setSetting('editorBracketMatching', v)}
+        />
+        <Check
+          label="Close brackets and quotes"
+          value={s.editorCloseBrackets}
+          onChange={(v) => setSetting('editorCloseBrackets', v)}
+        />
+        <Check
+          label="Suggest while typing"
+          hint="Completions shown as you type; Ctrl+Space shows them anyway"
+          value={s.editorAutocomplete}
+          onChange={(v) => setSetting('editorAutocomplete', v)}
+        />
+        <Check
+          label="Highlight selection matches"
+          hint="Other occurrences of the selected text"
+          value={s.editorSelectionMatches}
+          onChange={(v) => setSetting('editorSelectionMatches', v)}
+        />
+        <Check
+          label="Scroll past the end"
+          value={s.editorScrollPastEnd}
+          onChange={(v) => setSetting('editorScrollPastEnd', v)}
         />
       </Section>
       <div className="actions">

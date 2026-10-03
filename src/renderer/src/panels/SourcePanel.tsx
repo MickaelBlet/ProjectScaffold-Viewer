@@ -104,7 +104,6 @@ export function SourcePanel({ format }: { format: Format }): ReactNode {
   const [stale, setStale] = useState(false)
   const [view, setView] = useState<EditorView | null>(null)
   const handlers = useRef<Handlers>({ flush: noop, revert: noop, input: noop, caret: noop, focus: noop })
-  const whitespace = useSettings((s) => s.sourceWhitespace)
   const followCaret = useSettings((s) => s.sourceFollow)
 
   /** Keys and values the schema allows at the caret, and names of the project. */
@@ -257,12 +256,6 @@ export function SourcePanel({ format }: { format: Format }): ReactNode {
           title="Layout, views, notes and styles (kept when hidden)"
           on={editorData}
           onChange={setEditorData}
-        />
-        <Toggle
-          label="Whitespace"
-          title="Indentation, trailing spaces and tabs"
-          on={whitespace}
-          onChange={(on) => setSetting('sourceWhitespace', on)}
         />
         {format === 'yaml' ? (
           <Toggle

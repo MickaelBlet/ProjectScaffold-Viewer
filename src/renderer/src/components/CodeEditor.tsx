@@ -1,6 +1,7 @@
 // Code editor (CodeMirror) for the project text and the other text files: IDL, templates,
 // generated code.
-import { useEffect, useLayoutEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, type CSSProperties, type ReactNode } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 import {
   autocompletion,
   closeBrackets,
@@ -39,15 +40,14 @@ import {
   highlightWhitespace,
   keymap,
   lineNumbers,
-  rectangularSelection
+  rectangularSelection,
+  scrollPastEnd
 } from '@codemirror/view'
-import { useSettings } from '@/store/settings'
+import { useSettings, type Settings } from '@/store/settings'
 import { languageOf, type FileLanguage } from './codeLanguages'
 import { fixedLiquid } from './liquidSyntax'
 import { richYaml } from './yamlSyntax'
 import { codeTheme } from './codeTheme'
-
-const INDENT = '  '
 
 const words = (list: string): Record<string, true> =>
   Object.fromEntries(list.split(' ').map((w) => [w, true]))
@@ -171,31 +171,84 @@ export function revealLine(view: EditorView, line: number): void {
   })
 }
 
-const showSpaces = (on: boolean): Extension =>
-  on ? [highlightWhitespace(), highlightTrailingWhitespace()] : []
+/** Settings of the code editors (Settings › Text editor). */
+type EditorPrefs = Pick<
+  Settings,
+  | 'editorFontSize'
+  | 'editorFontFamily'
+  | 'editorLineHeight'
+  | 'editorTabSize'
+  | 'editorIndentTabs'
+  | 'editorWhitespace'
+  | 'editorWordWrap'
+  | 'editorLineNumbers'
+  | 'editorFolding'
+  | 'editorActiveLine'
+  | 'editorBracketMatching'
+  | 'editorCloseBrackets'
+  | 'editorAutocomplete'
+  | 'editorSelectionMatches'
+  | 'editorScrollPastEnd'
+>
+
+const selectPrefs = (s: Settings): EditorPrefs => ({
+  editorFontSize: s.editorFontSize,
+  editorFontFamily: s.editorFontFamily,
+  editorLineHeight: s.editorLineHeight,
+  editorTabSize: s.editorTabSize,
+  editorIndentTabs: s.editorIndentTabs,
+  editorWhitespace: s.editorWhitespace,
+  editorWordWrap: s.editorWordWrap,
+  editorLineNumbers: s.editorLineNumbers,
+  editorFolding: s.editorFolding,
+  editorActiveLine: s.editorActiveLine,
+  editorBracketMatching: s.editorBracketMatching,
+  editorCloseBrackets: s.editorCloseBrackets,
+  editorAutocomplete: s.editorAutocomplete,
+  editorSelectionMatches: s.editorSelectionMatches,
+  editorScrollPastEnd: s.editorScrollPastEnd
+})
+
+/** The parts of the editor its settings turn on or off; YAML is always indented with spaces. */
+function prefsSetup(p: EditorPrefs, fileName: string): Extension {
+  const tabs = p.editorIndentTabs && languageOf(fileName).id !== 'yaml'
+  return [
+    p.editorLineNumbers ? [lineNumbers(), highlightActiveLineGutter()] : [],
+    p.editorFolding ? foldGutter() : [],
+    p.editorActiveLine ? highlightActiveLine() : [],
+    p.editorBracketMatching ? bracketMatching() : [],
+    p.editorCloseBrackets ? closeBrackets() : [],
+    autocompletion({ activateOnTyping: p.editorAutocomplete }),
+    p.editorSelectionMatches ? highlightSelectionMatches() : [],
+    p.editorWordWrap ? EditorView.lineWrapping : [],
+    p.editorScrollPastEnd ? scrollPastEnd() : [],
+    p.editorWhitespace === 'all' ? highlightWhitespace() : [],
+    p.editorWhitespace !== 'none' ? highlightTrailingWhitespace() : [],
+    EditorState.tabSize.of(p.editorTabSize),
+    indentUnit.of(tabs ? '\t' : ' '.repeat(p.editorTabSize))
+  ]
+}
+
+/** Font of the editor, read by its theme (`codeTheme.ts`). */
+const fontStyle = (p: EditorPrefs): CSSProperties =>
+  ({
+    '--code-font-size': `${p.editorFontSize}px`,
+    '--code-line-height': String(p.editorLineHeight),
+    ...(p.editorFontFamily.trim() ? { '--code-font-family': p.editorFontFamily } : {})
+  }) as CSSProperties
 
 const NONE: Extension = []
 
 const baseSetup: Extension = [
-  lineNumbers(),
-  highlightActiveLineGutter(),
   highlightSpecialChars(),
   history(),
-  foldGutter(),
   drawSelection(),
   dropCursor(),
   EditorState.allowMultipleSelections.of(true),
   indentOnInput(),
-  bracketMatching(),
-  closeBrackets(),
-  autocompletion(),
   rectangularSelection(),
   crosshairCursor(),
-  highlightActiveLine(),
-  highlightSelectionMatches(),
   lintGutter(),
-  indentUnit.of(INDENT),
-  EditorState.tabSize.of(2),
   // High, not highest: editors flush their pending edits first (highest), shortcuts then see them.
   Prec.high(EditorView.domEventHandlers({ keydown: (e) => passKey(e) })),
   keymap.of([
@@ -254,14 +307,14 @@ export function CodeEditor({
     language: new Compartment(),
     completion: new Compartment(),
     readOnly: new Compartment(),
-    whitespace: new Compartment(),
+    prefs: new Compartment(),
     extra: new Compartment()
   })
   const callbacks = useRef<Callbacks>(handlers)
   useLayoutEffect(() => {
     callbacks.current = handlers
   })
-  const whitespace = useSettings((s) => s.sourceWhitespace)
+  const prefs = useSettings(useShallow(selectPrefs))
 
   // Created once; the props below reconfigure it.
   useLayoutEffect(() => {
@@ -275,7 +328,7 @@ export function CodeEditor({
           p.language.of(languageSupport(fileName)),
           p.completion.of(completionOf(completion)),
           p.readOnly.of(EditorState.readOnly.of(readOnly)),
-          p.whitespace.of(showSpaces(useSettings.getState().sourceWhitespace)),
+          p.prefs.of(prefsSetup(selectPrefs(useSettings.getState()), fileName)),
           p.extra.of(extensions),
           EditorView.contentAttributes.of({ 'aria-label': label }),
           Prec.highest(
@@ -316,11 +369,11 @@ export function CodeEditor({
     view.current?.dispatch({ effects: parts.current.readOnly.reconfigure(EditorState.readOnly.of(readOnly)) })
   }, [readOnly])
   useEffect(() => {
-    view.current?.dispatch({ effects: parts.current.whitespace.reconfigure(showSpaces(whitespace)) })
-  }, [whitespace])
+    view.current?.dispatch({ effects: parts.current.prefs.reconfigure(prefsSetup(prefs, fileName)) })
+  }, [prefs, fileName])
   useEffect(() => {
     view.current?.dispatch({ effects: parts.current.extra.reconfigure(extensions) })
   }, [extensions])
 
-  return <div ref={host} className="code-editor" />
+  return <div ref={host} className="code-editor" style={fontStyle(prefs)} />
 }

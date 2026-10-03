@@ -11,10 +11,13 @@ const theme = EditorView.theme({
     height: '100%',
     color: 'var(--text)',
     backgroundColor: 'var(--panel)',
-    fontSize: '12px'
+    fontSize: 'var(--code-font-size, 12px)'
   },
   '&.cm-focused': { outline: 'none' },
-  '.cm-scroller': { fontFamily: MONO, lineHeight: '1.5' },
+  '.cm-scroller': {
+    fontFamily: `var(--code-font-family, ${MONO})`,
+    lineHeight: 'var(--code-line-height, 1.5)'
+  },
   '.cm-content': { caretColor: 'var(--text)', padding: '8px 0' },
   '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--text)' },
   '&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground, ::selection':
@@ -60,14 +63,14 @@ const theme = EditorView.theme({
   // Panel controls as the app's: more specific than the base theme's light gradients.
   '.cm-panel.cm-search': { fontFamily: 'inherit', fontSize: '12px' },
   '.cm-panel .cm-textfield': {
-    fontSize: '12px',
+    fontSize: 'var(--code-font-size, 12px)',
     color: 'var(--text)',
     backgroundColor: 'var(--panel)',
     border: '1px solid var(--border)',
     borderRadius: '4px'
   },
   '.cm-panel .cm-button, .cm-panel .cm-button:active': {
-    fontSize: '12px',
+    fontSize: 'var(--code-font-size, 12px)',
     color: 'var(--text)',
     backgroundImage: 'none',
     backgroundColor: 'var(--panel-2)',

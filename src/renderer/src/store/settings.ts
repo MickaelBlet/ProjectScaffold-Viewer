@@ -8,6 +8,8 @@ export type Theme = 'system' | 'light' | 'dark'
 export type EdgeStyle = 'bezier' | 'smoothstep' | 'step' | 'straight'
 /** How port handles tell `in` from `out` apart, besides their color. */
 export type PortStyle = 'dots' | 'arrows' | 'hollow' | 'shapes'
+/** Whitespace shown in the code editors. */
+export type WhitespaceShown = 'all' | 'trailing' | 'none'
 
 export interface Settings {
   theme: Theme
@@ -31,8 +33,34 @@ export interface Settings {
   revealInspector: boolean
   /** Keep animations even when the system asks for reduced motion. */
   forceAnimations: boolean
-  /** Dots and arrows for the indentation, trailing spaces and tabs of the project text. */
-  sourceWhitespace: boolean
+  /** Code editors: font size in pixels. */
+  editorFontSize: number
+  /** Code editors: CSS font family, empty for the built-in monospace one. */
+  editorFontFamily: string
+  /** Code editors: line height, relative to the font size. */
+  editorLineHeight: number
+  /** Code editors: columns of a tab and of an indentation level. */
+  editorTabSize: number
+  /** Code editors: indent with tabs (never in YAML, where tabs are invalid). */
+  editorIndentTabs: boolean
+  /** Code editors: dots and arrows for spaces and tabs, everywhere or trailing only. */
+  editorWhitespace: WhitespaceShown
+  /** Code editors: long lines wrap. */
+  editorWordWrap: boolean
+  editorLineNumbers: boolean
+  /** Code editors: fold markers in the gutter. */
+  editorFolding: boolean
+  /** Code editors: the line of the caret highlighted. */
+  editorActiveLine: boolean
+  editorBracketMatching: boolean
+  /** Code editors: typing an opening bracket or quote inserts the closing one. */
+  editorCloseBrackets: boolean
+  /** Code editors: completions shown while typing (Ctrl+Space shows them anyway). */
+  editorAutocomplete: boolean
+  /** Code editors: other occurrences of the selected text highlighted. */
+  editorSelectionMatches: boolean
+  /** Code editors: the last line can scroll to the top. */
+  editorScrollPastEnd: boolean
   /** The element under the caret of the project text is selected and zoomed to. */
   sourceFollow: boolean
   /** Explorer sections top to bottom; sections missing here keep their default place. */
@@ -60,7 +88,21 @@ export const DEFAULT_SETTINGS: Settings = {
   autoLayoutOnOpen: true,
   revealInspector: true,
   forceAnimations: false,
-  sourceWhitespace: true,
+  editorFontSize: 12,
+  editorFontFamily: '',
+  editorLineHeight: 1.5,
+  editorTabSize: 2,
+  editorIndentTabs: false,
+  editorWhitespace: 'all',
+  editorWordWrap: false,
+  editorLineNumbers: true,
+  editorFolding: true,
+  editorActiveLine: true,
+  editorBracketMatching: true,
+  editorCloseBrackets: true,
+  editorAutocomplete: true,
+  editorSelectionMatches: true,
+  editorScrollPastEnd: false,
   sourceFollow: true,
   explorerOrder: [],
   explorerHidden: [],
@@ -70,11 +112,21 @@ export const DEFAULT_SETTINGS: Settings = {
 
 const SETTINGS_KEY = 'project-scaffold:settings'
 
+/** Settings renamed since. */
+interface Legacy {
+  sourceWhitespace?: boolean
+}
+
+function migrate({ sourceWhitespace, ...saved }: Partial<Settings> & Legacy): Partial<Settings> {
+  if (sourceWhitespace === false && saved.editorWhitespace === undefined) saved.editorWhitespace = 'none'
+  return saved
+}
+
 export const useSettings = create<Settings>()(
   persist(() => ({ ...DEFAULT_SETTINGS }), {
     name: SETTINGS_KEY,
     // Settings added later get their default.
-    merge: (saved, current) => ({ ...current, ...(saved as Partial<Settings>) }),
+    merge: (saved, current) => ({ ...current, ...migrate(saved as Partial<Settings> & Legacy) }),
     storage: createJSONStorage(() => storage)
   })
 )
