@@ -421,19 +421,27 @@ button.link-button:hover {
 .stacked-sections > .explorer-section {
   display: contents;
 }
+.stacked-sections {
+  --section-header-bg: var(--panel);
+}
+.side-panel .stacked-sections {
+  --section-header-bg: var(--vscode-sideBar-background, var(--panel));
+}
+/* 1px of background around: stuck at fractional offsets (zoomed), header edges are anti-aliased and the
+   list would show through the seams between headers and at the edges of the list. */
 .stacked-sections > .explorer-section > header {
   position: sticky;
   z-index: 1;
-  background: var(--panel);
+  background: var(--section-header-bg);
+  box-shadow: 0 0 0 1px var(--section-header-bg);
 }
 .stacked-sections > .explorer-section.drop-before > header {
-  box-shadow: inset 0 2px 0 var(--accent);
+  box-shadow:
+    inset 0 2px 0 var(--accent),
+    0 0 0 1px var(--section-header-bg);
 }
 .stacked-sections > .explorer-section.drop-after > :last-child {
   box-shadow: inset 0 -2px 0 var(--accent);
-}
-.side-panel .stacked-sections > .explorer-section > header {
-  background: var(--vscode-sideBar-background, var(--panel));
 }
 .generation-section > header {
   /* The toggle (title, listing label truncated) takes the row. */
