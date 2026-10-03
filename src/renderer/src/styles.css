@@ -458,17 +458,20 @@ button.link-button:hover {
   /* Above the filter, so they stay in view while the lists scroll. */
   display: flex;
   flex-wrap: wrap;
-  gap: 2px 8px;
+  align-items: center;
+  gap: 2px;
   margin-bottom: 4px;
 }
-.generation-actions .link {
-  padding: 0 2px;
-  border: none;
-  background: none;
-  color: var(--accent);
-  font-size: 11px;
-  font-weight: 600;
-  cursor: pointer;
+.generation-actions .spacer {
+  flex: 1;
+}
+.file-folder {
+  display: inline-flex;
+  color: var(--muted);
+}
+.generation-actions button.icon {
+  padding: 0 4px;
+  color: var(--text);
 }
 .generation-section > header small {
   min-width: 0;

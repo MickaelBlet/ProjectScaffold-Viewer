@@ -1,12 +1,13 @@
 // Code generation of the active document: the templates generating it and the files generated, each
 // opened in an editor tab (in its own VS Code editor in VS Code). Sections fold and reorder (drag their header,
-// Alt+Up / Alt+Down, right click); the order is kept in the settings.
+// Alt+Up / Alt+Down, right click); the order is kept in the settings. Files show as a list or a folder tree.
 import {
   useCallback,
   useDeferredValue,
   useEffect,
   useMemo,
   useState,
+  type CSSProperties,
   type MouseEvent,
   type ReactNode
 } from 'react'
@@ -14,6 +15,7 @@ import { generatedFiles, LOCAL_TEMPLATES } from '@/codegen/run'
 import { MANIFEST, parseManifest, templateFiles } from '@/codegen/templateSet'
 import { LANGUAGE_BADGES, languageOf } from '@/components/codeLanguages'
 import { FoldSection, placed, sectionOrder } from '@/components/FoldSection'
+import { Icon, type IconName } from '@/components/Icon'
 import { onListKeyDown } from '@/components/listKeys'
 import {
   builtinTemplates,
@@ -117,31 +119,142 @@ async function load<T extends Listing | null>(read: () => Promise<T>): Promise<L
   }
 }
 
-function FileList({ listing, filter }: { listing: Listing; filter: string }): ReactNode {
-  const files = listing.files.filter((f) => f.toLowerCase().includes(filter.toLowerCase()))
-  const open = (path: string, e?: MouseEvent): void =>
-    void openTextFile({ source: listing.source, path: listing.prefix + path }, { split: e?.altKey })
-  if (!files.length) return <p className="muted empty">{filter ? 'No match' : 'No files'}</p>
+/** Folder of the tree view: its subfolders and files (paths from the listing root). */
+interface Folder {
+  name: string
+  path: string
+  folders: Folder[]
+  files: string[]
+}
+
+/** Folder tree of `files`, in their order; a folder holding only one folder is one row (`a/b`). */
+function fileTree(files: string[]): Folder {
+  const root: Folder = { name: '', path: '', folders: [], files: [] }
+  for (const f of files) {
+    const parts = f.split('/')
+    let node = root
+    parts.slice(0, -1).forEach((name, i) => {
+      let child = node.folders.find((c) => c.name === name)
+      if (!child)
+        node.folders.push((child = { name, path: parts.slice(0, i + 1).join('/'), folders: [], files: [] }))
+      node = child
+    })
+    node.files.push(f)
+  }
+  const compact = (folder: Folder): Folder => {
+    let f = folder
+    while (!f.files.length && f.folders.length === 1)
+      f = { ...f.folders[0]!, name: `${f.name}/${f.folders[0]!.name}` }
+    return { ...f, folders: f.folders.map(compact).sort((a, b) => a.name.localeCompare(b.name)) }
+  }
+  return { ...root, folders: root.folders.map(compact).sort((a, b) => a.name.localeCompare(b.name)) }
+}
+
+type Row = { folder: Folder; depth: number; open: boolean } | { file: string; depth: number }
+
+/** Rows of the tree, folders before files; every folder open while `allOpen`. */
+function treeRows(root: Folder, collapsed: ReadonlySet<string>, allOpen: boolean): Row[] {
+  const rows: Row[] = []
+  const walk = (folder: Folder, depth: number): void => {
+    for (const f of folder.folders) {
+      const open = allOpen || !collapsed.has(f.path)
+      rows.push({ folder: f, depth, open })
+      if (open) walk(f, depth + 1)
+    }
+    for (const file of folder.files) rows.push({ file, depth })
+  }
+  walk(root, 0)
+  return rows
+}
+
+const indent = (depth: number): CSSProperties => ({ paddingLeft: 6 + depth * 14 })
+
+/** A file: its name, then its folder in the list view; indented by its `depth` in the tree view. */
+function FileItem(props: {
+  path: string
+  first: boolean
+  depth?: number
+  open: (path: string, e: MouseEvent) => void
+}): ReactNode {
+  const { path, depth } = props
+  const slash = path.lastIndexOf('/')
+  const tree = depth !== undefined
   return (
-    <ul className="results file-list" role="listbox" onKeyDown={onListKeyDown}>
-      {files.map((f, i) => {
-        const slash = f.lastIndexOf('/')
-        return (
+    <li
+      data-item
+      role={tree ? 'treeitem' : 'option'}
+      aria-selected={false}
+      tabIndex={props.first ? 0 : -1}
+      title={`${path} (Alt+click: to the side)`}
+      style={tree ? indent(depth) : undefined}
+      onClick={(e) => props.open(path, e)}
+    >
+      {tree ? <span className="chevron" aria-hidden /> : null}
+      <span className={`kind-badge file-${languageOf(path).id}`}>{LANGUAGE_BADGES[languageOf(path).id]}</span>
+      <span className="result-label">{path.slice(slash + 1)}</span>
+      {!tree && slash > 0 ? <small>{path.slice(0, slash)}</small> : null}
+    </li>
+  )
+}
+
+/** Paths of the folders of `files` in the tree view. */
+const folderPaths = (files: string[]): string[] =>
+  treeRows(fileTree(files), new Set(), true).flatMap((row) => ('folder' in row ? [row.folder.path] : []))
+
+function FileList(props: {
+  listing: Listing
+  filter: string
+  tree: boolean
+  collapsed: ReadonlySet<string>
+  toggle: (folder: string) => void
+}): ReactNode {
+  const { listing, filter, collapsed, toggle } = props
+  const files = listing.files.filter((f) => f.toLowerCase().includes(filter.toLowerCase()))
+  const open = (path: string, e: MouseEvent): void =>
+    void openTextFile({ source: listing.source, path: listing.prefix + path }, { split: e.altKey })
+  if (!files.length) return <p className="muted empty">{filter ? 'No match' : 'No files'}</p>
+  if (!props.tree)
+    return (
+      <ul className="results file-list" role="listbox" onKeyDown={onListKeyDown}>
+        {files.map((f, i) => (
+          <FileItem key={f} path={f} first={i === 0} open={open} />
+        ))}
+      </ul>
+    )
+  // While filtering, every folder holding a match is open.
+  return (
+    <ul className="results file-list" role="tree" onKeyDown={onListKeyDown}>
+      {treeRows(fileTree(files), collapsed, !!filter).map((row, i) =>
+        'file' in row ? (
+          <FileItem key={row.file} path={row.file} first={i === 0} depth={row.depth} open={open} />
+        ) : (
           <li
-            key={f}
+            key={`${row.folder.path}/`}
             data-item
-            role="option"
+            role="treeitem"
+            aria-expanded={row.open}
             aria-selected={false}
             tabIndex={i === 0 ? 0 : -1}
-            title={`${f} (Alt+click: to the side)`}
-            onClick={(e) => open(f, e)}
+            title={row.folder.path}
+            style={indent(row.depth)}
+            onClick={() => !filter && toggle(row.folder.path)}
+            onKeyDown={(e) => {
+              // Right opens, Left closes, as in the Explorer.
+              if (filter || e.key !== (row.open ? 'ArrowLeft' : 'ArrowRight')) return
+              e.preventDefault()
+              toggle(row.folder.path)
+            }}
           >
-            <span className={`kind-badge file-${languageOf(f).id}`}>{LANGUAGE_BADGES[languageOf(f).id]}</span>
-            <span className="result-label">{f.slice(slash + 1)}</span>
-            {slash > 0 ? <small>{f.slice(0, slash)}</small> : null}
+            <span className="chevron" aria-hidden>
+              <Icon name={row.open ? 'chevron-down' : 'chevron-right'} />
+            </span>
+            <span className="file-folder" aria-hidden>
+              <Icon name="folder" />
+            </span>
+            <span className="result-label">{row.folder.name}</span>
           </li>
         )
-      })}
+      )}
     </ul>
   )
 }
@@ -152,6 +265,9 @@ function Section(props: {
   loaded: Loaded | null
   empty: ReactNode
   filter: string
+  tree: boolean
+  collapsed: ReadonlySet<string>
+  toggle: (folder: string) => void
   retry: () => void
 }): ReactNode {
   const { id, loaded } = props
@@ -181,11 +297,37 @@ function Section(props: {
           </button>
         </p>
       ) : loaded.listing ? (
-        <FileList listing={loaded.listing} filter={props.filter} />
+        <FileList
+          listing={loaded.listing}
+          filter={props.filter}
+          tree={props.tree}
+          collapsed={props.collapsed}
+          toggle={props.toggle}
+        />
       ) : (
         props.empty
       )}
     </FoldSection>
+  )
+}
+
+function ActionButton(props: {
+  icon: IconName
+  title: string
+  pressed?: boolean
+  onClick: () => void
+}): ReactNode {
+  return (
+    <button
+      type="button"
+      className={`icon ${props.pressed ? 'active' : ''}`}
+      title={props.title}
+      aria-label={props.title}
+      aria-pressed={props.pressed}
+      onClick={props.onClick}
+    >
+      <Icon name={props.icon} />
+    </button>
   )
 }
 
@@ -197,7 +339,30 @@ export function GenerationPanel(): ReactNode {
   const [query, setQuery] = useState('')
   const filter = useDeferredValue(query.trim())
   const savedOrder = useSettings((s) => s.generationOrder)
+  const tree = useSettings((s) => s.generationTree)
   const order = useMemo(() => sectionOrder(savedOrder, SECTIONS), [savedOrder])
+  // Folded folders of the tree view, per section.
+  const [collapsed, setCollapsed] = useState<Record<SectionId, ReadonlySet<string>>>({
+    templates: new Set(),
+    generated: new Set()
+  })
+  const toggle = (id: SectionId, folder: string): void => {
+    const next = new Set(collapsed[id])
+    if (!next.delete(folder)) next.add(folder)
+    setCollapsed({ ...collapsed, [id]: next })
+  }
+  const folders = (l: Loaded | null): string[] =>
+    l && 'listing' in l && l.listing ? folderPaths(l.listing.files) : []
+  const allFolders: Record<SectionId, string[]> = {
+    templates: folders(templates),
+    generated: folders(generated)
+  }
+  const someOpen = SECTIONS.some((id) => allFolders[id].some((f) => !collapsed[id].has(f)))
+  const foldAll = (): void =>
+    setCollapsed({
+      templates: new Set(someOpen ? allFolders.templates : []),
+      generated: new Set(someOpen ? allFolders.generated : [])
+    })
 
   const refresh = useCallback((): void => {
     const doc = activeDoc()
@@ -214,17 +379,25 @@ export function GenerationPanel(): ReactNode {
     <div className="generation-panel">
       <div className="panel-filter">
         <div className="generation-actions">
-          <button type="button" className="link" onClick={() => void chooseTemplates()}>
-            Change templates…
-          </button>
+          <ActionButton icon="templates" title="Change templates…" onClick={() => void chooseTemplates()} />
           {canGenerate() ? (
-            <button type="button" className="link" onClick={() => void generateCode(false)}>
-              Generate
-            </button>
+            <ActionButton icon="play" title="Generate" onClick={() => void generateCode(false)} />
           ) : null}
-          <button type="button" className="link" onClick={refresh} title="List the files again">
-            Refresh
-          </button>
+          <ActionButton icon="refresh" title="Refresh: list the files again" onClick={refresh} />
+          <span className="spacer" />
+          {tree && SECTIONS.some((id) => allFolders[id].length) ? (
+            <ActionButton
+              icon={someOpen ? 'collapse-all' : 'expand-all'}
+              title={someOpen ? 'Fold all folders' : 'Unfold all folders'}
+              onClick={foldAll}
+            />
+          ) : null}
+          <ActionButton
+            icon="tree"
+            title="Files in folders"
+            pressed={tree}
+            onClick={() => setSetting('generationTree', !tree)}
+          />
         </div>
         <input
           data-autofocus
@@ -244,6 +417,9 @@ export function GenerationPanel(): ReactNode {
               title="Templates"
               loaded={templates}
               filter={filter}
+              tree={tree}
+              collapsed={collapsed[id]}
+              toggle={(folder) => toggle(id, folder)}
               retry={refresh}
               empty={null}
             />
@@ -254,6 +430,9 @@ export function GenerationPanel(): ReactNode {
               title="Generated"
               loaded={generated}
               filter={filter}
+              tree={tree}
+              collapsed={collapsed[id]}
+              toggle={(folder) => toggle(id, folder)}
               retry={refresh}
               empty={<p className="muted empty">No code generated yet for this document.</p>}
             />

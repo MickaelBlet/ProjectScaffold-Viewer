@@ -39,6 +39,8 @@ export interface Settings {
   explorerHidden: string[]
   /** Code generation panel sections top to bottom. */
   generationOrder: string[]
+  /** Code generation panel files as a folder tree, not a list. */
+  generationTree: boolean
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -59,7 +61,8 @@ export const DEFAULT_SETTINGS: Settings = {
   sourceFollow: true,
   explorerOrder: [],
   explorerHidden: [],
-  generationOrder: []
+  generationOrder: [],
+  generationTree: false
 }
 
 const SETTINGS_KEY = 'project-scaffold:settings'
