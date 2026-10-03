@@ -261,61 +261,54 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
           </>
         }
       >
-        <table className="grid">
-          <tbody>
-            {mod.ports.map((pt) => (
-              <tr key={pt.id}>
-                <td>
-                  <Select
-                    value={pt.role}
-                    options={['in', 'out'] as const}
-                    onChange={(role) =>
-                      withModule(id, (m, d) => {
-                        const p = m.ports.find((p) => p.id === pt.id)!
-                        p.role = role
-                        // A role change invalidates the port's links.
-                        d.links = d.links.filter((l) => l.from.portId !== pt.id && l.to.portId !== pt.id)
-                      })
-                    }
+        <div className="field-list">
+          {mod.ports.map((pt) => (
+            <div key={pt.id} className="field-row">
+              <div className="name">
+                <CommitInput
+                  value={pt.name}
+                  validate={(n) => nameError(project, { kind: 'port', id: pt.id, moduleId: id }, n)}
+                  onCommit={(n) =>
+                    withModule(id, (m) => void (m.ports.find((p) => p.id === pt.id)!.name = n))
+                  }
+                />
+              </div>
+              <div className="column">
+                <Select
+                  value={pt.role}
+                  options={['in', 'out'] as const}
+                  onChange={(role) =>
+                    withModule(id, (m, d) => {
+                      const p = m.ports.find((p) => p.id === pt.id)!
+                      p.role = role
+                      // A role change invalidates the port's links.
+                      d.links = d.links.filter((l) => l.from.portId !== pt.id && l.to.portId !== pt.id)
+                    })
+                  }
+                />
+              </div>
+              <div className="type">
+                <Select
+                  value={pt.interfaceId ?? ''}
+                  options={interfaceOptions}
+                  onChange={(v) =>
+                    withModule(id, (m) => void (m.ports.find((p) => p.id === pt.id)!.interfaceId = v || null))
+                  }
+                />
+              </div>
+              <div className="actions-cell">
+                {pt.interfaceId && (
+                  <IconButton
+                    icon="arrow-up-right"
+                    title="Open interface"
+                    onClick={() => navigate({ kind: 'interface', id: pt.interfaceId! })}
                   />
-                </td>
-                <td>
-                  <CommitInput
-                    value={pt.name}
-                    validate={(n) => nameError(project, { kind: 'port', id: pt.id, moduleId: id }, n)}
-                    onCommit={(n) =>
-                      withModule(id, (m) => void (m.ports.find((p) => p.id === pt.id)!.name = n))
-                    }
-                  />
-                </td>
-                <td>
-                  <Select
-                    value={pt.interfaceId ?? ''}
-                    options={interfaceOptions}
-                    onChange={(v) =>
-                      withModule(
-                        id,
-                        (m) => void (m.ports.find((p) => p.id === pt.id)!.interfaceId = v || null)
-                      )
-                    }
-                  />
-                </td>
-                <td>
-                  {pt.interfaceId && (
-                    <IconButton
-                      icon="arrow-up-right"
-                      title="Open interface"
-                      onClick={() => navigate({ kind: 'interface', id: pt.interfaceId! })}
-                    />
-                  )}
-                </td>
-                <td>
-                  <IconButton icon="x" title="Delete port" danger onClick={() => deletePort(id, pt.id)} />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                )}
+                <IconButton icon="x" title="Delete port" danger onClick={() => deletePort(id, pt.id)} />
+              </div>
+            </div>
+          ))}
+        </div>
         {!mod.ports.length && <p className="muted">No ports. Links connect ports.</p>}
       </Section>
 

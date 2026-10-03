@@ -31,9 +31,9 @@
     --bg: #15181e;
     --panel: #1c2028;
     --panel-2: #232833;
-    --row-odd: #2c323f;
+    --row-odd: #25303d;
     --row-even: #222731;
-    --border: #333a47;
+    --border: #363c49;
     --text: #e3e7ef;
     --muted: #8b93a5;
     --accent: #6f9bff;
@@ -55,9 +55,9 @@
   --bg: #15181e;
   --panel: #1c2028;
   --panel-2: #232833;
-  --row-odd: #2c323f;
+  --row-odd: #25303d;
   --row-even: #222731;
-  --border: #333a47;
+  --border: #363c49;
   --text: #e3e7ef;
   --muted: #8b93a5;
   --accent: #6f9bff;
@@ -993,17 +993,20 @@ input.number {
 .grid td {
   padding: 8px 2px;
   vertical-align: top;
+  border-block: 1px solid var(--border);
   background: var(--row-odd);
 }
 .grid tr:nth-child(even) > td {
-  background: var(--row-even);
+  background: var(--row-odd);
 }
 .grid td:first-child {
   padding-left: 8px;
+  border-left: 1px solid var(--border);
   border-radius: 6px 0 0 6px;
 }
 .grid td:last-child {
   padding-right: 8px;
+  border-right: 1px solid var(--border);
   border-radius: 0 6px 6px 0;
 }
 .grid td:only-child {
@@ -1040,6 +1043,7 @@ input.number {
 .metadata .kv,
 .binary-item,
 ul.plain > li {
+  border: 1px solid var(--border);
   border-radius: 6px;
   padding: 6px;
   background: var(--row-odd);
@@ -1048,7 +1052,7 @@ ul.plain > li {
 .metadata .kv:nth-child(even of .kv),
 .binary-item:nth-child(even of .binary-item),
 ul.plain > li:nth-child(even) {
-  background: var(--row-even);
+  background: var(--row-odd);
 }
 ul.plain > li + li {
   margin-top: 4px;
