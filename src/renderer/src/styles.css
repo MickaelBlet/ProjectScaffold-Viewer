@@ -2884,3 +2884,8 @@ mark {
 .raises select {
   width: auto;
 }
+
+/* Translucent minimap: the diagram stays visible behind it. */
+.react-flow__minimap {
+  --xy-minimap-background-color: color-mix(in srgb, var(--panel) 70%, transparent);
+}
