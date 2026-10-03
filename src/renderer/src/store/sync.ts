@@ -12,14 +12,10 @@ import { setStatus } from './ui'
 /** Documents whose last push to their dependents left conflicts, shown in the status bar. */
 const conflicted = new Set<Id>()
 
+/** Nesting of pushes: a push changes dependents, whose listeners must not re-check conflicts. */
+let pushing = 0
+
 function carryRenames(docId: Id, prev: Project, next: Project): void {
-  // A dependent dropping or changing its dependencies may resolve conflicts of other documents.
-  if (prev.dependencies !== next.dependencies)
-    for (const id of conflicted) {
-      const doc = id !== docId ? findDoc(id) : null
-      if (doc) pushToDependents(id, null, doc.store.getState().project)
-      else if (id !== docId) conflicted.delete(id)
-    }
   // What dependents read: definitions, modules and ports, and the dependencies carried along.
   if (
     prev.types === next.types &&
@@ -29,6 +25,15 @@ function carryRenames(docId: Id, prev: Project, next: Project): void {
     prev.dependencies === next.dependencies
   )
     return
+  // Any such change (undo included) may resolve the conflicts of other documents: a cycle broken,
+  // a name defined differently here renamed or removed.
+  if (!pushing)
+    for (const id of conflicted) {
+      if (id === docId) continue
+      const doc = findDoc(id)
+      if (doc) pushToDependents(id, null, doc.store.getState().project)
+      else conflicted.delete(id)
+    }
   pushToDependents(docId, prev, next)
 }
 
@@ -45,17 +50,22 @@ function pushToDependents(docId: Id, prev: Project | null, next: Project): void 
   const renames = prev && linked.length ? diffRenames(prev, next) : null
   const updated: string[] = []
   const conflicts: string[] = []
-  for (const d of linked) {
-    const p = d.store.getState().project
-    const q = produce(p, (draft) => {
-      if (renames) applyDependencyRenames(draft, file, renames)
-      const dep = draft.dependencies.find((x) => sameFile(x.file, file))!
-      const self = d.filePath ? baseName(d.filePath) : null
-      conflicts.push(...refreshDependencies(draft, new Map([[dep.id, next]]), self).conflicts)
-    })
-    if (q === p) continue
-    d.store.setState({ project: q })
-    updated.push(docTitle(d))
+  pushing++
+  try {
+    for (const d of linked) {
+      const p = d.store.getState().project
+      const q = produce(p, (draft) => {
+        if (renames) applyDependencyRenames(draft, file, renames)
+        const dep = draft.dependencies.find((x) => sameFile(x.file, file))!
+        const self = d.filePath ? baseName(d.filePath) : null
+        conflicts.push(...refreshDependencies(draft, new Map([[dep.id, next]]), self).conflicts)
+      })
+      if (q === p) continue
+      d.store.setState({ project: q })
+      updated.push(docTitle(d))
+    }
+  } finally {
+    pushing--
   }
   if (conflicts.length) {
     conflicted.add(docId)

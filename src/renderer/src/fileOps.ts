@@ -37,6 +37,7 @@ import {
 } from '@/store/documents'
 import { useSettings } from '@/store/settings'
 import { dirtyFiles, dropDocTextFiles } from '@/store/textFiles'
+import { log } from '@/store/output'
 import { setStatus, showDialog, useUiStore } from '@/store/ui'
 import type { DiagramAction } from '../../../vscode/src/protocol'
 import type { OpenResult, Session } from './api'
@@ -286,26 +287,29 @@ export async function checkDiskChanges(): Promise<void> {
 function reloaded(doc: DocState, content: string, what: string): Project | null {
   try {
     const project = reloadText(content, formatFromPath(doc.filePath!), doc.store.getState().project)
-    clearReadError()
+    clearReadError(docTitle(doc))
     return project
   } catch (e) {
-    showReadError(`${docTitle(doc)} ${what}`, e)
+    showReadError(docTitle(doc), what, e)
     return null
   }
 }
 
-/** Status telling that a file text cannot be read: cleared once it can (fixed in another editor). */
-let readError: unknown = null
+/** Status telling that a file text cannot be read: replaced once it can (fixed in another editor). */
+let readError: { name: string; status: unknown } | null = null
 
-function showReadError(what: string, e: unknown): void {
+function showReadError(name: string, what: string, e: unknown): void {
   const problems = e instanceof LoadError ? e.problems : [String(e)]
-  setStatus('error', `${what}: ${problems[0] ?? ''}`)
-  readError = useUiStore.getState().status
+  setStatus('error', `${name} ${what}: ${problems[0] ?? ''}`)
+  readError = { name, status: useUiStore.getState().status }
 }
 
-/** Clears the read error unless another status replaced it. */
-function clearReadError(): void {
-  if (readError && useUiStore.getState().status === readError) useUiStore.setState({ status: null })
+/** Tells that the file `name` can be read again, in the status bar unless another status replaced it. */
+function clearReadError(name: string): void {
+  if (readError?.name !== name) return
+  const text = `${name} can be read again`
+  if (useUiStore.getState().status === readError.status) setStatus('info', text)
+  else log('info', 'app', text)
   readError = null
 }
 
@@ -377,10 +381,10 @@ export function showHostDocument(file: OpenResult): void {
   if (file.path) {
     try {
       doc = createDoc(loadText(file.content, formatFromPath(file.path)), file.path)
-      clearReadError()
+      clearReadError(fileName(file.path))
     } catch (e) {
       doc = createDoc(undefined, file.path)
-      showReadError(`${fileName(file.path)} cannot be read`, e)
+      showReadError(fileName(file.path), 'cannot be read', e)
     }
   }
   useDocs.setState({ docs: [doc], activeId: doc.id })
