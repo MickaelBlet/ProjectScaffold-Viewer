@@ -366,8 +366,8 @@ export function GenerationPanel(): ReactNode {
 
   const refresh = useCallback((): void => {
     const doc = activeDoc()
-    void load(() => templateListing(doc)).then((l) => activeDoc() === doc && setTemplates(l))
-    void load(() => generatedListing(doc)).then((l) => activeDoc() === doc && setGenerated(l))
+    void load(() => templateListing(doc)).then((l) => activeDoc().id === doc.id && setTemplates(l))
+    void load(() => generatedListing(doc)).then((l) => activeDoc().id === doc.id && setGenerated(l))
   }, [])
   useEffect(() => {
     refresh()

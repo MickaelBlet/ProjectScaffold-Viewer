@@ -1,6 +1,7 @@
 // Code generation from the editor: the active project, rendered with the template folder chosen
 // for the document, else the output directory's own template set (see codegen/run.ts), else the
 // built-in set the project names (templates/<name>, cpp17 by default), into a directory the host gives.
+import { createElement } from 'react'
 import { snake } from '@/codegen/filters'
 import { formatReport, generateInto, reportEntries, templateSetFor, type OutputDir } from '@/codegen/run'
 import { loadTemplateSet, MANIFEST, parseManifest, type TemplateSet } from '@/codegen/templateSet'
@@ -14,6 +15,7 @@ import { activeDoc, type DocState } from '@/store/documents'
 import { log } from '@/store/output'
 import { update } from '@/store/project'
 import { showTool } from '@/shell/controllers'
+import { Icon } from '@/components/Icon'
 import { quickPick, setStatus, showDialog, useUiStore } from '@/store/ui'
 
 const BUILTIN = import.meta.glob<string>('../../../templates/*/*', {
@@ -195,46 +197,49 @@ export async function chooseTemplates(): Promise<void> {
     }
   }
   const adoptBuiltin = async (name: string): Promise<void> => {
-    if (doc !== activeDoc()) return
+    if (doc.id !== activeDoc().id) return
     setTemplateSet(name)
     if (current)
       await templateDir('forget').catch((e: unknown) => fail('Cannot forget the template folder', e))
     codegenChanged()
     setStatus('info', `Code generation uses the built-in ${name} templates`)
   }
+  const checked = createElement(Icon, { name: 'check' })
+  // The templates in use come first, checked.
+  const sets = current ? TEMPLATE_SETS : [builtin, ...TEMPLATE_SETS.filter((name) => name !== builtin)]
   quickPick('Templates generating the code of this document', [
-    ...TEMPLATE_SETS.map((name) => ({
-      key: `builtin:${name}`,
-      label: `${!current && name === builtin ? '✓ ' : ''}${name}`,
-      detail: `${builtinTemplates(name).manifest.description ?? 'built-in templates'}${name === DEFAULT_TEMPLATE_SET ? ' (default)' : ''}`,
-      kind: 'T',
-      run: () => void adoptBuiltin(name)
-    })),
     ...(current
       ? [
           {
             key: 'current',
-            label: `✓ ${current.label}`,
+            label: current.label,
             detail: 'template folder in use',
-            kind: 'T',
+            kind: checked,
             run: () => {}
           }
         ]
       : []),
+    ...sets.map((name) => ({
+      key: `builtin:${name}`,
+      label: name,
+      detail: `${builtinTemplates(name).manifest.description ?? 'built-in templates'}${name === DEFAULT_TEMPLATE_SET ? ' (default)' : ''}`,
+      kind: !current && name === builtin ? checked : '',
+      run: () => void adoptBuiltin(name)
+    })),
     ...(window.api.templateDir
       ? [
           {
             key: 'pick',
             label: 'Template folder…',
             detail: 'a manifest.yaml and its templates',
-            kind: 'T',
+            kind: '',
             run: () => void adopt(false)
           },
           {
             key: 'copy',
             label: `Copy the built-in ${builtin} templates into a folder…`,
             detail: 'to edit them, then generate with them',
-            kind: 'T',
+            kind: '',
             run: () => void adopt(true)
           }
         ]
