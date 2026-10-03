@@ -1,0 +1,98 @@
+// Collapsible panel section whose header drags to reorder it among the sections of the same drag type
+// (Alt+Up / Alt+Down on its toggle as well). Used by the Explorer and the Code generation panel.
+import { useId, useState, type DragEvent, type MouseEvent, type ReactNode } from 'react'
+import { Icon } from './Icon'
+
+/** Saved order of `all`; sections it lacks (added later) go after the section preceding them by default. */
+export function sectionOrder<T extends string>(saved: readonly string[], all: readonly T[]): T[] {
+  const order = [...new Set(saved.filter((s): s is T => (all as readonly string[]).includes(s)))]
+  all.forEach((id, i) => {
+    if (!order.includes(id)) order.splice(i ? order.indexOf(all[i - 1]!) + 1 : 0, 0, id)
+  })
+  return order
+}
+
+/** `order` with `id` just before or after `target`. */
+export function placed<T extends string>(order: readonly T[], id: T, target: T, after: boolean): T[] {
+  const rest = order.filter((s) => s !== id)
+  rest.splice(rest.indexOf(target) + (after ? 1 : 0), 0, id)
+  return rest
+}
+
+export function FoldSection(props: {
+  id: string
+  /** Data type of the header drag: sections take drops of their own type only. */
+  dragType: string
+  /** Toggle content after the chevron. */
+  title: ReactNode
+  actions?: ReactNode
+  className?: string
+  /** Puts section `from` before or after this one. */
+  onPlace: (from: string, after: boolean) => void
+  /** Moves this section past its neighbor above (-1) or below (1). */
+  onStep: (step: -1 | 1) => void
+  onContextMenu?: (e: MouseEvent) => void
+  children: ReactNode
+}): ReactNode {
+  const [open, setOpen] = useState(true)
+  const [drop, setDrop] = useState<'before' | 'after' | null>(null)
+  const body = useId()
+  const dropSide = (e: DragEvent): 'before' | 'after' => {
+    const r = e.currentTarget.getBoundingClientRect()
+    return e.clientY < r.top + r.height / 2 ? 'before' : 'after'
+  }
+  return (
+    <section
+      className={`explorer-section ${props.className ?? ''} ${open ? 'open' : ''} ${drop ? `drop-${drop}` : ''}`}
+      onDragOver={(e) => {
+        if (!e.dataTransfer.types.includes(props.dragType)) return
+        e.preventDefault()
+        e.dataTransfer.dropEffect = 'move'
+        setDrop(dropSide(e))
+      }}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDrop(null)
+      }}
+      onDrop={(e) => {
+        setDrop(null)
+        const from = e.dataTransfer.getData(props.dragType)
+        if (!from) return
+        e.preventDefault()
+        if (from !== props.id) props.onPlace(from, dropSide(e) === 'after')
+      }}
+    >
+      <header
+        draggable
+        title={`Drag to move the section${props.onContextMenu ? ', right click for more' : ''}`}
+        onDragStart={(e) => {
+          e.dataTransfer.setData(props.dragType, props.id)
+          e.dataTransfer.effectAllowed = 'move'
+        }}
+        onContextMenu={props.onContextMenu}
+      >
+        <button
+          type="button"
+          className="explorer-toggle"
+          aria-expanded={open}
+          aria-controls={body}
+          onClick={() => setOpen(!open)}
+          onKeyDown={(e) => {
+            // Alt+Up / Alt+Down move the section; focus stays on its toggle.
+            if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return
+            e.preventDefault()
+            const button = e.currentTarget
+            props.onStep(e.key === 'ArrowUp' ? -1 : 1)
+            requestAnimationFrame(() => button.focus())
+          }}
+        >
+          <span className="chevron">
+            <Icon name={open ? 'chevron-down' : 'chevron-right'} />
+          </span>
+          {props.title}
+        </button>
+        <span className="explorer-actions">{props.actions}</span>
+      </header>
+      {open && <div id={body}>{props.children}</div>}
+    </section>
+  )
+}

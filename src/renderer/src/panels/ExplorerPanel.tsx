@@ -3,11 +3,9 @@
 // Sections can be reordered (drag their header, Alt+Up / Alt+Down) and hidden; kept in the settings.
 import {
   Fragment,
-  useId,
   useMemo,
   useState,
   type CSSProperties,
-  type DragEvent,
   type KeyboardEvent,
   type MouseEvent,
   type ReactNode
@@ -46,6 +44,7 @@ import { dependencyMenu } from './DependenciesPanel'
 import { childrenByParent, matching } from './ModulesPanel'
 import { openEditor, openView } from '@/shell/controllers'
 import { Icon } from '@/components/Icon'
+import { FoldSection, placed, sectionOrder } from '@/components/FoldSection'
 import { onListKeyDown, tabStop } from '@/components/listKeys'
 
 const KIND_BADGE = {
@@ -83,26 +82,18 @@ const SECTION_DRAG = 'application/x-explorer-section'
 
 const isSection = (s: string): s is SectionId => (SECTIONS as readonly string[]).includes(s)
 
-/** Saved order; sections it lacks (added later) go after the section preceding them by default. */
-function sectionOrder(saved: readonly string[]): SectionId[] {
-  const order = [...new Set(saved.filter(isSection))]
-  SECTIONS.forEach((id, i) => {
-    if (!order.includes(id)) order.splice(i ? order.indexOf(SECTIONS[i - 1]!) + 1 : 0, 0, id)
-  })
-  return order
-}
-
 function shownSections(): SectionId[] {
   const { explorerOrder, explorerHidden } = useSettings.getState()
-  return sectionOrder(explorerOrder).filter((id) => !explorerHidden.includes(id))
+  return sectionOrder(explorerOrder, SECTIONS).filter((id) => !explorerHidden.includes(id))
 }
 
 /** Puts section `id` just before or after `target`. */
 function placeSection(id: SectionId, target: SectionId, after: boolean): void {
-  if (id === target) return
-  const order = sectionOrder(useSettings.getState().explorerOrder).filter((s) => s !== id)
-  order.splice(order.indexOf(target) + (after ? 1 : 0), 0, id)
-  setSetting('explorerOrder', order)
+  if (id !== target)
+    setSetting(
+      'explorerOrder',
+      placed(sectionOrder(useSettings.getState().explorerOrder, SECTIONS), id, target, after)
+    )
 }
 
 /** Moves a section past its shown neighbor above (-1) or below (1). */
@@ -138,7 +129,9 @@ function sectionMenu(e: MouseEvent, id: SectionId): void {
   e.preventDefault()
   const shown = shownSections()
   const i = shown.indexOf(id)
-  const hidden = sectionOrder(useSettings.getState().explorerOrder).filter((s) => !shown.includes(s))
+  const hidden = sectionOrder(useSettings.getState().explorerOrder, SECTIONS).filter(
+    (s) => !shown.includes(s)
+  )
   openContextMenu(e, [
     { label: 'Move up', keys: 'Alt+Up', disabled: i <= 0, run: () => stepSection(id, -1) },
     { label: 'Move down', keys: 'Alt+Down', disabled: i >= shown.length - 1, run: () => stepSection(id, 1) },
@@ -164,67 +157,23 @@ function Section(props: {
   actions?: ReactNode
   children: ReactNode
 }): ReactNode {
-  const [open, setOpen] = useState(true)
-  const [drop, setDrop] = useState<'before' | 'after' | null>(null)
-  const body = useId()
-  const dropSide = (e: DragEvent): 'before' | 'after' => {
-    const r = e.currentTarget.getBoundingClientRect()
-    return e.clientY < r.top + r.height / 2 ? 'before' : 'after'
-  }
   return (
-    <section
-      className={`explorer-section ${open ? 'open' : ''} ${drop ? `drop-${drop}` : ''}`}
-      onDragOver={(e) => {
-        if (!e.dataTransfer.types.includes(SECTION_DRAG)) return
-        e.preventDefault()
-        e.dataTransfer.dropEffect = 'move'
-        setDrop(dropSide(e))
-      }}
-      onDragLeave={(e) => {
-        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDrop(null)
-      }}
-      onDrop={(e) => {
-        setDrop(null)
-        const from = e.dataTransfer.getData(SECTION_DRAG)
-        if (!isSection(from)) return
-        e.preventDefault()
-        placeSection(from, props.id, dropSide(e) === 'after')
-      }}
-    >
-      <header
-        draggable
-        title="Drag to move the section, right click for more"
-        onDragStart={(e) => {
-          e.dataTransfer.setData(SECTION_DRAG, props.id)
-          e.dataTransfer.effectAllowed = 'move'
-        }}
-        onContextMenu={(e) => sectionMenu(e, props.id)}
-      >
-        <button
-          type="button"
-          className="explorer-toggle"
-          aria-expanded={open}
-          aria-controls={body}
-          onClick={() => setOpen(!open)}
-          onKeyDown={(e) => {
-            // Alt+Up / Alt+Down move the section; focus stays on its toggle.
-            if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return
-            e.preventDefault()
-            const button = e.currentTarget
-            stepSection(props.id, e.key === 'ArrowUp' ? -1 : 1)
-            requestAnimationFrame(() => button.focus())
-          }}
-        >
-          <span className="chevron">
-            <Icon name={open ? 'chevron-down' : 'chevron-right'} />
-          </span>
+    <FoldSection
+      id={props.id}
+      dragType={SECTION_DRAG}
+      title={
+        <>
           <span className="explorer-title">{props.title}</span>
           {props.count !== undefined && <small>{props.count}</small>}
-        </button>
-        <span className="explorer-actions">{props.actions}</span>
-      </header>
-      {open && <div id={body}>{props.children}</div>}
-    </section>
+        </>
+      }
+      actions={props.actions}
+      onPlace={(from, after) => isSection(from) && placeSection(from, props.id, after)}
+      onStep={(step) => stepSection(props.id, step)}
+      onContextMenu={(e) => sectionMenu(e, props.id)}
+    >
+      {props.children}
+    </FoldSection>
   )
 }
 
@@ -381,7 +330,7 @@ export function ExplorerPanel(): ReactNode {
   const [filter, setFilter] = useState('')
   const savedOrder = useSettings((s) => s.explorerOrder)
   const savedHidden = useSettings((s) => s.explorerHidden)
-  const order = useMemo(() => sectionOrder(savedOrder), [savedOrder])
+  const order = useMemo(() => sectionOrder(savedOrder, SECTIONS), [savedOrder])
   const hidden = order.filter((id) => savedHidden.includes(id))
   const f = filter.trim().toLowerCase()
   const match = (name: string): boolean => !f || name.toLowerCase().includes(f)

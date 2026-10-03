@@ -1,9 +1,19 @@
 // Code generation of the active document: the templates generating it and the files generated, each
-// opened in an editor tab (in its own VS Code editor in VS Code).
-import { useCallback, useDeferredValue, useEffect, useState, type MouseEvent, type ReactNode } from 'react'
+// opened in an editor tab (in its own VS Code editor in VS Code). Sections fold and reorder (drag their header,
+// Alt+Up / Alt+Down, right click); the order is kept in the settings.
+import {
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useState,
+  type MouseEvent,
+  type ReactNode
+} from 'react'
 import { generatedFiles, LOCAL_TEMPLATES } from '@/codegen/run'
 import { MANIFEST, parseManifest, templateFiles } from '@/codegen/templateSet'
 import { LANGUAGE_BADGES, languageOf } from '@/components/codeLanguages'
+import { FoldSection, placed, sectionOrder } from '@/components/FoldSection'
 import { onListKeyDown } from '@/components/listKeys'
 import {
   builtinTemplates,
@@ -17,6 +27,8 @@ import {
 } from '@/generateCode'
 import { activeDoc, useDocs, type DocState } from '@/store/documents'
 import { useProjectStore } from '@/store/project'
+import { setSetting, useSettings } from '@/store/settings'
+import { openContextMenu } from '@/store/ui'
 import type { TextSource } from '@/store/textFiles'
 import { openTextFile } from '@/textFileOps'
 
@@ -30,6 +42,34 @@ interface Listing {
 
 /** A listing, or why it could not be read (folder access not granted yet: `retry` asks for it). */
 type Loaded = { listing: Listing | null } | { error: string }
+
+const SECTIONS = ['templates', 'generated'] as const
+type SectionId = (typeof SECTIONS)[number]
+const SECTION_DRAG = 'application/x-generation-section'
+
+const isSection = (s: string): s is SectionId => (SECTIONS as readonly string[]).includes(s)
+
+function placeSection(id: SectionId, target: SectionId, after: boolean): void {
+  const order = sectionOrder(useSettings.getState().generationOrder, SECTIONS)
+  if (id !== target) setSetting('generationOrder', placed(order, id, target, after))
+}
+
+/** Moves a section past its neighbor above (-1) or below (1). */
+function stepSection(id: SectionId, step: -1 | 1): void {
+  const order = sectionOrder(useSettings.getState().generationOrder, SECTIONS)
+  const target = order[order.indexOf(id) + step]
+  if (target) placeSection(id, target, step > 0)
+}
+
+function sectionMenu(e: MouseEvent, id: SectionId): void {
+  e.preventDefault()
+  const order = sectionOrder(useSettings.getState().generationOrder, SECTIONS)
+  const i = order.indexOf(id)
+  openContextMenu(e, [
+    { label: 'Move up', keys: 'Alt+Up', disabled: i <= 0, run: () => stepSection(id, -1) },
+    { label: 'Move down', keys: 'Alt+Down', disabled: i >= order.length - 1, run: () => stepSection(id, 1) }
+  ])
+}
 
 const sorted = (files: string[]): string[] => [MANIFEST, ...files.filter((f) => f !== MANIFEST).sort()]
 
@@ -107,21 +147,29 @@ function FileList({ listing, filter }: { listing: Listing; filter: string }): Re
 }
 
 function Section(props: {
+  id: SectionId
   title: string
   loaded: Loaded | null
   empty: ReactNode
-  actions: ReactNode
   filter: string
   retry: () => void
 }): ReactNode {
-  const { loaded } = props
+  const { id, loaded } = props
   return (
-    <section className="explorer-section generation-section">
-      <header>
-        <span>{props.title}</span>
-        <small>{loaded && 'listing' in loaded && loaded.listing ? loaded.listing.label : null}</small>
-        <span className="explorer-actions">{props.actions}</span>
-      </header>
+    <FoldSection
+      id={id}
+      dragType={SECTION_DRAG}
+      className="generation-section"
+      title={
+        <>
+          <span className="explorer-title">{props.title}</span>
+          <small>{loaded && 'listing' in loaded && loaded.listing ? loaded.listing.label : null}</small>
+        </>
+      }
+      onPlace={(from, after) => isSection(from) && placeSection(from, id, after)}
+      onStep={(step) => stepSection(id, step)}
+      onContextMenu={(e) => sectionMenu(e, id)}
+    >
       {!loaded ? (
         <p className="muted empty">Reading…</p>
       ) : 'error' in loaded ? (
@@ -136,7 +184,7 @@ function Section(props: {
       ) : (
         props.empty
       )}
-    </section>
+    </FoldSection>
   )
 }
 
@@ -147,6 +195,8 @@ export function GenerationPanel(): ReactNode {
   const [generated, setGenerated] = useState<Loaded | null>(null)
   const [query, setQuery] = useState('')
   const filter = useDeferredValue(query.trim())
+  const savedOrder = useSettings((s) => s.generationOrder)
+  const order = useMemo(() => sectionOrder(savedOrder, SECTIONS), [savedOrder])
 
   const refresh = useCallback((): void => {
     const doc = activeDoc()
@@ -162,6 +212,19 @@ export function GenerationPanel(): ReactNode {
   return (
     <div className="generation-panel">
       <div className="panel-filter">
+        <div className="generation-actions">
+          <button type="button" className="link" onClick={() => void chooseTemplates()}>
+            Change templates…
+          </button>
+          {canGenerate() ? (
+            <button type="button" className="link" onClick={() => void generateCode(false)}>
+              Generate
+            </button>
+          ) : null}
+          <button type="button" className="link" onClick={refresh} title="List the files again">
+            Refresh
+          </button>
+        </div>
         <input
           data-autofocus
           type="search"
@@ -171,37 +234,31 @@ export function GenerationPanel(): ReactNode {
           onChange={(e) => setQuery(e.target.value)}
         />
       </div>
-      <Section
-        title="Templates"
-        loaded={templates}
-        filter={filter}
-        retry={refresh}
-        empty={null}
-        actions={
-          <button type="button" className="link" onClick={() => void chooseTemplates()}>
-            Change…
-          </button>
-        }
-      />
-      <Section
-        title="Generated"
-        loaded={generated}
-        filter={filter}
-        retry={refresh}
-        empty={<p className="muted empty">No code generated yet for this document.</p>}
-        actions={
-          <>
-            {canGenerate() ? (
-              <button type="button" className="link" onClick={() => void generateCode(false)}>
-                Generate
-              </button>
-            ) : null}
-            <button type="button" className="link" onClick={refresh} title="List the files again">
-              Refresh
-            </button>
-          </>
-        }
-      />
+      <div className="generation-sections">
+        {order.map((id) =>
+          id === 'templates' ? (
+            <Section
+              key={id}
+              id={id}
+              title="Templates"
+              loaded={templates}
+              filter={filter}
+              retry={refresh}
+              empty={null}
+            />
+          ) : (
+            <Section
+              key={id}
+              id={id}
+              title="Generated"
+              loaded={generated}
+              filter={filter}
+              retry={refresh}
+              empty={<p className="muted empty">No code generated yet for this document.</p>}
+            />
+          )
+        )}
+      </div>
     </div>
   )
 }

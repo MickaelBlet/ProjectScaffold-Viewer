@@ -37,6 +37,8 @@ export interface Settings {
   explorerOrder: string[]
   /** Explorer sections not shown. */
   explorerHidden: string[]
+  /** Code generation panel sections top to bottom. */
+  generationOrder: string[]
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -56,7 +58,8 @@ export const DEFAULT_SETTINGS: Settings = {
   sourceWhitespace: true,
   sourceFollow: true,
   explorerOrder: [],
-  explorerHidden: []
+  explorerHidden: [],
+  generationOrder: []
 }
 
 const SETTINGS_KEY = 'project-scaffold:settings'
