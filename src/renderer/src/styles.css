@@ -24,6 +24,8 @@
   --syn-key: #2757c7;
   --syn-string: #2b7a3f;
   --syn-literal: #b0480b;
+  --scrollbar-thumb: color-mix(in srgb, var(--text) 16%, transparent);
+  --scrollbar-thumb-hover: color-mix(in srgb, var(--text) 32%, transparent);
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
@@ -97,6 +99,11 @@
   --syn-key: var(--vscode-debugTokenExpression-name, var(--vscode-symbolIcon-propertyForeground));
   --syn-string: var(--vscode-debugTokenExpression-string, var(--vscode-charts-green));
   --syn-literal: var(--vscode-debugTokenExpression-number, var(--vscode-charts-orange));
+  --scrollbar-thumb: var(--vscode-scrollbarSlider-background, color-mix(in srgb, var(--text) 16%, transparent));
+  --scrollbar-thumb-hover: var(
+    --vscode-scrollbarSlider-hoverBackground,
+    color-mix(in srgb, var(--text) 32%, transparent)
+  );
 }
 :root[data-vscode-colors] body {
   font-family: var(--vscode-font-family, system-ui, sans-serif);
@@ -104,6 +111,32 @@
 
 * {
   box-sizing: border-box;
+}
+/* Thin scrollbars on a transparent track. Chromium ignores ::-webkit-scrollbar once scrollbar-width or
+   scrollbar-color is set, so those are for the other engines only. */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  background-clip: padding-box;
+  border: 3px solid transparent;
+  border-radius: 5px;
+}
+::-webkit-scrollbar-thumb:hover,
+::-webkit-scrollbar-thumb:active {
+  background-color: var(--scrollbar-thumb-hover);
+}
+@supports not selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) transparent;
+  }
 }
 html,
 body,
@@ -2614,7 +2647,7 @@ mark {
   --dv-inactivegroup-hiddenpanel-tab-color: var(--muted);
   --dv-separator-border: var(--border);
   --dv-paneview-header-border-color: var(--border);
-  --dv-scrollbar-background-color: var(--border);
+  --dv-scrollbar-background-color: var(--scrollbar-thumb);
   color: var(--text);
 }
 .dockview-theme-scaffold
