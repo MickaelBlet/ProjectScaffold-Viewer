@@ -58,17 +58,19 @@ export function StackedSections({ children }: { children: ReactNode }): ReactNod
     const el = list.current
     if (!el) return
     const headers = (): HTMLElement[] => [...el.querySelectorAll<HTMLElement>(':scope > section > header')]
+    // Exact heights (fractional when zoomed), offsets rounded down: neighbors overlap by less than a pixel
+    // rather than leave a gap showing the list behind.
     const place = (): void => {
-      const all = headers()
+      const all = headers().map((h) => [h, h.getBoundingClientRect().height] as const)
       let top = 0
-      for (const h of all) {
-        h.style.top = `${top}px`
-        top += h.offsetHeight
+      for (const [h, height] of all) {
+        h.style.top = `${Math.floor(top)}px`
+        top += height
       }
       let bottom = 0
-      for (const h of all.reverse()) {
-        h.style.bottom = `${bottom}px`
-        bottom += h.offsetHeight
+      for (const [h, height] of all.reverse()) {
+        h.style.bottom = `${Math.floor(bottom)}px`
+        bottom += height
       }
     }
     const resized = new ResizeObserver(place)
