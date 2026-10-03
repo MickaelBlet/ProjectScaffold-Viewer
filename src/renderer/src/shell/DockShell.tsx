@@ -63,9 +63,9 @@ const TOOL_ICONS: Record<ToolId, IconName> = {
   generation: 'code',
   inspector: 'info',
   problems: 'warning',
-  output: 'terminal',
+  output: 'output',
   search: 'search',
-  settings: 'sliders'
+  settings: 'gear'
 }
 
 function ProblemsBadge(): ReactNode {
