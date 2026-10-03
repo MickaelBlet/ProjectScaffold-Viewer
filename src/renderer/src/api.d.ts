@@ -83,6 +83,11 @@ export interface Api {
    * in another program); null otherwise, and when the file cannot be watched.
    */
   changedOnDisk(path: string): Promise<string | null>
+  /**
+   * Reads again a file picked earlier in this session (an IDL dependency), by path or file name;
+   * null when it is not at hand anymore. Absent when the host cannot.
+   */
+  readPicked?(path: string): Promise<string | null>
   /** False when saving downloads a copy instead of writing the file (Firefox, Safari). */
   writesFiles: boolean
   setDirty(dirty: boolean): void

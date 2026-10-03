@@ -46,6 +46,19 @@ export async function openIdlText(): Promise<void> {
   }
 }
 
+/**
+ * Opens an IDL dependency as text: the tab already editing it, else the file picked earlier in this
+ * session, else the file to pick again.
+ */
+export async function openIdlDependency(file: string): Promise<void> {
+  const ref: TextFileRef = { source: 'file', path: file }
+  const open = useTextFiles.getState().files[textFileKey(activeDoc().id, ref)]
+  if (open && open.saved !== null) return openTextFile(ref)
+  const content = await window.api.readPicked?.(file)
+  if (content != null) return openTextFile(ref, { content })
+  await openIdlText()
+}
+
 /** Saves the text file of the active editor tab; false when the active tab is no text file. */
 export function saveActiveTextFile(): boolean {
   const ref = activeFilePanel()

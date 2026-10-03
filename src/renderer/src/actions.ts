@@ -80,6 +80,7 @@ import {
   type Selection
 } from '@/store/ui'
 import { fileName } from '@/fileOps'
+import { openIdlDependency } from '@/textFileOps'
 import { normalizeFile, relativeFile, resolveRelative, sameFile } from '@/model/sync'
 import { formatFromPath, LoadError, loadText, toFile } from '@/model/serialize'
 import type { OpenResult } from '@/api'
@@ -967,9 +968,13 @@ export function showDependency(id: Id): void {
   navigate({ kind: 'dependency', id })
 }
 
-/** Show the project of a dependency in its tab when it is open (VS Code: in its editor). */
+/**
+ * Show the project of a dependency in its tab when it is open (VS Code: in its editor); an IDL file
+ * as text.
+ */
 export function openImportSource(file: string): void {
   if (window.api.openSibling) return window.api.openSibling(file)
+  if (isIdl(file)) return void openIdlDependency(file)
   const doc = useDocs.getState().docs.find((d) => d.filePath && fileName(d.filePath) === fileName(file))
   if (doc) activateDoc(doc.id)
   else setStatus('info', `${file} is not open`)

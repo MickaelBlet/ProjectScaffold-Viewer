@@ -138,6 +138,16 @@ async function changedOnDisk(path: string): Promise<string | null> {
   }
 }
 
+async function readPicked(path: string): Promise<string | null> {
+  const handle = handles.get(path) ?? handles.get(path.split(/[\\/]/).pop() ?? path)
+  if (!handle) return null
+  try {
+    return await read(handle, path)
+  } catch {
+    return null
+  }
+}
+
 /** Picks files; project files (no `filter`) go to the recent files. */
 async function pickFiles(multiple: boolean, filter?: FileFilter): Promise<OpenResult[]> {
   const accept = filter ?? PROJECT_FILES
@@ -705,6 +715,7 @@ const webApi: Api = {
   },
   saveFile,
   changedOnDisk,
+  readPicked,
   writesFiles: !!fs.showSaveFilePicker,
   recentFiles: async () => (await loadRecent()).map((e) => e.name),
   openRecent: async (path) => {
