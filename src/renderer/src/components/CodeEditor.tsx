@@ -49,6 +49,7 @@ import { fixedLiquid } from './liquidSyntax'
 import { richYaml } from './yamlSyntax'
 import { codeTheme } from './codeTheme'
 import { minimap } from './minimap'
+import { findWidget, replaceKeymap } from './searchPanel'
 
 const words = (list: string): Record<string, true> =>
   Object.fromEntries(list.split(' ').map((w) => [w, true]))
@@ -262,12 +263,14 @@ const baseSetup: Extension = [
   rectangularSelection(),
   crosshairCursor(),
   lintGutter(),
+  findWidget(),
   // High, not highest: editors flush their pending edits first (highest), shortcuts then see them.
   Prec.high(EditorView.domEventHandlers({ keydown: (e) => passKey(e) })),
   keymap.of([
     ...closeBracketsKeymap,
     ...defaultKeymap,
     ...searchKeymap,
+    ...replaceKeymap,
     ...historyKeymap,
     ...foldKeymap,
     ...completionKeymap,

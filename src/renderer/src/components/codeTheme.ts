@@ -58,10 +58,8 @@ const theme = EditorView.theme({
   '.cm-completionDetail': { color: 'var(--muted)', fontStyle: 'normal', fontFamily: 'system-ui, sans-serif' },
   '.cm-completionMatchedText': { textDecoration: 'none', fontWeight: '600' },
   '.cm-panels': { color: 'var(--text)', backgroundColor: 'var(--panel-2)' },
-  '.cm-panels.cm-panels-top': { borderBottom: '1px solid var(--border)' },
   '.cm-panels.cm-panels-bottom': { borderTop: '1px solid var(--border)' },
   // Panel controls as the app's: more specific than the base theme's light gradients.
-  '.cm-panel.cm-search': { fontFamily: 'inherit', fontSize: '12px' },
   '.cm-panel .cm-textfield': {
     fontSize: 'var(--code-font-size, 12px)',
     color: 'var(--text)',
