@@ -60,7 +60,9 @@ export function targetAt(p: Project, path: Path, names: (string | undefined)[]):
       const dep = byName(p.dependencies, itemName(1, file.dependencies))
       const fileDep = file.dependencies?.find((x) => x.name === dep?.name)
       const j = index(3)
-      if (!dep || !fileDep || j === null) return null
+      if (!dep) return null
+      // The dependency itself, or one of its fields.
+      if (!fileDep || j === null) return { kind: 'dependency', id: dep.id }
       if (path[2] === 'types') {
         const t = byName(p.types, itemName(3, fileDep.types))
         return t ? { kind: 'type', id: t.id } : null

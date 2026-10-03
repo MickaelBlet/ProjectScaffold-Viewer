@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useDoc } from '@/store/documents'
 import { deleteItems, setLocked, setModuleColor, updateNote, useProjectStore } from '@/store/project'
 import { select } from '@/store/ui'
@@ -13,6 +13,7 @@ import { LinkInspector } from './LinkInspector'
 import { TypeInspector } from './TypeInspector'
 import { InterfaceInspector } from './InterfaceInspector'
 import { ImportedInspector } from './ImportedInspector'
+import { DependencyDetail } from './DependenciesPanel'
 import { Icon, type IconName } from '@/components/Icon'
 
 function CommandButton({ id, icon, label }: { id: string; icon?: IconName; label: string }): ReactNode {
@@ -189,11 +190,38 @@ function NoteInspector({ id }: { id: string }): ReactNode {
   )
 }
 
+/** A dependency, as the Dependencies panel shows it. */
+function DependencyInspector({ id }: { id: string }): ReactNode {
+  const dep = useProjectStore((s) => s.project.dependencies.find((d) => d.id === id))
+  const [filter, setFilter] = useState('')
+  if (!dep) return <p className="muted">Dependency removed.</p>
+  return (
+    <>
+      <div className="panel-filter">
+        <input
+          type="search"
+          placeholder="Filter types, interfaces, members and modules"
+          aria-label="Filter the dependency"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+        />
+      </div>
+      <DependencyDetail lib={dep} filter={filter} onChoose={(d) => select({ kind: 'dependency', id: d })} />
+    </>
+  )
+}
+
 export function Inspector(): ReactNode {
   const sel = useDoc((d) => d.selection)
   const selectedIds = useDoc((d) => d.selectedIds)
   const openable: EditorKind | null =
-    sel && sel.kind !== 'project' && sel.kind !== 'note' && sel.kind !== 'imported' ? sel.kind : null
+    sel &&
+    sel.kind !== 'project' &&
+    sel.kind !== 'note' &&
+    sel.kind !== 'imported' &&
+    sel.kind !== 'dependency'
+      ? sel.kind
+      : null
   return (
     <div className="inspector">
       {openable && sel && 'id' in sel && selectedIds.length <= 1 && (
@@ -220,6 +248,8 @@ export function Inspector(): ReactNode {
         <NoteInspector key={sel.id} id={sel.id} />
       ) : sel.kind === 'imported' ? (
         <ImportedInspector key={sel.id} id={sel.id} />
+      ) : sel.kind === 'dependency' ? (
+        <DependencyInspector key={sel.id} id={sel.id} />
       ) : (
         <InterfaceInspector key={sel.id} id={sel.id} />
       )}

@@ -102,7 +102,7 @@ export function selectedIds(): Id[] {
   const d = activeDoc()
   if (d.selectedIds.length) return d.selectedIds
   const s = d.selection
-  return s && 'id' in s ? [s.id] : []
+  return s && 'id' in s && s.kind !== 'dependency' ? [s.id] : []
 }
 
 export function selectionOf(p: Project, id: Id): Selection {
@@ -112,6 +112,7 @@ export function selectionOf(p: Project, id: Id): Selection {
   if (p.interfaces.some((i) => i.id === id)) return { kind: 'interface', id }
   if (p.links.some((l) => l.id === id)) return { kind: 'link', id }
   if (findImported(p, id)) return { kind: 'imported', id }
+  if (p.dependencies.some((d) => d.id === id)) return { kind: 'dependency', id }
   return null
 }
 
@@ -141,7 +142,12 @@ export function navigate(target: ProblemTarget, { zoom = false }: { zoom?: boole
     return
   }
   if (target.kind === 'project') return
-  if (target.kind === 'type' || target.kind === 'interface' || target.kind === 'const')
+  if (
+    target.kind === 'type' ||
+    target.kind === 'interface' ||
+    target.kind === 'const' ||
+    target.kind === 'dependency'
+  )
     return showTool('inspector', false)
   const p = getProject()
   const link = target.kind === 'link' ? p.links.find((l) => l.id === target.id) : undefined

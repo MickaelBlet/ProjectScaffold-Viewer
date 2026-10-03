@@ -357,6 +357,7 @@ export function ExplorerPanel(): ReactNode {
   const selectedIds = useDoc((d) => d.selectedIds)
   // A single selected link is kept in `selection` only (`selectedIds` holds canvas nodes).
   const selectedLink = useDoc((d) => (d.selection?.kind === 'link' ? d.selection.id : null))
+  const selectedDependency = useDoc((d) => (d.selection?.kind === 'dependency' ? d.selection.id : null))
   const activeViewId = useDoc((d) => d.activeViewId)
   const [filter, setFilter] = useState('')
   const savedOrder = useSettings((s) => s.explorerOrder)
@@ -485,16 +486,28 @@ export function ExplorerPanel(): ReactNode {
           <Item
             key={r.key}
             tabStop={stop}
-            selected={false}
-            className="dependency"
+            selected={selectedDependency === r.dep.id}
+            className={`dependency ${selectedDependency === r.dep.id ? 'active' : ''}`}
             title={`${r.dep.file}${r.dep.indirect ? ' (used by another dependency)' : ''}${r.dep.uses.length ? `\nUses ${r.dep.uses.join(', ')}` : ''}`}
             style={indent(0)}
-            onClick={() => toggle(r.key)}
+            onClick={() => {
+              revealInspector()
+              select({ kind: 'dependency', id: r.dep.id })
+            }}
             onKeyDown={foldKeys(r.key, r.open)}
             onDoubleClick={() => showDependency(r.dep.id)}
             onContextMenu={(e) => dependencyMenu(e, r.dep)}
           >
-            {chevron(r.open)}
+            <span
+              className="chevron"
+              aria-hidden
+              onClick={(e) => {
+                e.stopPropagation()
+                toggle(r.key)
+              }}
+            >
+              <Icon name={r.open ? 'chevron-down' : 'chevron-right'} />
+            </span>
             <span className="kind-badge dependency">D</span>
             {r.dep.name}
             <small>{r.dep.indirect ? 'indirect' : r.dep.file}</small>

@@ -62,7 +62,10 @@ export const useUiStore = create<UiState>(() => ({
 export const select = (selection: Selection): void =>
   patchDoc({
     selection,
-    selectedIds: selection && 'id' in selection && selection.kind !== 'link' ? [selection.id] : []
+    selectedIds:
+      selection && 'id' in selection && selection.kind !== 'link' && selection.kind !== 'dependency'
+        ? [selection.id]
+        : []
   })
 
 export const useSelection = (): Selection => useDoc((d) => d.selection)

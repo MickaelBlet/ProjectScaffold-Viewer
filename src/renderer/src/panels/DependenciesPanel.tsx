@@ -188,11 +188,13 @@ const choose = (id: Id): void => useUiStore.setState({ dependency: id })
 function Chips({
   label,
   names,
-  dependencies
+  dependencies,
+  onChoose
 }: {
   label: string
   names: string[]
   dependencies: Dependency[]
+  onChoose: (id: Id) => void
 }): ReactNode {
   return (
     <div className="lib-relation">
@@ -206,7 +208,7 @@ function Chips({
               type="button"
               className="lib-chip"
               disabled={!target}
-              onClick={() => target && choose(target.id)}
+              onClick={() => target && onChoose(target.id)}
             >
               {n}
             </button>
@@ -219,8 +221,19 @@ function Chips({
   )
 }
 
-/** A dependency: its relations, types, interfaces, constants and placed modules. */
-function DependencyDetail({ lib, filter }: { lib: Dependency; filter: string }): ReactNode {
+/**
+ * A dependency: its relations, types, interfaces, constants and placed modules. `onChoose` shows
+ * another dependency (a chip of Uses / Used by).
+ */
+export function DependencyDetail({
+  lib,
+  filter,
+  onChoose = choose
+}: {
+  lib: Dependency
+  filter: string
+  onChoose?: (id: Id) => void
+}): ReactNode {
   const project = useProjectStore((s) => s.project)
   const selectedIds = useDoc((d) => d.selectedIds)
   const [collapsed, setCollapsed] = useState<ReadonlySet<Id>>(new Set())
@@ -354,8 +367,8 @@ function DependencyDetail({ lib, filter }: { lib: Dependency; filter: string }):
       <p className="lib-file muted" title={lib.file}>
         {lib.file}
       </p>
-      <Chips label="Uses" names={lib.uses} dependencies={project.dependencies} />
-      <Chips label="Used by" names={usedBy} dependencies={project.dependencies} />
+      <Chips label="Uses" names={lib.uses} dependencies={project.dependencies} onChoose={onChoose} />
+      <Chips label="Used by" names={usedBy} dependencies={project.dependencies} onChoose={onChoose} />
       {lib.shared.length > 0 && (
         <p className="lib-file muted">Also defines, like another dependency: {lib.shared.join(', ')}</p>
       )}

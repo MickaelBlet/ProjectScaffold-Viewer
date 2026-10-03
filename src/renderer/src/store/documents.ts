@@ -12,6 +12,7 @@ export type Selection =
   | { kind: 'interface'; id: Id }
   | { kind: 'note'; id: Id }
   | { kind: 'imported'; id: Id }
+  | { kind: 'dependency'; id: Id }
   | null
 
 export interface Viewport {
@@ -68,7 +69,7 @@ export function createDoc(project: Project = emptyProject(), filePath: string | 
       p.types.some((t) => t.id === x) ||
       p.interfaces.some((i) => i.id === x) ||
       p.links.some((l) => l.id === x) ||
-      p.dependencies.some((d) => d.modules.some((m) => m.id === x))
+      p.dependencies.some((d) => d.id === x || d.modules.some((m) => m.id === x))
     const selectedIds = doc.selectedIds.filter(exists)
     const selection =
       doc.selection && 'id' in doc.selection && !exists(doc.selection.id) ? null : doc.selection

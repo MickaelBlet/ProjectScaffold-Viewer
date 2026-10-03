@@ -14,7 +14,13 @@ function at(marker: string, from = 0): string | null {
   const t = targetAt(project, path, names)
   if (!t) return null
   if (t.kind === 'project') return 'project'
-  const all = [...project.modules, ...project.links, ...project.types, ...project.interfaces]
+  const all = [
+    ...project.modules,
+    ...project.links,
+    ...project.types,
+    ...project.interfaces,
+    ...project.dependencies
+  ]
   return `${t.kind}:${all.find((e) => e.id === t.id)?.name ?? t.id}`
 }
 
@@ -28,6 +34,9 @@ describe('caret target', () => {
     expect(at('role: out', text.indexOf('- name: Sensor'))).toBe('module:Sensor')
     expect(at('name: sensor_to_controller')).toBe('link:sensor_to_controller')
     expect(at('class: realtime')).toBe('link:sensor_to_controller')
+    expect(at('- name: Common')).toBe('dependency:Common')
+    expect(at('file: common.scaffold.yaml')).toBe('dependency:Common')
+    expect(at('name: Vec3')).toBe('type:Vec3')
   })
 
   it('finds modules from their editor data', () => {

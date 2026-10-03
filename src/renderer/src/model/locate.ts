@@ -36,6 +36,8 @@ export function targetPath(data: unknown, p: Project, target: ProblemTarget): Da
       const i = path[1] as number | undefined
       return i === undefined ? path : [...path, ...named(key, file.dependencies![i]![key], e.name)]
     }
+    case 'dependency':
+      return named('dependencies', file.dependencies, p.dependencies.find((d) => d.id === target.id)?.name)
     case 'link':
       return named('links', file.links, p.links.find((l) => l.id === target.id)?.name)
     case 'module': {

@@ -59,6 +59,10 @@ describe('targetPath', () => {
       expect(robot.split('\n')[lineOfTarget({ kind: 'module', id: m.id })! - 1]).toContain(`name: ${m.name}`)
     for (const t of p.types)
       expect(robot.split('\n')[lineOfTarget({ kind: 'type', id: t.id })! - 1]).toMatch(/kind: |name: /)
+    const dep = p.dependencies[0]!
+    expect(robot.split('\n')[lineOfTarget({ kind: 'dependency', id: dep.id })! - 1]).toContain(
+      `name: ${dep.name}`
+    )
     const link = p.links[0]!
     expect(robot.split('\n')[lineOfTarget({ kind: 'link', id: link.id })! - 1]).toContain(
       `name: ${link.name}`
