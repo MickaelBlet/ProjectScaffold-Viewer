@@ -622,6 +622,11 @@ kbd {
 .panel-filter input {
   width: 100%;
 }
+/* Full width of the inspector, aligned with its content. */
+.inspector .panel-filter {
+  margin: 0 -12px 8px;
+  padding: 6px 12px;
+}
 .explorer-section > header {
   /* Title left, whole; actions in the rest of the row, on the right, wrapping there. */
   display: grid;
@@ -2531,6 +2536,16 @@ mark {
 }
 .settings .check {
   margin: 6px 0;
+}
+/* Settings the filter leaves out render nothing: hide sections left empty. */
+.settings .section:not(:has(.row, .check)) {
+  display: none;
+}
+.settings-empty {
+  display: none;
+}
+.settings:not(:has(.section .row, .section .check)) .settings-empty {
+  display: block;
 }
 
 /* Dockview theme mapped on the app tokens */

@@ -218,10 +218,11 @@ function Chips({
 }
 
 /** A dependency: its relations, types, interfaces, constants and placed modules. */
-export function DependencyDetail({ lib, filter }: { lib: Dependency; filter: string }): ReactNode {
+export function DependencyDetail({ lib }: { lib: Dependency }): ReactNode {
   const project = useProjectStore((s) => s.project)
   const selectedIds = useDoc((d) => d.selectedIds)
   const [collapsed, setCollapsed] = useState<ReadonlySet<Id>>(new Set())
+  const [filter, setFilter] = useState('')
   const f = filter.trim().toLowerCase()
 
   const owned = useMemo(() => dependencyEntities(project, lib.id), [project, lib.id])
@@ -358,6 +359,15 @@ export function DependencyDetail({ lib, filter }: { lib: Dependency; filter: str
         <p className="lib-file muted">Also defines, like another dependency: {lib.shared.join(', ')}</p>
       )}
 
+      <div className="panel-filter">
+        <input
+          type="search"
+          placeholder="Filter types, interfaces, members and modules"
+          aria-label="Filter the dependency"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+        />
+      </div>
       <ul
         className="lib-entities"
         role="tree"

@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { useDoc } from '@/store/documents'
 import { deleteItems, setLocked, setModuleColor, updateNote, useProjectStore } from '@/store/project'
 import { select } from '@/store/ui'
@@ -193,22 +193,8 @@ function NoteInspector({ id }: { id: string }): ReactNode {
 /** A dependency: its relations and content. */
 function DependencyInspector({ id }: { id: string }): ReactNode {
   const dep = useProjectStore((s) => s.project.dependencies.find((d) => d.id === id))
-  const [filter, setFilter] = useState('')
   if (!dep) return <p className="muted">Dependency removed.</p>
-  return (
-    <>
-      <div className="panel-filter">
-        <input
-          type="search"
-          placeholder="Filter types, interfaces, members and modules"
-          aria-label="Filter the dependency"
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-        />
-      </div>
-      <DependencyDetail lib={dep} filter={filter} />
-    </>
-  )
+  return <DependencyDetail lib={dep} />
 }
 
 export function Inspector(): ReactNode {
