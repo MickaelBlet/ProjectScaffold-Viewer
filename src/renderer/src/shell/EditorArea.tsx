@@ -211,7 +211,7 @@ function Watermark(): ReactNode {
     <div className="watermark">
       <p>No open view.</p>
       <button type="button" onClick={() => openView(GLOBAL_VIEW)}>
-        Open global view
+        Open project view
       </button>
     </div>
   )

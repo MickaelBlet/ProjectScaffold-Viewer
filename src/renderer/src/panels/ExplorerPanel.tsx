@@ -391,7 +391,7 @@ function viewMenu(e: MouseEvent, v: View): void {
   ])
 }
 
-const GLOBAL: View = { id: GLOBAL_VIEW, name: 'Global', rootModuleId: null, hidden: [] }
+const GLOBAL: View = { id: GLOBAL_VIEW, name: 'Project', rootModuleId: null, hidden: [] }
 
 export function ExplorerPanel(): ReactNode {
   const types = useProjectStore((s) => s.project.types)
@@ -692,7 +692,12 @@ export function ExplorerPanel(): ReactNode {
                 selected={v.id === activeViewId}
                 tabStop={v.id === viewStop}
                 className={v.id === activeViewId ? 'current' : ''}
-                onClick={() => openView(v.id)}
+                onClick={() => {
+                  openView(v.id)
+                  if (v.id !== GLOBAL_VIEW) return
+                  revealInspector()
+                  select({ kind: 'project' })
+                }}
                 onContextMenu={(e) => viewMenu(e, v)}
               >
                 <span className={`kind-badge view ${root ? 'drill' : ''}`}>

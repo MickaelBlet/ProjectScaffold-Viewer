@@ -146,7 +146,7 @@ function Breadcrumbs({ view }: { view: View }): ReactNode {
       {chain.length > 0 && (
         <>
           <button type="button" className="link-button" onClick={() => openView(GLOBAL_VIEW)}>
-            Global
+            Project
           </button>
           {chain.map((c, i) => (
             <span key={c.id}>
@@ -627,7 +627,7 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
     if (node.id.startsWith(EXTERNAL)) {
       const id = node.id.slice(EXTERNAL.length)
       return openContextMenu(e, [
-        { label: 'Show in global view', run: () => (openView(GLOBAL_VIEW), navigate({ kind: 'module', id })) }
+        { label: 'Show in project view', run: () => (openView(GLOBAL_VIEW), navigate({ kind: 'module', id })) }
       ])
     }
     if (!activeDoc().selectedIds.includes(node.id)) select(selectionOf(getProject(), node.id))

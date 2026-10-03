@@ -83,7 +83,7 @@ function entityEntries(): Entry[] {
       kind: 'L',
       run: () => navigate({ kind: 'link', id: l.id })
     })),
-    { key: GLOBAL_VIEW, label: 'Global', detail: 'view', kind: 'V', run: () => openView(GLOBAL_VIEW) },
+    { key: GLOBAL_VIEW, label: 'Project', detail: 'view', kind: 'V', run: () => openView(GLOBAL_VIEW) },
     ...p.views.map((v) => ({
       key: v.id,
       label: v.name,

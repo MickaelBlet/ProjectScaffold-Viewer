@@ -474,7 +474,7 @@ const allCommands: Command[] = [
   },
   {
     id: 'view.global',
-    title: 'Open global view',
+    title: 'Open project view',
     category: 'View',
     keys: ['Alt+G'],
     run: () => openView(GLOBAL_VIEW)
