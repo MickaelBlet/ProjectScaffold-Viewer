@@ -113,6 +113,7 @@ type Toggle =
   | 'inheritance'
   | 'forceAnimations'
   | 'editorWordWrap'
+  | 'editorMinimap'
 const setting =
   <K extends Toggle>(key: K) =>
   (): boolean =>
@@ -566,6 +567,13 @@ const allCommands: Command[] = [
     global: true,
     checked: setting('editorWordWrap'),
     run: toggle('editorWordWrap')
+  },
+  {
+    id: 'view.textMinimap',
+    title: 'Text minimap',
+    category: 'View',
+    checked: setting('editorMinimap'),
+    run: toggle('editorMinimap')
   },
   {
     id: 'view.whitespace',

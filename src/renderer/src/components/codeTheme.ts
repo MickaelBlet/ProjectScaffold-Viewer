@@ -88,7 +88,8 @@ const theme = EditorView.theme({
   '.cm-diagnostic-warning': { borderLeftColor: 'var(--warning)' }
 })
 
-const highlight = HighlightStyle.define([
+/** Syntax colors; also read by the minimap. */
+export const highlight = HighlightStyle.define([
   {
     tag: [t.keyword, t.controlKeyword, t.moduleKeyword, t.definitionKeyword, t.operatorKeyword],
     color: 'var(--syn-key)',

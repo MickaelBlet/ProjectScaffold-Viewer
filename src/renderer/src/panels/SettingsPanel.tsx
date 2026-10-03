@@ -4,6 +4,8 @@ import {
   setSetting,
   useSettings,
   type EdgeStyle,
+  type MinimapRender,
+  type MinimapSlider,
   type PortStyle,
   type Theme,
   type WhitespaceShown
@@ -236,6 +238,32 @@ export function SettingsPanel(): ReactNode {
           value={s.editorScrollPastEnd}
           onChange={(v) => setSetting('editorScrollPastEnd', v)}
         />
+        <Check
+          label="Minimap"
+          hint="Overview of the file on the right, with the lines in view, selections, matches and problems"
+          value={s.editorMinimap}
+          onChange={(v) => setSetting('editorMinimap', v)}
+        />
+        <Row label="Minimap text">
+          <Select
+            value={s.editorMinimapRender}
+            options={[
+              { value: 'characters' as MinimapRender, label: 'characters' },
+              { value: 'blocks' as MinimapRender, label: 'blocks' }
+            ]}
+            onChange={(v) => setSetting('editorMinimapRender', v)}
+          />
+        </Row>
+        <Row label="Minimap slider">
+          <Select
+            value={s.editorMinimapSlider}
+            options={[
+              { value: 'mouse-over' as MinimapSlider, label: 'on hover' },
+              { value: 'always' as MinimapSlider, label: 'always' }
+            ]}
+            onChange={(v) => setSetting('editorMinimapSlider', v)}
+          />
+        </Row>
       </Section>
       <div className="actions">
         <button type="button" onClick={resetLayout}>

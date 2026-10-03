@@ -48,6 +48,7 @@ import { languageOf, type FileLanguage } from './codeLanguages'
 import { fixedLiquid } from './liquidSyntax'
 import { richYaml } from './yamlSyntax'
 import { codeTheme } from './codeTheme'
+import { minimap } from './minimap'
 
 const words = (list: string): Record<string, true> =>
   Object.fromEntries(list.split(' ').map((w) => [w, true]))
@@ -189,6 +190,9 @@ type EditorPrefs = Pick<
   | 'editorAutocomplete'
   | 'editorSelectionMatches'
   | 'editorScrollPastEnd'
+  | 'editorMinimap'
+  | 'editorMinimapRender'
+  | 'editorMinimapSlider'
 >
 
 const selectPrefs = (s: Settings): EditorPrefs => ({
@@ -206,12 +210,16 @@ const selectPrefs = (s: Settings): EditorPrefs => ({
   editorCloseBrackets: s.editorCloseBrackets,
   editorAutocomplete: s.editorAutocomplete,
   editorSelectionMatches: s.editorSelectionMatches,
-  editorScrollPastEnd: s.editorScrollPastEnd
+  editorScrollPastEnd: s.editorScrollPastEnd,
+  editorMinimap: s.editorMinimap,
+  editorMinimapRender: s.editorMinimapRender,
+  editorMinimapSlider: s.editorMinimapSlider
 })
 
 /** The parts of the editor its settings turn on or off; YAML is always indented with spaces. */
 function prefsSetup(p: EditorPrefs, fileName: string): Extension {
-  const tabs = p.editorIndentTabs && languageOf(fileName).id !== 'yaml'
+  const lang = languageOf(fileName).id
+  const tabs = p.editorIndentTabs && lang !== 'yaml'
   return [
     p.editorLineNumbers ? [lineNumbers(), highlightActiveLineGutter()] : [],
     p.editorFolding ? foldGutter() : [],
@@ -224,6 +232,14 @@ function prefsSetup(p: EditorPrefs, fileName: string): Extension {
     p.editorScrollPastEnd ? scrollPastEnd() : [],
     p.editorWhitespace === 'all' ? highlightWhitespace() : [],
     p.editorWhitespace !== 'none' ? highlightTrailingWhitespace() : [],
+    p.editorMinimap
+      ? minimap({
+          render: p.editorMinimapRender,
+          slider: p.editorMinimapSlider,
+          selectionMatches: p.editorSelectionMatches,
+          sections: lang === 'yaml' || lang === 'json' ? lang : 'comments'
+        })
+      : [],
     EditorState.tabSize.of(p.editorTabSize),
     indentUnit.of(tabs ? '\t' : ' '.repeat(p.editorTabSize))
   ]

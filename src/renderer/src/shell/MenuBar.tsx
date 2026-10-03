@@ -99,6 +99,7 @@ const MENUS: [Category, string[]][] = [
       '-',
       'view.wordWrap',
       'view.whitespace',
+      'view.textMinimap',
       '-',
       'view.themeSystem',
       'view.themeLight',
