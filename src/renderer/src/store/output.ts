@@ -33,7 +33,7 @@ export function log(
 ): void {
   const entry: OutputEntry = { id: nextId++, time: Date.now(), level, source, text, ...extra }
   useOutput.setState((s) => ({ entries: [...s.entries.slice(-(LIMIT - 1)), entry] }))
-  window.api.log?.(`[${clockTime(entry.time)}] [${level}] ${text}`)
+  window.api.log?.(level, text)
 }
 
 export const clearOutput = (): void => useOutput.setState({ entries: [] })

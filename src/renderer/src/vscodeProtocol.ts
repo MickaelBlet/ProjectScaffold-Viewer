@@ -31,6 +31,9 @@ export interface WebviewInit {
 export type ViewRef = string | { module: string } | null
 
 /** Done by a diagram for a side panel. Entities by data path of the file, views by reference. */
+/** Level of a line of the page's Output log. */
+export type LogLevel = 'info' | 'warning' | 'error'
+
 export type DiagramAction =
   | { kind: 'openView'; view: ViewRef; split?: boolean }
   | { kind: 'openEditor'; editor: 'type' | 'interface' | 'module' | 'link'; path: DataPath; split?: boolean }
@@ -102,8 +105,8 @@ export type ToHost =
   | { type: 'inDiagram'; action: DiagramAction }
   /** A page shows a side panel; the Dependencies panel with one of them (by name). */
   | { type: 'showPanel'; panel: SidePanel; dependency?: string }
-  /** A line of the page's Output log, for the ProjectScaffold Output channel. */
-  | { type: 'log'; line: string }
+  /** A line of the page's Output log, for the ProjectScaffold Output channel (which adds the time). */
+  | { type: 'log'; level: LogLevel; text: string }
   /** Side panel: listening for its document, sent again in reply. Diagram: listening for commands. */
   | { type: 'ready' }
 

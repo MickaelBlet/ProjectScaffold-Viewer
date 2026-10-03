@@ -224,7 +224,7 @@ const vscodeApi: Api = {
   onAction: (cb) => listen(actionListeners, cb),
   showPanel: (panel, dependency) => post({ type: 'showPanel', panel, dependency }),
   onDependency: (cb) => listen(dependencyListeners, cb),
-  log: (line) => post({ type: 'log', line }),
+  log: (level, text) => post({ type: 'log', level, text }),
   // Side panels have no Generate command.
   outputDir: IN_PANEL ? undefined : outputDir,
   templateDir: IN_PANEL ? undefined : templateDir

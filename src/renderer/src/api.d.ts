@@ -1,4 +1,4 @@
-import type { DiagramAction, SidePanel, ViewRef } from '../../../vscode/src/protocol'
+import type { DiagramAction, LogLevel, SidePanel, ViewRef } from '../../../vscode/src/protocol'
 import type { OutputDir } from './codegen/run'
 
 export interface OpenResult {
@@ -143,8 +143,8 @@ export interface Api {
   showPanel?(panel: SidePanel, dependency?: string): void
   /** Dependencies side panel: the dependency another page shows (by name). */
   onDependency?(cb: (name: string) => void): () => void
-  /** Appends a line of the Output log to the host's own log (ProjectScaffold Output channel). */
-  log?(line: string): void
+  /** Appends an entry of the Output log to the host's own log (ProjectScaffold Output channel). */
+  log?(level: LogLevel, text: string): void
 }
 
 /** Window edge or corner a resize starts from. */
