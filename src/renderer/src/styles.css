@@ -2102,6 +2102,7 @@ ul.plain {
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
 }
 .note.frame {
+  padding: 0px;
   border: 2px solid var(--note-color, var(--muted));
   background: color-mix(in srgb, var(--note-color, var(--muted)) 7%, transparent);
 }
@@ -3121,23 +3122,31 @@ mark {
   --xy-minimap-background-color: color-mix(in srgb, var(--panel) 70%, transparent);
 }
 
-/* Resizer edges: a 10px grab area centered on the border, still drawn as a 1px line. */
+/* Resizer edges: an 8px grab area centered on the border, still drawn as a 1px line, above the
+   port bands and labels lying on the border; port handles stay on top to start links. */
 .react-flow__resize-control.line {
+  z-index: 2;
   border-width: 0 !important;
   --resize-line: var(--xy-resize-background-color, var(--xy-resize-background-color-default));
 }
 .react-flow__resize-control.line.left,
 .react-flow__resize-control.line.right {
-  width: 10px;
-  background: linear-gradient(to right, transparent 4.5px, var(--resize-line) 4.5px 5.5px, transparent 5.5px);
+  width: 8px;
+  background: linear-gradient(to right, transparent 3.5px, var(--resize-line) 3.5px 4.5px, transparent 4.5px);
 }
 .react-flow__resize-control.line.top,
 .react-flow__resize-control.line.bottom {
-  height: 10px;
+  height: 8px;
   background: linear-gradient(
     to bottom,
-    transparent 4.5px,
-    var(--resize-line) 4.5px 5.5px,
-    transparent 5.5px
+    transparent 3.5px,
+    var(--resize-line) 3.5px 4.5px,
+    transparent 4.5px
   );
+}
+.react-flow__resize-control.handle {
+  z-index: 3;
+}
+.react-flow__handle.handle {
+  z-index: 4;
 }
