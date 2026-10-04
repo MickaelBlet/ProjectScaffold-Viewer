@@ -1051,6 +1051,10 @@ kbd {
 .entity-list.drop {
   box-shadow: inset 0 0 0 2px var(--accent);
 }
+/* Explorer: module of a dependency not placed on the canvas. */
+.entity-list li.unplaced {
+  opacity: 0.55;
+}
 /* Explorer: group of the content of a dependency (Constants, Types…). */
 .entity-list li.dependency-group {
   font-size: 11px;

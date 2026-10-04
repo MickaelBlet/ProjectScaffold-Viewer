@@ -1,6 +1,8 @@
 // Views, binaries, dependencies, constants, types, interfaces, modules and links of the active document. Click selects (Ctrl / Shift for several),
 // double-click opens an editor tab, right click for more. Arrows move between items, Enter selects.
-// Modules: the eye hides one in the focused view, drag one onto another (or the list) to re-parent it.
+// Modules: the eye hides one in the focused view, drag one onto another (or the list) to re-parent it;
+// the modules of dependencies placed on the canvas follow. Dependencies also list their modules not
+// placed (double-click places one).
 // Sections can be reordered (drag their header, Alt+Up / Alt+Down) and hidden; kept in the settings.
 import {
   Fragment,
@@ -49,10 +51,12 @@ import {
   newView,
   openImportSource,
   pickDependency,
+  placeDependencyModuleOf,
   selectionOf,
   showDependency
 } from '@/actions'
 import { dependencyMenu } from './DependencyDetail'
+import { useDependencyModules, type DependencyModule } from './dependencyModules'
 import { childrenByParent, dropModule, matching, MODULE_DRAG, toggleHidden } from './moduleTree'
 import { openEditor, openView, revealInspector } from '@/shell/controllers'
 import { Icon } from '@/components/Icon'
@@ -108,7 +112,9 @@ type DependencyRow = { key: string } & (
   | { kind: 'type'; e: TypeDef }
   | { kind: 'interface'; e: Interface }
   | { kind: 'module'; dep: Dependency; m: ImportedModule }
+  | { kind: 'unplaced'; dep: Dependency; m: DependencyModule }
 )
+type ModuleRow = Extract<DependencyRow, { kind: 'module' | 'unplaced' }>
 
 /** Left padding of a row of a tree at `depth`. */
 const indent = (depth: number): CSSProperties => ({ paddingLeft: 6 + depth * 14 })
@@ -236,19 +242,21 @@ function EntityList(
   )
 }
 
-function Item(props: {
-  selected: boolean
-  tabStop: boolean
-  className?: string
-  title?: string
-  style?: CSSProperties
-  onClick: (e: MouseEvent) => void
-  onKeyDown?: (e: KeyboardEvent) => void
-  onDoubleClick?: () => void
-  onContextMenu: (e: MouseEvent) => void
-  onDragStart?: (e: DragEvent) => void
-  children: ReactNode
-} & DropHandlers): ReactNode {
+function Item(
+  props: {
+    selected: boolean
+    tabStop: boolean
+    className?: string
+    title?: string
+    style?: CSSProperties
+    onClick: (e: MouseEvent) => void
+    onKeyDown?: (e: KeyboardEvent) => void
+    onDoubleClick?: () => void
+    onContextMenu: (e: MouseEvent) => void
+    onDragStart?: (e: DragEvent) => void
+    children: ReactNode
+  } & DropHandlers
+): ReactNode {
   return (
     <li
       data-item
@@ -315,7 +323,8 @@ function clickItem(e: MouseEvent, id: Id, list: Id[]): void {
     }
   }
   const sel = selectionOf(getProject(), id)
-  // Modules and links are also brought into view on the canvas.
+  // Modules (placed ones of dependencies too) and links are also brought into view on the canvas.
+  if (sel?.kind === 'imported') return navigate({ kind: 'module', id: sel.id })
   if (sel?.kind === 'module' || sel?.kind === 'link') return navigate(sel)
   select(sel)
 }
@@ -354,6 +363,17 @@ function moduleMenu(e: MouseEvent, id: Id, hidden: boolean): void {
     commandItem('edit.duplicate'),
     'separator',
     commandItem('edit.delete')
+  ])
+}
+
+function importedMenu(e: MouseEvent, dep: Dependency, m: ImportedModule): void {
+  e.preventDefault()
+  select({ kind: 'imported', id: m.id })
+  openContextMenu(e, [
+    { label: 'Show on the canvas', run: () => navigate({ kind: 'module', id: m.id }) },
+    { label: `Open ${dep.file}`, run: () => openImportSource(dep.file) },
+    'separator',
+    { label: 'Remove from this project', danger: true, run: () => deleteItems([m.id]) }
   ])
 }
 
@@ -402,6 +422,7 @@ export function ExplorerPanel(): ReactNode {
   const links = useProjectStore((s) => s.project.links)
   const dependencies = useProjectStore((s) => s.project.dependencies)
   const binaries = useProjectStore((s) => s.project.binaries)
+  const dependencyModules = useDependencyModules(dependencies)
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const selectedIds = useDoc((d) => d.selectedIds)
   // A single selected link is kept in `selection` only (`selectedIds` holds canvas nodes).
@@ -446,14 +467,28 @@ export function ExplorerPanel(): ReactNode {
   const shownInterfaces = ownInterfaces.filter((i) => match(i.name))
   const ownConsts = consts.filter((c) => !c.dependency)
   const shownConsts = ownConsts.filter((c) => match(c.name))
-  // Dependencies, each with its constants, types, interfaces and placed modules in groups ordered as
-  // the sections; a dependency or a group folds (all open while filtering).
+  // Dependencies, each with its constants, types, interfaces and modules in groups ordered as the
+  // sections; a dependency or a group folds (all open while filtering). Modules come in the order of
+  // their project when it can be read, the ones not placed on the canvas dimmed.
   const isOpen = (key: string): boolean => !!f || !collapsed.has(key)
   const dependencyRows: DependencyRow[] = []
   for (const dep of dependencies) {
     const all = match(dep.name)
     const pick = <T,>(list: T[], name: (x: T) => string): T[] =>
       all ? list : list.filter((x) => match(name(x)))
+    const read = dependencyModules.get(dep.id) ?? []
+    const known = new Set(read.map((m) => m.path))
+    const moduleRows: ModuleRow[] = [
+      ...read.map((m): ModuleRow => {
+        const placed = dep.modules.find((x) => x.path === m.path)
+        return placed
+          ? { kind: 'module', key: placed.id, dep, m: placed }
+          : { kind: 'unplaced', key: `${dep.id}:${m.id}`, dep, m }
+      }),
+      ...dep.modules
+        .filter((m) => !known.has(m.path))
+        .map((m): ModuleRow => ({ kind: 'module', key: m.id, dep, m }))
+    ]
     const groups: { [G in DependencyGroup]: DependencyRow[] } = {
       constants: pick(
         consts.filter((c) => c.dependency === dep.id),
@@ -467,7 +502,7 @@ export function ExplorerPanel(): ReactNode {
         interfaces.filter((i) => i.dependency === dep.id),
         (i) => i.name
       ).map((e) => ({ kind: 'interface', key: e.id, e })),
-      modules: pick(dep.modules, (m) => m.path).map((m) => ({ kind: 'module', key: m.id, dep, m }))
+      modules: pick(moduleRows, (r) => r.m.path)
     }
     const shown = order.filter(isDependencyGroup).filter((g) => groups[g].length)
     if (f && !all && !shown.length) continue
@@ -506,12 +541,15 @@ export function ExplorerPanel(): ReactNode {
     }
   }
   walk(moduleChildren.get(null) ?? [], 0)
+  // Modules of dependencies placed on the canvas, after the project's own (always top level).
+  const imported = dependencies.flatMap((dep) => dep.modules.map((m) => ({ dep, m })))
+  const shownImported = imported.filter(({ m }) => match(paths.get(m.id) ?? m.path))
   const shownBinaries = binaries.filter((b) => match(b.name))
   const binaryIds = shownBinaries.map((b) => b.id)
   const shownLinks = allLinks.filter((x) => match(x.l.name) || match(x.from) || match(x.to))
   const typeIds = shownTypes.map((t) => t.id)
   const interfaceIds = shownInterfaces.map((i) => i.id)
-  const moduleIds = shownModules.map((x) => x.m.id)
+  const moduleIds = [...shownModules.map((x) => x.m.id), ...shownImported.map((x) => x.m.id)]
   const linkIds = shownLinks.map((x) => x.l.id)
   const viewStop = tabStop(viewItems, (id) => id === activeViewId)
   const typeStop = tabStop(typeIds, isSelected)
@@ -579,7 +617,7 @@ export function ExplorerPanel(): ReactNode {
             tabStop={stop}
             selected={false}
             className="dependency-group"
-            title={r.group === 'modules' ? 'Its modules placed on the canvas' : undefined}
+            title={r.group === 'modules' ? 'Its modules: placed on the canvas, dimmed when not' : undefined}
             style={indent(1)}
             onClick={() => toggle(r.key)}
             onKeyDown={foldKeys(r.key, r.open)}
@@ -655,21 +693,42 @@ export function ExplorerPanel(): ReactNode {
             style={indent(2)}
             onClick={(ev) => clickItem(ev, m.id, dependencyIds)}
             onDoubleClick={() => navigate({ kind: 'module', id: m.id })}
+            onContextMenu={(ev) => importedMenu(ev, dep, m)}
+          >
+            {leaf}
+            <span className="kind-badge mod">M</span>
+            {m.path}
+            <small>{m.ports.length ? `${m.ports.length}p` : ''}</small>
+          </Item>
+        )
+      }
+      case 'unplaced': {
+        const { dep, m } = r
+        return (
+          <Item
+            key={r.key}
+            tabStop={stop}
+            selected={false}
+            className="unplaced"
+            title={`${m.path}, not placed on the canvas: double-click to place it`}
+            style={indent(2)}
+            onClick={() => {
+              revealInspector()
+              showDependency(dep.id)
+            }}
+            onDoubleClick={() => placeDependencyModuleOf(dep.id, m.id)}
             onContextMenu={(ev) => {
               ev.preventDefault()
-              select({ kind: 'imported', id: m.id })
               openContextMenu(ev, [
-                { label: 'Show on the canvas', run: () => navigate({ kind: 'module', id: m.id }) },
-                { label: `Open ${dep.file}`, run: () => openImportSource(dep.file) },
-                'separator',
-                { label: 'Remove from this project', danger: true, run: () => deleteItems([m.id]) }
+                { label: 'Place on the canvas', run: () => placeDependencyModuleOf(dep.id, m.id) },
+                { label: `Open ${dep.file}`, run: () => openImportSource(dep.file) }
               ])
             }}
           >
             {leaf}
             <span className="kind-badge mod">M</span>
             {m.path}
-            <small>{m.ports.length ? `${m.ports.length}p` : ''}</small>
+            <small>{m.ports ? `${m.ports}p` : ''}</small>
           </Item>
         )
       }
@@ -930,7 +989,7 @@ export function ExplorerPanel(): ReactNode {
       <Section
         id="modules"
         title="Modules"
-        count={modules.length}
+        count={modules.length + imported.length}
         actions={
           <button type="button" className="icon" title="New module" onClick={() => addModuleAt()}>
             <Icon name="plus" />
@@ -1005,7 +1064,27 @@ export function ExplorerPanel(): ReactNode {
               </button>
             </Item>
           ))}
-          {!shownModules.length && <Empty>{f ? 'No match' : 'No modules yet'}</Empty>}
+          {shownImported.map(({ dep, m }) => (
+            <Item
+              key={m.id}
+              selected={isSelected(m.id)}
+              tabStop={m.id === moduleStop}
+              className={isSelected(m.id) ? 'active' : ''}
+              title={`${m.path} of ${dep.name} (${dep.file}), placed on the canvas`}
+              style={indent(0)}
+              onClick={(e) => clickItem(e, m.id, moduleIds)}
+              onDoubleClick={() => navigate({ kind: 'module', id: m.id })}
+              onContextMenu={(e) => importedMenu(e, dep, m)}
+            >
+              {leaf}
+              <span className="kind-badge mod">M</span>
+              <span className="tree-name">{m.path}</span>
+              <small>{dep.name}</small>
+            </Item>
+          ))}
+          {!shownModules.length && !shownImported.length && (
+            <Empty>{f ? 'No match' : 'No modules yet'}</Empty>
+          )}
         </EntityList>
       </Section>
     ),

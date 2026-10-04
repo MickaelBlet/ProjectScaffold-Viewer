@@ -519,6 +519,20 @@ function dependencyLines(r: DependencyResult): string[] {
   ]
 }
 
+/** Place module `moduleId` of `other` on the global view at `at`, depending on its project. */
+function placeFrom(
+  other: OtherProject,
+  moduleId: Id,
+  at: { x: number; y: number },
+  lines: string[] = []
+): void {
+  if (activeDoc().activeViewId !== GLOBAL_VIEW) openView(GLOBAL_VIEW)
+  const { id, result } = placeModuleFrom(other.project, other.file, moduleId, at, selfFile())
+  if (id) select({ kind: 'imported', id })
+  const all = [...lines, ...dependencyLines(result)]
+  if (all.length) showDialog(`Linking to ${other.file}`, all)
+}
+
 /** Pick a module of `others` and place it on the canvas at `at`, depending on its project. */
 function pickModuleOf(others: OtherProject[], at: { x: number; y: number }, lines: string[] = []): void {
   const entries = others.flatMap((other) =>
@@ -532,13 +546,7 @@ function pickModuleOf(others: OtherProject[], at: { x: number; y: number }, line
         .filter(Boolean)
         .join(' · '),
       kind: 'M',
-      run: () => {
-        if (activeDoc().activeViewId !== GLOBAL_VIEW) openView(GLOBAL_VIEW)
-        const { id, result } = placeModuleFrom(other.project, other.file, m.id, at, selfFile())
-        if (id) select({ kind: 'imported', id })
-        const all = [...lines, ...dependencyLines(result)]
-        if (all.length) showDialog(`Linking to ${other.file}`, all)
-      }
+      run: () => placeFrom(other, m.id, at, lines)
     }))
   )
   if (!entries.length) {
@@ -599,6 +607,17 @@ export function placeDependencyModule(id: Id, pos?: { x: number; y: number }): v
   const at = pos ?? activeCanvas()?.center() ?? { x: 80, y: 80 }
   void importSource(dep.file).then((project) => {
     if (project) pickModuleOf([{ project, file: dep.file }], at)
+    else showDialog(`Cannot read ${dep.file}`, [cannotRead(dep.name, dep.file)])
+  })
+}
+
+/** Place module `moduleId` of a dependency (as read from its file) on the canvas. */
+export function placeDependencyModuleOf(id: Id, moduleId: Id): void {
+  const dep = getProject().dependencies.find((x) => x.id === id)
+  if (!dep) return
+  const at = activeCanvas()?.center() ?? { x: 80, y: 80 }
+  void importSource(dep.file).then((project) => {
+    if (project) placeFrom({ project, file: dep.file }, moduleId, at)
     else showDialog(`Cannot read ${dep.file}`, [cannotRead(dep.name, dep.file)])
   })
 }
@@ -850,10 +869,16 @@ async function importIdlFiles(picked: OpenResult[], whole = false): Promise<Id[]
  * Project of a dependency: from the open document of the same file name, else (VS Code) from the
  * file next to the document (an IDL file with the files it includes).
  */
-async function importSource(file: string): Promise<Project | null> {
-  const doc = useDocs
+/** Another open document saved as `file`. */
+export function openSource(file: string): DocState | undefined {
+  return useDocs
     .getState()
     .docs.find((d) => d.id !== activeDoc().id && d.filePath && fileName(d.filePath) === fileName(file))
+}
+
+/** The project saved as `file`: open in a tab, else read next to this file when the host can. */
+export async function importSource(file: string): Promise<Project | null> {
+  const doc = openSource(file)
   if (doc) return doc.store.getState().project
   const text = await window.api.readSibling?.(file)
   if (!text) return null

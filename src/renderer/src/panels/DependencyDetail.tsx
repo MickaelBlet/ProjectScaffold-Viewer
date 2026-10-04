@@ -13,6 +13,7 @@ import { useProjectStore } from '@/store/project'
 import { openContextMenu, select } from '@/store/ui'
 import {
   detachDependencyAction,
+  navigate,
   openImportSource,
   placeDependencyModule,
   refreshDependencies,
@@ -425,7 +426,7 @@ export function DependencyDetail({ lib }: { lib: Dependency }): ReactNode {
             aria-selected={selectedIds.includes(m.id)}
             tabIndex={-1}
             className={`lib-entity ${selectedIds.includes(m.id) ? 'active' : ''}`}
-            onClick={() => select({ kind: 'imported', id: m.id })}
+            onClick={() => navigate({ kind: 'module', id: m.id })}
           >
             <div className="lib-entity-head">
               <span className="chevron" aria-hidden />
