@@ -215,13 +215,27 @@ const selectPrefs = (s: Settings): EditorPrefs => ({
   editorMinimapRender: s.editorMinimapRender
 })
 
+/** Fold gutter chevron (Icon's `chevron-down` / `chevron-right`), centered on its line. */
+function foldMarker(open: boolean): HTMLElement {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+  svg.setAttribute('viewBox', '0 0 16 16')
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+  path.setAttribute('d', open ? 'M4 6l4 4 4-4' : 'M6 4l4 4-4 4')
+  svg.append(path)
+  const span = document.createElement('span')
+  span.className = 'cm-foldMarker'
+  span.title = open ? 'Fold line' : 'Unfold line'
+  span.append(svg)
+  return span
+}
+
 /** The parts of the editor its settings turn on or off; YAML is always indented with spaces. */
 function prefsSetup(p: EditorPrefs, fileName: string): Extension {
   const lang = languageOf(fileName).id
   const tabs = p.editorIndentTabs && lang !== 'yaml'
   return [
     p.editorLineNumbers ? [lineNumbers(), highlightActiveLineGutter()] : [],
-    p.editorFolding ? foldGutter() : [],
+    p.editorFolding ? foldGutter({ markerDOM: foldMarker }) : [],
     p.editorActiveLine ? highlightActiveLine() : [],
     p.editorBracketMatching ? bracketMatching() : [],
     p.editorCloseBrackets ? closeBrackets() : [],

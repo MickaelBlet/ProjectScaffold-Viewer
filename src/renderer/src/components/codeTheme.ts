@@ -37,6 +37,25 @@ const theme = EditorView.theme({
     borderRight: '1px solid var(--border)'
   },
   '.cm-activeLineGutter': { backgroundColor: 'transparent', color: 'var(--text)' },
+  '.cm-foldGutter .cm-gutterElement': { display: 'flex', alignItems: 'center' },
+  '.cm-foldMarker': {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '18px',
+    height: '100%',
+    cursor: 'pointer'
+  },
+  '.cm-foldMarker svg': {
+    width: '14px',
+    height: '14px',
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeWidth: '1.5',
+    strokeLinecap: 'round',
+    strokeLinejoin: 'round'
+  },
+  '.cm-foldMarker:hover': { color: 'var(--text)' },
   '.cm-foldPlaceholder': {
     color: 'var(--muted)',
     backgroundColor: 'var(--panel-2)',
