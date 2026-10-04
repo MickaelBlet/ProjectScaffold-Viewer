@@ -1,4 +1,4 @@
-import type { DiagramAction, LogLevel, SidePanel, ViewRef } from '../../../vscode/src/protocol'
+import type { DiagramAction, EditorLayout, LogLevel, SidePanel, ViewRef } from '../../../vscode/src/protocol'
 import type { OutputDir } from './codegen/run'
 
 export interface OpenResult {
@@ -146,6 +146,8 @@ export interface Api {
   onDocument?(cb: (file: OpenResult) => void): () => void
   /** Side panel: the view the diagram shows. */
   onView?(cb: (view: ViewRef) => void): () => void
+  /** Full diagram editor: switches the layout of the full diagram editors, which load again. */
+  setLayout?(layout: EditorLayout): void
   /** Diagram: shows another view, for the side panels. */
   viewChanged?(view: ViewRef): void
   /** Diagram: actions asked by the side panels. */

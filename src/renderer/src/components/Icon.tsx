@@ -57,7 +57,8 @@ const PATHS = {
   'same-size': 'M2.5 2.5h5v5h-5zM8.5 8.5h5v5h-5z',
   minimize: 'M3 8h10',
   maximize: 'M3.5 3.5h9v9h-9z',
-  restore: 'M3.5 5.5h7v7h-7zM5.5 5.5v-2h7v7h-2'
+  restore: 'M3.5 5.5h7v7h-7zM5.5 5.5v-2h7v7h-2',
+  layout: 'M2.5 3h11v10h-11zM6 3v10M6 9.5h7.5'
 } as const
 
 export type IconName = keyof typeof PATHS

@@ -13,7 +13,7 @@ import type {
 } from '../../../vscode/src/protocol'
 import type { Api, OpenResult, OutputDirRequest, Session, TemplateDirRequest } from './api'
 import type { OutputDir } from './codegen/run'
-import { IN_PANEL, IN_PREVIEW, vscode } from './host'
+import { FULL_LAYOUT, IN_EDITOR, IN_PANEL, IN_PREVIEW, vscode } from './host'
 import { storageChanged } from './storage'
 
 const post = (msg: ToHost): void => vscode!.postMessage(msg)
@@ -88,7 +88,8 @@ function dataUrlPayload(url: string): { data: string; encoding: 'utf8' | 'base64
     : { data: decodeURIComponent(payload), encoding: 'utf8' }
 }
 
-/** Directory given by the extension (`outputDir`, `templateDir`), its files read and written by it. */
+/** Directory given by the extension (`outputDir`, `templateDir`), its files read and written by it,
+ *  opened in VS Code's editors (in the page's tabs in the full layout). */
 function hostDir(found: OutputDirReply): OutputDir {
   const file = async (
     op: 'read' | 'write' | 'remove',
@@ -111,7 +112,7 @@ function hostDir(found: OutputDirReply): OutputDir {
     read: (path) => file('read', path),
     write: async (path, text) => void (await file('write', path, text)),
     remove: async (path) => void (await file('remove', path)),
-    open: (path, at) => post({ type: 'openOutputFile', dir: found.dir, path, at })
+    open: FULL_LAYOUT ? undefined : (path, at) => post({ type: 'openOutputFile', dir: found.dir, path, at })
   }
 }
 
@@ -156,7 +157,9 @@ const vscodeApi: Api = {
   reopen: (path) => Promise.resolve(path === currentDoc().path ? currentDoc() : null),
   clearRecent: () => Promise.resolve(),
   onRecentChange: () => () => {},
+  // Only the document: VS Code opens the other files in editors of their own.
   saveFile: (req) => {
+    if (req.path !== current.path) return Promise.reject(new Error(`Cannot save ${req.path ?? 'a new file'} here`))
     post({ type: 'edit', text: req.content, uri: current.uri })
     post({ type: 'save' })
     return Promise.resolve(currentDoc().path)
@@ -211,6 +214,7 @@ const vscodeApi: Api = {
   viewChanged: (view) => post({ type: 'view', view }),
   onAction: (cb) => listen(actionListeners, cb),
   showPanel: (panel) => post({ type: 'showPanel', panel }),
+  setLayout: IN_EDITOR ? (layout) => post({ type: 'setLayout', layout }) : undefined,
   log: (level, text) => post({ type: 'log', level, text }),
   // Side panels have no Generate command.
   outputDir: IN_PANEL ? undefined : outputDir,

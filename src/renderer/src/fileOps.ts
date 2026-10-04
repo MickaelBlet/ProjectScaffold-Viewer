@@ -37,6 +37,7 @@ import {
 import { parseSettings, settingsText, useSettings } from '@/store/settings'
 import { dirtyFiles, dropDocTextFiles } from '@/store/textFiles'
 import { log } from '@/store/output'
+import { FULL_LAYOUT } from '@/host'
 import { setStatus, showDialog, useUiStore } from '@/store/ui'
 import type { DiagramAction } from '../../../vscode/src/protocol'
 import type { OpenResult, Session } from './api'
@@ -364,6 +365,14 @@ function flush(): void {
   if (hostSync === undefined) return
   clearTimeout(hostSync)
   pushToHost()
+}
+
+/** VS Code full diagram editor: switches the editors to the other layout; they load again, showing
+ *  what this one shows (its session) with the changes made here. */
+export function switchEditorLayout(): void {
+  flush()
+  window.api.saveSession(currentSession())
+  window.api.setLayout?.(FULL_LAYOUT ? 'integrated' : 'full')
 }
 
 /** VS Code side panel: asks the diagram for an action, once it has the changes made here. */

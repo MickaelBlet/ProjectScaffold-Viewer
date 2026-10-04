@@ -30,6 +30,15 @@ export const IN_PREVIEW = IN_VSCODE && window.scaffoldInit?.mode === 'preview'
 export const SIDE_PANEL = (IN_VSCODE && window.scaffoldInit?.panel) || null
 export const IN_PANEL = SIDE_PANEL !== null
 
+/** VS Code full diagram editor (in place of the text). */
+export const IN_EDITOR = IN_VSCODE && window.scaffoldInit?.mode === 'editor'
+
+/** VS Code full diagram editor in the full layout: every tool docked in the page, like the web app. */
+export const FULL_LAYOUT = IN_EDITOR && window.scaffoldInit?.layout === 'full'
+
+/** VS Code page whose Explorer and Settings are in the VS Code side bar (not the full layout). */
+export const INTEGRATED = IN_VSCODE && !FULL_LAYOUT
+
 /** Light or dark, after the VS Code color theme (class of the body). */
 export function vscodeTheme(): 'light' | 'dark' {
   const c = document.body.classList

@@ -25,7 +25,7 @@ import { useProjectStore } from './store/project'
 import { useTextFiles } from './store/textFiles'
 import { useUiStore } from './store/ui'
 import { Icon } from '@/components/Icon'
-import { IN_PANEL, IN_PREVIEW, IN_VSCODE, SIDE_PANEL } from './host'
+import { FULL_LAYOUT, IN_EDITOR, IN_PANEL, IN_PREVIEW, IN_VSCODE, SIDE_PANEL } from './host'
 import {
   installSelectionSync,
   installViewSync,
@@ -273,6 +273,19 @@ export function App(): ReactNode {
           Go to… <kbd>Ctrl+P</kbd>
         </button>
         <span className="spacer" />
+        {/* VS Code: tools in its side bar, or all of them in the page. */}
+        {IN_EDITOR && (
+          <ToolbarButton
+            command="window.fullLayout"
+            title={
+              FULL_LAYOUT
+                ? 'Integrated layout: Explorer and Settings in the VS Code side bar'
+                : 'Full layout: every tool in the editor, like the web app'
+            }
+          >
+            <Icon name="layout" /> {FULL_LAYOUT ? 'Integrated' : 'Full'}
+          </ToolbarButton>
+        )}
         <WindowControls />
       </header>
       <DockShell />

@@ -133,21 +133,23 @@ const MENUS: [Category, string[]][] = [
       'window.nextDoc',
       'window.prevDoc',
       '-',
-      'window.resetLayout'
+      'window.resetLayout',
+      'window.fullLayout'
     ]
   ],
   ['Help', ['help.shortcuts', 'view.palette', '-', 'help.resetData', '-', 'help.about']]
 ]
 
-// Every listed command must exist.
+// Every listed command must exist (but those of the VS Code full editor).
 if (!IN_VSCODE)
   for (const [, ids] of MENUS)
     for (const id of ids)
-      if (id !== '-' && id !== 'recent' && !commands.some((c) => c.id === id)) throw new Error(id)
+      if (id !== '-' && id !== 'recent' && id !== 'window.fullLayout' && !commands.some((c) => c.id === id))
+        throw new Error(id)
 
-/** Menus without the commands VS Code leaves out (document commands), nor the separators they leave. */
+/** Menus without the commands the host leaves out (VS Code: document commands; elsewhere: VS Code
+ *  commands), nor the separators they leave. */
 function availableMenus(): [Category, string[]][] {
-  if (!IN_VSCODE) return MENUS
   return MENUS.map(([cat, ids]) => {
     const kept = ids.filter((id) => id === '-' || commands.some((c) => c.id === id))
     const between = (i: number): boolean =>
