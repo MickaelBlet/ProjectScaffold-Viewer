@@ -2224,6 +2224,13 @@ ul.plain {
   font-weight: 700;
   color: var(--accent);
 }
+/* Overflow menu (shell/overflowTabs.ts): icons of one width, so titles start on one column */
+.dv-tabs-overflow-container .dv-default-tab[data-tab] .dv-default-tab-content::before {
+  display: inline-block;
+  width: 1.75em;
+  margin-right: 4px;
+  text-align: center;
+}
 
 /* Frameless desktop window (Electron, Tauri): data-frame is 'frameless' or 'maximized' */
 :root[data-frame='frameless'] .app {
@@ -2594,9 +2601,11 @@ mark {
   position: relative;
   padding: 0 10px;
 }
-.tool-tab .dv-default-tab-content {
+.dv-tab .tool-tab .dv-default-tab-content {
   display: flex;
   align-items: center;
+  justify-content: center;
+  margin-right: 0;
 }
 .tool-tab-badge {
   position: absolute;
