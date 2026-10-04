@@ -49,7 +49,7 @@ import { focusedEditorHistory, setPassedKeys } from './components/CodeEditor'
 import { openIdlText, saveActiveTextFile } from './textFileOps'
 import { activeDoc, cycleDoc, patchDoc, useDocs, activateDoc } from './store/documents'
 import { getProject, redo, undo } from './store/project'
-import { setSetting, useSettings, type Theme } from './store/settings'
+import { COLOR_THEMES, setSetting, useSettings, type Theme } from './store/settings'
 import { clearOutput } from './store/output'
 import { useUiStore, type ActionItem } from './store/ui'
 import {
@@ -621,6 +621,13 @@ const allCommands: Command[] = [
     checked: () => useSettings.getState().theme === 'dark',
     run: theme('dark')
   },
+  ...COLOR_THEMES.map((t): Command => ({
+    id: `view.theme.${t}`,
+    title: `Theme: ${t}`,
+    category: 'View',
+    checked: () => useSettings.getState().theme === t,
+    run: theme(t)
+  })),
 
   // Arrange
   {

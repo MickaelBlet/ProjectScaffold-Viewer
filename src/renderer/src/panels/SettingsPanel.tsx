@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, type ReactNode } from 'react'
 import {
+  COLOR_THEMES,
   DEFAULT_SETTINGS,
   setSetting,
   useSettings,
@@ -95,7 +96,8 @@ export function SettingsPanel(): ReactNode {
               options={[
                 { value: 'system' as Theme, label: IN_VSCODE ? 'VS Code' : 'system' },
                 { value: 'light' as Theme, label: 'light' },
-                { value: 'dark' as Theme, label: 'dark' }
+                { value: 'dark' as Theme, label: 'dark' },
+                ...COLOR_THEMES.map((t) => ({ value: t, label: t }))
               ]}
               onChange={(t) => setSetting('theme', t)}
             />

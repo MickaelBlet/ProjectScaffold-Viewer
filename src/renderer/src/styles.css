@@ -52,7 +52,15 @@
     color-scheme: dark;
   }
 }
-:root[data-theme='dark'] {
+/* Dark, and the base of the color themes below. */
+:root[data-theme='dark'],
+:root[data-theme='black'],
+:root[data-theme='red'],
+:root[data-theme='orange'],
+:root[data-theme='yellow'],
+:root[data-theme='green'],
+:root[data-theme='pink'],
+:root[data-theme='violet'] {
   --bg: #15181e;
   --panel: #1c2028;
   --panel-2: #232833;
@@ -74,6 +82,111 @@
   --syn-literal: #f0a45d;
   --syn-liquid: #c792ea;
   color-scheme: dark;
+}
+/* Color themes: dark surfaces tinted with the theme color, and that color as the accent. */
+:root[data-theme='black'] {
+  --bg: #000000;
+  --panel: #0b0b0c;
+  --panel-2: #151516;
+  --row: #19191b;
+  --border: #2a2a2d;
+  --text: #e8e8ea;
+  --muted: #8c8c92;
+  --accent: #d4d6dc;
+  --accent-soft: #2a2b2f;
+  --on-accent: #0b0b0c;
+  --node-bg: #121214;
+}
+:root[data-theme='red'] {
+  --bg: #190f11;
+  --panel: #211417;
+  --panel-2: #2b1a1e;
+  --row: #2f1d21;
+  --border: #47292f;
+  --text: #f2e5e7;
+  --muted: #aa8f94;
+  --accent: #e5484d;
+  --accent-soft: #4a1e25;
+  --on-accent: #ffffff;
+  --node-bg: #29181c;
+}
+:root[data-theme='orange'] {
+  --bg: #19130d;
+  --panel: #221911;
+  --panel-2: #2c2016;
+  --row: #302318;
+  --border: #4a3524;
+  --text: #f4e9df;
+  --muted: #ad9682;
+  --accent: #ff8b3d;
+  --accent-soft: #4a2c14;
+  --on-accent: #2a1200;
+  --node-bg: #2a1f15;
+}
+:root[data-theme='yellow'] {
+  --bg: #16140b;
+  --panel: #1e1b10;
+  --panel-2: #272315;
+  --row: #2b2717;
+  --border: #433c22;
+  --text: #f3efdd;
+  --muted: #a69e80;
+  --accent: #f5c518;
+  --accent-soft: #3d3412;
+  --on-accent: #1e1700;
+  --node-bg: #25220f;
+}
+:root[data-theme='green'] {
+  --bg: #0e1611;
+  --panel: #131d17;
+  --panel-2: #1a271f;
+  --row: #1d2b22;
+  --border: #2c4134;
+  --text: #e3efe7;
+  --muted: #8ba695;
+  --accent: #4cd27f;
+  --accent-soft: #1d3a28;
+  --on-accent: #06210f;
+  --node-bg: #18251d;
+}
+:root[data-theme='pink'] {
+  --bg: #1a1017;
+  --panel: #22141e;
+  --panel-2: #2b1a27;
+  --row: #301d2b;
+  --border: #482a40;
+  --text: #f4e5ef;
+  --muted: #ae8fa5;
+  --accent: #ff6fb5;
+  --accent-soft: #4a1f3b;
+  --on-accent: #2a0a1b;
+  --node-bg: #2a1925;
+}
+:root[data-theme='violet'] {
+  --bg: #13111c;
+  --panel: #1a1626;
+  --panel-2: #221d31;
+  --row: #251f36;
+  --border: #382f52;
+  --text: #eae5f6;
+  --muted: #9b91b4;
+  --accent: #a77bff;
+  --accent-soft: #33264f;
+  --on-accent: #14082b;
+  --node-bg: #211c30;
+}
+:root:is(
+  [data-theme='black'],
+  [data-theme='red'],
+  [data-theme='orange'],
+  [data-theme='yellow'],
+  [data-theme='green'],
+  [data-theme='pink'],
+  [data-theme='violet']
+) {
+  --node-label-bg: color-mix(in srgb, var(--node-bg) 70%, transparent);
+  --node-container: color-mix(in srgb, var(--accent) 7%, transparent);
+  --syn-key: color-mix(in srgb, var(--accent) 70%, var(--text));
 }
 /* VS Code, theme "VS Code": the colors of its color theme (variables it gives its webviews), the
    light / dark ones above as fallbacks. */

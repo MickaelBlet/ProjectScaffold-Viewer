@@ -4,7 +4,10 @@ import { createJSONStorage, persist } from 'zustand/middleware'
 import { IN_VSCODE, vscodeTheme } from '@/host'
 import { onStorageChange, storage } from '@/storage'
 
-export type Theme = 'system' | 'light' | 'dark'
+/** Dark themes tinted with a color, besides light and dark. */
+export const COLOR_THEMES = ['black', 'red', 'orange', 'yellow', 'green', 'pink', 'violet'] as const
+export type ColorTheme = (typeof COLOR_THEMES)[number]
+export type Theme = 'system' | 'light' | 'dark' | ColorTheme
 export type EdgeStyle = 'bezier' | 'smoothstep' | 'step' | 'straight'
 /** How port handles tell `in` from `out` apart, besides their color. */
 export type PortStyle = 'dots' | 'arrows' | 'hollow' | 'shapes'
@@ -160,6 +163,11 @@ export function applyForceAnimations(force: boolean): void {
 
 export function applyPortStyle(style: PortStyle): void {
   document.documentElement.dataset.portStyle = style
+}
+
+/** Light or dark scheme of a theme (for components with their own colors), 'system' when it follows it. */
+export function themeScheme(theme: Theme): 'system' | 'light' | 'dark' {
+  return theme === 'system' || theme === 'light' ? theme : 'dark'
 }
 
 export function applyTheme(theme: Theme): void {

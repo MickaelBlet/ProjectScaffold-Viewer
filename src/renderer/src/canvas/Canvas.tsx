@@ -46,7 +46,7 @@ import {
   useProjectStore
 } from '@/store/project'
 import { activeDoc, patchDoc, useDoc } from '@/store/documents'
-import { useSettings } from '@/store/settings'
+import { themeScheme, useSettings } from '@/store/settings'
 import { openContextMenu, select, setStatus, useUiStore, type MenuItem } from '@/store/ui'
 import {
   addModuleAt,
@@ -861,7 +861,7 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
         zIndexMode="manual"
         snapToGrid={settings.snapToGrid}
         snapGrid={[settings.gridSize, settings.gridSize]}
-        colorMode={settings.theme}
+        colorMode={themeScheme(settings.theme)}
         minZoom={0.1}
         defaultViewport={savedViewport}
         fitView={!savedViewport}
