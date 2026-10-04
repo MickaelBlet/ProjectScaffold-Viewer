@@ -104,8 +104,11 @@ export interface Api {
    * host opens documents one by one (VS Code).
    */
   readWorkspace?(path: string, files: string[]): Promise<(OpenResult | null)[] | null>
-  /** Saves an exported diagram image (data: URL); resolves to its name, or null when cancelled. */
-  saveImage(name: string, dataUrl: string): Promise<string | null>
+  /**
+   * Saves an exported file (data: URL: diagram image, settings), not added to the recent files;
+   * resolves to its name, or null when cancelled.
+   */
+  saveExport(name: string, dataUrl: string): Promise<string | null>
   /**
    * Directory generated code goes to: the one last used for the document, else one to pick (always
    * with `pick`); null when cancelled. Absent when the host cannot write into a directory.

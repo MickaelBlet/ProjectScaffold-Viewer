@@ -789,7 +789,7 @@ const webApi: Api = {
   loadSession,
   clearStorage,
   readWorkspace,
-  saveImage: (name, dataUrl) => {
+  saveExport: (name, dataUrl) => {
     downloadUrl(name, dataUrl)
     return Promise.resolve(name)
   },

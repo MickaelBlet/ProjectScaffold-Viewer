@@ -177,7 +177,7 @@ const vscodeApi: Api = {
     })
   },
   loadSession: () => Promise.resolve(IN_PANEL ? null : ((vscode!.getState() as Session | undefined) ?? null)),
-  saveImage: (name, dataUrl) => request((id) => ({ type: 'export', id, name, ...dataUrlPayload(dataUrl) })),
+  saveExport: (name, dataUrl) => request((id) => ({ type: 'export', id, name, ...dataUrlPayload(dataUrl) })),
   updateText: (text) => post({ type: 'edit', text, uri: current.uri }),
   // A preview or side panel has its own history: VS Code's undo applies to the focused editor, not to
   // the text beside.

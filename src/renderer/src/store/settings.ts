@@ -138,6 +138,39 @@ function migrate({ sourceWhitespace, ...saved }: Partial<Settings> & Legacy): Pa
   return saved
 }
 
+/** Values of the settings taking one of a few. */
+const CHOICES: Partial<Record<keyof Settings, readonly unknown[]>> = {
+  theme: ['system', 'light', 'dark', ...COLOR_THEMES],
+  edgeStyle: ['bezier', 'smoothstep', 'step', 'straight'],
+  portStyle: ['dots', 'arrows', 'hollow', 'shapes'],
+  editorWhitespace: ['all', 'trailing', 'none'],
+  editorMinimapRender: ['characters', 'blocks']
+}
+
+/** Settings of an exported settings file: the known ones holding a valid value. Throws when the
+ *  text is no JSON object. */
+export function parseSettings(text: string): Partial<Settings> {
+  const data: unknown = JSON.parse(text)
+  if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Not a settings file')
+  const valid: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(migrate(data as Partial<Settings> & Legacy))) {
+    if (!(key in DEFAULT_SETTINGS)) continue
+    const def: unknown = DEFAULT_SETTINGS[key as keyof Settings]
+    const ok = Array.isArray(def)
+      ? Array.isArray(value) && value.every((v) => typeof v === 'string')
+      : typeof value === typeof def && (CHOICES[key as keyof Settings]?.includes(value) ?? true)
+    if (ok) valid[key] = value
+  }
+  return valid
+}
+
+/** The current settings as an exported settings file. */
+export function settingsText(): string {
+  const s = useSettings.getState()
+  const settings = Object.fromEntries(Object.keys(DEFAULT_SETTINGS).map((k) => [k, s[k as keyof Settings]]))
+  return `${JSON.stringify(settings, null, 2)}\n`
+}
+
 export const useSettings = create<Settings>()(
   persist(() => ({ ...DEFAULT_SETTINGS }), {
     name: SETTINGS_KEY,

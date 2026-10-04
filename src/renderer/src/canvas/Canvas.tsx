@@ -345,7 +345,7 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
           const base = doc.filePath
             ? fileName(doc.filePath).replace(/\.[^.]+$/, '')
             : getProject().name || 'diagram'
-          const saved = await window.api.saveImage(`${base}-${view.name}.${format}`, url)
+          const saved = await window.api.saveExport(`${base}-${view.name}.${format}`, url)
           if (saved) setStatus('info', `Exported ${saved}`)
         }
       }),

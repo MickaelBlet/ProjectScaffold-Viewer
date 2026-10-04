@@ -34,7 +34,7 @@ import {
   activateDoc,
   type DocState
 } from '@/store/documents'
-import { useSettings } from '@/store/settings'
+import { parseSettings, settingsText, useSettings } from '@/store/settings'
 import { dirtyFiles, dropDocTextFiles } from '@/store/textFiles'
 import { log } from '@/store/output'
 import { setStatus, showDialog, useUiStore } from '@/store/ui'
@@ -444,4 +444,32 @@ export async function saveAll(): Promise<void> {
     await saveProject()
   }
   activateDoc(activeId)
+}
+
+const SETTINGS_FILES = { description: 'Settings', extensions: ['json'] }
+
+export async function exportSettings(): Promise<void> {
+  const url = `data:application/json;charset=utf-8,${encodeURIComponent(settingsText())}`
+  const saved = await window.api.saveExport('project-scaffold.settings.json', url)
+  if (saved) setStatus('info', `Exported settings to ${saved}`)
+}
+
+/** Takes the valid settings of a settings file; the others keep their value. */
+export async function importSettings(): Promise<void> {
+  let path = ''
+  try {
+    const [file] = await window.api.openFiles(SETTINGS_FILES)
+    if (!file) return
+    path = file.path
+    const settings = parseSettings(file.content)
+    const count = Object.keys(settings).length
+    if (!count)
+      return showDialog(`No setting in ${fileName(path)}`, ['Export settings to get a settings file.'])
+    useSettings.setState(settings)
+    setStatus('info', `Imported ${count} settings from ${fileName(path)}`)
+  } catch (e) {
+    showDialog(`Cannot import settings${path ? ` from ${fileName(path)}` : ''}`, [
+      e instanceof Error ? e.message : String(e)
+    ])
+  }
 }

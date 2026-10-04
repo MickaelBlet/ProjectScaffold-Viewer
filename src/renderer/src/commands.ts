@@ -41,7 +41,9 @@ import {
   openProject,
   saveAll,
   saveProject,
-  saveWorkspace
+  saveWorkspace,
+  importSettings,
+  exportSettings
 } from './fileOps'
 import { chooseTemplates, generateCode } from './generateCode'
 import { focusedEditorHistory, setPassedKeys } from './components/CodeEditor'
@@ -180,6 +182,18 @@ const allCommands: Command[] = [
     title: 'Save workspace as…',
     category: 'File',
     run: () => void saveWorkspace(true)
+  },
+  {
+    id: 'file.importSettings',
+    title: 'Import settings…',
+    category: 'File',
+    run: () => void importSettings()
+  },
+  {
+    id: 'file.exportSettings',
+    title: 'Export settings…',
+    category: 'File',
+    run: () => void exportSettings()
   },
   {
     id: 'file.close',
