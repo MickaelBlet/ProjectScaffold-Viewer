@@ -449,7 +449,36 @@ button.link-button:hover {
 }
 /* VS Code side bar: one tool panel, on the side bar background. */
 .app.side-panel {
-  grid-template-rows: 1fr;
+  grid-template-rows: auto 1fr;
+}
+/* Its tabs, like the ones of the VS Code panel. */
+.side-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--vscode-sideBarSectionHeader-border, var(--border));
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.side-tabs button {
+  flex: none;
+  padding: 6px 6px 5px;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  border-radius: 0;
+  background: none;
+  color: var(--vscode-panelTitle-inactiveForeground, var(--muted));
+  font-size: 11px;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.side-tabs button:hover:not([aria-selected='true']) {
+  color: var(--vscode-panelTitle-activeForeground, var(--text));
+  border-color: transparent;
+}
+.side-tabs button[aria-selected='true'] {
+  color: var(--vscode-panelTitle-activeForeground, var(--text));
+  border-bottom-color: var(--vscode-panelTitle-activeBorder, var(--accent));
 }
 .side-panel .tool-panel {
   background: var(--vscode-sideBar-background, var(--panel));

@@ -167,6 +167,8 @@ export interface Api {
   onAction?(cb: (action: DiagramAction) => void): () => void
   /** Shows a panel of the VS Code side bar. */
   showPanel?(panel: SidePanel): void
+  /** Side bar view: shows a tab. */
+  onShowPanel?(cb: (panel: SidePanel) => void): () => void
   /** Appends an entry of the Output log to the host's own log (ProjectScaffold Output channel). */
   log?(level: LogLevel, text: string): void
 }

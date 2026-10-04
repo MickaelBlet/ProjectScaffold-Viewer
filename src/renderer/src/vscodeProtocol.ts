@@ -5,12 +5,12 @@ import type { TextSpot } from '../../src/renderer/src/model/search'
 export type { TextSpot }
 
 /**
- * Full diagram editor in place of the text, compact preview beside it, or one tool panel of the
- * ProjectScaffold views (following the active project document).
+ * Full diagram editor in place of the text, compact preview beside it, or the ProjectScaffold side
+ * bar view, its tools in tabs (following the active project document).
  */
 export type WebviewMode = 'editor' | 'preview' | 'panel'
 
-/** Tool panels of the ProjectScaffold views (the ProjectScaffold side bar). */
+/** Tools of the ProjectScaffold side bar view, in tabs. */
 export type SidePanel = 'explorer' | 'generation' | 'settings'
 
 /**
@@ -29,7 +29,7 @@ export interface WebviewInit {
   /** URI of the document, kept by the page to be restored after a window reload. */
   uri: string
   mode: WebviewMode
-  /** Side panel shown (mode `panel`). */
+  /** Side bar view (mode `panel`): tab to show, else the one shown last. */
   panel?: SidePanel
   /** Layout of a diagram (modes `editor` and `preview`). */
   layout?: EditorLayout
@@ -117,7 +117,7 @@ export type ToHost =
   | { type: 'view'; view: ViewRef }
   /** A side panel asks the diagram of its document for an action. */
   | { type: 'inDiagram'; action: DiagramAction }
-  /** A page shows a side panel. */
+  /** A page shows a tab of the side bar view. */
   | { type: 'showPanel'; panel: SidePanel }
   /** Switches the layout of the diagrams (they all load again). */
   | { type: 'setLayout'; layout: EditorLayout }
@@ -142,6 +142,8 @@ export type ToPage =
   | { type: 'reveal'; path: DataPath; names: (string | undefined)[] }
   /** Side panel: the view the diagram shows. */
   | { type: 'view'; view: ViewRef }
+  /** Side bar view: shows a tab. */
+  | { type: 'showPanel'; panel: SidePanel }
   /** Another page generated the document's code or chose other templates. */
   | { type: 'codegen' }
   /** Diagram: an action asked by a side panel. */

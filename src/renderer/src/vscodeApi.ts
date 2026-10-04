@@ -7,6 +7,7 @@ import type {
   DiagramAction,
   OutputDirReply,
   OutputFileReply,
+  SidePanel,
   ToHost,
   ToPage,
   ViewRef
@@ -37,6 +38,7 @@ const documentListeners = new Set<(file: OpenResult) => void>()
 const viewListeners = new Set<(view: ViewRef) => void>()
 const actionListeners = new Set<(action: DiagramAction) => void>()
 const codegenListeners = new Set<() => void>()
+const showPanelListeners = new Set<(panel: SidePanel) => void>()
 /** Latest text received while the document was still loading. */
 let unheard: string | null = null
 
@@ -74,6 +76,9 @@ function onMessage(e: MessageEvent<ToPage>): void {
       break
     case 'codegen':
       codegenListeners.forEach((cb) => cb())
+      break
+    case 'showPanel':
+      showPanelListeners.forEach((cb) => cb(msg.panel))
       break
     case 'reply':
       pending.get(msg.id)?.(msg.result)
@@ -222,6 +227,7 @@ const vscodeApi: Api = {
   viewChanged: (view) => post({ type: 'view', view }),
   onAction: (cb) => listen(actionListeners, cb),
   showPanel: (panel) => post({ type: 'showPanel', panel }),
+  onShowPanel: (cb) => listen(showPanelListeners, cb),
   setLayout: IN_DIAGRAM ? (layout) => post({ type: 'setLayout', layout }) : undefined,
   log: (level, text) => post({ type: 'log', level, text }),
   // Side panels list the files; their Generate runs in the diagram (see generateCode).

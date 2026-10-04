@@ -26,9 +26,12 @@ export const IN_VSCODE = vscode !== null
 /** VS Code preview beside the text: compact UI, and the page's own undo history. */
 export const IN_PREVIEW = IN_VSCODE && window.scaffoldInit?.mode === 'preview'
 
-/** VS Code side bar: a single tool panel following the active project document; the diagram is elsewhere. */
-export const SIDE_PANEL = (IN_VSCODE && window.scaffoldInit?.panel) || null
-export const IN_PANEL = SIDE_PANEL !== null
+/** VS Code side bar view: the side tools in tabs, following the active project document; the diagram
+ *  is elsewhere. */
+export const IN_PANEL = IN_VSCODE && window.scaffoldInit?.mode === 'panel'
+
+/** Tab the side bar view shows first, else the one shown last. */
+export const FIRST_SIDE_TAB = (IN_PANEL && window.scaffoldInit?.panel) || null
 
 /** VS Code diagram: full diagram editor or preview, not a side panel. Switches between the layouts. */
 export const IN_DIAGRAM = IN_VSCODE && !IN_PANEL

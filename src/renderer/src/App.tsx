@@ -1,4 +1,4 @@
-import { useEffect, useId, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useId, useState, type ReactNode } from 'react'
 import { DockShell } from './shell/DockShell'
 import { MenuBar } from './shell/MenuBar'
 import { ResizeEdges, WindowControls } from './shell/WindowFrame'
@@ -25,7 +25,8 @@ import { useProjectStore } from './store/project'
 import { useTextFiles } from './store/textFiles'
 import { useUiStore } from './store/ui'
 import { Icon } from '@/components/Icon'
-import { COMPACT, FULL_LAYOUT, IN_DIAGRAM, IN_PANEL, IN_VSCODE, SIDE_PANEL } from './host'
+import { COMPACT, FIRST_SIDE_TAB, FULL_LAYOUT, IN_DIAGRAM, IN_PANEL, IN_VSCODE } from './host'
+import { storage } from './storage'
 import {
   installSelectionSync,
   installViewSync,
@@ -79,19 +80,52 @@ const SIDE_PANELS: Record<SidePanel, () => ReactNode> = {
   settings: SettingsPanel
 }
 
-/** A tool panel alone, in the VS Code side bar: it shows the active project document. */
-function SidePanelView({ panel }: { panel: SidePanel }): ReactNode {
-  const Content = SIDE_PANELS[panel]
+const SIDE_TABS: [SidePanel, string][] = [
+  ['explorer', 'Explorer'],
+  ['generation', 'Code generation'],
+  ['settings', 'Settings']
+]
+/** Tab of the side bar view shown last. */
+const SIDE_TAB_KEY = 'project-scaffold:side-tab'
+
+function initialSideTab(): SidePanel {
+  const saved = storage.getItem(SIDE_TAB_KEY)
+  return FIRST_SIDE_TAB ?? SIDE_TABS.find(([id]) => id === saved)?.[0] ?? 'explorer'
+}
+
+/** The side tools in tabs, in the VS Code side bar: they show the active project document. */
+function SidePanelView(): ReactNode {
+  const [tab, setTab] = useState(initialSideTab)
+  // Tabs shown once stay mounted, keeping their filter, folds and scroll.
+  const [shown, setShown] = useState<ReadonlySet<SidePanel>>(() => new Set([tab]))
+  const select = useCallback((id: SidePanel): void => {
+    setTab(id)
+    setShown((s) => (s.has(id) ? s : new Set([...s, id])))
+    storage.setItem(SIDE_TAB_KEY, id)
+  }, [])
+  useEffect(() => window.api.onShowPanel?.(select), [select])
   const filePath = useDoc((d) => d.filePath)
   return (
     <div className="app side-panel">
-      {filePath || panel === 'settings' ? (
-        <div className="tool-panel" data-panel={panel}>
-          <Content />
-        </div>
-      ) : (
-        <p className="side-panel-empty">Open a project file (*.scaffold.yaml) to see its content here.</p>
-      )}
+      <div className="side-tabs" role="tablist">
+        {SIDE_TABS.map(([id, title]) => (
+          <button key={id} type="button" role="tab" aria-selected={id === tab} onClick={() => select(id)}>
+            {title}
+          </button>
+        ))}
+      </div>
+      {SIDE_TABS.filter(([id]) => shown.has(id)).map(([id]) => {
+        const Content = SIDE_PANELS[id]
+        return (
+          <div key={id} className="tool-panel" data-panel={id} role="tabpanel" hidden={id !== tab}>
+            {filePath || id === 'settings' ? (
+              <Content />
+            ) : (
+              <p className="side-panel-empty">Open a project file (*.scaffold.yaml) to see its content here.</p>
+            )}
+          </div>
+        )
+      })}
       <ContextMenu />
       <CommandPalette />
       <Dialog />
@@ -214,7 +248,7 @@ export function App(): ReactNode {
     }
   }, [loaded, docs, project])
 
-  if (SIDE_PANEL) return <SidePanelView panel={SIDE_PANEL} />
+  if (IN_PANEL) return <SidePanelView />
   return (
     <div className="app">
       {/* Moves the Tauri window; its buttons and menus stay clickable. */}
