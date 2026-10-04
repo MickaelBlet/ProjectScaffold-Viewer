@@ -862,6 +862,21 @@ kbd {
   letter-spacing: 0.04em;
   color: var(--muted);
 }
+/* Body scrolled into view by a click on its header. */
+.explorer-section > .revealed {
+  animation: section-revealed 5s ease-in forwards;
+}
+@keyframes section-revealed {
+  0%,
+  70% {
+    outline: 1px solid var(--accent);
+    outline-offset: -2px;
+  }
+  100% {
+    outline: 1px solid transparent;
+    outline-offset: -2px;
+  }
+}
 .explorer-section.drop-before {
   box-shadow: inset 0 2px 0 var(--accent);
 }

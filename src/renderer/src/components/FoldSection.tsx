@@ -47,6 +47,10 @@ function revealBody(header: HTMLElement, body: HTMLElement): boolean {
   if (bottom - top > 1) return false
   const stuck = parseFloat(getComputedStyle(header).top) || 0
   scroller.scrollBy({ top: b.top - (view.top + stuck + h.height) })
+  // Outlines the body a moment, restarting the animation on a repeated click.
+  body.classList.remove('revealed')
+  void body.offsetWidth
+  body.classList.add('revealed')
   return true
 }
 
@@ -186,7 +190,11 @@ export function FoldSection(props: {
         </button>
         <span className="explorer-actions">{props.actions}</span>
       </header>
-      {open && <div id={body}>{props.children}</div>}
+      {open && (
+        <div id={body} onAnimationEnd={(e) => e.currentTarget.classList.remove('revealed')}>
+          {props.children}
+        </div>
+      )}
     </section>
   )
 }
