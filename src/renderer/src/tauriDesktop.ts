@@ -26,3 +26,8 @@ function create(): Desktop {
 
 /** The window controls, undefined outside Tauri. */
 export const tauriDesktop: Desktop | undefined = isTauri() ? create() : undefined
+
+/** Shows the window, created hidden so that no white window appears before the page is painted. */
+export function showTauriWindow(): void {
+  if (isTauri()) void getCurrentWindow().show()
+}

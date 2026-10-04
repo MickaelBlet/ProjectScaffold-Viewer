@@ -15,6 +15,8 @@ function createWindow() {
     minWidth: MIN_WIDTH,
     minHeight: MIN_HEIGHT,
     frame: false,
+    // Shown once the page has painted: no white window at startup.
+    show: false,
     title: 'ProjectScaffold',
     icon: join(root, 'electron/icon.png'),
     webPreferences: { contextIsolation: true, sandbox: true, preload: join(root, 'electron/preload.cjs') }
@@ -38,6 +40,7 @@ function createWindow() {
     })
     if (choice === 0) e.preventDefault()
   })
+  win.once('ready-to-show', () => win.show())
   const sendMaximized = () => win.webContents.send('window:maximized', win.isMaximized())
   win.on('maximize', sendMaximized)
   win.on('unmaximize', sendMaximized)

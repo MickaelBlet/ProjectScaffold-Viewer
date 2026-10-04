@@ -34,6 +34,7 @@ import {
   showDiagramView
 } from './actions'
 import { toggleTool } from './shell/controllers'
+import { showTauriWindow } from './tauriDesktop'
 import { ExplorerPanel } from './panels/ExplorerPanel'
 import { SettingsPanel } from './panels/SettingsPanel'
 import type { SidePanel } from '../../../vscode/src/protocol'
@@ -133,6 +134,8 @@ export function App(): ReactNode {
   }, [theme])
   useEffect(() => applyForceAnimations(forceAnimations), [forceAnimations])
   useEffect(() => applyPortStyle(portStyle), [portStyle])
+  // After the theme: the first frame shown has the app colors.
+  useEffect(showTauriWindow, [])
 
   useEffect(() => {
     void (async () => {
