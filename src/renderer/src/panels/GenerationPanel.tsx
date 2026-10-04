@@ -190,7 +190,7 @@ function FileItem(props: {
       onClick={(e) => props.open(path, e)}
     >
       {tree ? <span className="chevron" aria-hidden /> : null}
-      <span className={`kind-badge file-${languageOf(path).id}`}>{LANGUAGE_BADGES[languageOf(path).id]}</span>
+      <span className={`file-badge file-${languageOf(path).id}`}>{LANGUAGE_BADGES[languageOf(path).id]}</span>
       <span className="result-label">{path.slice(slash + 1)}</span>
       {!tree && slash > 0 ? <small>{path.slice(0, slash)}</small> : null}
     </li>
