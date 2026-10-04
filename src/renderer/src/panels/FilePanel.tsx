@@ -10,7 +10,7 @@ import {
   type EditorView,
   type ViewUpdate
 } from '@codemirror/view'
-import { CodeEditor, goToLine } from '@/components/CodeEditor'
+import { CodeEditor, goToLine, selectSpot } from '@/components/CodeEditor'
 import { languageOf } from '@/components/codeLanguages'
 import { idlProblems, liquidProblems, userSections, type TextProblem } from '@/components/fileDiagnostics'
 import { ORPHANS } from '@/codegen/run'
@@ -27,6 +27,7 @@ import {
   saveTextFile,
   textFileKey,
   useTextFiles,
+  useTextReveals,
   type TextFile,
   type TextFileRef
 } from '@/store/textFiles'
@@ -133,6 +134,8 @@ export function FilePanel({ api, params }: IDockviewPanelProps<TextFileRef>): Re
   const dirty = isFileDirty(file)
   const readOnly = isReadOnly(ref)
   const [view, setView] = useState<EditorView | null>(null)
+  const reveal = useTextReveals((s) => s[key])
+  const loaded = file?.saved != null
   const text = useDeferredValue(file?.text ?? '')
   const problems = useMemo(
     () => (file?.saved === null ? [] : problemsOf(ref, text)),
@@ -156,6 +159,16 @@ export function FilePanel({ api, params }: IDockviewPanelProps<TextFileRef>): Re
       window.removeEventListener('focus', check)
     }
   }, [api, docId, ref])
+  // Text to select (a search result): once the editor holds the file.
+  useEffect(() => {
+    if (!view || !reveal || !loaded) return
+    selectSpot(view, reveal)
+    useTextReveals.setState((s) => {
+      const rest = { ...s }
+      delete rest[key]
+      return rest
+    }, true)
+  }, [view, reveal, loaded, key])
   useEffect(() => {
     if (!view) return
     const doc = view.state.doc

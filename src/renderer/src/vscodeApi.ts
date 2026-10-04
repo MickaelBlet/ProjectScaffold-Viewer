@@ -111,7 +111,7 @@ function hostDir(found: OutputDirReply): OutputDir {
     read: (path) => file('read', path),
     write: async (path, text) => void (await file('write', path, text)),
     remove: async (path) => void (await file('remove', path)),
-    open: (path) => post({ type: 'openOutputFile', dir: found.dir, path })
+    open: (path, at) => post({ type: 'openOutputFile', dir: found.dir, path, at })
   }
 }
 

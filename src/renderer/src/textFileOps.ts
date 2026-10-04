@@ -1,4 +1,5 @@
 // Opening, saving and closing the text files edited in tabs beside a document (store/textFiles.ts).
+import type { TextSpot } from '@/model/search'
 import { activeDoc } from '@/store/documents'
 import { showDialog } from '@/store/ui'
 import {
@@ -12,6 +13,7 @@ import {
   sourceDir,
   textFileKey,
   useTextFiles,
+  useTextReveals,
   type TextFileRef
 } from '@/store/textFiles'
 import { activeFilePanel, openFilePanel } from '@/shell/controllers'
@@ -19,18 +21,20 @@ import { activeFilePanel, openFilePanel } from '@/shell/controllers'
 const IDL_FILES = { description: 'IDL files', extensions: ['idl'] }
 
 /**
- * Opens a text file in a tab of the active document, read from its source unless `content` is given;
- * in its own editor when the host has one for it (VS Code).
+ * Opens a text file in a tab of the active document, read from its source unless `content` is given,
+ * selecting `at`; in its own editor when the host has one for it (VS Code).
  */
 export async function openTextFile(
   ref: TextFileRef,
-  options: { content?: string; split?: boolean } = {}
+  options: { content?: string; split?: boolean; at?: TextSpot } = {}
 ): Promise<void> {
   const doc = activeDoc()
   if (ref.source === 'templates' || ref.source === 'output') {
     const dir = await sourceDir(doc, ref.source).catch(() => null)
-    if (dir?.open) return dir.open(ref.path)
+    if (dir?.open) return dir.open(ref.path, options.at)
   }
+  const at = options.at
+  if (at) useTextReveals.setState({ [textFileKey(doc.id, ref)]: at })
   addTextFile(doc.id, ref, options.content)
   openFilePanel(ref, options)
   if (useTextFiles.getState().files[textFileKey(doc.id, ref)]?.saved === null) await loadTextFile(doc.id, ref)

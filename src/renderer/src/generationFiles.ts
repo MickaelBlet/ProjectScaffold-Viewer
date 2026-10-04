@@ -1,10 +1,10 @@
 // Files of a document's code generation: the templates generating it and the files generated, listed by
-// the Code generation panel and Go to (Ctrl+P).
+// the Code generation panel, Go to (Ctrl+P) and Search.
 import { generatedFiles, LOCAL_TEMPLATES } from '@/codegen/run'
 import { MANIFEST, parseManifest, templateFiles } from '@/codegen/templateSet'
 import { builtinTemplates, knownOutputDir, projectTemplateSet, templateFolder } from '@/generateCode'
 import type { DocState } from '@/store/documents'
-import type { TextSource } from '@/store/textFiles'
+import type { TextFileRef, TextSource } from '@/store/textFiles'
 
 /** Files of a folder, opened from `source` under `prefix`. */
 export interface Listing {
@@ -51,4 +51,27 @@ export async function templateListing(doc: DocState): Promise<Listing> {
 export async function generatedListing(doc: DocState): Promise<Listing | null> {
   const out = await knownOutputDir(doc)
   return out && { label: out.label, source: 'output', prefix: '', files: await generatedFiles(out) }
+}
+
+/** A template or generated file of a document. */
+export interface CodegenFile {
+  ref: TextFileRef
+  /** Path in its listing. */
+  name: string
+  kind: 'template' | 'generated'
+}
+
+/** Templates and generated files of a document; none of a folder that cannot be read. */
+export async function codegenFiles(doc: DocState): Promise<CodegenFile[]> {
+  const [templates, generated] = await Promise.all([
+    templateListing(doc).catch(() => null),
+    generatedListing(doc).catch(() => null)
+  ])
+  const files = (listing: Listing | null, kind: CodegenFile['kind']): CodegenFile[] =>
+    listing?.files.map((name) => ({
+      ref: { source: listing.source, path: listing.prefix + name },
+      name,
+      kind
+    })) ?? []
+  return [...files(templates, 'template'), ...files(generated, 'generated')]
 }

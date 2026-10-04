@@ -1,5 +1,8 @@
 // Messages between the extension (session.ts) and its webview pages (src/renderer/src/vscodeApi.ts).
 // Types only: the page imports this file too.
+import type { TextSpot } from '../../src/renderer/src/model/search'
+
+export type { TextSpot }
 
 /**
  * Full diagram editor in place of the text, compact preview beside it, or one tool panel of the
@@ -95,8 +98,8 @@ export type ToHost =
       op: 'read' | 'write' | 'remove'
       text?: string
     }
-  /** Opens a file of a directory given by `outputDir` / `templateDir` in its VS Code editor. */
-  | { type: 'openOutputFile'; dir: string; path: string }
+  /** Opens a file of a directory given by `outputDir` / `templateDir` in its VS Code editor, selecting `at`. */
+  | { type: 'openOutputFile'; dir: string; path: string; at?: TextSpot }
   /** The selection changed: data path of the selected entity in the file. */
   | { type: 'selected'; path: DataPath }
   /** A diagram shows another view. */

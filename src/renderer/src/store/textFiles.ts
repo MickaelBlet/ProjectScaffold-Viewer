@@ -2,6 +2,7 @@
 import { create } from 'zustand'
 import type { OutputDir } from '@/codegen/run'
 import { builtinFile, knownOutputDir, templateFolder } from '@/generateCode'
+import type { TextSpot } from '@/model/search'
 import type { Id } from '@/model/types'
 import { findDoc, type DocState } from './documents'
 
@@ -34,6 +35,9 @@ interface TextFilesState {
 
 export const useTextFiles = create<TextFilesState>(() => ({ files: {} }))
 
+/** Text to select in the tab of a file once it shows it, by `textFileKey` (see `openTextFile`). */
+export const useTextReveals = create<Record<string, TextSpot>>(() => ({}))
+
 export const textFileKey = (docId: Id, ref: TextFileRef): string => `${docId}|${ref.source}:${ref.path}`
 export const isReadOnly = (ref: TextFileRef): boolean => ref.source === 'builtin'
 export const isFileDirty = (f: TextFile | undefined): boolean => !!f && f.saved !== null && f.text !== f.saved
@@ -64,7 +68,7 @@ export async function sourceDir(doc: DocState, source: TextSource): Promise<Outp
 }
 
 /** Content of a file; null when it does not exist. `file`: only when it changed since last read. */
-async function read(doc: DocState, ref: TextFileRef): Promise<string | null> {
+export async function readTextFile(doc: DocState, ref: TextFileRef): Promise<string | null> {
   switch (ref.source) {
     case 'builtin':
       return builtinFile(ref.path)
@@ -111,7 +115,7 @@ export async function loadTextFile(docId: Id, ref: TextFileRef): Promise<void> {
     return
   }
   try {
-    const text = await read(doc, ref)
+    const text = await readTextFile(doc, ref)
     if (text === null) patch(key, { error: `${ref.path} does not exist` })
     else patch(key, { text, saved: text, error: null, stale: false })
   } catch (e) {
@@ -127,7 +131,7 @@ export async function checkTextFile(docId: Id, ref: TextFileRef): Promise<void> 
   if (!doc || !f || f.saved === null || ref.source === 'builtin') return
   let text: string | null
   try {
-    text = await read(doc, ref)
+    text = await readTextFile(doc, ref)
   } catch {
     // Not readable without a user gesture (folder access): checked again on the next focus.
     return

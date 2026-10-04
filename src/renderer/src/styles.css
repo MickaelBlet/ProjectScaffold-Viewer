@@ -211,7 +211,10 @@
   --syn-string: var(--vscode-debugTokenExpression-string, var(--vscode-charts-green));
   --syn-literal: var(--vscode-debugTokenExpression-number, var(--vscode-charts-orange));
   --syn-liquid: var(--vscode-charts-purple, #c792ea);
-  --scrollbar-thumb: var(--vscode-scrollbarSlider-background, color-mix(in srgb, var(--text) 16%, transparent));
+  --scrollbar-thumb: var(
+    --vscode-scrollbarSlider-background,
+    color-mix(in srgb, var(--text) 16%, transparent)
+  );
   --scrollbar-thumb-hover: var(
     --vscode-scrollbarSlider-hoverBackground,
     color-mix(in srgb, var(--text) 32%, transparent)
@@ -2685,6 +2688,45 @@ ul.plain {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.results li.file-hit {
+  margin-top: 4px;
+  flex-wrap: nowrap;
+}
+.results li.file-hit .result-label {
+  white-space: nowrap;
+}
+.results li.file-hit small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hit-count {
+  margin-left: auto;
+  padding: 0 6px;
+  border-radius: 8px;
+  background: var(--panel-2);
+  color: var(--muted);
+  font-size: 11px;
+}
+.results li.line-hit {
+  flex-wrap: nowrap;
+  padding-left: 28px;
+}
+.line-number {
+  flex-shrink: 0;
+  min-width: 3ch;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.result-line {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: pre;
+  font-family: ui-monospace, 'SF Mono', Consolas, monospace;
+  font-size: 12px;
 }
 mark {
   background: color-mix(in srgb, var(--warning) 40%, transparent);

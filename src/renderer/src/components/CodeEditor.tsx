@@ -43,6 +43,7 @@ import {
   rectangularSelection,
   scrollPastEnd
 } from '@codemirror/view'
+import type { TextSpot } from '@/model/search'
 import { useSettings, type Settings } from '@/store/settings'
 import { languageOf, type FileLanguage } from './codeLanguages'
 import { fixedLiquid } from './liquidSyntax'
@@ -158,6 +159,17 @@ export function goToLine(view: EditorView, line: number): void {
   view.dispatch({
     selection: { anchor: l.from, head: l.to },
     effects: EditorView.scrollIntoView(l.from, { y: 'center' })
+  })
+}
+
+/** Selects text at a line and scrolls it into view. */
+export function selectSpot(view: EditorView, at: TextSpot): void {
+  const l = view.state.doc.line(Math.max(1, Math.min(at.line, view.state.doc.lines)))
+  const from = Math.min(l.from + at.column, l.to)
+  view.focus()
+  view.dispatch({
+    selection: { anchor: from, head: Math.min(from + at.length, l.to) },
+    effects: EditorView.scrollIntoView(from, { y: 'center' })
   })
 }
 

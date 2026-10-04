@@ -2,7 +2,7 @@
 // (and the types, interfaces, constants and modules it brings), view, template or generated file.
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import { commands, keyLabel, runCommand } from '@/commands'
-import { generatedListing, templateListing, type Listing } from '@/generationFiles'
+import { codegenFiles } from '@/generationFiles'
 import { formatValue } from '@/model/defaults'
 import { fuzzyFilter } from '@/model/fuzzy'
 import { modulePaths } from '@/model/project'
@@ -129,29 +129,18 @@ function entityEntries(): Entry[] {
   ]
 }
 
-function fileEntries(listing: Listing | null, detail: string): Entry[] {
-  if (!listing) return []
-  return listing.files.map((f) => {
-    const path = listing.prefix + f
-    const { id } = languageOf(f)
+/** Templates and generated files of the active document. */
+async function codegenEntries(): Promise<Entry[]> {
+  return (await codegenFiles(activeDoc())).map(({ ref, name, kind }) => {
+    const { id } = languageOf(name)
     return {
-      key: `${listing.source}:${path}`,
-      label: f,
-      detail,
+      key: `${ref.source}:${ref.path}`,
+      label: name,
+      detail: kind,
       kind: <span className={`file-badge file-${id}`}>{LANGUAGE_BADGES[id]}</span>,
-      run: () => void openTextFile({ source: listing.source, path })
+      run: () => void openTextFile(ref)
     }
   })
-}
-
-/** Templates and generated files of the active document; none when they cannot be read. */
-async function codegenEntries(): Promise<Entry[]> {
-  const doc = activeDoc()
-  const [templates, generated] = await Promise.all([
-    templateListing(doc).catch(() => null),
-    generatedListing(doc).catch(() => null)
-  ])
-  return [...fileEntries(templates, 'template'), ...fileEntries(generated, 'generated')]
 }
 
 function Highlight({ text, positions }: { text: string; positions: number[] }): ReactNode {

@@ -3,7 +3,7 @@ import YAML from 'yaml'
 import { describe, expect, it } from 'vitest'
 import { align, distribute, sameSize } from '@/model/align'
 import { fuzzyFilter, fuzzyMatch } from '@/model/fuzzy'
-import { searchProject } from '@/model/search'
+import { searchLines, searchProject } from '@/model/search'
 import { fromFile } from '@/model/serialize'
 import type { Rect } from '@/model/types'
 
@@ -53,5 +53,15 @@ describe('search', () => {
     expect(searchProject(example, 'team-a')[0]).toMatchObject({ label: 'Core', field: 'metadata owner' })
     expect(searchProject(example, 'position').some((h) => h.label === 'Pose.position')).toBe(true)
     expect(searchProject(example, '  ')).toEqual([])
+  })
+
+  it('finds the lines of a text', () => {
+    const text = 'int main() {\r\n  return Sensor::read();\n}\n// sensor\n'
+    expect(searchLines(text, 'SENSOR')).toEqual([
+      { line: 2, column: 9, length: 6, text: 'return Sensor::read();' },
+      { line: 4, column: 3, length: 6, text: '// sensor' }
+    ])
+    expect(searchLines(text, 'sensor', 1)).toHaveLength(1)
+    expect(searchLines(text, ' ')).toEqual([])
   })
 })
