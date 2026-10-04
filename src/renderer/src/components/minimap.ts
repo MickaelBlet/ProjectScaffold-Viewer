@@ -1,8 +1,8 @@
 // Minimap of the code editors, like VS Code's: the text drawn small on the right of the editor with
 // its syntax colors, a slider over the lines in view, the caret lines, selections, search and
-// selection matches, problems, changes since the last save (unified merge view) and section headers.
+// selection matches, matching brackets, problems, changes since the last save (unified merge view) and section headers.
 // The editor's scrollbar stays on its right, over an overview ruler marking them across the whole text.
-import { foldedRanges, syntaxTree } from '@codemirror/language'
+import { foldedRanges, matchBrackets, syntaxTree } from '@codemirror/language'
 import { forEachDiagnostic } from '@codemirror/lint'
 import { getChunks } from '@codemirror/merge'
 import { getSearchQuery, SearchCursor, searchPanelOpen } from '@codemirror/search'
@@ -29,6 +29,8 @@ export interface MinimapOptions {
   render: 'characters' | 'blocks'
   /** Occurrences of the selected text marked. */
   selectionMatches: boolean
+  /** Brackets matching the one at the caret marked. */
+  brackets: boolean
   /** Lines shown as section headers: top-level keys (YAML, JSON), or `MARK:` / `#region` comments. */
   sections: 'yaml' | 'json' | 'comments'
 }
@@ -141,6 +143,7 @@ class Minimap {
   searchMarks: Mark[] = []
   searchDirty = true
   selectionMarks: Mark[] = []
+  bracketMarks: Mark[] = []
   selectionDirty = true
   headers: { line: number; label: string }[] = []
   headersDirty = true
@@ -323,6 +326,7 @@ class Minimap {
         this.opts.selectionMatches && text.trim() && text.length <= 200 && !text.includes('\n')
           ? marks(state, new SearchCursor(doc, text))
           : []
+      this.bracketMarks = this.opts.brackets ? marks(state, matchingBrackets(state)[Symbol.iterator]()) : []
       this.selectionDirty = false
     }
     if (this.headersDirty) {
@@ -550,6 +554,8 @@ class Minimap {
       lineRows(mark.line, (row) => fillColumns(row, mark.from, mark.to, colors.accent, 0.7))
     for (const mark of this.searchMarks)
       lineRows(mark.line, (row) => fillColumns(row, mark.from, mark.to, colors.warning, 0.9))
+    for (const mark of this.bracketMarks)
+      lineRows(mark.line, (row) => fillColumns(row, mark.from, mark.to, colors.accent, 1))
 
     // Section headers: a rule and the name over the lines below it, names kept apart.
     ctx.font = '600 8px system-ui, sans-serif'
@@ -609,6 +615,7 @@ class Minimap {
       for (const [line, severity] of this.diagnostics)
         if (severity !== 'info')
           mark(severity === 'error' ? colors.danger : colors.warning, 1, 2 * lane, line, lane, 3)
+      for (const bm of this.bracketMarks) mark(colors.accent, 1, 0, bm.line, rulerWidth, 2)
       for (const r of state.selection.ranges)
         mark(colors.text, 0.8, 0, doc.lineAt(r.head).number, rulerWidth, 2)
       rc.globalAlpha = 1
@@ -732,6 +739,21 @@ function context(
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
   ctx.clearRect(0, 0, width, height)
   return ctx
+}
+
+/** Brackets at empty carets and their matches, found as `bracketMatching` does. */
+function matchingBrackets(state: EditorState): { from: number; to: number }[] {
+  const out: { from: number; to: number }[] = []
+  for (const { empty, head } of state.selection.ranges) {
+    if (!empty) continue
+    const match =
+      matchBrackets(state, head, -1) ||
+      (head > 0 && matchBrackets(state, head - 1, 1)) ||
+      matchBrackets(state, head, 1) ||
+      (head < state.doc.length && matchBrackets(state, head + 1, -1))
+    if (match && match.matched && match.end) out.push(match.start, match.end)
+  }
+  return out
 }
 
 /** Columns of matches, at most MAX_MATCHES. */

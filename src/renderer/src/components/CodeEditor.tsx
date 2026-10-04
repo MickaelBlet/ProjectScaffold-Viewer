@@ -235,6 +235,7 @@ function prefsSetup(p: EditorPrefs, fileName: string): Extension {
       ? minimap({
           render: p.editorMinimapRender,
           selectionMatches: p.editorSelectionMatches,
+          brackets: p.editorBracketMatching,
           sections: lang === 'yaml' || lang === 'json' ? lang : 'comments'
         })
       : [],
