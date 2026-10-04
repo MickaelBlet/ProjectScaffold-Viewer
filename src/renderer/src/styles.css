@@ -462,7 +462,9 @@ button.link-button:hover {
 }
 .side-tabs button {
   flex: none;
-  padding: 6px 6px 5px;
+  display: flex;
+  align-items: center;
+  padding: 6px 10px 5px;
   border: 0;
   border-bottom: 1px solid transparent;
   border-radius: 0;

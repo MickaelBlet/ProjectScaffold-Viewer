@@ -58,7 +58,7 @@ function ProblemsToolPanel(props: IDockviewPanelProps): ReactNode {
   )
 }
 
-const TOOL_ICONS: Record<ToolId, IconName> = {
+export const TOOL_ICONS: Record<ToolId, IconName> = {
   explorer: 'tree',
   generation: 'code',
   inspector: 'info',

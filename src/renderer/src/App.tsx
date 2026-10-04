@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useState, type ReactNode } from 'react'
-import { DockShell } from './shell/DockShell'
+import { DockShell, TOOL_ICONS } from './shell/DockShell'
 import { MenuBar } from './shell/MenuBar'
 import { ResizeEdges, WindowControls } from './shell/WindowFrame'
 import { StatusBar } from './shell/StatusBar'
@@ -105,8 +105,16 @@ function SidePanelView(): ReactNode {
     <div className="app side-panel">
       <div className="side-tabs" role="tablist">
         {SIDE_TABS.map(([id, title]) => (
-          <button key={id} type="button" role="tab" aria-selected={id === tab} onClick={() => select(id)}>
-            {title}
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            title={title}
+            aria-label={title}
+            aria-selected={id === tab}
+            onClick={() => select(id)}
+          >
+            <Icon name={TOOL_ICONS[id]} />
           </button>
         ))}
       </div>
