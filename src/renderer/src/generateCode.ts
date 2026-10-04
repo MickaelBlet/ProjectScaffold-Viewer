@@ -15,6 +15,8 @@ import { activeDoc, type DocState } from '@/store/documents'
 import { log } from '@/store/output'
 import { update } from '@/store/project'
 import { showTool } from '@/shell/controllers'
+import { sendToDiagram } from '@/fileOps'
+import { IN_PANEL } from '@/host'
 import { Icon } from '@/components/Icon'
 import { quickPick, setStatus, showDialog, useUiStore } from '@/store/ui'
 
@@ -80,8 +82,13 @@ export async function knownOutputDir(doc: DocState): Promise<OutputDir | null> {
 
 /** Called after code was generated or other templates were chosen: the files to list changed. */
 export const codegenListeners = new Set<() => void>()
-const codegenChanged = (): void => {
+/** The files to list changed, here or in another page of the document (VS Code). */
+export const notifyCodegen = (): void => {
   for (const listener of codegenListeners) listener()
+}
+const codegenChanged = (): void => {
+  notifyCodegen()
+  window.api.codegenChanged?.()
 }
 
 /** Whether the host can write generated files. */
@@ -89,6 +96,8 @@ export const canGenerate = (): boolean => !!window.api.outputDir
 
 /** Generates the active project's code into its output directory; `pick` asks for another one. */
 export async function generateCode(pick: boolean): Promise<void> {
+  // A VS Code side panel: the diagram of the document generates, with its Output and dialogs.
+  if (IN_PANEL) return sendToDiagram({ kind: 'command', id: pick ? 'file.generateInto' : 'file.generate' })
   const doc = activeDoc()
   const project = doc.store.getState().project
   if (!window.api.outputDir) {
@@ -159,6 +168,7 @@ function errorLines(e: unknown): string[] {
  * project), a folder of the user's own, or a copy of the project's built-in set to edit.
  */
 export async function chooseTemplates(): Promise<void> {
+  if (IN_PANEL) return sendToDiagram({ kind: 'command', id: 'file.codeTemplates' })
   const doc = activeDoc()
   const document = doc.filePath
   const project = doc.store.getState().project

@@ -36,6 +36,8 @@ import {
 import { toggleTool } from './shell/controllers'
 import { showTauriWindow } from './tauriDesktop'
 import { ExplorerPanel } from './panels/ExplorerPanel'
+import { GenerationPanel } from './panels/GenerationPanel'
+import { notifyCodegen } from './generateCode'
 import { SettingsPanel } from './panels/SettingsPanel'
 import type { SidePanel } from '../../../vscode/src/protocol'
 
@@ -73,6 +75,7 @@ function Dialog(): ReactNode {
 
 const SIDE_PANELS: Record<SidePanel, () => ReactNode> = {
   explorer: ExplorerPanel,
+  generation: GenerationPanel,
   settings: SettingsPanel
 }
 
@@ -164,6 +167,7 @@ export function App(): ReactNode {
       window.api.onCommand!(runCommand),
       window.api.onReveal!(navigateToPath),
       installSelectionSync(),
+      window.api.onCodegen!(notifyCodegen),
       // A side panel follows the active document and the view of its diagram, which acts for it.
       ...(IN_PANEL
         ? [

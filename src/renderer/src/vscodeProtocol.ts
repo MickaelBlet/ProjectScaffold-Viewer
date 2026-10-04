@@ -11,7 +11,7 @@ export type { TextSpot }
 export type WebviewMode = 'editor' | 'preview' | 'panel'
 
 /** Tool panels of the ProjectScaffold views (the ProjectScaffold side bar). */
-export type SidePanel = 'explorer' | 'settings'
+export type SidePanel = 'explorer' | 'generation' | 'settings'
 
 /**
  * Layout of the diagrams (full editor, preview): `integrated` puts the Explorer and Settings in the VS
@@ -119,6 +119,8 @@ export type ToHost =
   | { type: 'showPanel'; panel: SidePanel }
   /** Switches the layout of the diagrams (they all load again). */
   | { type: 'setLayout'; layout: EditorLayout }
+  /** The page generated code or chose other templates: the files to list changed. */
+  | { type: 'codegen' }
   /** A line of the page's Output log, for the ProjectScaffold Output channel (which adds the time). */
   | { type: 'log'; level: LogLevel; text: string }
   /** Side panel: listening for its document, sent again in reply. Diagram: listening for commands. */
@@ -138,6 +140,8 @@ export type ToPage =
   | { type: 'reveal'; path: DataPath; names: (string | undefined)[] }
   /** Side panel: the view the diagram shows. */
   | { type: 'view'; view: ViewRef }
+  /** Another page generated the document's code or chose other templates. */
+  | { type: 'codegen' }
   /** Diagram: an action asked by a side panel. */
   | { type: 'action'; action: DiagramAction }
   | { type: 'reply'; id: number; result: unknown }

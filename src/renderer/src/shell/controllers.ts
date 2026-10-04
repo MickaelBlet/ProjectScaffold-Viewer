@@ -100,7 +100,7 @@ const LAYOUT_KEY = COMPACT
         : 'project-scaffold:layout'
 
 /** Tools of the VS Code side bar (see vscode/package.json). */
-const SIDE_TOOLS = new Set<ToolId>(['explorer', 'settings'])
+const SIDE_TOOLS = new Set<ToolId>(['explorer', 'generation', 'settings'])
 const inSideBar = (id: ToolId): id is SidePanel => INTEGRATED && SIDE_TOOLS.has(id)
 
 /**
@@ -187,6 +187,8 @@ export function loadOuterLayout(api: DockviewApi): void {
     // A layout with panels no longer there (removed tools) is dropped for the default one.
     if (layout && Object.keys(layout.panels).every((id) => id === EDITOR_AREA || id in TOOL_TITLES)) {
       api.fromJSON(layout)
+      // Tools now in the VS Code side bar (Code generation was docked before).
+      if (INTEGRATED) for (const id of SIDE_TOOLS) api.getPanel(id)?.api.close()
       if (api.getPanel(EDITOR_AREA)) return lockEditorArea(api)
     }
   } catch {

@@ -36,6 +36,7 @@ const revealListeners = new Set<(path: (string | number)[], names: (string | und
 const documentListeners = new Set<(file: OpenResult) => void>()
 const viewListeners = new Set<(view: ViewRef) => void>()
 const actionListeners = new Set<(action: DiagramAction) => void>()
+const codegenListeners = new Set<() => void>()
 /** Latest text received while the document was still loading. */
 let unheard: string | null = null
 
@@ -70,6 +71,9 @@ function onMessage(e: MessageEvent<ToPage>): void {
       break
     case 'action':
       actionListeners.forEach((cb) => cb(msg.action))
+      break
+    case 'codegen':
+      codegenListeners.forEach((cb) => cb())
       break
     case 'reply':
       pending.get(msg.id)?.(msg.result)
@@ -203,6 +207,8 @@ const vscodeApi: Api = {
     return off
   },
   onReveal: (cb) => listen(revealListeners, cb),
+  codegenChanged: () => post({ type: 'codegen' }),
+  onCodegen: (cb) => listen(codegenListeners, cb),
   inDiagram: (action) => post({ type: 'inDiagram', action }),
   onDocument: (cb) => {
     const off = listen(documentListeners, cb)
@@ -216,9 +222,9 @@ const vscodeApi: Api = {
   showPanel: (panel) => post({ type: 'showPanel', panel }),
   setLayout: IN_DIAGRAM ? (layout) => post({ type: 'setLayout', layout }) : undefined,
   log: (level, text) => post({ type: 'log', level, text }),
-  // Side panels have no Generate command.
-  outputDir: IN_PANEL ? undefined : outputDir,
-  templateDir: IN_PANEL ? undefined : templateDir
+  // Side panels list the files; their Generate runs in the diagram (see generateCode).
+  outputDir,
+  templateDir
 }
 
 export function installVscodeApi(): void {

@@ -146,6 +146,10 @@ export interface Api {
   onDocument?(cb: (file: OpenResult) => void): () => void
   /** Side panel: the view the diagram shows. */
   onView?(cb: (view: ViewRef) => void): () => void
+  /** Code was generated or other templates chosen here: the other pages of the document list their files again. */
+  codegenChanged?(): void
+  /** Another page of the document generated code or chose other templates. */
+  onCodegen?(cb: () => void): () => void
   /** Full diagram editor: switches the layout of the full diagram editors, which load again. */
   setLayout?(layout: EditorLayout): void
   /** Diagram: shows another view, for the side panels. */
