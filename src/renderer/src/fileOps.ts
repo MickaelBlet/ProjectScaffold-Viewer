@@ -9,7 +9,6 @@ import {
   saveText,
   type Format
 } from '@/model/serialize'
-import { hasErrors, validate } from '@/model/validate'
 import { arrange, arrangeOptions } from '@/model/autoLayout'
 import { baseName } from '@/model/sync'
 import type { Project } from '@/model/types'
@@ -445,26 +444,4 @@ export async function saveAll(): Promise<void> {
     await saveProject()
   }
   activateDoc(activeId)
-}
-
-/** Export for generators: no editor data, blocked on validation errors. */
-export async function exportProject(format: Format): Promise<void> {
-  const project = activeDoc().store.getState().project
-  const problems = validate(project)
-  if (hasErrors(problems)) {
-    showDialog(
-      'Export blocked: fix these errors first',
-      problems.filter((p) => p.severity === 'error').map((p) => p.message)
-    )
-    return
-  }
-  const path = await window.api.saveFile({
-    path: null,
-    content: saveText(project, format, { editor: false }),
-    defaultName: `${project.name || 'project'}.${format}`,
-    format,
-    title: `Export ${format.toUpperCase()}`,
-    export: true
-  })
-  if (path) setStatus('info', `Exported ${path}`)
 }

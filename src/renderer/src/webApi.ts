@@ -199,7 +199,7 @@ async function openFile(): Promise<OpenResult | null> {
 
 async function saveFile(req: SaveRequest): Promise<string | null> {
   const path = await writeFile(req)
-  if (path && !req.export && req.format !== 'text') {
+  if (path && req.format !== 'text') {
     await remember({ name: path, content: req.content, handle: handles.get(path) })
     await updateWorkspaceFile(path, req.content)
   }

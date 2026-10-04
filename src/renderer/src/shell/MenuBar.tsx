@@ -1,14 +1,13 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { commandItem, commands, getCommand, type Category } from '@/commands'
+import { commandItem, commands, type Category } from '@/commands'
 import { MenuList } from '@/components/ContextMenu'
 import { fileName, openRecentProject } from '@/fileOps'
 import { useDoc } from '@/store/documents'
 import { useUiStore, type MenuItem } from '@/store/ui'
 import { IN_VSCODE } from '@/host'
-import { COLOR_THEMES } from '@/store/settings'
 
 /** Menus built from the command registry: command ids, '-' for a separator between groups of
- *  related commands, 'recent' for the recent documents submenu, 'theme' for the themes submenu. */
+ *  related commands, 'recent' for the recent documents submenu. */
 const MENUS: [Category, string[]][] = [
   [
     'File',
@@ -26,8 +25,6 @@ const MENUS: [Category, string[]][] = [
       '-',
       'file.openIdlText',
       '-',
-      'file.exportYaml',
-      'file.exportJson',
       'file.exportPng',
       'file.exportSvg',
       '-',
@@ -91,19 +88,7 @@ const MENUS: [Category, string[]][] = [
       'view.fitAll',
       'view.zoomIn',
       'view.zoomOut',
-      'view.zoomReset',
-      '-',
-      'view.minimap',
-      'view.badges',
-      'view.autoOrient',
-      'view.inheritance',
-      '-',
-      'view.wordWrap',
-      'view.whitespace',
-      'view.indentGuides',
-      'view.textMinimap',
-      '-',
-      'theme'
+      'view.zoomReset'
     ]
   ],
   [
@@ -155,14 +140,13 @@ const MENUS: [Category, string[]][] = [
 if (!IN_VSCODE)
   for (const [, ids] of MENUS)
     for (const id of ids)
-      if (id !== '-' && id !== 'recent' && id !== 'theme' && !commands.some((c) => c.id === id))
-        throw new Error(id)
+      if (id !== '-' && id !== 'recent' && !commands.some((c) => c.id === id)) throw new Error(id)
 
 /** Menus without the commands VS Code leaves out (document commands), nor the separators they leave. */
 function availableMenus(): [Category, string[]][] {
   if (!IN_VSCODE) return MENUS
   return MENUS.map(([cat, ids]) => {
-    const kept = ids.filter((id) => id === '-' || id === 'theme' || commands.some((c) => c.id === id))
+    const kept = ids.filter((id) => id === '-' || commands.some((c) => c.id === id))
     const between = (i: number): boolean =>
       kept.slice(0, i).some((x) => x !== '-') && kept[i + 1] !== undefined && kept[i + 1] !== '-'
     return [cat, kept.filter((id, i) => id !== '-' || between(i))]
@@ -170,23 +154,6 @@ function availableMenus(): [Category, string[]][] {
 }
 
 const menus = availableMenus()
-
-const THEME_COMMANDS = [
-  'view.themeSystem',
-  'view.themeLight',
-  'view.themeDark',
-  '-',
-  ...COLOR_THEMES.map((t) => `view.theme.${t}`)
-]
-
-function themeItem(): MenuItem {
-  return {
-    label: 'Theme',
-    submenu: THEME_COMMANDS.map((id) =>
-      id === '-' ? 'separator' : commandItem(id, getCommand(id).title.replace('Theme: ', ''))
-    )
-  }
-}
 
 function recentItem(recent: string[], filePath: string | null): MenuItem {
   return {
@@ -245,13 +212,7 @@ export function MenuBar(): ReactNode {
             <div className="dropdown-menu context-menu" role="menu" aria-label={cat}>
               <MenuList
                 items={ids.map((id): MenuItem =>
-                  id === '-'
-                    ? 'separator'
-                    : id === 'recent'
-                      ? recentItem(recent, filePath)
-                      : id === 'theme'
-                        ? themeItem()
-                        : commandItem(id)
+                  id === '-' ? 'separator' : id === 'recent' ? recentItem(recent, filePath) : commandItem(id)
                 )}
                 onDone={() => setOpen(null)}
               />

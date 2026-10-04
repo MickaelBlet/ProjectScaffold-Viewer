@@ -37,7 +37,6 @@ import {
 } from './actions'
 import {
   closeDocument,
-  exportProject,
   newProject,
   openProject,
   saveAll,
@@ -49,7 +48,7 @@ import { focusedEditorHistory, setPassedKeys } from './components/CodeEditor'
 import { openIdlText, saveActiveTextFile } from './textFileOps'
 import { activeDoc, cycleDoc, patchDoc, useDocs, activateDoc } from './store/documents'
 import { getProject, redo, undo } from './store/project'
-import { COLOR_THEMES, setSetting, useSettings, type Theme } from './store/settings'
+import { setSetting, useSettings } from './store/settings'
 import { clearOutput } from './store/output'
 import { useUiStore, type ActionItem } from './store/ui'
 import {
@@ -104,23 +103,12 @@ function nudgeStep(far: boolean): number {
   return snapToGrid ? gridSize * (far ? 5 : 1) : far ? 20 : 2
 }
 
-type Toggle =
-  | 'snapToGrid'
-  | 'guides'
-  | 'minimap'
-  | 'edgeBadges'
-  | 'autoOrientLinks'
-  | 'inheritance'
-  | 'forceAnimations'
-  | 'editorWordWrap'
-  | 'editorMinimap'
-  | 'editorIndentGuides'
+type Toggle = 'snapToGrid' | 'guides' | 'editorWordWrap'
 const setting =
   <K extends Toggle>(key: K) =>
   (): boolean =>
     useSettings.getState()[key]
 const toggle = (key: Toggle) => (): void => setSetting(key, !useSettings.getState()[key])
-const theme = (t: Theme) => (): void => setSetting('theme', t)
 const tool = (id: ToolId) => (): void => showTool(id)
 
 const docCommands: Command[] = Array.from({ length: 9 }, (_, i) => ({
@@ -200,22 +188,6 @@ const allCommands: Command[] = [
     keys: ['Alt+W'],
     global: true,
     run: () => closeDocument()
-  },
-  {
-    id: 'file.exportYaml',
-    title: 'Export YAML…',
-    category: 'File',
-    keys: ['Ctrl+E'],
-    global: true,
-    run: () => void exportProject('yaml')
-  },
-  {
-    id: 'file.exportJson',
-    title: 'Export JSON…',
-    category: 'File',
-    keys: ['Ctrl+Shift+E'],
-    global: true,
-    run: () => void exportProject('json')
   },
   {
     id: 'file.exportPng',
@@ -535,41 +507,6 @@ const allCommands: Command[] = [
     run: showAllInView
   },
   {
-    id: 'view.minimap',
-    title: 'Minimap',
-    category: 'View',
-    checked: setting('minimap'),
-    run: toggle('minimap')
-  },
-  {
-    id: 'view.badges',
-    title: 'Link badges',
-    category: 'View',
-    checked: setting('edgeBadges'),
-    run: toggle('edgeBadges')
-  },
-  {
-    id: 'view.autoOrient',
-    title: 'Auto-orient link ends',
-    category: 'View',
-    checked: setting('autoOrientLinks'),
-    run: toggle('autoOrientLinks')
-  },
-  {
-    id: 'view.inheritance',
-    title: 'Inheritance arrows',
-    category: 'View',
-    checked: setting('inheritance'),
-    run: toggle('inheritance')
-  },
-  {
-    id: 'view.forceAnimations',
-    title: 'Force animations',
-    category: 'View',
-    checked: setting('forceAnimations'),
-    run: toggle('forceAnimations')
-  },
-  {
     id: 'view.wordWrap',
     title: 'Word wrap',
     category: 'View',
@@ -578,56 +515,6 @@ const allCommands: Command[] = [
     checked: setting('editorWordWrap'),
     run: toggle('editorWordWrap')
   },
-  {
-    id: 'view.textMinimap',
-    title: 'Text minimap',
-    category: 'View',
-    checked: setting('editorMinimap'),
-    run: toggle('editorMinimap')
-  },
-  {
-    id: 'view.whitespace',
-    title: 'Show whitespace',
-    category: 'View',
-    checked: () => useSettings.getState().editorWhitespace !== 'none',
-    run: () =>
-      setSetting('editorWhitespace', useSettings.getState().editorWhitespace === 'none' ? 'all' : 'none')
-  },
-  {
-    id: 'view.indentGuides',
-    title: 'Indentation guides',
-    category: 'View',
-    checked: setting('editorIndentGuides'),
-    run: toggle('editorIndentGuides')
-  },
-  {
-    id: 'view.themeSystem',
-    title: IN_VSCODE ? 'Theme: VS Code' : 'Theme: system',
-    category: 'View',
-    checked: () => useSettings.getState().theme === 'system',
-    run: theme('system')
-  },
-  {
-    id: 'view.themeLight',
-    title: 'Theme: light',
-    category: 'View',
-    checked: () => useSettings.getState().theme === 'light',
-    run: theme('light')
-  },
-  {
-    id: 'view.themeDark',
-    title: 'Theme: dark',
-    category: 'View',
-    checked: () => useSettings.getState().theme === 'dark',
-    run: theme('dark')
-  },
-  ...COLOR_THEMES.map((t): Command => ({
-    id: `view.theme.${t}`,
-    title: `Theme: ${t}`,
-    category: 'View',
-    checked: () => useSettings.getState().theme === t,
-    run: theme(t)
-  })),
 
   // Arrange
   {

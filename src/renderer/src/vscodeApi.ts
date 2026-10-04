@@ -157,14 +157,6 @@ const vscodeApi: Api = {
   clearRecent: () => Promise.resolve(),
   onRecentChange: () => () => {},
   saveFile: (req) => {
-    if (req.export)
-      return request((id) => ({
-        type: 'export',
-        id,
-        name: req.defaultName,
-        data: req.content,
-        encoding: 'utf8'
-      }))
     post({ type: 'edit', text: req.content, uri: current.uri })
     post({ type: 'save' })
     return Promise.resolve(currentDoc().path)

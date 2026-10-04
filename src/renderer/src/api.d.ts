@@ -21,8 +21,6 @@ export interface SaveRequest {
   /** `text`: another kind of file (IDL), written as it is. */
   format: 'yaml' | 'json' | 'text'
   title?: string
-  /** Exports are not added to the recent documents. */
-  export?: boolean
 }
 
 export interface OutputDirRequest {
