@@ -48,6 +48,7 @@ import { languageOf, type FileLanguage } from './codeLanguages'
 import { fixedLiquid } from './liquidSyntax'
 import { richYaml } from './yamlSyntax'
 import { codeTheme } from './codeTheme'
+import { indentGuides } from './indentGuides'
 import { minimap } from './minimap'
 import { findWidget, replaceKeymap } from './searchPanel'
 
@@ -182,6 +183,7 @@ type EditorPrefs = Pick<
   | 'editorTabSize'
   | 'editorIndentTabs'
   | 'editorWhitespace'
+  | 'editorIndentGuides'
   | 'editorWordWrap'
   | 'editorLineNumbers'
   | 'editorFolding'
@@ -202,6 +204,7 @@ const selectPrefs = (s: Settings): EditorPrefs => ({
   editorTabSize: s.editorTabSize,
   editorIndentTabs: s.editorIndentTabs,
   editorWhitespace: s.editorWhitespace,
+  editorIndentGuides: s.editorIndentGuides,
   editorWordWrap: s.editorWordWrap,
   editorLineNumbers: s.editorLineNumbers,
   editorFolding: s.editorFolding,
@@ -245,6 +248,7 @@ function prefsSetup(p: EditorPrefs, fileName: string): Extension {
     p.editorScrollPastEnd ? scrollPastEnd() : [],
     p.editorWhitespace === 'all' ? highlightWhitespace() : [],
     p.editorWhitespace !== 'none' ? highlightTrailingWhitespace() : [],
+    p.editorIndentGuides ? indentGuides() : [],
     p.editorMinimap
       ? minimap({
           render: p.editorMinimapRender,

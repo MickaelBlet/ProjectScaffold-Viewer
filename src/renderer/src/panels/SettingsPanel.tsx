@@ -228,6 +228,12 @@ export function SettingsPanel(): ReactNode {
             onChange={(v) => setSetting('editorIndentTabs', v)}
           />
           <Check
+            label="Indentation guides"
+            hint="A vertical line at each indentation level"
+            value={s.editorIndentGuides}
+            onChange={(v) => setSetting('editorIndentGuides', v)}
+          />
+          <Check
             label="Word wrap"
             value={s.editorWordWrap}
             onChange={(v) => setSetting('editorWordWrap', v)}

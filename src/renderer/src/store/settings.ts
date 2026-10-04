@@ -47,6 +47,8 @@ export interface Settings {
   editorIndentTabs: boolean
   /** Code editors: dots and arrows for spaces and tabs, everywhere or trailing only. */
   editorWhitespace: WhitespaceShown
+  /** Code editors: a vertical line at each indentation level. */
+  editorIndentGuides: boolean
   /** Code editors: long lines wrap. */
   editorWordWrap: boolean
   editorLineNumbers: boolean
@@ -101,6 +103,7 @@ export const DEFAULT_SETTINGS: Settings = {
   editorTabSize: 2,
   editorIndentTabs: false,
   editorWhitespace: 'all',
+  editorIndentGuides: true,
   editorWordWrap: false,
   editorLineNumbers: true,
   editorFolding: true,

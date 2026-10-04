@@ -114,6 +114,7 @@ type Toggle =
   | 'forceAnimations'
   | 'editorWordWrap'
   | 'editorMinimap'
+  | 'editorIndentGuides'
 const setting =
   <K extends Toggle>(key: K) =>
   (): boolean =>
@@ -591,6 +592,13 @@ const allCommands: Command[] = [
     checked: () => useSettings.getState().editorWhitespace !== 'none',
     run: () =>
       setSetting('editorWhitespace', useSettings.getState().editorWhitespace === 'none' ? 'all' : 'none')
+  },
+  {
+    id: 'view.indentGuides',
+    title: 'Indentation guides',
+    category: 'View',
+    checked: setting('editorIndentGuides'),
+    run: toggle('editorIndentGuides')
   },
   {
     id: 'view.themeSystem',

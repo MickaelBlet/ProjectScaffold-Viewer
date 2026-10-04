@@ -65,6 +65,14 @@ const theme = EditorView.theme({
     backgroundImage: 'radial-gradient(circle at 50% 55%, var(--border) 15%, transparent 5%)'
   },
   '.cm-highlightTab': { color: 'var(--border)' },
+  // Columns from `indentGuides.ts`: a 1px line every `--indent-width` columns over `--indent-columns`.
+  '.cm-indentGuides': {
+    backgroundImage:
+      'repeating-linear-gradient(to right, var(--border) 0 1px, transparent 1px calc(var(--indent-width) * 1ch))',
+    backgroundSize: 'calc(var(--indent-columns) * 1ch) 100%',
+    backgroundRepeat: 'no-repeat',
+    backgroundOrigin: 'content-box'
+  },
   '.cm-tooltip': {
     color: 'var(--text)',
     backgroundColor: 'var(--panel)',
