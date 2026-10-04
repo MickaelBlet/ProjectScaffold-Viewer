@@ -1,9 +1,16 @@
 // Liquid syntax with whitespace-control end tags in raw blocks: @codemirror/lang-liquid 6.3.3 misses
 // `{%- endcomment %}` / `{%- endraw %}` (its raw tokenizers skip no dash), so the block runs to the end
 // of the file. Its comment and raw tokenizers are replaced by ones that accept the dash.
+// Its delimiters and punctuation get tags of their own, to tell them from the generated code's.
 import { LanguageSupport, LRLanguage } from '@codemirror/language'
 import { liquid } from '@codemirror/lang-liquid'
+import { styleTags, Tag } from '@lezer/highlight'
 import { ExternalTokenizer } from '@lezer/lr'
+
+/** `{% %} {{ }}` of Liquid. */
+export const liquidDelimiter = Tag.define()
+/** Filter pipes, separators, brackets inside Liquid tags and outputs. */
+export const liquidPunctuation = Tag.define()
 
 // Terms of the generated lang-liquid parser.
 const endrawTagStart = 4
@@ -44,7 +51,7 @@ function rawTokenizer(endTag: string, text: number, tagStart: number): ExternalT
 const comment = rawTokenizer('endcomment', commentText, endcommentTagStart)
 const raw = rawTokenizer('endraw', rawText, endrawTagStart)
 
-/** `liquid()` with the fixed raw tokenizers. */
+/** `liquid()` with the fixed raw tokenizers and its own delimiter tags. */
 export function fixedLiquid(config: Parameters<typeof liquid>[0]): LanguageSupport {
   const support = liquid(config)
   const lang = support.language as LRLanguage
@@ -56,6 +63,12 @@ export function fixedLiquid(config: Parameters<typeof liquid>[0]): LanguageSuppo
     tokenizers: [
       { from: oldRaw, to: raw },
       { from: oldComment, to: comment }
+    ],
+    props: [
+      styleTags({
+        '{% %} {{ }}': liquidDelimiter,
+        '| : , .. . ( ) [ ]': liquidPunctuation
+      })
     ]
   })
   return new LanguageSupport(fixed, support.support)

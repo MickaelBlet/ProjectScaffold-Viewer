@@ -22,6 +22,7 @@
   --syn-key: #2757c7;
   --syn-string: #2b7a3f;
   --syn-literal: #b0480b;
+  --syn-liquid: #8a3fc7;
   --scrollbar-thumb: color-mix(in srgb, var(--text) 16%, transparent);
   --scrollbar-thumb-hover: color-mix(in srgb, var(--text) 32%, transparent);
   color-scheme: light;
@@ -47,6 +48,7 @@
     --syn-key: #82aaff;
     --syn-string: #9ccc7a;
     --syn-literal: #f0a45d;
+    --syn-liquid: #c792ea;
     color-scheme: dark;
   }
 }
@@ -70,6 +72,7 @@
   --syn-key: #82aaff;
   --syn-string: #9ccc7a;
   --syn-literal: #f0a45d;
+  --syn-liquid: #c792ea;
   color-scheme: dark;
 }
 /* VS Code, theme "VS Code": the colors of its color theme (variables it gives its webviews), the
@@ -94,6 +97,7 @@
   --syn-key: var(--vscode-debugTokenExpression-name, var(--vscode-symbolIcon-propertyForeground));
   --syn-string: var(--vscode-debugTokenExpression-string, var(--vscode-charts-green));
   --syn-literal: var(--vscode-debugTokenExpression-number, var(--vscode-charts-orange));
+  --syn-liquid: var(--vscode-charts-purple, #c792ea);
   --scrollbar-thumb: var(--vscode-scrollbarSlider-background, color-mix(in srgb, var(--text) 16%, transparent));
   --scrollbar-thumb-hover: var(
     --vscode-scrollbarSlider-hoverBackground,
