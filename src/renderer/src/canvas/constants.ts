@@ -11,7 +11,7 @@ export const MODULE_HANDLE = 'module'
 /**
  * Stacking of the canvas (zIndexMode manual): links above containers, so they show inside them,
  * but below the other modules, so the names of their ports stay readable over the links. The port
- * names of containers are drawn apart, above the links (`label`).
+ * names of containers are drawn apart, above the links (`label`). Link badges sit with their link.
  */
 export const Z = { frame: -1, container: 0, link: 500, label: 550, module: 600, note: 700 } as const
 

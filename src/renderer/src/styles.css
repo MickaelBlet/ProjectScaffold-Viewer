@@ -1675,7 +1675,6 @@ ul.plain {
   display: flex;
   gap: 3px;
   cursor: pointer;
-  z-index: 1001;
 }
 /* Hand-set link shape (selected link): drag the line to bend it, the handles to move bends and ends. */
 .route-grab {
