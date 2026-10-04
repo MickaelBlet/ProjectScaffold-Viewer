@@ -78,6 +78,7 @@ import { ExternalNode } from './ExternalNode'
 import { ImportedNode } from './ImportedNode'
 import { LinkEdge } from './LinkEdge'
 import { InheritEdge } from './InheritEdge'
+import { compactSvg } from './compactSvg'
 
 const nodeTypes = { module: ModuleNode, note: NoteNode, external: ExternalNode, imported: ImportedNode }
 const edgeTypes = { link: LinkEdge, inherit: InheritEdge }
@@ -339,7 +340,7 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
               transform: `translate(${vp.x}px, ${vp.y}px) scale(${vp.zoom})`
             }
           }
-          const url = format === 'png' ? await toPng(el, options) : await toSvg(el, options)
+          const url = format === 'png' ? await toPng(el, options) : compactSvg(await toSvg(el, options))
           const doc = activeDoc()
           const base = doc.filePath
             ? fileName(doc.filePath).replace(/\.[^.]+$/, '')
