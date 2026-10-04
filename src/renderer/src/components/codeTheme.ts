@@ -27,6 +27,7 @@ const theme = EditorView.theme({
   '.cm-selectionMatch': { backgroundColor: 'color-mix(in srgb, var(--accent) 16%, transparent)' },
   '.cm-matchingBracket, &.cm-focused .cm-matchingBracket': {
     backgroundColor: 'color-mix(in srgb, var(--accent) 22%, transparent)',
+    boxShadow: 'inset 0 0 0 1px color-mix(in srgb, var(--accent) 70%, transparent)',
     outline: 'none'
   },
   '.cm-gutters': {
