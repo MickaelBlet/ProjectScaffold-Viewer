@@ -25,7 +25,7 @@ import { useProjectStore } from './store/project'
 import { useTextFiles } from './store/textFiles'
 import { useUiStore } from './store/ui'
 import { Icon } from '@/components/Icon'
-import { COMPACT, FIRST_SIDE_TAB, FULL_LAYOUT, IN_DIAGRAM, IN_PANEL, IN_VSCODE } from './host'
+import { FIRST_SIDE_TAB, FULL_LAYOUT, IN_DIAGRAM, IN_PANEL, IN_VSCODE } from './host'
 import { storage } from './storage'
 import {
   installSelectionSync,
@@ -34,7 +34,6 @@ import {
   runDiagramAction,
   showDiagramView
 } from './actions'
-import { toggleTool } from './shell/controllers'
 import { showTauriWindow } from './tauriDesktop'
 import { ExplorerPanel } from './panels/ExplorerPanel'
 import { GenerationPanel } from './panels/GenerationPanel'
@@ -250,29 +249,24 @@ export function App(): ReactNode {
     <div className="app">
       {/* Moves the Tauri window; its buttons and menus stay clickable. */}
       <header className="toolbar" data-tauri-drag-region="deep">
-        {/* The preview is compact: VS Code has the file commands, its palette the others. */}
-        {!COMPACT && (
-          <>
-            <svg className="brand" viewBox="0 0 32 32" role="img" aria-label="ProjectScaffold">
-              <title>ProjectScaffold</title>
-              <rect width="32" height="32" rx="7" fill="#3b6fe0" />
-              <path
-                d="M15 10h7v8"
-                fill="none"
-                stroke="#fff"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <rect x="5" y="5" width="10" height="10" rx="2" fill="#fff" />
-              <rect x="17" y="17" width="10" height="10" rx="2" fill="#fff" />
-              <circle cx="15" cy="10" r="2" fill="#3b6fe0" stroke="#fff" strokeWidth="1.5" />
-              <circle cx="22" cy="17" r="2" fill="#3b6fe0" stroke="#fff" strokeWidth="1.5" />
-            </svg>
-            <MenuBar />
-            <span className="sep" />
-          </>
-        )}
+        <svg className="brand" viewBox="0 0 32 32" role="img" aria-label="ProjectScaffold">
+          <title>ProjectScaffold</title>
+          <rect width="32" height="32" rx="7" fill="#3b6fe0" />
+          <path
+            d="M15 10h7v8"
+            fill="none"
+            stroke="#fff"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <rect x="5" y="5" width="10" height="10" rx="2" fill="#fff" />
+          <rect x="17" y="17" width="10" height="10" rx="2" fill="#fff" />
+          <circle cx="15" cy="10" r="2" fill="#3b6fe0" stroke="#fff" strokeWidth="1.5" />
+          <circle cx="22" cy="17" r="2" fill="#3b6fe0" stroke="#fff" strokeWidth="1.5" />
+        </svg>
+        <MenuBar />
+        <span className="sep" />
         <ToolbarButton command="insert.module" title="Add module (Ctrl+M)">
           <Icon name="plus" /> Module
         </ToolbarButton>
@@ -293,11 +287,6 @@ export function App(): ReactNode {
         <ToolbarButton command="view.forward" title="Next selection (Alt+Right)">
           <Icon name="arrow-right" />
         </ToolbarButton>
-        {COMPACT && (
-          <button type="button" title="Show or hide the Inspector" onClick={() => toggleTool('inspector')}>
-            Inspector
-          </button>
-        )}
         <span className="spacer" />
         <button
           type="button"

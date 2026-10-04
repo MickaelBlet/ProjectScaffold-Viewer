@@ -5,7 +5,7 @@ import type { TextSpot } from '../../src/renderer/src/model/search'
 export type { TextSpot }
 
 /**
- * Full diagram editor in place of the text, compact preview beside it, or the ProjectScaffold side
+ * Full diagram editor in place of the text, preview beside it (the same UI), or the ProjectScaffold side
  * bar view, its tools in tabs (following the active project document).
  */
 export type WebviewMode = 'editor' | 'preview' | 'panel'
@@ -15,8 +15,7 @@ export type SidePanel = 'explorer' | 'generation'
 
 /**
  * Layout of the diagrams (full editor, preview): `integrated` puts the Explorer and Code generation in the VS
- * Code side bar (the preview compact); `full` docks every tool in the page, like the web app (setting
- * projectScaffold.editor.layout).
+ * Code side bar; `full` docks every tool in the page, like the web app (setting projectScaffold.editor.layout).
  */
 export type EditorLayout = 'integrated' | 'full'
 

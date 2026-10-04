@@ -23,7 +23,7 @@ export const vscode: VsCodeApi | null = typeof acquireVsCodeApi === 'function' ?
 
 export const IN_VSCODE = vscode !== null
 
-/** VS Code preview beside the text: compact UI, and the page's own undo history. */
+/** VS Code preview beside the text: the full editor's UI, with the page's own undo history. */
 export const IN_PREVIEW = IN_VSCODE && window.scaffoldInit?.mode === 'preview'
 
 /** VS Code side bar view: the side tools in tabs, following the active project document; the diagram
@@ -41,9 +41,6 @@ export const FULL_LAYOUT = IN_DIAGRAM && window.scaffoldInit?.layout === 'full'
 
 /** VS Code page whose Explorer and Code generation are in the VS Code side bar (not the full layout). */
 export const INTEGRATED = IN_VSCODE && !FULL_LAYOUT
-
-/** Preview in the integrated layout: no menu bar, tools opened on demand. */
-export const COMPACT = IN_PREVIEW && !FULL_LAYOUT
 
 /** Light or dark, after the VS Code color theme (class of the body). */
 export function vscodeTheme(): 'light' | 'dark' {
