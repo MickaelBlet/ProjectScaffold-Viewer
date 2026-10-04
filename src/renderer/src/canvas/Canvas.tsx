@@ -331,7 +331,6 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
           const height = Math.min(8000, Math.max(200, bounds.height + 80))
           const vp = getViewportForBounds(bounds, width, height, 0.1, 2, 0.05)
           const options = {
-            backgroundColor: getComputedStyle(document.body).backgroundColor,
             width,
             height,
             style: {
