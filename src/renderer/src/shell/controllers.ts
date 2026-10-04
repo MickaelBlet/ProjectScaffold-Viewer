@@ -88,8 +88,8 @@ export const setEditorApi = (api: DockviewApi | null): void => void (editor = ap
 export const editorApi = (): DockviewApi | null => editor
 
 export const EDITOR_AREA = 'editor-area'
-/** VS Code diagrams (full editor and preview alike) have layouts of their own: the side tools are in
- *  its side bar, but in the full layout. */
+/** VS Code previews have layouts of their own: the side tools are in its side bar, but in the full
+ *  layout. */
 const LAYOUT_KEY = FULL_LAYOUT
   ? 'project-scaffold:layout:vscode-full'
   : INTEGRATED

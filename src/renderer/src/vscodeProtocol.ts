@@ -5,19 +5,19 @@ import type { TextSpot } from '../../src/renderer/src/model/search'
 export type { TextSpot }
 
 /**
- * Full diagram editor in place of the text, preview beside it (the same UI), or the ProjectScaffold side
- * bar view, its tools in tabs (following the active project document).
+ * Diagram preview beside the text, or the ProjectScaffold side bar view, its tools in tabs (following
+ * the active project document).
  */
-export type WebviewMode = 'editor' | 'preview' | 'panel'
+export type WebviewMode = 'preview' | 'panel'
 
 /** Tools of the ProjectScaffold side bar view, in tabs. */
 export type SidePanel = 'explorer' | 'generation'
 
 /**
- * Layout of the diagrams (full editor, preview): `integrated` puts the Explorer and Code generation in the VS
- * Code side bar; `full` docks every tool in the page, like the web app (setting projectScaffold.editor.layout).
+ * Layout of the previews: `integrated` puts the Explorer and Code generation in the VS Code side bar;
+ * `full` docks every tool in the page, like the web app (setting projectScaffold.preview.layout).
  */
-export type EditorLayout = 'integrated' | 'full'
+export type PreviewLayout = 'integrated' | 'full'
 
 type DataPath = (string | number)[]
 
@@ -30,8 +30,8 @@ export interface WebviewInit {
   mode: WebviewMode
   /** Side bar view (mode `panel`): tab to show, else the one shown last. */
   panel?: SidePanel
-  /** Layout of a diagram (modes `editor` and `preview`). */
-  layout?: EditorLayout
+  /** Layout of a preview. */
+  layout?: PreviewLayout
   /** Text of the document, unsaved edits included. */
   text: string
   /** Stored preferences (settings, panel layout...), shared by all the editors. */
@@ -65,8 +65,6 @@ export type ToHost =
   /** The project changed: new text of the document (an undoable, unsaved edit). */
   | { type: 'edit'; text: string; uri: string }
   | { type: 'save' }
-  | { type: 'undo' }
-  | { type: 'redo' }
   /** The page gained or lost the keyboard focus. */
   | { type: 'focus'; focused: boolean }
   | { type: 'storage'; key: string; value: string | null }
@@ -119,7 +117,7 @@ export type ToHost =
   /** A page shows a tab of the side bar view. */
   | { type: 'showPanel'; panel: SidePanel }
   /** Switches the layout of the diagrams (they all load again). */
-  | { type: 'setLayout'; layout: EditorLayout }
+  | { type: 'setLayout'; layout: PreviewLayout }
   /** The page generated code or chose other templates: the files to list changed. */
   | { type: 'codegen' }
   /** A line of the page's Output log, for the ProjectScaffold Output channel (which adds the time). */

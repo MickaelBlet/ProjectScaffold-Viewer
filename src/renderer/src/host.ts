@@ -23,7 +23,7 @@ export const vscode: VsCodeApi | null = typeof acquireVsCodeApi === 'function' ?
 
 export const IN_VSCODE = vscode !== null
 
-/** VS Code preview beside the text: the full editor's UI, with the page's own undo history. */
+/** VS Code diagram preview beside the text, with the page's own undo history (the text has its own). */
 export const IN_PREVIEW = IN_VSCODE && window.scaffoldInit?.mode === 'preview'
 
 /** VS Code side bar view: the side tools in tabs, following the active project document; the diagram
@@ -33,11 +33,8 @@ export const IN_PANEL = IN_VSCODE && window.scaffoldInit?.mode === 'panel'
 /** Tab the side bar view shows first, else the one shown last. */
 export const FIRST_SIDE_TAB = (IN_PANEL && window.scaffoldInit?.panel) || null
 
-/** VS Code diagram: full diagram editor or preview, not a side panel. Switches between the layouts. */
-export const IN_DIAGRAM = IN_VSCODE && !IN_PANEL
-
-/** VS Code diagram in the full layout: every tool docked in the page, like the web app. */
-export const FULL_LAYOUT = IN_DIAGRAM && window.scaffoldInit?.layout === 'full'
+/** VS Code preview in the full layout: every tool docked in the page, like the web app. */
+export const FULL_LAYOUT = IN_PREVIEW && window.scaffoldInit?.layout === 'full'
 
 /** VS Code page whose Explorer and Code generation are in the VS Code side bar (not the full layout). */
 export const INTEGRATED = IN_VSCODE && !FULL_LAYOUT

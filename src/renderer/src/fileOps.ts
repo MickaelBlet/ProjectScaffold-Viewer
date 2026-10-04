@@ -369,7 +369,7 @@ function flush(): void {
 
 /** VS Code diagram: switches the diagrams to the other layout; they load again, showing what this
  *  one shows (its session) with the changes made here. */
-export function switchEditorLayout(): void {
+export function switchPreviewLayout(): void {
   flush()
   window.api.saveSession(currentSession())
   window.api.setLayout?.(FULL_LAYOUT ? 'integrated' : 'full')

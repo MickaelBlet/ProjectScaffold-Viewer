@@ -1,6 +1,6 @@
 import type {
   DiagramAction,
-  EditorLayout,
+  PreviewLayout,
   LogLevel,
   SidePanel,
   TextSpot,
@@ -127,12 +127,10 @@ export interface Api {
    */
   templateDir?(request: TemplateDirRequest): Promise<OutputDir | null>
 
-  // VS Code only: the page edits one document whose text, undo history and file VS Code owns.
+  // VS Code only: the page edits one document whose text and file VS Code owns (the page keeps its
+  // own undo history: VS Code's applies to the text beside).
   /** Writes the project's new content to the document text, as an unsaved edit. */
   updateText?(content: string): void
-  /** Undo / redo of the document text; they replace the page's own history. */
-  undo?(): void
-  redo?(): void
   /** Reads a project file next to the document; null when it cannot be read. */
   readSibling?(file: string): Promise<string | null>
   /** Reads a file by absolute path (files an imported IDL file includes); null when unreadable. */
@@ -159,8 +157,8 @@ export interface Api {
   codegenChanged?(): void
   /** Another page of the document generated code or chose other templates. */
   onCodegen?(cb: () => void): () => void
-  /** Full diagram editor: switches the layout of the full diagram editors, which load again. */
-  setLayout?(layout: EditorLayout): void
+  /** Preview: switches the layout of the previews, which load again. */
+  setLayout?(layout: PreviewLayout): void
   /** Diagram: shows another view, for the side panels. */
   viewChanged?(view: ViewRef): void
   /** Diagram: actions asked by the side panels. */

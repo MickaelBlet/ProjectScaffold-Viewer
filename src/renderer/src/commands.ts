@@ -44,7 +44,7 @@ import {
   saveWorkspace,
   importSettings,
   exportSettings,
-  switchEditorLayout
+  switchPreviewLayout
 } from './fileOps'
 import { chooseTemplates, generateCode } from './generateCode'
 import { focusedEditorHistory, setPassedKeys } from './components/CodeEditor'
@@ -64,7 +64,7 @@ import {
   type ToolId
 } from './shell/controllers'
 import { GLOBAL_VIEW } from './model/types'
-import { FULL_LAYOUT, IN_DIAGRAM, IN_PANEL, IN_PREVIEW, IN_VSCODE } from './host'
+import { FULL_LAYOUT, IN_PREVIEW, IN_VSCODE } from './host'
 
 export type Category = 'File' | 'Edit' | 'Insert' | 'View' | 'Arrange' | 'Window' | 'Help'
 
@@ -93,9 +93,6 @@ export function isEditable(el: Element | null): boolean {
   )
 }
 
-// VS Code undoes the document text, which replaces the page's own history.
-const undoModel = (): void => (window.api.undo ? window.api.undo() : undo())
-const redoModel = (): void => (window.api.redo ? window.api.redo() : redo())
 
 const hasSelection = (): boolean => selectedIds().length > 0
 const multi = (n: number) => (): boolean => selectedIds().length >= n
@@ -253,7 +250,7 @@ const allCommands: Command[] = [
     // Inside a text field, undo the typing instead of the model.
     run: () =>
       focusedEditorHistory('undo') ||
-      (isEditable(document.activeElement) ? document.execCommand('undo') : undoModel())
+      (isEditable(document.activeElement) ? document.execCommand('undo') : undo())
   },
   {
     id: 'edit.redo',
@@ -263,7 +260,7 @@ const allCommands: Command[] = [
     global: true,
     run: () =>
       focusedEditorHistory('redo') ||
-      (isEditable(document.activeElement) ? document.execCommand('redo') : redoModel())
+      (isEditable(document.activeElement) ? document.execCommand('redo') : redo())
   },
   // Ctrl+X / C / V go through the clipboard events (see installClipboard); listed for menus.
   {
@@ -722,7 +719,7 @@ const allCommands: Command[] = [
     title: 'Full layout',
     category: 'Window',
     checked: () => FULL_LAYOUT,
-    run: switchEditorLayout
+    run: switchPreviewLayout
   },
   ...docCommands,
 
@@ -766,7 +763,7 @@ const DOCUMENT_COMMANDS = new Set([
   'help.resetData'
 ])
 
-/** The VS Code diagrams (full editor, preview) switch between their layouts. */
+/** The VS Code previews switch between their layouts. */
 const EDITOR_COMMANDS = new Set(['window.fullLayout'])
 
 export const commands: Command[] = IN_VSCODE
@@ -774,7 +771,7 @@ export const commands: Command[] = IN_VSCODE
       (c) =>
         !DOCUMENT_COMMANDS.has(c.id) &&
         !(IN_PREVIEW && c.id === 'view.source') &&
-        (IN_DIAGRAM || !EDITOR_COMMANDS.has(c.id))
+        (IN_PREVIEW || !EDITOR_COMMANDS.has(c.id))
     )
   : allCommands.filter((c) => !EDITOR_COMMANDS.has(c.id))
 
@@ -834,8 +831,6 @@ export function installKeyboard(): () => void {
     if (e.defaultPrevented && !(IN_VSCODE && VSCODE_PREVENTED.test(key))) return false
     const c = byKey.get(key)
     if (!c) return false
-    // The full editor: VS Code runs these keys itself, on the document text.
-    if (IN_VSCODE && !IN_PREVIEW && !IN_PANEL && (c.id === 'edit.undo' || c.id === 'edit.redo')) return false
     // Clipboard shortcuts go through the copy / cut / paste events.
     if (c.id === 'edit.copy' || c.id === 'edit.cut' || c.id === 'edit.paste') return false
     if (!c.global && isEditable(document.activeElement)) return false

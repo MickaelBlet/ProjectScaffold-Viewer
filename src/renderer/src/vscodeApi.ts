@@ -14,7 +14,7 @@ import type {
 } from '../../../vscode/src/protocol'
 import type { Api, OpenResult, OutputDirRequest, Session, TemplateDirRequest } from './api'
 import type { OutputDir } from './codegen/run'
-import { FULL_LAYOUT, IN_DIAGRAM, IN_PANEL, IN_PREVIEW, vscode } from './host'
+import { FULL_LAYOUT, IN_PANEL, IN_PREVIEW, vscode } from './host'
 import { storageChanged } from './storage'
 
 const post = (msg: ToHost): void => vscode!.postMessage(msg)
@@ -191,10 +191,6 @@ const vscodeApi: Api = {
   loadSession: () => Promise.resolve(IN_PANEL ? null : ((vscode!.getState() as Session | undefined) ?? null)),
   saveExport: (name, dataUrl) => request((id) => ({ type: 'export', id, name, ...dataUrlPayload(dataUrl) })),
   updateText: (text) => post({ type: 'edit', text, uri: current.uri }),
-  // A preview or side panel has its own history: VS Code's undo applies to the focused editor, not to
-  // the text beside.
-  undo: IN_PREVIEW || IN_PANEL ? undefined : () => post({ type: 'undo' }),
-  redo: IN_PREVIEW || IN_PANEL ? undefined : () => post({ type: 'redo' }),
   selected: (path) => post({ type: 'selected', path }),
   readSibling: (file) => request((id) => ({ type: 'readSibling', id, file })),
   readFile: (path) => request((id) => ({ type: 'readFile', id, path })),
@@ -228,7 +224,7 @@ const vscodeApi: Api = {
   onAction: (cb) => listen(actionListeners, cb),
   showPanel: (panel) => post({ type: 'showPanel', panel }),
   onShowPanel: (cb) => listen(showPanelListeners, cb),
-  setLayout: IN_DIAGRAM ? (layout) => post({ type: 'setLayout', layout }) : undefined,
+  setLayout: IN_PREVIEW ? (layout) => post({ type: 'setLayout', layout }) : undefined,
   log: (level, text) => post({ type: 'log', level, text }),
   // Side panels list the files; their Generate runs in the diagram (see generateCode).
   outputDir,

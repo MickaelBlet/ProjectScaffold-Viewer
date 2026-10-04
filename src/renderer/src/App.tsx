@@ -25,7 +25,7 @@ import { useProjectStore } from './store/project'
 import { useTextFiles } from './store/textFiles'
 import { useUiStore } from './store/ui'
 import { Icon } from '@/components/Icon'
-import { FIRST_SIDE_TAB, FULL_LAYOUT, IN_DIAGRAM, IN_PANEL, IN_VSCODE } from './host'
+import { FIRST_SIDE_TAB, FULL_LAYOUT, IN_PANEL, IN_PREVIEW, IN_VSCODE } from './host'
 import { storage } from './storage'
 import {
   installSelectionSync,
@@ -298,7 +298,7 @@ export function App(): ReactNode {
         </button>
         <span className="spacer" />
         {/* VS Code: tools in its side bar, or all of them in the page. */}
-        {IN_DIAGRAM && (
+        {IN_PREVIEW && (
           <ToolbarButton
             command="window.fullLayout"
             title={

@@ -140,7 +140,7 @@ const MENUS: [Category, string[]][] = [
   ['Help', ['help.shortcuts', 'view.palette', '-', 'help.resetData', '-', 'help.about']]
 ]
 
-// Every listed command must exist (but those of the VS Code full editor).
+// Every listed command must exist (but those of the VS Code previews).
 if (!IN_VSCODE)
   for (const [, ids] of MENUS)
     for (const id of ids)
