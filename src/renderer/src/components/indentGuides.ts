@@ -1,7 +1,8 @@
 // Indentation guides of the code editors, like VS Code's: a vertical line at each indentation level in
 // the leading whitespace of the lines, blank lines taking the indentation of the next line with text.
-// Drawn as the line's background (`.cm-indentGuides` in `codeTheme.ts`), so the text and caret are untouched.
-import { countColumn, RangeSetBuilder, type EditorState } from '@codemirror/state'
+// The guide of the block of the caret is highlighted. Drawn as the line's background (`.cm-indentGuides`
+// in `codeTheme.ts`), so the text and caret are untouched.
+import { countColumn, RangeSetBuilder, type EditorState, type Text } from '@codemirror/state'
 import {
   Decoration,
   ViewPlugin,
@@ -52,22 +53,78 @@ function indentWidth(state: EditorState): number {
 
 const decorations = new Map<string, Decoration>()
 
-function guidesOf(columns: number, width: number): Decoration {
-  const key = `${columns}:${width}`
+/** Guides over `columns`, the one at column `active` (when not -1) highlighted. */
+function guidesOf(columns: number, width: number, active: number): Decoration {
+  const key = `${columns}:${width}:${active}`
   let deco = decorations.get(key)
   if (!deco) {
-    deco = Decoration.line({
-      class: 'cm-indentGuides',
-      attributes: { style: `--indent-columns: ${columns}; --indent-width: ${width}` }
-    })
+    deco = Decoration.line(
+      active < 0
+        ? {
+            class: 'cm-indentGuides',
+            attributes: { style: `--indent-columns: ${columns}; --indent-width: ${width}` }
+          }
+        : {
+            class: 'cm-indentGuides cm-indentGuides-active',
+            attributes: {
+              style: `--indent-columns: ${columns}; --indent-width: ${width}; --indent-active: ${active}`
+            }
+          }
+    )
     decorations.set(key, deco)
   }
   return deco
 }
 
+/** Columns of the indentation of line `n`; a blank line takes the next line with text's. */
+function lineIndent(doc: Text, n: number, tabSize: number): number {
+  const last = Math.min(doc.lines, n + BLANK_LOOKAHEAD)
+  for (let i = n; i <= last; i++) {
+    const col = indentOf(doc.line(i).text, tabSize)
+    if (col >= 0) return col
+  }
+  return 0
+}
+
+/** Lines `from`-`to` of the block of the caret, its guide at `column`. */
+interface ActiveBlock {
+  from: number
+  to: number
+  column: number
+}
+
+/**
+ * Block of the main caret, as VS Code's active guide: the lines below a line opening a block (followed by
+ * a more indented one), else the lines around the caret more indented than its innermost guide. Only
+ * searched up to lines `top`-`bottom` (in view).
+ */
+function activeBlock(state: EditorState, width: number, top: number, bottom: number): ActiveBlock | null {
+  const { doc, tabSize } = state
+  const caret = doc.lineAt(state.selection.main.head).number
+  const indent = lineIndent(doc, caret, tabSize)
+  const opens =
+    caret < doc.lines &&
+    indentOf(doc.line(caret).text, tabSize) >= 0 &&
+    lineIndent(doc, caret + 1, tabSize) > indent
+  if (!opens && indent === 0) return null
+  const column = opens ? indent : (Math.ceil(indent / width) - 1) * width
+  let from = opens ? caret + 1 : caret
+  let to = from
+  while (from > top && from > 1 && lineIndent(doc, from - 1, tabSize) > column) from--
+  while (to < bottom && to < doc.lines && lineIndent(doc, to + 1, tabSize) > column) to++
+  return { from, to, column }
+}
+
 function guides(view: EditorView, width: number): DecorationSet {
   const { doc, tabSize } = view.state
   const builder = new RangeSetBuilder<Decoration>()
+  const { viewport } = view
+  const active = activeBlock(
+    view.state,
+    width,
+    doc.lineAt(viewport.from).number,
+    doc.lineAt(viewport.to).number
+  )
   let last = 0
   // Indentation taken by blank lines up to line `blankUntil`.
   let blankIndent = 0
@@ -95,7 +152,9 @@ function guides(view: EditorView, width: number): DecorationSet {
         col = blankIndent
       }
       const levels = Math.ceil(col / width)
-      if (levels > 0) builder.add(line.from, line.from, guidesOf(levels * width, width))
+      if (levels === 0) continue
+      const inBlock = active !== null && line.number >= active.from && line.number <= active.to
+      builder.add(line.from, line.from, guidesOf(levels * width, width, inBlock ? active.column : -1))
     }
   }
   return builder.finish()
@@ -114,7 +173,8 @@ const indentGuidesPlugin = ViewPlugin.fromClass(
     update(u: ViewUpdate): void {
       const tabSize = u.state.tabSize !== u.startState.tabSize
       if (u.docChanged || tabSize) this.width = indentWidth(u.state)
-      if (u.docChanged || tabSize || u.viewportChanged) this.decorations = guides(u.view, this.width)
+      if (u.docChanged || tabSize || u.viewportChanged || u.selectionSet)
+        this.decorations = guides(u.view, this.width)
     }
   },
   { decorations: (v) => v.decorations }

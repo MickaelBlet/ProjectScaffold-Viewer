@@ -7,6 +7,10 @@ import { liquidDelimiter, liquidPunctuation } from './liquidSyntax'
 
 const MONO = "ui-monospace, 'SF Mono', Consolas, monospace"
 
+/** A 1px line every `--indent-width` columns. */
+const INDENT_GUIDES =
+  'repeating-linear-gradient(to right, var(--border) 0 1px, transparent 1px calc(var(--indent-width) * 1ch))'
+
 const theme = EditorView.theme({
   '&': {
     height: '100%',
@@ -67,9 +71,16 @@ const theme = EditorView.theme({
   '.cm-highlightTab': { color: 'var(--border)' },
   // Columns from `indentGuides.ts`: a 1px line every `--indent-width` columns over `--indent-columns`.
   '.cm-indentGuides': {
-    backgroundImage:
-      'repeating-linear-gradient(to right, var(--border) 0 1px, transparent 1px calc(var(--indent-width) * 1ch))',
+    backgroundImage: INDENT_GUIDES,
     backgroundSize: 'calc(var(--indent-columns) * 1ch) 100%',
+    backgroundRepeat: 'no-repeat',
+    backgroundOrigin: 'content-box'
+  },
+  // The guide at column `--indent-active` (block of the caret) over the others.
+  '.cm-indentGuides.cm-indentGuides-active': {
+    backgroundImage: `linear-gradient(var(--muted), var(--muted)), ${INDENT_GUIDES}`,
+    backgroundSize: '1px 100%, calc(var(--indent-columns) * 1ch) 100%',
+    backgroundPosition: 'calc(var(--indent-active) * 1ch) 0, 0 0',
     backgroundRepeat: 'no-repeat',
     backgroundOrigin: 'content-box'
   },

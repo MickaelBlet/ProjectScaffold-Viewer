@@ -469,10 +469,10 @@ button.link-button:hover {
   text-decoration: underline;
 }
 .code-editor .cm-userSection {
-  background: color-mix(in srgb, var(--ok) 9%, transparent);
+  background-color: color-mix(in srgb, var(--ok) 9%, transparent);
 }
 .code-editor .cm-userMarker {
-  background: color-mix(in srgb, var(--ok) 16%, transparent);
+  background-color: color-mix(in srgb, var(--ok) 16%, transparent);
 }
 /* Explorer and Code generation panel: the filter stays on top, the sections scroll under it. Sections there
    have no box of their own, so every header sticks in the whole list: always in view, stacked at its top
