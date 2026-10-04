@@ -8,8 +8,11 @@ const PATHS = {
   dot: 'M8 5a3 3 0 1 0 0 6 3 3 0 1 0 0-6z',
   'chevron-right': 'M6 4l4 4-4 4',
   'chevron-down': 'M4 6l4 4 4-4',
+  menu: 'M2.5 4h11M2.5 8h11M2.5 12h11',
   'arrow-left': 'M13 8H3M7 4 3 8l4 4',
   'arrow-right': 'M3 8h10M9 4l4 4-4 4',
+  'selection-prev': 'M1 3h10v10h-10zM15 8H6M9 5 6 8l3 3',
+  'selection-next': 'M5 3h10v10h-10zM1 8h8M7 5l3 3-3 3',
   'arrow-left-right': 'M2 8h12M5 5 2 8l3 3M11 5l3 3-3 3',
   'arrow-up': 'M8 13V3M4 7l4-4 4 4',
   'arrow-down': 'M8 3v10M4 9l4 4 4-4',
@@ -32,7 +35,6 @@ const PATHS = {
     'M2 2l12 12M6.5 3.7A6 6 0 0 1 8 3.5c4 0 6.5 4.5 6.5 4.5a11 11 0 0 1-1.6 2.1M11 11.6a6 6 0 0 1-3 .9C4 12.5 1.5 8 1.5 8a11 11 0 0 1 2.7-3.2M6.6 6.6a2 2 0 0 0 2.8 2.8',
   view: 'M8 2.5 13.5 8 8 13.5 2.5 8z',
   globe: 'M8 2a6 6 0 1 0 0 12A6 6 0 1 0 8 2zM2 8h12M8 2c-2 2-2 10 0 12M8 2c2 2 2 10 0 12',
-  arrange: 'M3 3h4v4H3zM9 3h4v4H9zM3 9h4v4H3zM9 9h4v4H9z',
   grid: 'M6 2v12M10 2v12M2 6h12M2 10h12',
   search: 'M7 2.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 1 0 0-9zM10.3 10.3 13.5 13.5',
   info: 'M8 2a6 6 0 1 0 0 12A6 6 0 1 0 8 2zM8 7.5v4M8 5h.01',
@@ -57,8 +59,7 @@ const PATHS = {
   'same-size': 'M2.5 2.5h5v5h-5zM8.5 8.5h5v5h-5z',
   minimize: 'M3 8h10',
   maximize: 'M3.5 3.5h9v9h-9z',
-  restore: 'M3.5 5.5h7v7h-7zM5.5 5.5v-2h7v7h-2',
-  layout: 'M2.5 3h11v10h-11zM6 3v10M6 9.5h7.5'
+  restore: 'M3.5 5.5h7v7h-7zM5.5 5.5v-2h7v7h-2'
 } as const
 
 export type IconName = keyof typeof PATHS

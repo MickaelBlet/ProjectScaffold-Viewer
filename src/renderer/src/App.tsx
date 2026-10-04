@@ -25,7 +25,7 @@ import { useProjectStore } from './store/project'
 import { useTextFiles } from './store/textFiles'
 import { useUiStore } from './store/ui'
 import { Icon } from '@/components/Icon'
-import { FIRST_SIDE_TAB, FULL_LAYOUT, IN_PANEL, IN_PREVIEW, IN_VSCODE } from './host'
+import { FIRST_SIDE_TAB, IN_PANEL, IN_VSCODE } from './host'
 import { storage } from './storage'
 import {
   installSelectionSync,
@@ -267,13 +267,6 @@ export function App(): ReactNode {
         </svg>
         <MenuBar />
         <span className="sep" />
-        <ToolbarButton command="insert.module" title="Add module (Ctrl+M)">
-          <Icon name="plus" /> Module
-        </ToolbarButton>
-        <ToolbarButton command="arrange.auto" title="Auto-arrange (Ctrl+Alt+L)">
-          <Icon name="arrange" /> Arrange
-        </ToolbarButton>
-        <span className="sep" />
         <ToolbarButton command="edit.undo" title="Undo (Ctrl+Z)">
           <Icon name="undo" />
         </ToolbarButton>
@@ -282,10 +275,10 @@ export function App(): ReactNode {
         </ToolbarButton>
         <span className="sep" />
         <ToolbarButton command="view.back" title="Previous selection (Alt+Left)">
-          <Icon name="arrow-left" />
+          <Icon name="selection-prev" />
         </ToolbarButton>
         <ToolbarButton command="view.forward" title="Next selection (Alt+Right)">
-          <Icon name="arrow-right" />
+          <Icon name="selection-next" />
         </ToolbarButton>
         <span className="spacer" />
         <button
@@ -297,19 +290,6 @@ export function App(): ReactNode {
           Go to… <kbd>Ctrl+P</kbd>
         </button>
         <span className="spacer" />
-        {/* VS Code: tools in its side bar, or all of them in the page. */}
-        {IN_PREVIEW && (
-          <ToolbarButton
-            command="window.fullLayout"
-            title={
-              FULL_LAYOUT
-                ? 'Integrated layout: Explorer and Code generation in the VS Code side bar'
-                : 'Full layout: every tool in the editor, like the web app'
-            }
-          >
-            <Icon name="layout" /> {FULL_LAYOUT ? 'Integrated' : 'Full'}
-          </ToolbarButton>
-        )}
         <WindowControls />
       </header>
       <DockShell />
