@@ -1,5 +1,5 @@
-// Shrinks the SVG of a diagram export: html-to-image copies every computed style property onto
-// every element; the ones the element would get anyway are left out.
+// Finishes the SVG of a diagram export: html-to-image copies every computed style property onto
+// every element but those of SVG drawings; the ones an element would get anyway are left out.
 
 const SVG_PREFIX = 'data:image/svg+xml;charset=utf-8,'
 
@@ -47,8 +47,36 @@ function compact(el: Element, probe: Element): void {
     compact(child, probe.appendChild(probe.ownerDocument.importNode(child, false)))
 }
 
-/** The `data:` URL of a diagram exported by html-to-image `toSvg`, smaller. */
-export function compactSvg(url: string): string {
+/** The SVG drawings in `root`, not those inside them. */
+function drawings(root: Element): Element[] {
+  return [...root.querySelectorAll('svg')].filter((svg) => {
+    const outer = svg.parentElement?.closest('svg')
+    return !outer || !root.contains(outer)
+  })
+}
+
+/**
+ * html-to-image copies the SVG drawings as they are, without the style the page's style sheets
+ * give their elements: copies the computed style of the elements of `source` onto their copies.
+ */
+function styleDrawings(content: Element, source: Element): void {
+  const live = drawings(source)
+  drawings(content).forEach((svg, i) => {
+    const from = live[i] ? [...live[i].querySelectorAll('*')] : []
+    const to = [...svg.querySelectorAll('*')]
+    if (from.length !== to.length || from.some((el, j) => el.localName !== to[j]?.localName)) return
+    from.forEach((el, j) => {
+      const computed = getComputedStyle(el)
+      const style = (to[j] as SVGElement).style
+      // Computed values have their variables resolved.
+      for (const name of computed)
+        if (!name.startsWith('--')) style.setProperty(name, computed.getPropertyValue(name))
+    })
+  })
+}
+
+/** The `data:` URL of `source` exported by html-to-image `toSvg`, styled and smaller. */
+export function compactSvg(url: string, source: Element): string {
   if (!url.startsWith(SVG_PREFIX)) return url
   const doc = new DOMParser().parseFromString(
     decodeURIComponent(url.slice(SVG_PREFIX.length)),
@@ -60,6 +88,7 @@ export function compactSvg(url: string): string {
   const frame = document.createElement('iframe')
   frame.style.cssText = 'position: fixed; left: -10000px; width: 10px; height: 10px; border: 0'
   document.body.appendChild(frame)
+  styleDrawings(content, source)
   try {
     const copy = frame.contentDocument!
     // Inherits the initial values, as the content of the foreignObject does.
@@ -70,4 +99,18 @@ export function compactSvg(url: string): string {
     frame.remove()
   }
   return SVG_PREFIX + encodeURIComponent(new XMLSerializer().serializeToString(doc))
+}
+
+/** The `data:` URL of a PNG drawing the SVG `url` of `width` × `height`, at the screen's resolution. */
+export async function svgToPng(url: string, width: number, height: number): Promise<string> {
+  const img = new Image()
+  img.src = url
+  await img.decode()
+  const canvas = document.createElement('canvas')
+  // Canvases are limited to 16384 pixels a side.
+  const ratio = Math.min(window.devicePixelRatio || 1, 16384 / Math.max(width, height))
+  canvas.width = Math.round(width * ratio)
+  canvas.height = Math.round(height * ratio)
+  canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height)
+  return canvas.toDataURL('image/png')
 }

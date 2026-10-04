@@ -20,7 +20,7 @@ import {
   type Viewport
 } from '@xyflow/react'
 import { useShallow } from 'zustand/react/shallow'
-import { toPng, toSvg } from 'html-to-image'
+import { toSvg } from 'html-to-image'
 import {
   findImported,
   findView,
@@ -78,7 +78,7 @@ import { ExternalNode } from './ExternalNode'
 import { ImportedNode } from './ImportedNode'
 import { LinkEdge } from './LinkEdge'
 import { InheritEdge } from './InheritEdge'
-import { compactSvg } from './compactSvg'
+import { compactSvg, svgToPng } from './exportImage'
 
 const nodeTypes = { module: ModuleNode, note: NoteNode, external: ExternalNode, imported: ImportedNode }
 const edgeTypes = { link: LinkEdge, inherit: InheritEdge }
@@ -340,7 +340,8 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
               transform: `translate(${vp.x}px, ${vp.y}px) scale(${vp.zoom})`
             }
           }
-          const url = format === 'png' ? await toPng(el, options) : compactSvg(await toSvg(el, options))
+          const svg = compactSvg(await toSvg(el, options), el)
+          const url = format === 'png' ? await svgToPng(svg, width, height) : svg
           const doc = activeDoc()
           const base = doc.filePath
             ? fileName(doc.filePath).replace(/\.[^.]+$/, '')
@@ -627,7 +628,10 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
     if (node.id.startsWith(EXTERNAL)) {
       const id = node.id.slice(EXTERNAL.length)
       return openContextMenu(e, [
-        { label: 'Show in project view', run: () => (openView(GLOBAL_VIEW), navigate({ kind: 'module', id })) }
+        {
+          label: 'Show in project view',
+          run: () => (openView(GLOBAL_VIEW), navigate({ kind: 'module', id }))
+        }
       ])
     }
     if (!activeDoc().selectedIds.includes(node.id)) select(selectionOf(getProject(), node.id))
