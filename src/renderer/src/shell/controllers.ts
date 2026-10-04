@@ -100,12 +100,12 @@ const LAYOUT_KEY = COMPACT
         : 'project-scaffold:layout'
 
 /** Tools of the VS Code side bar (see vscode/package.json). */
-const SIDE_TOOLS = new Set<ToolId>(['explorer', 'generation', 'settings'])
+const SIDE_TOOLS = new Set<ToolId>(['explorer', 'generation'])
 const inSideBar = (id: ToolId): id is SidePanel => INTEGRATED && SIDE_TOOLS.has(id)
 
 /**
- * Tool panels around the editor area. In VS Code: only the Inspector (the side tools are in its side
- * bar), none in the compact preview (tools open on demand), all of them in the full layout.
+ * Tool panels around the editor area. In VS Code: the Inspector and Settings (the side tools are in its
+ * side bar), none in the compact preview (tools open on demand), all of them in the full layout.
  */
 export function buildDefaultLayout(api: DockviewApi): void {
   api.clear()
@@ -118,6 +118,13 @@ export function buildDefaultLayout(api: DockviewApi): void {
       title: TOOL_TITLES.inspector,
       initialWidth: TOOL_SIZES.inspector,
       position: { referencePanel: EDITOR_AREA, direction: 'right' }
+    })
+    api.addPanel({
+      id: 'settings',
+      component: 'settings',
+      title: TOOL_TITLES.settings,
+      inactive: true,
+      position: { referencePanel: 'inspector', direction: 'within' }
     })
     return lockEditorArea(api)
   }

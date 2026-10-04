@@ -11,10 +11,10 @@ export type { TextSpot }
 export type WebviewMode = 'editor' | 'preview' | 'panel'
 
 /** Tools of the ProjectScaffold side bar view, in tabs. */
-export type SidePanel = 'explorer' | 'generation' | 'settings'
+export type SidePanel = 'explorer' | 'generation'
 
 /**
- * Layout of the diagrams (full editor, preview): `integrated` puts the Explorer and Settings in the VS
+ * Layout of the diagrams (full editor, preview): `integrated` puts the Explorer and Code generation in the VS
  * Code side bar (the preview compact); `full` docks every tool in the page, like the web app (setting
  * projectScaffold.editor.layout).
  */

@@ -39,7 +39,6 @@ import { showTauriWindow } from './tauriDesktop'
 import { ExplorerPanel } from './panels/ExplorerPanel'
 import { GenerationPanel } from './panels/GenerationPanel'
 import { notifyCodegen } from './generateCode'
-import { SettingsPanel } from './panels/SettingsPanel'
 import type { SidePanel } from '../../../vscode/src/protocol'
 
 /** How often open files are checked for changes made by other programs. */
@@ -76,14 +75,12 @@ function Dialog(): ReactNode {
 
 const SIDE_PANELS: Record<SidePanel, () => ReactNode> = {
   explorer: ExplorerPanel,
-  generation: GenerationPanel,
-  settings: SettingsPanel
+  generation: GenerationPanel
 }
 
 const SIDE_TABS: [SidePanel, string][] = [
   ['explorer', 'Explorer'],
-  ['generation', 'Code generation'],
-  ['settings', 'Settings']
+  ['generation', 'Code generation']
 ]
 /** Tab of the side bar view shown last. */
 const SIDE_TAB_KEY = 'project-scaffold:side-tab'
@@ -118,7 +115,7 @@ function SidePanelView(): ReactNode {
         const Content = SIDE_PANELS[id]
         return (
           <div key={id} className="tool-panel" data-panel={id} role="tabpanel" hidden={id !== tab}>
-            {filePath || id === 'settings' ? (
+            {filePath ? (
               <Content />
             ) : (
               <p className="side-panel-empty">Open a project file (*.scaffold.yaml) to see its content here.</p>
@@ -317,7 +314,7 @@ export function App(): ReactNode {
             command="window.fullLayout"
             title={
               FULL_LAYOUT
-                ? 'Integrated layout: Explorer and Settings in the VS Code side bar'
+                ? 'Integrated layout: Explorer and Code generation in the VS Code side bar'
                 : 'Full layout: every tool in the editor, like the web app'
             }
           >

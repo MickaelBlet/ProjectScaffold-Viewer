@@ -39,7 +39,7 @@ export const IN_DIAGRAM = IN_VSCODE && !IN_PANEL
 /** VS Code diagram in the full layout: every tool docked in the page, like the web app. */
 export const FULL_LAYOUT = IN_DIAGRAM && window.scaffoldInit?.layout === 'full'
 
-/** VS Code page whose Explorer and Settings are in the VS Code side bar (not the full layout). */
+/** VS Code page whose Explorer and Code generation are in the VS Code side bar (not the full layout). */
 export const INTEGRATED = IN_VSCODE && !FULL_LAYOUT
 
 /** Preview in the integrated layout: no menu bar, tools opened on demand. */
