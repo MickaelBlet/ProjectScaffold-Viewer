@@ -11,36 +11,17 @@ import {
   type MouseEvent,
   type ReactNode
 } from 'react'
-import { generatedFiles, LOCAL_TEMPLATES } from '@/codegen/run'
-import { MANIFEST, parseManifest, templateFiles } from '@/codegen/templateSet'
 import { LANGUAGE_BADGES, languageOf } from '@/components/codeLanguages'
 import { FoldSection, placed, sectionOrder, StackedSections } from '@/components/FoldSection'
 import { Icon, type IconName } from '@/components/Icon'
 import { onListKeyDown } from '@/components/listKeys'
-import {
-  builtinTemplates,
-  canGenerate,
-  chooseTemplates,
-  codegenListeners,
-  generateCode,
-  knownOutputDir,
-  projectTemplateSet,
-  templateFolder
-} from '@/generateCode'
-import { activeDoc, useDocs, type DocState } from '@/store/documents'
+import { canGenerate, chooseTemplates, codegenListeners, generateCode } from '@/generateCode'
+import { generatedListing, templateListing, type Listing } from '@/generationFiles'
+import { activeDoc, useDocs } from '@/store/documents'
 import { useProjectStore } from '@/store/project'
 import { setSetting, useSettings } from '@/store/settings'
 import { openContextMenu } from '@/store/ui'
-import type { TextSource } from '@/store/textFiles'
 import { openTextFile } from '@/textFileOps'
-
-/** Files of a folder, opened from `source` under `prefix`. */
-interface Listing {
-  label: string
-  source: TextSource
-  prefix: string
-  files: string[]
-}
 
 /** A listing, or why it could not be read (folder access not granted yet: `retry` asks for it). */
 type Loaded = { listing: Listing | null } | { error: string }
@@ -71,44 +52,6 @@ function sectionMenu(e: MouseEvent, id: SectionId): void {
     { label: 'Move up', keys: 'Alt+Up', disabled: i <= 0, run: () => stepSection(id, -1) },
     { label: 'Move down', keys: 'Alt+Down', disabled: i >= order.length - 1, run: () => stepSection(id, 1) }
   ])
-}
-
-const sorted = (files: string[]): string[] => [MANIFEST, ...files.filter((f) => f !== MANIFEST).sort()]
-
-/** Templates generating the document: its template folder, else the output directory's, else built-in. */
-async function templateListing(doc: DocState): Promise<Listing> {
-  const folder = await templateFolder(doc)
-  if (folder) {
-    const manifest = await folder.read(MANIFEST)
-    return {
-      label: folder.label,
-      source: 'templates',
-      prefix: '',
-      files: manifest === null ? [] : sorted(templateFiles(parseManifest(manifest)))
-    }
-  }
-  const out = await knownOutputDir(doc)
-  const local = out && (await out.read(`${LOCAL_TEMPLATES}/${MANIFEST}`))
-  if (out && local)
-    return {
-      label: `${out.label}/${LOCAL_TEMPLATES}`,
-      source: 'output',
-      prefix: `${LOCAL_TEMPLATES}/`,
-      files: sorted(templateFiles(parseManifest(local)))
-    }
-  const set = projectTemplateSet(doc.store.getState().project)
-  const builtin = builtinTemplates(set).manifest
-  return {
-    label: `built-in ${builtin.name}`,
-    source: 'builtin',
-    prefix: `${set}/`,
-    files: sorted(templateFiles(builtin))
-  }
-}
-
-async function generatedListing(doc: DocState): Promise<Listing | null> {
-  const out = await knownOutputDir(doc)
-  return out && { label: out.label, source: 'output', prefix: '', files: await generatedFiles(out) }
 }
 
 async function load<T extends Listing | null>(read: () => Promise<T>): Promise<Loaded> {

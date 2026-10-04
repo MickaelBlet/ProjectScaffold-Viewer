@@ -1,14 +1,20 @@
-// Ctrl+Shift+P: commands ('>' prefix). Ctrl+P: go to a module, type, interface, link or view.
+// Ctrl+Shift+P: commands ('>' prefix). Ctrl+P: go to a module, type, interface, constant, link, dependency
+// (and the types, interfaces, constants and modules it brings), view, template or generated file.
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import { commands, keyLabel, runCommand } from '@/commands'
+import { generatedListing, templateListing, type Listing } from '@/generationFiles'
+import { formatValue } from '@/model/defaults'
 import { fuzzyFilter } from '@/model/fuzzy'
 import { modulePaths } from '@/model/project'
-import { GLOBAL_VIEW } from '@/model/types'
+import { GLOBAL_VIEW, type Id } from '@/model/types'
+import { activeDoc } from '@/store/documents'
 import { getProject } from '@/store/project'
 import { storage } from '@/storage'
 import { useUiStore, type PickEntry } from '@/store/ui'
 import { navigate } from '@/actions'
 import { openView } from '@/shell/controllers'
+import { openTextFile } from '@/textFileOps'
+import { LANGUAGE_BADGES, languageOf } from './codeLanguages'
 import { Icon } from './Icon'
 
 interface Entry extends PickEntry {
@@ -54,6 +60,10 @@ function commandEntries(): Entry[] {
 function entityEntries(): Entry[] {
   const p = getProject()
   const paths = modulePaths(p)
+  const deps = new Map(p.dependencies.map((d) => [d.id, d.name]))
+  // A dependency's entities by qualified name, so that its name finds them.
+  const named = (e: { name: string; dependency?: Id }): string =>
+    e.dependency ? `${deps.get(e.dependency) ?? '?'}.${e.name}` : e.name
   return [
     ...p.modules.map((m) => ({
       key: m.id,
@@ -64,17 +74,26 @@ function entityEntries(): Entry[] {
     })),
     ...p.types.map((t) => ({
       key: t.id,
-      label: t.name,
+      label: named(t),
       detail: t.kind,
       kind: 'T',
       run: () => navigate({ kind: 'type', id: t.id })
     })),
     ...p.interfaces.map((i) => ({
       key: i.id,
-      label: i.name,
+      label: named(i),
       detail: `interface · ${i.messages.length} messages`,
       kind: 'I',
       run: () => navigate({ kind: 'interface', id: i.id })
+    })),
+    ...p.consts.map((c) => ({
+      key: c.id,
+      label: named(c),
+      detail: `constant · ${formatValue(c.value)}`,
+      kind: 'C',
+      // A dependency's constants show with it in the Inspector.
+      run: () =>
+        navigate(c.dependency ? { kind: 'dependency', id: c.dependency } : { kind: 'const', id: c.id })
     })),
     ...p.links.map((l) => ({
       key: l.id,
@@ -83,6 +102,22 @@ function entityEntries(): Entry[] {
       kind: 'L',
       run: () => navigate({ kind: 'link', id: l.id })
     })),
+    ...p.dependencies.flatMap((d) => [
+      {
+        key: d.id,
+        label: d.name,
+        detail: `dependency · ${d.file}`,
+        kind: 'D',
+        run: () => navigate({ kind: 'dependency', id: d.id })
+      },
+      ...d.modules.map((m) => ({
+        key: m.id,
+        label: `${d.name}.${m.path}`,
+        detail: 'imported module',
+        kind: 'M',
+        run: () => navigate({ kind: 'module', id: m.id })
+      }))
+    ]),
     { key: GLOBAL_VIEW, label: 'Project', detail: 'view', kind: 'V', run: () => openView(GLOBAL_VIEW) },
     ...p.views.map((v) => ({
       key: v.id,
@@ -92,6 +127,31 @@ function entityEntries(): Entry[] {
       run: () => openView(v.id)
     }))
   ]
+}
+
+function fileEntries(listing: Listing | null, detail: string): Entry[] {
+  if (!listing) return []
+  return listing.files.map((f) => {
+    const path = listing.prefix + f
+    const { id } = languageOf(f)
+    return {
+      key: `${listing.source}:${path}`,
+      label: f,
+      detail,
+      kind: <span className={`file-badge file-${id}`}>{LANGUAGE_BADGES[id]}</span>,
+      run: () => void openTextFile({ source: listing.source, path })
+    }
+  })
+}
+
+/** Templates and generated files of the active document; none when they cannot be read. */
+async function codegenEntries(): Promise<Entry[]> {
+  const doc = activeDoc()
+  const [templates, generated] = await Promise.all([
+    templateListing(doc).catch(() => null),
+    generatedListing(doc).catch(() => null)
+  ])
+  return [...fileEntries(templates, 'template'), ...fileEntries(generated, 'generated')]
 }
 
 function Highlight({ text, positions }: { text: string; positions: number[] }): ReactNode {
@@ -118,10 +178,28 @@ export function CommandPalette(): ReactNode {
 
   const pickList = palette?.pick
   const isCommands = !pickList && query.startsWith('>')
+  // Read on each opening (the folders may have changed), listed after the entities once read.
+  const [files, setFiles] = useState<Entry[]>([])
+  const goTo = !!palette && !pickList
+  useEffect(() => {
+    if (!goTo) return
+    let current = true
+    void codegenEntries().then((e) => current && setFiles(e))
+    return () => {
+      current = false
+      setFiles([])
+    }
+  }, [goTo])
   const entries = useMemo(
     (): Entry[] =>
-      !palette ? [] : pickList ? pickList.entries : isCommands ? commandEntries() : entityEntries(),
-    [palette, pickList, isCommands]
+      !palette
+        ? []
+        : pickList
+          ? pickList.entries
+          : isCommands
+            ? commandEntries()
+            : [...entityEntries(), ...files],
+    [palette, pickList, isCommands, files]
   )
   const results = useMemo(
     () => fuzzyFilter(isCommands ? query.slice(1) : query, entries, (e) => e.label).slice(0, 60),
@@ -143,7 +221,7 @@ export function CommandPalette(): ReactNode {
     ? pickList.placeholder
     : isCommands
       ? 'Type a command'
-      : 'Go to module, type, interface, link, view — ">" for commands'
+      : 'Go to module, type, interface, constant, link, dependency, view, file — ">" for commands'
 
   return (
     <div className="palette-backdrop" onMouseDown={close}>
