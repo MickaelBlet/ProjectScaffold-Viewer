@@ -20,6 +20,7 @@
   --perf-normal: #7a8496;
   --perf-bulk: #3b8fd1;
   --syn-key: #2757c7;
+  --syn-type: var(--accent);
   --syn-string: #2b7a3f;
   --syn-literal: #b0480b;
   --syn-liquid: #8a3fc7;
@@ -187,6 +188,11 @@
   --node-label-bg: color-mix(in srgb, var(--node-bg) 70%, transparent);
   --node-container: color-mix(in srgb, var(--accent) 7%, transparent);
   --syn-key: color-mix(in srgb, var(--accent) 70%, var(--text));
+}
+/* Black: its gray accent would color keys and types as the text. */
+:root[data-theme='black'] {
+  --syn-key: #82aaff;
+  --syn-type: #4ec9b0;
 }
 /* VS Code, theme "VS Code": the colors of its color theme (variables it gives its webviews), the
    light / dark ones above as fallbacks. */

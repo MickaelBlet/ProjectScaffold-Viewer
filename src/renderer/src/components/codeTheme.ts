@@ -153,7 +153,7 @@ export const highlight = HighlightStyle.define([
     fontWeight: '600'
   },
   { tag: [t.propertyName, t.definition(t.propertyName), t.attributeName], color: 'var(--syn-key)' },
-  { tag: [t.typeName, t.className, t.namespace, t.labelName], color: 'var(--accent)' },
+  { tag: [t.typeName, t.className, t.namespace, t.labelName], color: 'var(--syn-type)' },
   { tag: [t.string, t.special(t.string), t.regexp, t.character], color: 'var(--syn-string)' },
   { tag: [t.number, t.bool, t.null, t.atom, t.literal, t.unit], color: 'var(--syn-literal)' },
   { tag: [t.processingInstruction, t.meta, t.macroName], color: 'var(--syn-literal)' },
