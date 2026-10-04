@@ -13,7 +13,7 @@ import type {
 } from '../../../vscode/src/protocol'
 import type { Api, OpenResult, OutputDirRequest, Session, TemplateDirRequest } from './api'
 import type { OutputDir } from './codegen/run'
-import { FULL_LAYOUT, IN_EDITOR, IN_PANEL, IN_PREVIEW, vscode } from './host'
+import { FULL_LAYOUT, IN_DIAGRAM, IN_PANEL, IN_PREVIEW, vscode } from './host'
 import { storageChanged } from './storage'
 
 const post = (msg: ToHost): void => vscode!.postMessage(msg)
@@ -214,7 +214,7 @@ const vscodeApi: Api = {
   viewChanged: (view) => post({ type: 'view', view }),
   onAction: (cb) => listen(actionListeners, cb),
   showPanel: (panel) => post({ type: 'showPanel', panel }),
-  setLayout: IN_EDITOR ? (layout) => post({ type: 'setLayout', layout }) : undefined,
+  setLayout: IN_DIAGRAM ? (layout) => post({ type: 'setLayout', layout }) : undefined,
   log: (level, text) => post({ type: 'log', level, text }),
   // Side panels have no Generate command.
   outputDir: IN_PANEL ? undefined : outputDir,

@@ -25,7 +25,7 @@ import { useProjectStore } from './store/project'
 import { useTextFiles } from './store/textFiles'
 import { useUiStore } from './store/ui'
 import { Icon } from '@/components/Icon'
-import { FULL_LAYOUT, IN_EDITOR, IN_PANEL, IN_PREVIEW, IN_VSCODE, SIDE_PANEL } from './host'
+import { COMPACT, FULL_LAYOUT, IN_DIAGRAM, IN_PANEL, IN_VSCODE, SIDE_PANEL } from './host'
 import {
   installSelectionSync,
   installViewSync,
@@ -216,7 +216,7 @@ export function App(): ReactNode {
       {/* Moves the Tauri window; its buttons and menus stay clickable. */}
       <header className="toolbar" data-tauri-drag-region="deep">
         {/* The preview is compact: VS Code has the file commands, its palette the others. */}
-        {!IN_PREVIEW && (
+        {!COMPACT && (
           <>
             <svg className="brand" viewBox="0 0 32 32" role="img" aria-label="ProjectScaffold">
               <title>ProjectScaffold</title>
@@ -258,7 +258,7 @@ export function App(): ReactNode {
         <ToolbarButton command="view.forward" title="Next selection (Alt+Right)">
           <Icon name="arrow-right" />
         </ToolbarButton>
-        {IN_PREVIEW && (
+        {COMPACT && (
           <button type="button" title="Show or hide the Inspector" onClick={() => toggleTool('inspector')}>
             Inspector
           </button>
@@ -274,7 +274,7 @@ export function App(): ReactNode {
         </button>
         <span className="spacer" />
         {/* VS Code: tools in its side bar, or all of them in the page. */}
-        {IN_EDITOR && (
+        {IN_DIAGRAM && (
           <ToolbarButton
             command="window.fullLayout"
             title={

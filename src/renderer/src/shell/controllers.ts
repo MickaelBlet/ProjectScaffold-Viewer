@@ -12,7 +12,7 @@ import { activeDoc, patchDoc } from '@/store/documents'
 import { getProject } from '@/store/project'
 import { storage } from '@/storage'
 import { useSettings } from '@/store/settings'
-import { FULL_LAYOUT, IN_PANEL, IN_PREVIEW, INTEGRATED } from '@/host'
+import { COMPACT, FULL_LAYOUT, IN_PANEL, IN_PREVIEW, INTEGRATED } from '@/host'
 import { sendToDiagram } from '@/fileOps'
 import { fileBaseName, type TextFileRef } from '@/store/textFiles'
 import { targetPath } from '@/model/locate'
@@ -89,13 +89,15 @@ export const editorApi = (): DockviewApi | null => editor
 
 export const EDITOR_AREA = 'editor-area'
 /** VS Code editors have layouts of their own: the side tools are in its side bar, but in the full layout. */
-const LAYOUT_KEY = IN_PREVIEW
+const LAYOUT_KEY = COMPACT
   ? 'project-scaffold:layout:preview'
-  : FULL_LAYOUT
-    ? 'project-scaffold:layout:vscode-full'
-    : INTEGRATED
-      ? 'project-scaffold:layout:vscode'
-      : 'project-scaffold:layout'
+  : IN_PREVIEW
+    ? 'project-scaffold:layout:preview-full'
+    : FULL_LAYOUT
+      ? 'project-scaffold:layout:vscode-full'
+      : INTEGRATED
+        ? 'project-scaffold:layout:vscode'
+        : 'project-scaffold:layout'
 
 /** Tools of the VS Code side bar (see vscode/package.json). */
 const SIDE_TOOLS = new Set<ToolId>(['explorer', 'settings'])
@@ -103,12 +105,12 @@ const inSideBar = (id: ToolId): id is SidePanel => INTEGRATED && SIDE_TOOLS.has(
 
 /**
  * Tool panels around the editor area. In VS Code: only the Inspector (the side tools are in its side
- * bar), none in the preview (tools open on demand), all of them in the full layout.
+ * bar), none in the compact preview (tools open on demand), all of them in the full layout.
  */
 export function buildDefaultLayout(api: DockviewApi): void {
   api.clear()
   api.addPanel({ id: EDITOR_AREA, component: 'editorArea', title: 'Editor' })
-  if (IN_PREVIEW) return lockEditorArea(api)
+  if (COMPACT) return lockEditorArea(api)
   if (INTEGRATED) {
     api.addPanel({
       id: 'inspector',

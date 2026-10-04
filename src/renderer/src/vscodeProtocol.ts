@@ -14,8 +14,9 @@ export type WebviewMode = 'editor' | 'preview' | 'panel'
 export type SidePanel = 'explorer' | 'settings'
 
 /**
- * Layout of the full diagram editor: `integrated` puts the Explorer and Settings in the VS Code side
- * bar; `full` docks every tool in the page, like the web app (setting projectScaffold.editor.layout).
+ * Layout of the diagrams (full editor, preview): `integrated` puts the Explorer and Settings in the VS
+ * Code side bar (the preview compact); `full` docks every tool in the page, like the web app (setting
+ * projectScaffold.editor.layout).
  */
 export type EditorLayout = 'integrated' | 'full'
 
@@ -30,7 +31,7 @@ export interface WebviewInit {
   mode: WebviewMode
   /** Side panel shown (mode `panel`). */
   panel?: SidePanel
-  /** Layout of the full diagram editor (mode `editor`). */
+  /** Layout of a diagram (modes `editor` and `preview`). */
   layout?: EditorLayout
   /** Text of the document, unsaved edits included. */
   text: string
@@ -116,7 +117,7 @@ export type ToHost =
   | { type: 'inDiagram'; action: DiagramAction }
   /** A page shows a side panel. */
   | { type: 'showPanel'; panel: SidePanel }
-  /** Switches the layout of the full diagram editors (they all load again). */
+  /** Switches the layout of the diagrams (they all load again). */
   | { type: 'setLayout'; layout: EditorLayout }
   /** A line of the page's Output log, for the ProjectScaffold Output channel (which adds the time). */
   | { type: 'log'; level: LogLevel; text: string }

@@ -64,7 +64,7 @@ import {
   type ToolId
 } from './shell/controllers'
 import { GLOBAL_VIEW } from './model/types'
-import { FULL_LAYOUT, IN_EDITOR, IN_PANEL, IN_PREVIEW, IN_VSCODE } from './host'
+import { FULL_LAYOUT, IN_DIAGRAM, IN_PANEL, IN_PREVIEW, IN_VSCODE } from './host'
 
 export type Category = 'File' | 'Edit' | 'Insert' | 'View' | 'Arrange' | 'Window' | 'Help'
 
@@ -766,7 +766,7 @@ const DOCUMENT_COMMANDS = new Set([
   'help.resetData'
 ])
 
-/** The full diagram editor of VS Code switches between its layouts. */
+/** The VS Code diagrams (full editor, preview) switch between their layouts. */
 const EDITOR_COMMANDS = new Set(['window.fullLayout'])
 
 export const commands: Command[] = IN_VSCODE
@@ -774,7 +774,7 @@ export const commands: Command[] = IN_VSCODE
       (c) =>
         !DOCUMENT_COMMANDS.has(c.id) &&
         !(IN_PREVIEW && c.id === 'view.source') &&
-        (IN_EDITOR || !EDITOR_COMMANDS.has(c.id))
+        (IN_DIAGRAM || !EDITOR_COMMANDS.has(c.id))
     )
   : allCommands.filter((c) => !EDITOR_COMMANDS.has(c.id))
 

@@ -367,8 +367,8 @@ function flush(): void {
   pushToHost()
 }
 
-/** VS Code full diagram editor: switches the editors to the other layout; they load again, showing
- *  what this one shows (its session) with the changes made here. */
+/** VS Code diagram: switches the diagrams to the other layout; they load again, showing what this
+ *  one shows (its session) with the changes made here. */
 export function switchEditorLayout(): void {
   flush()
   window.api.saveSession(currentSession())
