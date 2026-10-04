@@ -39,6 +39,7 @@ interface DirHandle {
   /** Names from this folder down to the entry; null when it is not inside. */
   resolve?(entry: FileHandle | DirHandle): Promise<string[] | null>
   isSameEntry?(other: DirHandle): Promise<boolean>
+  keys?(): AsyncIterator<string>
 }
 
 interface FsAccessWindow {
@@ -615,6 +616,17 @@ async function pickDir(id: string, startIn?: DirHandle): Promise<DirHandle | nul
 const notFound = (e: unknown): boolean =>
   e instanceof DOMException && (e.name === 'NotFoundError' || e.name === 'TypeMismatchError')
 
+/** Whether a remembered folder still exists: deleted or recreated since, its handle finds nothing. */
+async function exists(dir: DirHandle): Promise<boolean> {
+  try {
+    await dir.keys?.().next()
+    return true
+  } catch (e) {
+    if (notFound(e)) return false
+    throw e
+  }
+}
+
 /** A directory handle as an output directory: paths are `/`-separated, relative to it. */
 function handleDir(root: DirHandle): OutputDir {
   const locate = async (path: string, create: boolean): Promise<[DirHandle, string]> => {
@@ -659,8 +671,10 @@ async function outputDir(req: OutputDirRequest): Promise<OutputDir | null> {
   if (req.known) return previous && !req.pick ? askingDir(previous) : null
   let handle = req.pick ? undefined : previous
   if (handle && !(await granted(handle, true))) handle = undefined
+  const gone = !!handle && !(await exists(handle))
+  if (gone) handle = undefined
   if (!handle) {
-    const picked = await pickDir('generate', previous)
+    const picked = await pickDir('generate', gone ? undefined : previous)
     if (!picked) return null
     await rememberDir(key, picked)
     handle = picked
