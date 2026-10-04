@@ -17,6 +17,7 @@ import {
   type TextFileRef
 } from '@/store/textFiles'
 import { activeFilePanel, openFilePanel } from '@/shell/controllers'
+import { builtinFile } from '@/generateCode'
 
 const IDL_FILES = { description: 'IDL files', extensions: ['idl'] }
 
@@ -33,6 +34,8 @@ export async function openTextFile(
     const dir = await sourceDir(doc, ref.source).catch(() => null)
     if (dir?.open) return dir.open(ref.path, options.at)
   }
+  const builtin = ref.source === 'builtin' && window.api.openBuiltin ? builtinFile(ref.path) : null
+  if (builtin !== null) return window.api.openBuiltin?.(ref.path, builtin, options.at)
   const at = options.at
   if (at) useTextReveals.setState({ [textFileKey(doc.id, ref)]: at })
   addTextFile(doc.id, ref, options.content)

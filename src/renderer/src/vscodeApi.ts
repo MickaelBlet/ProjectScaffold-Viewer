@@ -208,6 +208,8 @@ const vscodeApi: Api = {
   },
   onReveal: (cb) => listen(revealListeners, cb),
   codegenChanged: () => post({ type: 'codegen' }),
+  // Like the other template files: in VS Code's editors, in the page's tabs in the full layout.
+  openBuiltin: FULL_LAYOUT ? undefined : (path, text, at) => post({ type: 'openBuiltin', path, text, at }),
   onCodegen: (cb) => listen(codegenListeners, cb),
   inDiagram: (action) => post({ type: 'inDiagram', action }),
   onDocument: (cb) => {

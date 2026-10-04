@@ -107,6 +107,8 @@ export type ToHost =
       op: 'read' | 'write' | 'remove'
       text?: string
     }
+  /** Shows a built-in template (`path`: `<set>/<file>`) in a read-only VS Code editor, selecting `at`. */
+  | { type: 'openBuiltin'; path: string; text: string; at?: TextSpot }
   /** Opens a file of a directory given by `outputDir` / `templateDir` in its VS Code editor, selecting `at`. */
   | { type: 'openOutputFile'; dir: string; path: string; at?: TextSpot }
   /** The selection changed: data path of the selected entity in the file. */

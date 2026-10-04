@@ -1,4 +1,11 @@
-import type { DiagramAction, EditorLayout, LogLevel, SidePanel, ViewRef } from '../../../vscode/src/protocol'
+import type {
+  DiagramAction,
+  EditorLayout,
+  LogLevel,
+  SidePanel,
+  TextSpot,
+  ViewRef
+} from '../../../vscode/src/protocol'
 import type { OutputDir } from './codegen/run'
 
 export interface OpenResult {
@@ -146,6 +153,8 @@ export interface Api {
   onDocument?(cb: (file: OpenResult) => void): () => void
   /** Side panel: the view the diagram shows. */
   onView?(cb: (view: ViewRef) => void): () => void
+  /** Shows a built-in template (`<set>/<file>`) read-only in the host's own editor, selecting `at`. */
+  openBuiltin?(path: string, text: string, at?: TextSpot): void
   /** Code was generated or other templates chosen here: the other pages of the document list their files again. */
   codegenChanged?(): void
   /** Another page of the document generated code or chose other templates. */
