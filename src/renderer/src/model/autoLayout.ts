@@ -26,7 +26,7 @@ export interface ArrangeOptions {
   spacing: number
 }
 
-export const DEFAULT_ARRANGE: ArrangeOptions = { orientation: 'horizontal', spacing: 70 }
+const DEFAULT_ARRANGE: ArrangeOptions = { orientation: 'horizontal', spacing: 70 }
 
 export function arrangeOptions(orientation: Orientation): ArrangeOptions {
   return { ...DEFAULT_ARRANGE, orientation }
