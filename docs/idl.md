@@ -19,6 +19,8 @@ In [`examples/idl/`](../examples/idl):
 | `tank_ccm.idl`      | CCM components, porttypes and events; includes `sensors_dds.idl`                                                        |
 | `navigation.idl`    | uses `Pose` and `Vec3` without defining them: import it into `examples/robot.scaffold.yaml` to see them matched by name |
 
+[`filling_cell.scaffold.yaml`](../examples/idl/filling_cell.scaffold.yaml) depends on `tank_ccm.idl` (with `sensors_dds.idl`, indirect) and `robot_control.idl`: it places the `Tank` and `Supervisor` components, links its own modules to them, and uses the IDL interfaces (`Arm`, `Gripper`, `Valve`…) and types (`Scan`, `Health`, `JointAngles`…) as its own.
+
 ## Preprocessor
 
 - `#include` and IDL `import "file";`. VS Code reads included files next to the IDL file and in its parent folders; elsewhere, pick them along with it.
