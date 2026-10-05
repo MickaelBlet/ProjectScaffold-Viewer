@@ -8,6 +8,7 @@ import {
   globalTypeNames,
   findImported,
   findPort,
+  findView,
   growAncestors,
   LAYOUT_PAD,
   linkOrigin,
@@ -33,6 +34,7 @@ import {
   type DependencySource
 } from '@/model/dependencies'
 import { snapChanges } from '@/model/grid'
+import { foldLayouts, inView } from '@/model/viewLayout'
 import { binarySnapshot, settleBinaries } from '@/model/binaries'
 import type {
   Endpoint,
@@ -61,17 +63,35 @@ const projectStore = () => activeDoc().store
 export const history = () => projectStore().temporal.getState()
 export const getProject = (): Project => projectStore().getState().project
 
-export function update(fn: (draft: Project) => void): void {
+/**
+ * Edit the project. With `viewId`, a layout edit in that view: the modules are at its rects
+ * (see inView), and the rects of the modules of a drill-down view it changes are the view's own.
+ */
+export function update(fn: (draft: Project) => void, viewId?: Id): void {
   projectStore().setState((s) => {
-    const project = produce(s.project, (d) => {
+    const base = viewId ? inView(s.project, findView(s.project, viewId)) : s.project
+    let project = produce(base, (d) => {
       fn(d)
       // Placed ports reference interfaces by name.
-      followInterfaceRenames(s.project, d)
+      followInterfaceRenames(base, d)
     })
+    if (project === base) return { project: s.project }
     // Whatever an edit moves or resizes lands on the grid.
     const { snapToGrid, gridSize } = useSettings.getState()
-    return { project: snapToGrid ? snapChanges(s.project, project, gridSize) : project }
+    if (snapToGrid) project = snapChanges(base, project, gridSize)
+    return { project: viewId ? foldLayouts(s.project, base, project, viewId) : project }
   })
+}
+
+/** Layout edit in the focused view (see update). */
+export function updateLayout(fn: (draft: Project) => void): void {
+  update(fn, activeDoc().activeViewId)
+}
+
+/** The project with its modules where the focused view draws them (see inView). */
+export function getLayout(): Project {
+  const p = getProject()
+  return inView(p, findView(p, activeDoc().activeViewId))
 }
 
 export function replaceProject(project: Project): void {
@@ -89,9 +109,10 @@ export function redo(): void {
 
 // Modules
 
+/** New module at a place of the focused view. */
 export function addModule(parentId: Id | null, x: number, y: number): Id {
   const id = newId()
-  update((d) => {
+  updateLayout((d) => {
     const name = uniqueName(
       'Module',
       childModules(d, parentId).map((m) => m.name)
@@ -115,7 +136,7 @@ export function addModule(parentId: Id | null, x: number, y: number): Id {
 
 /** Add a child module below the parent's ports and existing children. */
 export function addSubmodule(parentId: Id): Id {
-  return addModule(parentId, LAYOUT_PAD, belowContent(getProject(), parentId))
+  return addModule(parentId, LAYOUT_PAD, belowContent(getLayout(), parentId))
 }
 
 /** Delete modules (with their content), imported modules and notes in one undo step. */
@@ -137,9 +158,9 @@ export function deleteItems(ids: Id[]): void {
   })
 }
 
-/** Set several module and note rects in one undo step. */
+/** Set several module and note rects of the focused view in one undo step. */
 export function setLayouts(layouts: Map<Id, Partial<Rect>>): void {
-  update((d) => {
+  updateLayout((d) => {
     shiftBends(d, layouts)
     for (const [id, r] of layouts) {
       const m = d.modules.find((m) => m.id === id)
@@ -187,8 +208,9 @@ function shiftBends(d: Project, layouts: Map<Id, Partial<Rect>>): void {
   }
 }
 
+/** Set a module rect of the focused view. */
 export function setModuleLayout(id: Id, layout: Partial<Rect>): void {
-  update((d) => {
+  updateLayout((d) => {
     const im = findImported(d, id)?.module
     if (im) return setImportedRect(im, layout)
     const m = d.modules.find((m) => m.id === id)
@@ -198,9 +220,9 @@ export function setModuleLayout(id: Id, layout: Partial<Rect>): void {
   })
 }
 
-/** Move a module under a new parent, renaming it if the name is taken there. */
+/** Move a module under a new parent (at a place of the focused view), renaming it if its name is taken. */
 export function reparentModule(id: Id, parentId: Id | null, x: number, y: number): void {
-  update((d) => {
+  updateLayout((d) => {
     const m = d.modules.find((m) => m.id === id)
     if (!m || m.parentId === parentId) return
     if (parentId && subtreeIds(d, id).has(parentId)) return
@@ -475,6 +497,14 @@ export function renameView(id: Id, name: string): void {
 export function deleteView(id: Id): void {
   update((d) => {
     d.views = d.views.filter((v) => v.id !== id)
+  })
+}
+
+/** Draw the modules of a stored view at their own layout again. */
+export function resetViewLayouts(viewId: Id): void {
+  update((d) => {
+    const v = d.views.find((v) => v.id === viewId)
+    if (v) delete v.layouts
   })
 }
 

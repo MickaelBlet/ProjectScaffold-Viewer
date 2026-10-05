@@ -213,7 +213,7 @@ export const ModuleNode = memo(function ModuleNode({
       title={mod.description}
     >
       <NodeResizer
-        isVisible={selected && draggable}
+        isVisible={selected && (draggable || (!!data.frame && !mod.locked))}
         minWidth={min.width}
         minHeight={min.height}
         onResizeEnd={(_, r) => setModuleLayout(id, { x: r.x, y: r.y, width: r.width, height: r.height })}

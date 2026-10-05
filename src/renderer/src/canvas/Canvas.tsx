@@ -31,6 +31,7 @@ import {
   visibleModuleIds
 } from '@/model/project'
 import { NOTE_MIN, snapRect, snapValue } from '@/model/grid'
+import { inView } from '@/model/viewLayout'
 import { assignBinary } from '@/model/binaries'
 import { GLOBAL_VIEW, type Id, type Project, type View } from '@/model/types'
 import {
@@ -209,6 +210,8 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
   const [guides, setGuides] = useState<Guide[]>([])
 
   const view = useMemo(() => findView(project, viewId), [project, viewId])
+  // Modules at the view's own rects.
+  const drawn = useMemo(() => inView(project, view), [project, view])
   const visible = useMemo(() => visibleModuleIds(project, view), [project, view])
   const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds])
   const selectedLink = selection?.kind === 'link' ? selection.id : null
@@ -224,23 +227,23 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
   // they link to, and the ports follow them back.
   const { sides, externals } = useMemo(() => {
     const auto = settings.autoOrientLinks
-    let externals = externalNodes(project, view, visible, null)
-    let sides = auto ? floatingPortSides(project, visible, standIns(project, view, externals)) : null
+    let externals = externalNodes(drawn, view, visible, null)
+    let sides = auto ? floatingPortSides(drawn, visible, standIns(drawn, view, externals)) : null
     if (externals.length) {
-      externals = externalNodes(project, view, visible, portPoints(project, visible, sides))
-      if (auto) sides = floatingPortSides(project, visible, standIns(project, view, externals))
+      externals = externalNodes(drawn, view, visible, portPoints(drawn, visible, sides))
+      if (auto) sides = floatingPortSides(drawn, visible, standIns(drawn, view, externals))
     }
     return { sides, externals }
-  }, [project, view, visible, settings.autoOrientLinks])
+  }, [drawn, view, visible, settings.autoOrientLinks])
   const grid = settings.snapToGrid ? settings.gridSize : null
   // Nodes and links are rebuilt on every edit; only those that changed get new objects (and render again).
   const selectToMove = settings.selectToMove
   useEffect(
     () =>
       setNodes((prev) =>
-        reuseUnchanged(prev, toNodes(project, view, selectedSet, sides, externals, grid, selectToMove))
+        reuseUnchanged(prev, toNodes(drawn, view, selectedSet, sides, externals, grid, selectToMove))
       ),
-    [project, view, selectedSet, sides, externals, grid, selectToMove, setNodes]
+    [drawn, view, selectedSet, sides, externals, grid, selectToMove, setNodes]
   )
   const [edges, setEdges] = useEdgesState<Edge>([])
   useEffect(
@@ -787,6 +790,7 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
       item('view.fitAll'),
       item('edit.selectAll'),
       ...(view.hidden.length ? [item('view.showAll')] : []),
+      ...(view.layouts ? [item('view.resetLayout')] : []),
       'separator',
       item('file.exportPng'),
       item('file.exportSvg')

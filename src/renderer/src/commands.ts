@@ -1,6 +1,7 @@
 // Command registry: toolbar menus, context menus, the command palette and keyboard shortcuts
 // all run the same commands.
 import {
+  activeViewHasLayouts,
   activeViewTemporary,
   addModuleAt,
   addNoteAt,
@@ -26,6 +27,7 @@ import {
   paste,
   refreshDependencies,
   pickDependency,
+  resetViewLayout,
   sameSizeSelection,
   selectAll,
   selectedIds,
@@ -510,6 +512,13 @@ const allCommands: Command[] = [
     keys: ['H'],
     enabled: hasSelection,
     run: hideSelection
+  },
+  {
+    id: 'view.resetLayout',
+    title: 'Reset view layout',
+    category: 'View',
+    enabled: activeViewHasLayouts,
+    run: resetViewLayout
   },
   {
     id: 'view.showAll',

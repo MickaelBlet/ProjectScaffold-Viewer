@@ -61,14 +61,17 @@ import {
   deleteItems,
   deleteLink,
   deleteType,
+  getLayout,
   getProject,
   placeModuleFrom,
   refreshDependenciesFrom,
   removeDependencyById,
+  resetViewLayouts,
   setHidden,
   setLayouts,
   setLocked,
-  update
+  update,
+  updateLayout
 } from '@/store/project'
 import {
   quickPick,
@@ -288,7 +291,7 @@ function writeClip(clip: Clip, data?: DataTransfer | null): void {
 
 /** Copy the selection. With a clipboard event, writes to it; else to the system clipboard when allowed. */
 export function copySelection(data?: DataTransfer | null): boolean {
-  const clip = copyItems(getProject(), selectedIds())
+  const clip = copyItems(getLayout(), selectedIds())
   if (!clip) return false
   writeClip(clip, data)
   const n =
@@ -309,7 +312,7 @@ export function pasteItems(clip: Clip, place?: { at: { x: number; y: number }; p
   pasteCount = text === pasteKey ? pasteCount + 1 : 1
   pasteKey = text
   let pasted: Id[] = []
-  update((d) => {
+  updateLayout((d) => {
     pasted = place
       ? pasteClip(d, clip, { parent: place.parent, at: place.at })
       : pasteClip(d, clip, { parent: 'original', offset: 30 * pasteCount })
@@ -332,10 +335,10 @@ export async function paste(
 }
 
 export function duplicateSelection(): void {
-  const clip = copyItems(getProject(), selectedIds())
+  const clip = copyItems(getLayout(), selectedIds())
   if (!clip) return
   let pasted: Id[] = []
-  update((d) => void (pasted = pasteClip(d, clip, { parent: 'original', offset: 30 })))
+  updateLayout((d) => void (pasted = pasteClip(d, clip, { parent: 'original', offset: 30 })))
   selectMany(pasted)
 }
 
@@ -378,7 +381,7 @@ function viewParent(): Id | null {
 }
 
 export function addModuleAt(pos?: { x: number; y: number }, parentId: Id | null = viewParent()): Id {
-  const p = getProject()
+  const p = getLayout()
   const c = pos ?? activeCanvas()?.center() ?? { x: 80, y: 80 }
   const origin = parentId ? absolutePosition(p, parentId) : { x: 0, y: 0 }
   const size = defaultSize({ ports: [] }, p.orientation)
@@ -1051,7 +1054,7 @@ export function toggleLockSelection(): void {
 
 /** Selected modules and notes with their absolute rects. */
 function selectedRects(): Map<Id, Rect> {
-  const p = getProject()
+  const p = getLayout()
   const rects = new Map<Id, Rect>()
   for (const id of selectedIds()) {
     if (p.modules.some((m) => m.id === id)) rects.set(id, absoluteRect(p, id))
@@ -1063,7 +1066,7 @@ function selectedRects(): Map<Id, Rect> {
 
 /** Apply absolute rects to modules (converted to parent-relative) and notes. */
 function applyAbsolute(rects: Map<Id, Rect>): void {
-  const p = getProject()
+  const p = getLayout()
   const layouts = new Map<Id, Rect>()
   for (const [id, r] of rects) {
     // Locked items stay put: they only serve as references.
@@ -1091,7 +1094,7 @@ export function sameSizeSelection(dim: 'width' | 'height' | 'both'): void {
 }
 
 export function nudgeSelection(dx: number, dy: number): void {
-  const p = getProject()
+  const p = getLayout()
   const layouts = new Map<Id, Partial<Rect>>()
   for (const id of selectedIds()) {
     const e = p.modules.find((m) => m.id === id) ?? p.notes.find((n) => n.id === id)
@@ -1104,7 +1107,7 @@ export function nudgeSelection(dx: number, dy: number): void {
 
 /** Group sibling modules into a new parent module. */
 export function groupSelection(): void {
-  const p = getProject()
+  const p = getLayout()
   const mods = selectedIds().flatMap((id) => p.modules.find((m) => m.id === id) ?? [])
   if (!mods.length) return
   const parentId = mods[0]!.parentId
@@ -1113,7 +1116,7 @@ export function groupSelection(): void {
   const box = boundsOf(mods.map((m) => m.layout))
   const groupId = newId()
   const top = contentTop(p.orientation) + LAYOUT_PAD / 2
-  update((d) => {
+  updateLayout((d) => {
     const before = binarySnapshot(d)
     d.modules.push({
       id: groupId,
@@ -1164,17 +1167,20 @@ export async function arrangeLayout(
   orientation?: Orientation
 ): Promise<void> {
   if (arranging) return
-  const p = getProject()
-  const target = orientation ?? p.orientation
+  const source = getProject()
+  const target = orientation ?? source.orientation
   const sel = activeDoc().selection
   let scopeId: Id | null = viewParent()
-  if (scope === 'auto' && sel?.kind === 'module' && childModules(p, sel.id).length) scopeId = sel.id
-  if (scope === 'all' || target !== p.orientation) scopeId = null
+  if (scope === 'auto' && sel?.kind === 'module' && childModules(source, sel.id).length) scopeId = sel.id
+  if (scope === 'all' || target !== source.orientation) scopeId = null
+  // A module's content is arranged in the focused view, everything in the project.
+  const viewId = scopeId ? activeDoc().activeViewId : undefined
+  const p = scopeId ? getLayout() : source
   arranging = true
   try {
     const arranged = await arrangeProject(p, scopeId, arrangeOptions(target))
     // Edits made meanwhile win.
-    if (getProject() !== p) return
+    if (getProject() !== source) return
     update((d) => {
       d.orientation = arranged.orientation
       for (const m of d.modules) {
@@ -1194,7 +1200,7 @@ export async function arrangeLayout(
         else if (l.route.from || l.route.to) l.route.points = []
         else delete l.route
       }
-    })
+    }, viewId)
     setStatus('info', `Arranged ${scopeId ? modulePath(p, scopeId) : 'all modules'} ${target}ly`)
     // After React Flow has measured the new sizes.
     setTimeout(() => activeCanvas()?.fit(), 120)
@@ -1254,6 +1260,14 @@ export function hideSelection(): void {
   if (!ids.length) return
   setHidden(storedViewFor(activeDoc().activeViewId), ids, true)
   select(null)
+}
+
+export function activeViewHasLayouts(): boolean {
+  return !!findView(getProject(), activeDoc().activeViewId).layouts
+}
+
+export function resetViewLayout(): void {
+  resetViewLayouts(activeDoc().activeViewId)
 }
 
 export function showAllInView(): void {

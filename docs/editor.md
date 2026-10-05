@@ -31,6 +31,7 @@ Each document has a _Project_ view plus any number of stored views, opened as ta
 - _Open module in its own view_ (Alt+Enter, or ⤢ on a container) shows one module's content, with stand-ins for the outside modules it is linked to and a breadcrumb back to the parents.
 - It opens in a temporary tab (italic title, not saved in the file). _Keep view_ (double-click the tab, its right-click menu, the breadcrumb or _View › Keep view_) stores it with the document; closing the tab discards it.
 - Modules can be hidden per view: H, or _Hide in view_ in the right-click menu of a module in the Explorer; Shift+H shows them again.
+- A module's own view has its own layout: moving or resizing modules there (the module itself included: it is resized, not moved), arranging or aligning them leaves the _Project_ view as it is, and keeps a temporary view. New modules, and modules moved to another parent, take their place in the view in the _Project_ view too. Link bend points are shared by all views. _View › Reset view layout_ draws the modules at their place in the _Project_ view again.
 
 ### Editor tabs
 

@@ -31,6 +31,8 @@ export type PortNodeData = {
   sides?: Record<Id, PortPlacement>
   /** Ports at a hand-set link attachment (see portAnchors), out of their edge's rows. */
   anchors: Record<Id, LinkAnchor>
+  /** Root of a drill-down view: resized, not moved. */
+  frame?: true
 }
 
 /**
@@ -97,7 +99,7 @@ export function toNodes(
       draggable: !isRoot && !m.locked && movable(m.id),
       selected: selected.has(m.id),
       zIndex: containers.has(m.id) ? Z.container : Z.module,
-      data: portData(m.ports, placements)
+      data: { ...portData(m.ports, placements), ...(isRoot && { frame: true as const }) }
     })
   }
   nodes.push(...externals)

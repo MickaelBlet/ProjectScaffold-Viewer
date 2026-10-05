@@ -82,6 +82,7 @@ const MENUS: [Category, string[]][] = [
       'view.openModule',
       'view.openModuleSplit',
       'view.keep',
+      'view.resetLayout',
       'view.new',
       'view.source',
       '-',
