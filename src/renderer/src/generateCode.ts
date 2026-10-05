@@ -189,6 +189,7 @@ export async function chooseTemplates(): Promise<void> {
       if (!dir) return
       if (copy) {
         if ((await dir.read(MANIFEST)) !== null) {
+          codegenChanged()
           showDialog(`${dir.label} already holds a template set`, [
             'It is used as it is: copy the built-in templates into an empty folder to start again.'
           ])

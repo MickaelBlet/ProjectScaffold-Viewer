@@ -670,7 +670,7 @@ async function outputDir(req: OutputDirRequest): Promise<OutputDir | null> {
   const key = outputKey(req.document)
   const previous = await rememberedDir(key)
   // Asked for without a user gesture (listing its files): access is asked for on first use.
-  if (req.known) return previous && !req.pick ? askingDir(previous) : null
+  if (req.known) return previous && !req.pick ? knownDir(key, previous) : null
   let handle = req.pick ? undefined : previous
   if (handle && !(await granted(handle, true))) handle = undefined
   const gone = !!handle && !(await exists(handle))
@@ -710,6 +710,13 @@ function askingDir(handle: DirHandle): OutputDir {
   }
 }
 
+/**
+ * A remembered folder: picked in this session, it is granted already (WebView2 may not say so, and
+ * asking without a user gesture can stay pending); else access is asked for on first use.
+ */
+const knownDir = (key: string, handle: DirHandle): OutputDir =>
+  dirHandles.get(key) === handle ? handleDir(handle) : askingDir(handle)
+
 async function templateDir(req: TemplateDirRequest): Promise<OutputDir | null> {
   const key = templateKey(req.document)
   if (req.op === 'forget') {
@@ -717,7 +724,7 @@ async function templateDir(req: TemplateDirRequest): Promise<OutputDir | null> {
     return null
   }
   const previous = await rememberedDir(key)
-  if (req.op === 'current') return previous ? askingDir(previous) : null
+  if (req.op === 'current') return previous ? knownDir(key, previous) : null
   const picked = await pickDir('templates', previous)
   if (!picked) return null
   await rememberDir(key, picked)
