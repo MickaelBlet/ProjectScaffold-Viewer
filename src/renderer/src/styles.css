@@ -1288,6 +1288,7 @@ fieldset.readonly {
 }
 .field > input {
   width: 100%;
+  height: 100%;
 }
 .field-error {
   color: var(--danger);
