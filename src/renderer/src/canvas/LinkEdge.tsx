@@ -13,7 +13,7 @@ import {
   type InternalNode
 } from '@xyflow/react'
 import { useShallow } from 'zustand/react/shallow'
-import { linkOrigin } from '@/model/project'
+import { indexById, linkOrigin } from '@/model/project'
 import { setLinkRoute, useProjectStore } from '@/store/project'
 import { useSettings } from '@/store/settings'
 import { openContextMenu, select } from '@/store/ui'
@@ -158,9 +158,9 @@ function follow(e: React.PointerEvent, move: (ev: PointerEvent) => void, end: ()
 }
 
 export const LinkEdge = memo(function LinkEdge(props: EdgeProps): ReactNode {
-  const link = useProjectStore((s) => s.project.links.find((l) => l.id === props.id))
+  const link = useProjectStore((s) => indexById(s.project.links).get(props.id))
   const origin = useProjectStore((s) => {
-    const l = s.project.links.find((l) => l.id === props.id)
+    const l = indexById(s.project.links).get(props.id)
     return l ? linkOrigin(s.project, l) : null
   })
   const { edgeStyle, edgeBadges, autoOrientLinks, snapToGrid, gridSize } = useSettings(

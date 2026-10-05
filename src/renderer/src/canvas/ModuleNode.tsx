@@ -1,6 +1,6 @@
 import { memo, type CSSProperties, type ReactNode } from 'react'
 import { Handle, NodeResizer, Position, type Node, type NodeProps } from '@xyflow/react'
-import { minSize, nameError } from '@/model/project'
+import { indexById, minSize, nameError, parentIds } from '@/model/project'
 import { getProject, setLocked, setModuleLayout, update, useProjectStore } from '@/store/project'
 import { useUiStore } from '@/store/ui'
 import { openModuleView } from '@/actions'
@@ -147,20 +147,20 @@ export const ModuleNode = memo(function ModuleNode({
   draggable,
   data
 }: NodeProps<Node<PortNodeData>>): ReactNode {
-  const mod = useProjectStore((s) => s.project.modules.find((m) => m.id === id))
+  const mod = useProjectStore((s) => indexById(s.project.modules).get(id))
   const interfaces = useProjectStore((s) => s.project.interfaces)
   const types = useProjectStore((s) => s.project.types)
-  const hasChildren = useProjectStore((s) => s.project.modules.some((m) => m.parentId === id))
+  const hasChildren = useProjectStore((s) => parentIds(s.project.modules).has(id))
   const orientation = useProjectStore((s) => s.project.orientation)
   const binary = useProjectStore((s) => {
-    const m = s.project.modules.find((m) => m.id === id)
-    return m?.binaryId ? s.project.binaries.find((b) => b.id === m.binaryId) : undefined
+    const m = indexById(s.project.modules).get(id)
+    return m?.binaryId ? indexById(s.project.binaries).get(m.binaryId) : undefined
   })
   const renaming = useUiStore((s) => s.renaming === id)
   // Stable string: re-renders only when a base is added, removed or renamed.
   const bases = useProjectStore((s) => {
-    const m = s.project.modules.find((x) => x.id === id)
-    return (m?.bases ?? []).map((b) => s.project.modules.find((x) => x.id === b)?.name ?? '?').join(', ')
+    const modules = indexById(s.project.modules)
+    return (modules.get(id)?.bases ?? []).map((b) => modules.get(b)?.name ?? '?').join(', ')
   })
   const { floating, anchors, top, bottom, left, right } = usePortLayout(
     id,
