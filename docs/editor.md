@@ -22,7 +22,7 @@ Explorer, Inspector, Problems, Output, Search, Settings and Code generation are 
 
 - Drag a tab to dock it on any side, stack it with others or float it. The layout is kept; _Window › Reset panel layout_ restores the default one.
 - The Explorer's sections are reordered by dragging their header (or Alt+↑ / Alt+↓) and hidden from their right-click menu (_Reset sections_ restores them).
-- In the Explorer's _Modules_, the eye hides a module in the focused view, and dragging a module onto another (or onto the list) moves it inside (or to the top level). The modules of dependencies placed on the canvas follow the project's own.
+- In the Explorer's _Modules_, dragging a module onto another (or onto the list) moves it inside (or to the top level). The modules of dependencies placed on the canvas follow the project's own.
 
 ### Views
 
@@ -30,7 +30,7 @@ Each document has a _Project_ view plus any number of stored views, opened as ta
 
 - _Open module in its own view_ (Alt+Enter, or ⤢ on a container) shows one module's content, with stand-ins for the outside modules it is linked to and a breadcrumb back to the parents.
 - It opens in a temporary tab (italic title, not saved in the file). _Keep view_ (double-click the tab, its right-click menu, the breadcrumb or _View › Keep view_) stores it with the document; closing the tab discards it.
-- Modules can be hidden per view: H, or the eye of a module in the Explorer; Shift+H shows them again.
+- Modules can be hidden per view: H, or _Hide in view_ in the right-click menu of a module in the Explorer; Shift+H shows them again.
 
 ### Editor tabs
 

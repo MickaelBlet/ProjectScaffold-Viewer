@@ -1042,13 +1042,6 @@ kbd {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.entity-list li .eye {
-  opacity: 0;
-  padding: 0 4px;
-}
-.entity-list li:is(:hover, :focus-visible, .is-hidden) .eye {
-  opacity: 1;
-}
 .entity-list li.drop,
 .entity-list.drop {
   box-shadow: inset 0 0 0 2px var(--accent);

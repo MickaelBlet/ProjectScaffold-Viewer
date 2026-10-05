@@ -1,6 +1,6 @@
 // Views, binaries, dependencies, constants, types, interfaces, modules and links of the active document. Click selects (Ctrl / Shift for several),
 // double-click opens an editor tab, right click for more. Arrows move between items, Enter selects.
-// Modules: the eye hides one in the focused view, drag one onto another (or the list) to re-parent it;
+// Modules: drag one onto another (or the list) to re-parent it;
 // the modules of dependencies placed on the canvas follow. Dependencies also list their modules not
 // placed (double-click places one).
 // Sections can be reordered (drag their header, Alt+Up / Alt+Down) and hidden; kept in the settings.
@@ -1049,19 +1049,6 @@ export function ExplorerPanel(): ReactNode {
               </span>
               <span className="tree-name">{m.name}</span>
               <small>{m.ports.length ? `${m.ports.length}p` : ''}</small>
-              <button
-                type="button"
-                className="icon eye"
-                tabIndex={-1}
-                title={hiddenIds.includes(m.id) ? 'Show in view' : 'Hide in view'}
-                aria-label={`${hiddenIds.includes(m.id) ? 'Show' : 'Hide'} ${m.name} in view`}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  toggleHidden(m.id, hiddenIds.includes(m.id))
-                }}
-              >
-                <Icon name={hiddenIds.includes(m.id) ? 'eye-off' : 'eye'} />
-              </button>
             </Item>
           ))}
           {shownImported.map(({ dep, m }) => (
