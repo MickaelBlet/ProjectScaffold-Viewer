@@ -13,6 +13,7 @@ import type {
   TemplateDirRequest
 } from './api'
 import type { OutputDir } from './codegen/run'
+import { isInsidePath } from './codegen/templateSet'
 
 type Permission = 'granted' | 'denied' | 'prompt'
 
@@ -437,11 +438,11 @@ async function granted(dir: DirHandle, ask: boolean): Promise<boolean> {
 
 /** Handle of the file at a `/`-separated path in a folder; null when absent or out of it. */
 async function fileAt(dir: DirHandle, path: string): Promise<FileHandle | null> {
+  if (!isInsidePath(path)) return null
   const parts = path.split('/')
   const name = parts.pop()!
-  if (parts.some((p) => p === '..' || p === '') || /^[A-Za-z]:/.test(path)) return null
   try {
-    for (const p of parts) if (p !== '.') dir = await dir.getDirectoryHandle(p)
+    for (const p of parts) if (p && p !== '.') dir = await dir.getDirectoryHandle(p)
     return await dir.getFileHandle(name)
   } catch (e) {
     if (notFound(e)) return null
@@ -630,10 +631,11 @@ async function exists(dir: DirHandle): Promise<boolean> {
 /** A directory handle as an output directory: paths are `/`-separated, relative to it. */
 function handleDir(root: DirHandle): OutputDir {
   const locate = async (path: string, create: boolean): Promise<[DirHandle, string]> => {
+    if (!isInsidePath(path)) throw new Error(`invalid path '${path}': not inside ${root.name}`)
     const parts = path.split('/')
     const name = parts.pop()!
     let dir = root
-    for (const p of parts) dir = await dir.getDirectoryHandle(p, { create })
+    for (const p of parts) if (p && p !== '.') dir = await dir.getDirectoryHandle(p, { create })
     return [dir, name]
   }
   return {
