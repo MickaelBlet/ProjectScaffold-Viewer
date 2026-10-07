@@ -158,15 +158,7 @@ const length = (pts: Point[]): number => pts.slice(1).reduce((sum, p, i) => sum 
 
 /** Point halfway along a polyline. */
 export function midpoint(pts: Point[]): Point {
-  let rest = length(pts) / 2
-  for (let i = 1; i < pts.length; i++) {
-    const a = pts[i - 1]!
-    const b = pts[i]!
-    const l = dist(a, b)
-    if (l >= rest && l > 0) return { x: a.x + ((b.x - a.x) * rest) / l, y: a.y + ((b.y - a.y) * rest) / l }
-    rest -= l
-  }
-  return { ...pts[0]! }
+  return pointAlong(pts, 0.5)
 }
 
 /** Middle of the longest leg between two bend points, clear of the bends. */
@@ -230,4 +222,62 @@ export function snapToNeighbours(p: Point, neighbours: Point[], tolerance: numbe
     if (near.length) out[axis] = near[0]!
   }
   return out
+}
+
+/** Points of an SVG path of absolute M, L, Q and C commands (the paths of links), curves sampled. */
+export function pathPoints(d: string): Point[] {
+  const tokens = d.match(/[MLQC]|-?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?/gi) ?? []
+  const out: Point[] = []
+  let cmd = 'M'
+  for (let i = 0; i < tokens.length;) {
+    if (/[MLQC]/i.test(tokens[i]!)) cmd = tokens[i++]!.toUpperCase()
+    const take = (): Point => ({ x: Number(tokens[i++]), y: Number(tokens[i++]) })
+    const a = out[out.length - 1] ?? { x: 0, y: 0 }
+    if (cmd === 'Q' || cmd === 'C') {
+      const c = cmd === 'Q' ? [take()] : [take(), take()]
+      const b = take()
+      const ctrl = [a, ...c, b]
+      for (let k = 1; k <= 16; k++) {
+        const u = k / 16
+        // De Casteljau.
+        let pts = ctrl
+        while (pts.length > 1)
+          pts = pts
+            .slice(1)
+            .map((p, j) => ({ x: pts[j]!.x + (p.x - pts[j]!.x) * u, y: pts[j]!.y + (p.y - pts[j]!.y) * u }))
+        out.push(pts[0]!)
+      }
+    } else out.push(take())
+  }
+  return out
+}
+
+/** Point at `at` (0 to 1) of the length of a polyline. */
+export function pointAlong(pts: Point[], at: number): Point {
+  let rest = clamp(at, 0, 1) * length(pts)
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1]!
+    const b = pts[i]!
+    const l = dist(a, b)
+    if (l >= rest && l > 0) return { x: a.x + ((b.x - a.x) * rest) / l, y: a.y + ((b.y - a.y) * rest) / l }
+    rest -= l
+  }
+  return { ...(pts[pts.length - 1] ?? { x: 0, y: 0 }) }
+}
+
+/** Where on a polyline (0 to 1 of its length) the point nearest to `p` is. */
+export function fractionAlong(pts: Point[], p: Point): number {
+  const total = length(pts)
+  if (!total) return 0.5
+  let best = { d: Infinity, at: 0 }
+  let run = 0
+  for (let i = 1; i < pts.length; i++) {
+    const [a, b] = [pts[i - 1]!, pts[i]!]
+    const l = dist(a, b)
+    const u = l ? clamp(((p.x - a.x) * (b.x - a.x) + (p.y - a.y) * (b.y - a.y)) / (l * l), 0, 1) : 0
+    const d = dist(p, { x: a.x + u * (b.x - a.x), y: a.y + u * (b.y - a.y) })
+    if (d < best.d) best = { d, at: (run + u * l) / total }
+    run += l
+  }
+  return Math.round(best.at * 1000) / 1000
 }

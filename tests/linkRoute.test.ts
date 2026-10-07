@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
   anchorPoint,
+  fractionAlong,
   insertIndex,
   midpoint,
   nearestAnchor,
+  pathPoints,
+  pointAlong,
   routeThrough,
   snapToNeighbours
 } from '@/canvas/linkRoute'
@@ -71,4 +74,28 @@ it('midpoint and neighbour snapping', () => {
     ])
   ).toEqual({ x: 10, y: 0 })
   expect(snapToNeighbours({ x: 103, y: 50 }, [{ x: 100, y: 0 }], 5)).toEqual({ x: 100, y: 50 })
+})
+
+describe('badges along the link', () => {
+  it('reads the points of a link path', () => {
+    expect(pathPoints('M0,0 L100,0 L100 50')).toEqual([
+      { x: 0, y: 0 },
+      { x: 100, y: 0 },
+      { x: 100, y: 50 }
+    ])
+    const curve = pathPoints('M0,0 C50,0 50,100 100,100')
+    expect(curve.length).toBe(17)
+    expect(curve.at(-1)).toEqual({ x: 100, y: 100 })
+    expect(curve[8]).toEqual({ x: 50, y: 50 })
+    expect(pathPoints('M0 0 Q10,0 10,10').at(-1)).toEqual({ x: 10, y: 10 })
+  })
+
+  it('maps a point to its place along the line and back', () => {
+    const line = pathPoints('M0,0 L100,0 L100,100')
+    expect(pointAlong(line, 0.25)).toEqual({ x: 50, y: 0 })
+    expect(pointAlong(line, 0.75)).toEqual({ x: 100, y: 50 })
+    expect(fractionAlong(line, { x: 50, y: 10 })).toBe(0.25)
+    expect(fractionAlong(line, { x: 130, y: 50 })).toBe(0.75)
+    expect(fractionAlong(line, { x: -20, y: -20 })).toBe(0)
+  })
 })

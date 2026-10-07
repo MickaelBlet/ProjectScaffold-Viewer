@@ -23,8 +23,11 @@ import { EXTERNAL, OPPOSITE, PERF_COLORS, POSITION, SIDE, Z } from './constants'
 import { orientLinkEnds } from './linkEnds'
 import {
   anchorPoint,
+  fractionAlong,
   insertIndex,
   nearestAnchor,
+  pathPoints,
+  pointAlong,
   routeThrough,
   snapToNeighbours,
   type Point,
@@ -195,13 +198,14 @@ export const LinkEdge = memo(function LinkEdge(props: EdgeProps): ReactNode {
   const s = { x: ends.sourceX, y: ends.sourceY, side: SIDE[ends.sourcePosition] }
   const t = { x: ends.targetX, y: ends.targetY, side: SIDE[ends.targetPosition] }
   const shaped: Route | null = route?.points.length ? routeThrough(edgeStyle, s, t, route.points) : null
-  const [path, labelX, labelY] = shaped
+  const [path, midX, midY] = shaped
     ? [shaped.path, shaped.label.x, shaped.label.y]
     : edgeStyle === 'straight'
       ? getStraightPath(ends)
       : edgeStyle === 'bezier'
         ? getBezierPath(ends)
         : getSmoothStepPath({ ...ends, borderRadius: edgeStyle === 'step' ? 0 : 8 })
+  const label = route?.label !== undefined ? pointAlong(pathPoints(path), route.label) : { x: midX, y: midY }
   if (!link) return null
   const c = link.constraints
   const color = PERF_COLORS[c.performance.class]
@@ -274,6 +278,25 @@ export const LinkEdge = memo(function LinkEdge(props: EdgeProps): ReactNode {
     )
   }
   const detach = (which: 'from' | 'to'): void => commit({ ...base, [which]: undefined })
+
+  /** Drags the badges along the link; a mere click selects the link. */
+  const dragLabel = (e: React.PointerEvent): void => {
+    if (e.button !== 0 || !editable) return
+    const line = pathPoints(path)
+    const start = flowPoint(e)
+    // Keeps the badges where they were grabbed.
+    const grab = { x: label.x - start.x, y: label.y - start.y }
+    let moved: LinkRoute | null = null
+    follow(
+      e,
+      (ev) => {
+        const p = flowPoint(ev)
+        if (!moved && Math.hypot(p.x - start.x, p.y - start.y) * flow.getZoom() < 3) return
+        setDraft((moved = { ...base, label: fractionAlong(line, { x: p.x + grab.x, y: p.y + grab.y }) }))
+      },
+      () => moved && commit(moved)
+    )
+  }
 
   const handleMenu = (e: React.MouseEvent, label: string, run: () => void): void => {
     e.preventDefault()
@@ -356,13 +379,20 @@ export const LinkEdge = memo(function LinkEdge(props: EdgeProps): ReactNode {
             />
           ))}
         <div
-          className={`edge-label nodrag nopan ${props.selected ? 'selected' : ''} ${edgeBadges ? '' : 'compact'}`}
-          style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`, zIndex: Z.link }}
-          onClick={() => {
+          className={`edge-label nodrag nopan ${props.selected ? 'selected' : ''} ${edgeBadges ? '' : 'compact'} ${editable ? 'movable' : ''}`}
+          style={{ ...at(label), zIndex: Z.link }}
+          onPointerDown={dragLabel}
+          onClick={(e) => {
+            if (e.detail === 2 && editable && base.label !== undefined)
+              return commit({ ...base, label: undefined })
             select({ kind: 'link', id: link.id })
             revealInspector()
           }}
-          title={link.name}
+          title={
+            editable
+              ? `${link.name}\nDrag along the link to move; double-click to put back in the middle`
+              : link.name
+          }
         >
           {edgeBadges ? (
             <>

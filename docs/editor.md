@@ -92,6 +92,7 @@ Like draw.io; saved in `editor.links`.
 
 - Select a link, then drag its line to add a bend, drag a bend to move it (snaps to the grid and in line with its neighbours; Alt: free), double-click a bend to remove it.
 - Drag an end square along its module's border to attach the link there; double-click it to attach at the port again.
+- Drag a link's badges along the link to move them anywhere between its ends; double-click them to put them back in the middle.
 - _Reset shape_ in the link's menu. _Arrange_ clears the bends.
 - Bends move with the module holding both ends, and with both ends when they are moved together.
 

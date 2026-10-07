@@ -1192,12 +1192,12 @@ export async function arrangeLayout(
         const pos = findImported(arranged, m.id)?.module.position
         if (pos) m.position = { ...pos }
       }
-      // Hand-set bends do not fit the new layout; attachments do not fit a new orientation.
+      // Hand-set bends do not fit the new layout; attachments and badges do not fit a new orientation.
       const moved = scopeId ? subtreeIds(p, scopeId) : null
       for (const l of d.links) {
         if (!l.route || (moved && !moved.has(l.from.moduleId) && !moved.has(l.to.moduleId))) continue
         if (target !== p.orientation) delete l.route
-        else if (l.route.from || l.route.to) l.route.points = []
+        else if (l.route.from || l.route.to || l.route.label !== undefined) l.route.points = []
         else delete l.route
       }
     }, viewId)

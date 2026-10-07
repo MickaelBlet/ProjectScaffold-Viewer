@@ -571,8 +571,15 @@ export function reverseLink(id: Id): void {
     if (!l) return
     ;[l.from, l.to] = [l.to, l.from]
     if (l.route) {
-      const { from, to } = l.route
-      l.route = { ...clean({ from: to, to: from }), points: l.route.points.reverse() }
+      const { from, to, label } = l.route
+      l.route = {
+        ...clean({
+          from: to,
+          to: from,
+          label: label === undefined ? undefined : Math.round((1 - label) * 1000) / 1000
+        }),
+        points: l.route.points.reverse()
+      }
     }
   })
 }
@@ -596,7 +603,8 @@ export function setLinkRoute(id: Id, route: LinkRoute | undefined): void {
   update((d) => {
     const l = d.links.find((l) => l.id === id)
     if (!l) return
-    if (route && (route.points.length || route.from || route.to)) l.route = clean(route)
+    if (route && (route.points.length || route.from || route.to || route.label !== undefined))
+      l.route = clean(route)
     else delete l.route
   })
 }
