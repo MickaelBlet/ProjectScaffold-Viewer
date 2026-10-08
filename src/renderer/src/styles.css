@@ -532,6 +532,24 @@ button.link-button:hover {
 .source-editor header > * {
   white-space: nowrap;
 }
+/* Changes toggle with its previous / next buttons, joined into one pill. */
+.source-changes {
+  display: inline-flex;
+}
+.source-changes button.qualifier + button.qualifier {
+  margin-left: -1px;
+  padding: 0 4px;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  --icon-size: 12px;
+}
+.source-changes button.qualifier + button.qualifier:hover {
+  background: color-mix(in srgb, var(--accent) 25%, transparent);
+}
+.source-changes button.qualifier:has(+ button.qualifier) {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
 .source-editor .source-state.error {
   color: var(--danger);
 }

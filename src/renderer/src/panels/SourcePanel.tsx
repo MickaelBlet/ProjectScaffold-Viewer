@@ -5,8 +5,8 @@ import { z } from 'zod'
 import { insertCompletionText, startCompletion, type CompletionSource } from '@codemirror/autocomplete'
 import { setDiagnostics, type Diagnostic } from '@codemirror/lint'
 import { getChunks, unifiedMergeView } from '@codemirror/merge'
-import type { EditorState, Extension } from '@codemirror/state'
-import { EditorView } from '@codemirror/view'
+import { Prec, type EditorState, type Extension } from '@codemirror/state'
+import { EditorView, keymap } from '@codemirror/view'
 import { FileProjectSchema } from '@/model/schema'
 import { modulePaths, notePath } from '@/model/project'
 import { locateValidation, targetPath } from '@/model/locate'
@@ -93,6 +93,33 @@ function revertButton(type: 'accept' | 'reject', action: (e: MouseEvent) => void
   return button
 }
 
+/** Moves the caret to the start of the next (1) or previous (-1) change, around at the ends. */
+function goToChange(view: EditorView, dir: 1 | -1): boolean {
+  const chunks = getChunks(view.state)?.chunks
+  if (!chunks?.length) return false
+  const head = view.state.selection.main.head
+  const n = chunks.length
+  // Next: the first change starting after the caret; previous: the last one starting before it.
+  const next = chunks.findIndex((c) => c.fromB > head)
+  const before = chunks.filter((c) => c.fromB < head).length
+  const i = dir > 0 ? (next < 0 ? 0 : next) : (before - 1 + n) % n
+  const from = chunks[i]!.fromB
+  view.dispatch({
+    selection: { anchor: from },
+    userEvent: 'select.byChunk',
+    effects: EditorView.scrollIntoView(from, { y: 'center' })
+  })
+  return true
+}
+
+/** Alt+F5 / Shift+Alt+F5: next / previous change, as in VS Code. */
+const changeKeys = Prec.high(
+  keymap.of([
+    { key: 'Alt-F5', run: (v) => goToChange(v, 1) },
+    { key: 'Shift-Alt-F5', run: (v) => goToChange(v, -1) }
+  ])
+)
+
 const NO_EXTENSIONS: Extension = []
 
 /** Handlers of the editor, set up by the effect binding it to the project. */
@@ -154,6 +181,7 @@ export function SourcePanel({ format }: { format: Format }): ReactNode {
       showChanges
         ? [
             unifiedMergeView({ original: savedText, mergeControls: revertButton, gutter: true }),
+            changeKeys,
             EditorView.updateListener.of((u) => setChangeCount(getChunks(u.state)?.chunks.length ?? 0))
           ]
         : NO_EXTENSIONS,
@@ -330,16 +358,41 @@ export function SourcePanel({ format }: { format: Format }): ReactNode {
           />
         ) : null}
         {IN_VSCODE ? null : (
-          <button
-            type="button"
-            className={`qualifier ${showChanges ? 'on' : ''}`}
-            aria-pressed={showChanges}
-            disabled={savedText === null}
-            title={changesTitle}
-            onClick={() => setSetting('sourceChanges', !changesOn)}
-          >
-            Changes{showChanges ? ` ${changeCount}` : ''}
-          </button>
+          // One pill: the toggle, then previous / next change while there are some.
+          <span className="source-changes">
+            <button
+              type="button"
+              className={`qualifier ${showChanges ? 'on' : ''}`}
+              aria-pressed={showChanges}
+              disabled={savedText === null}
+              title={changesTitle}
+              onClick={() => setSetting('sourceChanges', !changesOn)}
+            >
+              Changes{showChanges ? ` ${changeCount}` : ''}
+            </button>
+            {showChanges && changeCount ? (
+              <>
+                <button
+                  type="button"
+                  className="qualifier on"
+                  title="Previous change (Shift+Alt+F5)"
+                  aria-label="Previous change"
+                  onClick={() => view && (view.focus(), goToChange(view, -1))}
+                >
+                  <Icon name="arrow-up" />
+                </button>
+                <button
+                  type="button"
+                  className="qualifier on"
+                  title="Next change (Alt+F5)"
+                  aria-label="Next change"
+                  onClick={() => view && (view.focus(), goToChange(view, 1))}
+                >
+                  <Icon name="arrow-down" />
+                </button>
+              </>
+            ) : null}
+          </span>
         )}
         <span className="spacer" />
         {unreadable ? <span className="source-state error">Not applied</span> : null}

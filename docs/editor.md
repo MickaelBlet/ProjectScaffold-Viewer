@@ -48,7 +48,7 @@ _View › Edit as text_ (Alt+U) opens the project file's YAML (or JSON) in a cod
 - Search and replace in a floating widget like VS Code's (Ctrl+F, Ctrl+H): match case, whole word, regular expression, match count.
 - Completion of the keys, values and names the file allows (Ctrl+Space).
 - Load and validation errors and warnings marked on their lines and listed below the text.
-- Changes since the last save shown in the text, the minimap and the scrollbar (_Changes_, on by default), with a button to revert each.
+- Changes since the last save shown in the text, the minimap and the scrollbar (_Changes_, on by default), with a button to revert each; ↑ / ↓ in the _Changes_ button (Shift+Alt+F5 / Alt+F5) go to the previous / next change.
 - A minimap on the right (_View › Text minimap_): the lines in view, selections, search matches, matching brackets, problems, changes and section headers.
 - Valid edits apply to the project after a pause, one undo step each.
 - _Sync selection_: the element under the cursor is selected in the diagram; the cursor moves to the element selected in the diagram or a list. In a view's data (`editor.views`, `editor.links`), the module or link it is about is selected. Following the cursor never opens or switches a view: the element is shown when the focused view draws it.
