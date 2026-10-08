@@ -1,10 +1,15 @@
 import type { ReactNode } from 'react'
-import { availableIds, getCommand, keyLabel, runCommand } from '@/commands'
+import { availableIds, commands, getCommand, keyLabel, runCommand } from '@/commands'
 import { Icon } from '@/components/Icon'
 import { useSettings } from '@/store/settings'
 import { useDoc } from '@/store/documents'
 import { useProjectStore } from '@/store/project'
+import { IN_VSCODE } from '@/host'
 import { commandIcon } from './toolbar'
+
+// Every command the toolbar can show has an icon.
+if (!IN_VSCODE)
+  for (const c of commands) if (!c.hidden && !commandIcon(c.id)) throw new Error(`No icon for ${c.id}`)
 
 function CommandButton({ id }: { id: string }): ReactNode {
   const c = getCommand(id)
