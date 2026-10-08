@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useState, type ReactNode } from 'react'
 import { DockShell, TOOL_ICONS } from './shell/DockShell'
 import { MenuBar } from './shell/MenuBar'
+import { CommandToolbar } from './shell/CommandToolbar'
 import { ResizeEdges, WindowControls } from './shell/WindowFrame'
 import { StatusBar } from './shell/StatusBar'
 import { ContextMenu } from './components/ContextMenu'
@@ -125,7 +126,9 @@ function SidePanelView(): ReactNode {
             {filePath ? (
               <Content />
             ) : (
-              <p className="side-panel-empty">Open a project file (*.scaffold.yaml) to see its content here.</p>
+              <p className="side-panel-empty">
+                Open a project file (*.scaffold.yaml) to see its content here.
+              </p>
             )}
           </div>
         )
@@ -134,24 +137,6 @@ function SidePanelView(): ReactNode {
       <CommandPalette />
       <Dialog />
     </div>
-  )
-}
-
-function ToolbarButton({
-  command,
-  children,
-  title,
-  className
-}: {
-  command: string
-  children: ReactNode
-  title: string
-  className?: string
-}): ReactNode {
-  return (
-    <button type="button" className={className} title={title} onClick={() => runCommand(command)}>
-      {children}
-    </button>
   )
 }
 
@@ -208,10 +193,7 @@ export function App(): ReactNode {
       window.api.onCodegen!(notifyCodegen),
       // A side panel follows the active document and the view of its diagram, which acts for it.
       ...(IN_PANEL
-        ? [
-            window.api.onDocument!(showHostDocument),
-            window.api.onView!(showDiagramView)
-          ]
+        ? [window.api.onDocument!(showHostDocument), window.api.onView!(showDiagramView)]
         : [
             window.api.onAction!((a) => (a.kind === 'command' ? runCommand(a.id) : runDiagramAction(a))),
             installViewSync()
@@ -274,20 +256,7 @@ export function App(): ReactNode {
           <circle cx="22" cy="17" r="2" fill="#3b6fe0" stroke="#fff" strokeWidth="1.5" />
         </svg>
         <MenuBar />
-        <span className="sep" />
-        <ToolbarButton command="edit.undo" title="Undo (Ctrl+Z)">
-          <Icon name="undo" />
-        </ToolbarButton>
-        <ToolbarButton command="edit.redo" title="Redo (Ctrl+Y)">
-          <Icon name="redo" />
-        </ToolbarButton>
-        <span className="sep" />
-        <ToolbarButton command="view.back" title="Previous selection (Alt+Left)">
-          <Icon name="selection-prev" />
-        </ToolbarButton>
-        <ToolbarButton command="view.forward" title="Next selection (Alt+Right)">
-          <Icon name="selection-next" />
-        </ToolbarButton>
+        <CommandToolbar />
         <span className="spacer" />
         <button
           type="button"

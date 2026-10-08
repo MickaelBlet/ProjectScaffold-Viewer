@@ -160,5 +160,6 @@ The diagram exports as PNG or SVG from the _File_ menu.
   - link style and badges, port style (dots, arrows, hollow, shapes) to tell `in` from `out`;
   - grid, guides, select before moving, Inspector shown on selection, minimap, arrange on open;
   - text editor: font, tab size, whitespace, indentation guides, word wrap, minimap, line numbers, folding, brackets, suggestions…
+  - toolbar: the buttons right of the menus (any command, separators), added, moved and removed in _Toolbar_; _Reset_ restores undo, redo, previous / next selection.
 - _File › Export settings…_ / _Import settings…_ carry the settings to another browser, app or VS Code as a JSON file.
 - _Help › Reset app data…_ deletes everything the app stores in the browser (settings, panel layout, recent files, open documents, caches) and reloads it.

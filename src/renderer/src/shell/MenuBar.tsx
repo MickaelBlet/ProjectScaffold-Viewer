@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
-import { commandItem, commands, type Category } from '@/commands'
+import { availableIds, commandItem, commands, type Category } from '@/commands'
 import { MenuList } from '@/components/ContextMenu'
 import { Icon } from '@/components/Icon'
 import { fileName, openRecentProject } from '@/fileOps'
@@ -149,18 +149,12 @@ if (!IN_VSCODE)
       if (id !== '-' && id !== 'recent' && id !== 'window.fullLayout' && !commands.some((c) => c.id === id))
         throw new Error(id)
 
-/** Menus without the commands the host leaves out (VS Code: document commands; elsewhere: VS Code
- *  commands), nor the separators they leave. */
-function availableMenus(): [Category, string[]][] {
-  return MENUS.map(([cat, ids]) => {
-    const kept = ids.filter((id) => id === '-' || commands.some((c) => c.id === id))
-    const between = (i: number): boolean =>
-      kept.slice(0, i).some((x) => x !== '-') && kept[i + 1] !== undefined && kept[i + 1] !== '-'
-    return [cat, kept.filter((id, i) => id !== '-' || between(i))]
-  })
-}
-
-const menus = availableMenus()
+/** Menus without the commands the host leaves out (VS Code: document commands and recent documents;
+ *  elsewhere: VS Code commands), nor the separators they leave. */
+const menus = MENUS.map(([cat, ids]): [Category, string[]] => [
+  cat,
+  availableIds(ids, IN_VSCODE ? [] : ['recent'])
+])
 
 function recentItem(recent: string[], filePath: string | null): MenuItem {
   return {

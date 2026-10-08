@@ -422,6 +422,14 @@ button.link-button:hover {
   background: var(--border);
   margin: 0 4px;
 }
+.toolbar > button.command {
+  flex: none;
+  white-space: nowrap;
+}
+.toolbar > button.command[aria-pressed='true'] {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
 .toolbar .spacer,
 .statusbar .spacer {
   flex: 1;
@@ -2824,14 +2832,50 @@ mark {
   margin: 6px 0;
 }
 /* Settings the filter leaves out render nothing: hide sections left empty. */
-.settings .section:not(:has(.row, .check)) {
+.settings .section:not(:has(.row, .check, .toolbar-editor)) {
   display: none;
 }
 .settings-empty {
   display: none;
 }
-.settings:not(:has(.section .row, .section .check)) .settings-empty {
+.settings:not(:has(.section .row, .section .check, .section .toolbar-editor)) .settings-empty {
   display: block;
+}
+/* Toolbar buttons (Settings › Toolbar). */
+.toolbar-editor ul {
+  list-style: none;
+  margin: 0 0 6px;
+  padding: 0;
+}
+.toolbar-editor li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 0;
+}
+.toolbar-editor li.separator .toolbar-editor-label {
+  color: var(--muted);
+}
+.toolbar-editor-icon {
+  display: inline-flex;
+  width: var(--icon-size);
+  flex: none;
+}
+.toolbar-editor-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.toolbar-editor-add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.toolbar-editor-add select {
+  flex: 1;
+  min-width: 140px;
 }
 
 /* Tool tabs (shell/DockShell.tsx): icon only, title as tooltip */

@@ -95,7 +95,6 @@ export function isEditable(el: Element | null): boolean {
   )
 }
 
-
 const hasSelection = (): boolean => selectedIds().length > 0
 const multi = (n: number) => (): boolean => selectedIds().length >= n
 const moduleSelected = (): boolean => activeDoc().selection?.kind === 'module'
@@ -785,6 +784,17 @@ export const commands: Command[] = IN_VSCODE
   : allCommands.filter((c) => !EDITOR_COMMANDS.has(c.id))
 
 const byId = new Map(commands.map((c) => [c.id, c]))
+
+/** Command ids and '-' separators without the commands the host leaves out (or unknown ids, but
+ *  the `extra` ones), nor the separators they leave at the ends or next to each other. */
+export function availableIds(ids: readonly string[], extra: readonly string[] = []): string[] {
+  const kept = ids.filter((id) => id === '-' || byId.has(id) || extra.includes(id))
+  return kept.filter(
+    (id, i) =>
+      id !== '-' ||
+      (kept.slice(0, i).some((x) => x !== '-') && kept[i + 1] !== undefined && kept[i + 1] !== '-')
+  )
+}
 
 export function getCommand(id: string): Command {
   const c = byId.get(id)

@@ -11,8 +11,11 @@ import {
   type WhitespaceShown
 } from '@/store/settings'
 import { IN_VSCODE } from '@/host'
-import { Row, Section, Select } from '@/components/fields'
+import { availableIds, commands, getCommand, type Category } from '@/commands'
+import { Icon } from '@/components/Icon'
+import { IconButton, Row, Section, Select } from '@/components/fields'
 import { resetLayout } from '@/shell/controllers'
+import { commandIcon } from '@/shell/toolbar'
 
 /** Number field kept within its bounds; empty or invalid input gives the default. */
 function NumberField(props: {
@@ -71,6 +74,70 @@ function Check(props: {
       <input type="checkbox" checked={props.value} onChange={(e) => props.onChange(e.target.checked)} />
       {props.label}
     </label>
+  )
+}
+
+/** Buttons of the toolbar right of the menus, in order: commands and separators. */
+function ToolbarEditor(): ReactNode {
+  const ids = availableIds(useSettings((s) => s.toolbar))
+  if (!useShown('Toolbar buttons', 'Commands and separators right of the menus')) return null
+  const set = (next: string[]): void => setSetting('toolbar', next)
+  const move = (i: number, step: -1 | 1): void => {
+    const next = [...ids]
+    ;[next[i], next[i + step]] = [next[i + step]!, next[i]!]
+    set(next)
+  }
+  const addable = commands.filter((c) => !c.hidden && !ids.includes(c.id))
+  const categories = [...new Set(addable.map((c) => c.category))] as Category[]
+  return (
+    <div className="toolbar-editor">
+      <ul>
+        {ids.map((id, i) => {
+          const icon = id === '-' ? undefined : commandIcon(id)
+          return (
+            <li key={i} className={id === '-' ? 'separator' : undefined}>
+              <span className="toolbar-editor-icon">{icon && <Icon name={icon} />}</span>
+              <span className="toolbar-editor-label">{id === '-' ? 'Separator' : getCommand(id).title}</span>
+              <IconButton title="Move up" icon="arrow-up" disabled={i === 0} onClick={() => move(i, -1)} />
+              <IconButton
+                title="Move down"
+                icon="arrow-down"
+                disabled={i === ids.length - 1}
+                onClick={() => move(i, 1)}
+              />
+              <IconButton title="Remove" icon="x" onClick={() => set(ids.filter((_, j) => j !== i))} />
+            </li>
+          )
+        })}
+        {!ids.length && <li className="muted">No buttons</li>}
+      </ul>
+      <div className="toolbar-editor-add">
+        <select
+          aria-label="Add a command"
+          value=""
+          onChange={(e) => e.target.value && set([...ids, e.target.value])}
+        >
+          <option value="">Add a command…</option>
+          {categories.map((cat) => (
+            <optgroup key={cat} label={cat}>
+              {addable
+                .filter((c) => c.category === cat)
+                .map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.title}
+                  </option>
+                ))}
+            </optgroup>
+          ))}
+        </select>
+        <button type="button" disabled={!ids.length || ids.at(-1) === '-'} onClick={() => set([...ids, '-'])}>
+          Add separator
+        </button>
+        <button type="button" onClick={() => set(DEFAULT_SETTINGS.toolbar)}>
+          Reset
+        </button>
+      </div>
+    </div>
   )
 }
 
@@ -175,6 +242,9 @@ export function SettingsPanel(): ReactNode {
             value={s.autoLayoutOnOpen}
             onChange={(v) => setSetting('autoLayoutOnOpen', v)}
           />
+        </SettingsSection>
+        <SettingsSection title="Toolbar">
+          <ToolbarEditor />
         </SettingsSection>
         <SettingsSection title="Text editor">
           <Field label="Font size">

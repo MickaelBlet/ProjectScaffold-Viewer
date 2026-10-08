@@ -83,6 +83,8 @@ export interface Settings {
   generationOrder: string[]
   /** Code generation panel files as a folder tree, not a list. */
   generationTree: boolean
+  /** Toolbar buttons right of the menus: command ids, '-' for a separator. */
+  toolbar: string[]
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -123,7 +125,8 @@ export const DEFAULT_SETTINGS: Settings = {
   explorerOrder: [],
   explorerHidden: [],
   generationOrder: [],
-  generationTree: false
+  generationTree: false,
+  toolbar: ['edit.undo', 'edit.redo', '-', 'view.back', 'view.forward']
 }
 
 const SETTINGS_KEY = 'project-scaffold:settings'
