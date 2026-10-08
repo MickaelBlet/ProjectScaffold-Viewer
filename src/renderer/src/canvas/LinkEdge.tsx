@@ -64,20 +64,21 @@ function endPoints(
   route: LinkRoute | undefined
 ) {
   const ends = portEnds(props, source, target, lookup, auto, orientation)
-  const anchored = (node: InternalNode | undefined, anchor: LinkRoute['from']) =>
-    node && anchor ? anchorPoint(rectOf(node), anchor) : null
-  const from = anchored(source, route?.from)
-  const to = anchored(target, route?.to)
-  // Ports are drawn at their attachment (portAnchors) unless another link's attachment took them.
-  const atPort = (p: Point, x: number, y: number): boolean => Math.hypot(p.x - x, p.y - y) < 8
+  // Ports are drawn at their attachment (portAnchors) unless another link's attachment took them:
+  // there the link ends at the port's handle (outside the border), as at an unanchored port.
+  const atPort = (p: Point, x: number, y: number): boolean => Math.hypot(p.x - x, p.y - y) < 12
+  const anchored = (node: InternalNode | undefined, anchor: LinkRoute['from'], x: number, y: number) => {
+    if (!node || !anchor) return null
+    const p = anchorPoint(rectOf(node), anchor)
+    return atPort(p, x, y) ? { x, y, moved: false } : { ...p, moved: true }
+  }
+  const from = anchored(source, route?.from, props.sourceX, props.sourceY)
+  const to = anchored(target, route?.to, props.targetX, props.targetY)
   const out = {
     ...ends,
     ...(from && { sourceX: from.x, sourceY: from.y, sourcePosition: POSITION[route!.from!.side] }),
     ...(to && { targetX: to.x, targetY: to.y, targetPosition: POSITION[route!.to!.side] }),
-    moved: [
-      from ? !atPort(from, props.sourceX, props.sourceY) : ends.moved[0]!,
-      to ? !atPort(to, props.targetX, props.targetY) : ends.moved[1]!
-    ]
+    moved: [from ? from.moved : ends.moved[0]!, to ? to.moved : ends.moved[1]!]
   }
   // A container's end of a link to its content leaves inwards, from the edge it sits on.
   const inwards = (node: InternalNode, x: number, y: number): Position =>
