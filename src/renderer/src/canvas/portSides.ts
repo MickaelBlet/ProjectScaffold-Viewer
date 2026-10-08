@@ -269,10 +269,14 @@ export function portsOn<T extends { id: Id }>(
     .map((x) => x.pt)
 }
 
-/** Height a module needs to draw its ports where they are placed. */
-export function neededHeight(ports: { id: Id }[], placements: Record<Id, PortPlacement>): number {
+/** Height a module needs to draw its ports where they are placed, below its `compartments` height. */
+export function neededHeight(
+  ports: { id: Id }[],
+  placements: Record<Id, PortPlacement>,
+  compartments = 0
+): number {
   const count = (side: Side): number => portsOn(ports, placements, side).length
   const rows = Math.max(count('left'), count('right'))
   const bands = (count('top') ? 1 : 0) + (count('bottom') ? 1 : 0)
-  return MODULE_HEADER + bands * PORT_BAND + (rows ? rows * PORT_ROW + 12 : 12)
+  return MODULE_HEADER + compartments + bands * PORT_BAND + (rows ? rows * PORT_ROW + 12 : 12)
 }

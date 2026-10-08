@@ -134,6 +134,8 @@ describe('floatingPortSides', () => {
     expect(portsOn(p.modules[1]!.ports, b, 'top').map((x) => x.id)).toEqual(['b_in', 'b_cmd'])
     // Header, one band, one row (a_free on the right).
     expect(neededHeight(ports, placements)).toBe(36 + 24 + 24 + 12)
+    // Attributes and methods push the ports down.
+    expect(neededHeight(ports, placements, 44)).toBe(36 + 44 + 24 + 24 + 12)
   })
 
   it('orders side ports so that links do not cross', () => {

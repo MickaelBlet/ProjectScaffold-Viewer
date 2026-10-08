@@ -2,7 +2,14 @@
 // inView: a drill-down view adds the modules outside it), and the link ends of a connection drawn
 // between two handles.
 import { MarkerType, type Connection, type Edge, type Node } from '@xyflow/react'
-import { allImported, findPort, importedSize, orderLinkEnds, viewNotes } from '@/model/project'
+import {
+  allImported,
+  compartmentsHeight,
+  findPort,
+  importedSize,
+  orderLinkEnds,
+  viewNotes
+} from '@/model/project'
 import { ceilToGrid } from '@/model/grid'
 import { outsideOf, shownModuleIds } from '@/model/viewLayout'
 import type { Id, LinkAnchor, PortRole, Project, View } from '@/model/types'
@@ -85,7 +92,10 @@ export function toNodes(
       position: { x: m.layout.x, y: m.layout.y },
       width: m.layout.width,
       height: grow
-        ? Math.max(m.layout.height, fit(neededHeight(freePorts(m.ports, anchors), placements)))
+        ? Math.max(
+            m.layout.height,
+            fit(neededHeight(freePorts(m.ports, anchors), placements, compartmentsHeight(m)))
+          )
         : m.layout.height,
       // The root of a drill-down view and the modules outside it are drawn at the top level.
       parentId: m.parentId ?? undefined,
