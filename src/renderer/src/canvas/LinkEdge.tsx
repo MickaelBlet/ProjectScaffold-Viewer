@@ -19,7 +19,7 @@ import { useSettings } from '@/store/settings'
 import { openContextMenu, select } from '@/store/ui'
 import { revealInspector } from '@/shell/controllers'
 import type { LinkRoute, Orientation } from '@/model/types'
-import { EXTERNAL, OPPOSITE, PERF_COLORS, POSITION, SIDE, Z } from './constants'
+import { OPPOSITE, PERF_COLORS, POSITION, SIDE, Z } from './constants'
 import { orientLinkEnds } from './linkEnds'
 import {
   anchorPoint,
@@ -34,6 +34,7 @@ import {
   type Route
 } from './linkRoute'
 import { Icon } from '@/components/Icon'
+import { useDrawn } from './viewContext'
 
 type Lookup = (id: string) => InternalNode | undefined
 
@@ -64,7 +65,7 @@ function endPoints(
 ) {
   const ends = portEnds(props, source, target, lookup, auto, orientation)
   const anchored = (node: InternalNode | undefined, anchor: LinkRoute['from']) =>
-    node && anchor && node.type !== 'external' ? anchorPoint(rectOf(node), anchor) : null
+    node && anchor ? anchorPoint(rectOf(node), anchor) : null
   const from = anchored(source, route?.from)
   const to = anchored(target, route?.to)
   // Ports are drawn at their attachment (portAnchors) unless another link's attachment took them.
@@ -108,9 +109,8 @@ function portEnds(
   if (!auto || !source || !target) return base
   // A container's port links to its content from the inside: keep the sides.
   if (isAncestor(lookup, source.id, target.id) || isAncestor(lookup, target.id, source.id)) return base
-  // Floating ports already sit on the facing edge (portSides.ts), as do the ports of outside
-  // stand-ins: the link starts at the port.
-  const floats = [source, target].map((n) => n.type === 'external' || !!(n.data as { sides?: unknown }).sides)
+  // Floating ports already sit on the facing edge (portSides.ts): the link starts at the port.
+  const floats = [source, target].map((n) => !!(n.data as { sides?: unknown }).sides)
   if (floats[0] && floats[1]) return base
   const ends = orientLinkEnds(
     { rect: rectOf(source), handle: { x: props.sourceX, y: props.sourceY } },
@@ -141,6 +141,13 @@ function portEnds(
 /** Screen pixels within which a dragged point lines up with its neighbours. */
 const ALIGN_PX = 6
 
+/** Swallow the click a drag ends with: released off the handle, it would land on the pane (deselecting). */
+function swallowClick(): void {
+  const stop = (ev: MouseEvent): void => ev.stopPropagation()
+  window.addEventListener('click', stop, { capture: true, once: true })
+  setTimeout(() => window.removeEventListener('click', stop, { capture: true }))
+}
+
 /**
  * Follows the pointer from a pointer down on a handle until it is released. Pointer downs are
  * cancelled on the canvas, so no `dblclick` follows: double clicks are clicks with `detail` 2.
@@ -150,21 +157,29 @@ function follow(e: React.PointerEvent, move: (ev: PointerEvent) => void, end: ()
   e.stopPropagation()
   // Grabbing cursor wherever the pointer goes until released.
   document.documentElement.classList.add('grabbing')
+  const start = { x: e.clientX, y: e.clientY }
+  let dragged = false
+  const onMove = (ev: PointerEvent): void => {
+    dragged ||= ev.clientX !== start.x || ev.clientY !== start.y
+    move(ev)
+  }
   const up = (): void => {
-    window.removeEventListener('pointermove', move)
+    window.removeEventListener('pointermove', onMove)
     window.removeEventListener('pointerup', up)
     document.documentElement.classList.remove('grabbing')
+    if (dragged) swallowClick()
     end()
   }
-  window.addEventListener('pointermove', move)
+  window.addEventListener('pointermove', onMove)
   window.addEventListener('pointerup', up)
 }
 
 export const LinkEdge = memo(function LinkEdge(props: EdgeProps): ReactNode {
-  const link = useProjectStore((s) => indexById(s.project.links).get(props.id))
-  const origin = useProjectStore((s) => {
-    const l = indexById(s.project.links).get(props.id)
-    return l ? linkOrigin(s.project, l) : null
+  // Shape of the link in the canvas's view.
+  const link = useDrawn((p) => indexById(p.links).get(props.id))
+  const origin = useDrawn((p) => {
+    const l = indexById(p.links).get(props.id)
+    return l ? linkOrigin(p, l) : null
   })
   const { edgeStyle, edgeBadges, autoOrientLinks, snapToGrid, gridSize } = useSettings(
     useShallow((s) => ({
@@ -184,10 +199,10 @@ export const LinkEdge = memo(function LinkEdge(props: EdgeProps): ReactNode {
   /** Shape being dragged, with absolute bend points. */
   const [draft, setDraft] = useState<LinkRoute | null>(null)
 
-  // Shapes are set where both ends are shown: bend points are relative to the module holding both.
+  // Bend points are relative to the module holding both ends as the view draws it (none for the
+  // links to the modules outside a drill-down view: absolute).
   const originNode = origin ? lookup(origin) : undefined
-  const editable =
-    !props.source.startsWith(EXTERNAL) && !props.target.startsWith(EXTERNAL) && (!origin || !!originNode)
+  const editable = !origin || !!originNode
   const offset = originNode?.internals.positionAbsolute ?? { x: 0, y: 0 }
   const saved =
     editable && link?.route

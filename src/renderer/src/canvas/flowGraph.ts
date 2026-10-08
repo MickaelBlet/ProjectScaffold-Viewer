@@ -1,28 +1,20 @@
-// React Flow graph of a view: nodes and edges built from the project, and the link ends of a
-// connection drawn between two handles.
+// React Flow graph of a view: nodes and edges built from the project as the view draws it (see
+// inView: a drill-down view adds the modules outside it), and the link ends of a connection drawn
+// between two handles.
 import { MarkerType, type Connection, type Edge, type Node } from '@xyflow/react'
-import {
-  absoluteRect,
-  allImported,
-  findPort,
-  importedSize,
-  modulePath,
-  orderLinkEnds,
-  visibleModuleIds
-} from '@/model/project'
+import { allImported, findPort, importedSize, orderLinkEnds, viewNotes } from '@/model/project'
 import { ceilToGrid } from '@/model/grid'
+import { outsideOf, shownModuleIds } from '@/model/viewLayout'
 import type { Id, LinkAnchor, PortRole, Project, View } from '@/model/types'
-import type { ExternalNodeData, ExternalPort } from './ExternalNode'
 import { inheritEdges } from './inheritEdges'
-import { EXTERNAL, MODULE_HANDLE, PERF_COLORS, Z } from './constants'
+import { MODULE_HANDLE, PERF_COLORS, Z } from './constants'
 import {
+  containerIds,
   freePorts,
   neededHeight,
   portAnchors,
-  STAND_IN_HEADER,
   type PortPlacement,
-  type PortSides,
-  type StandIn
+  type PortSides
 } from './portSides'
 
 /** Data of module and imported module nodes: where their ports are drawn. */
@@ -31,8 +23,10 @@ export type PortNodeData = {
   sides?: Record<Id, PortPlacement>
   /** Ports at a hand-set link attachment (see portAnchors), out of their edge's rows. */
   anchors: Record<Id, LinkAnchor>
-  /** Root of a drill-down view: resized, not moved. */
+  /** Root of a drill-down view: moved and resized in it, never into another module. */
   frame?: true
+  /** Module outside a drill-down view: drawn compact, without its content. */
+  outside?: true
 }
 
 /**
@@ -44,29 +38,28 @@ export function toNodes(
   view: View,
   selected: Set<Id>,
   sides: PortSides | null,
-  externals: Node<ExternalNodeData>[],
   grid: number | null,
   selectToMove = false
 ): Node[] {
   const movable = (id: Id): boolean => !selectToMove || selected.has(id)
   // On the grid, sizes grown for their ports stay multiples of it.
   const fit = (v: number): number => (grid ? ceilToGrid(v, grid) : v)
-  const visible = visibleModuleIds(p, view)
+  const visible = shownModuleIds(p, view)
+  const outside = outsideOf(p)
   const nodes: Node[] = []
-  if (!view.rootModuleId)
-    for (const n of p.notes)
-      nodes.push({
-        id: n.id,
-        type: 'note',
-        position: { x: n.layout.x, y: n.layout.y },
-        width: n.layout.width,
-        height: n.layout.height,
-        selected: selected.has(n.id),
-        draggable: !n.locked && movable(n.id),
-        zIndex: n.kind === 'frame' ? Z.frame : Z.note,
-        data: {}
-      })
-  const parents = new Set(p.modules.flatMap((m) => m.parentId ?? []))
+  for (const n of viewNotes(p, view))
+    nodes.push({
+      id: n.id,
+      type: 'note',
+      position: { x: n.layout.x, y: n.layout.y },
+      width: n.layout.width,
+      height: n.layout.height,
+      selected: selected.has(n.id),
+      draggable: !n.locked && movable(n.id),
+      zIndex: n.kind === 'frame' ? Z.frame : Z.note,
+      data: {}
+    })
+  const parents = containerIds(p)
   // Modules drawn around others: links between their content go over them.
   const containers = new Set(p.modules.flatMap((m) => (visible.has(m.id) && m.parentId) || []))
   // Ports at a hand-set link attachment are drawn there, out of their edge's rows.
@@ -94,16 +87,19 @@ export function toNodes(
       height: grow
         ? Math.max(m.layout.height, fit(neededHeight(freePorts(m.ports, anchors), placements)))
         : m.layout.height,
-      parentId: isRoot ? undefined : (m.parentId ?? undefined),
-      // The root of a drill-down view is the frame of the view.
-      draggable: !isRoot && !m.locked && movable(m.id),
+      // The root of a drill-down view and the modules outside it are drawn at the top level.
+      parentId: m.parentId ?? undefined,
+      draggable: !m.locked && movable(m.id),
       selected: selected.has(m.id),
       zIndex: containers.has(m.id) ? Z.container : Z.module,
-      data: { ...portData(m.ports, placements), ...(isRoot && { frame: true as const }) }
+      data: {
+        ...portData(m.ports, placements),
+        ...(isRoot && { frame: true as const }),
+        ...(outside.has(m.id) && { outside: true as const })
+      }
     })
   }
-  nodes.push(...externals)
-  // Modules of other projects (global view only).
+  // Modules of other projects (global view, or outside a drill-down view).
   for (const m of allImported(p)) {
     if (!visible.has(m.id)) continue
     const placements = sides?.get(m.id)
@@ -121,114 +117,18 @@ export function toNodes(
       selected: selected.has(m.id),
       draggable: movable(m.id),
       zIndex: Z.module,
-      data: portData(m.ports, placements)
+      data: { ...portData(m.ports, placements), ...(outside.has(m.id) && { outside: true as const }) }
     })
   }
   return nodes
 }
 
-/**
- * Stand-ins for the modules outside a drill-down view linked to its content. Given where the
- * inside ports are drawn, stand-ins and their ports follow the order of the ports they link to.
- */
-export function externalNodes(
-  p: Project,
-  view: View,
-  visible: Set<Id>,
-  inside: Map<Id, { x: number; y: number }> | null
-): Node<ExternalNodeData>[] {
-  const root = p.modules.find((m) => m.id === view.rootModuleId)
-  if (!root) return []
-  const outside = new Map<Id, ExternalPort[]>()
-  /** Inside ports linked to each outside port. */
-  const partners = new Map<Id, Id[]>()
-  const add = (moduleId: Id, portId: Id, type: 'source' | 'target', partner: Id): void => {
-    const port = findPort(p, moduleId, portId)
-    if (!port) return
-    const list = outside.get(moduleId) ?? []
-    if (!list.some((x) => x.id === portId)) list.push({ id: portId, name: port.name, type })
-    outside.set(moduleId, list)
-    partners.set(portId, [...(partners.get(portId) ?? []), partner])
-  }
-  for (const l of p.links) {
-    const fromIn = visible.has(l.from.moduleId)
-    const toIn = visible.has(l.to.moduleId)
-    if (fromIn && !toIn) add(l.to.moduleId, l.to.portId, 'target', l.from.portId)
-    if (!fromIn && toIn) add(l.from.moduleId, l.from.portId, 'source', l.to.portId)
-  }
-  const r = root.layout
-  const vertical = p.orientation === 'vertical'
-  let groups = [...outside]
-  if (inside) {
-    const mean = (xs: number[]): number => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : Infinity)
-    const key = (portId: Id): number =>
-      mean((partners.get(portId) ?? []).flatMap((id) => inside.get(id)?.[vertical ? 'x' : 'y'] ?? []))
-    groups = groups
-      .map(([id, ports]) => [id, [...ports].sort((a, b) => key(a.id) - key(b.id))] as const)
-      .map(([id, ports]) => ({ id, ports, at: mean(ports.map((pt) => key(pt.id)).filter(Number.isFinite)) }))
-      .sort((a, b) => a.at - b.at)
-      .map(({ id, ports }) => [id, ports])
-  }
-  // Next free place along the edge of the view, for senders and receivers.
-  let before = vertical ? r.x : r.y
-  let after = before
-  return groups.map(([moduleId, ports]) => {
-    // Senders on the in side of the view (left, or above), receivers on the out side.
-    const sender = ports.every((pt) => pt.type === 'source')
-    const width = vertical ? Math.max(180, ports.length * 120) : 180
-    const height = vertical ? 58 : STAND_IN_HEADER + ports.length * 24
-    const along = sender ? before : after
-    if (sender) before += (vertical ? width : height) + 20
-    else after += (vertical ? width : height) + 20
-    const position = vertical
-      ? { x: along, y: sender ? r.y - height - 80 : r.y + r.height + 80 }
-      : { x: sender ? r.x - width - 80 : r.x + r.width + 80, y: along }
-    const side = vertical ? (sender ? 'bottom' : 'top') : sender ? 'right' : 'left'
-    return {
-      id: EXTERNAL + moduleId,
-      type: 'external',
-      position,
-      width,
-      height,
-      draggable: false,
-      selectable: false,
-      zIndex: Z.module,
-      data: { label: modulePath(p, moduleId), ports, side }
-    }
-  })
-}
-
-/** Outside modules at their stand-in, in the absolute coordinates of the project. */
-export function standIns(p: Project, view: View, externals: Node<ExternalNodeData>[]): Map<Id, StandIn> {
-  const root = p.modules.find((m) => m.id === view.rootModuleId)
-  const out = new Map<Id, StandIn>()
-  if (!root) return out
-  // The root of the view is drawn at its layout, not at its absolute place.
-  const abs = absoluteRect(p, root.id)
-  const dx = abs.x - root.layout.x
-  const dy = abs.y - root.layout.y
-  for (const n of externals)
-    out.set(n.id.slice(EXTERNAL.length), {
-      rect: { x: n.position.x + dx, y: n.position.y + dy, width: n.width ?? 0, height: n.height ?? 0 },
-      side: n.data.side,
-      ports: n.data.ports.map((pt) => pt.id)
-    })
-  return out
-}
-
-export function toEdges(
-  p: Project,
-  visible: Set<Id>,
-  drill: boolean,
-  selectedLink: Id | null,
-  inheritance: boolean
-): Edge[] {
-  const end = (moduleId: Id): string | null =>
-    visible.has(moduleId) ? moduleId : drill ? EXTERNAL + moduleId : null
+/** Links between the modules a view draws (see shownModuleIds). */
+export function toEdges(p: Project, shown: Set<Id>, selectedLink: Id | null, inheritance: boolean): Edge[] {
   const links = p.links.flatMap((l): Edge[] => {
-    const source = end(l.from.moduleId)
-    const target = end(l.to.moduleId)
-    if (!source || !target || (source.startsWith(EXTERNAL) && target.startsWith(EXTERNAL))) return []
+    const source = l.from.moduleId
+    const target = l.to.moduleId
+    if (!shown.has(source) || !shown.has(target)) return []
     const color = PERF_COLORS[l.constraints.performance.class]
     const marker = { type: MarkerType.ArrowClosed, color, width: 16, height: 16 }
     return [
@@ -246,7 +146,7 @@ export function toEdges(
       }
     ]
   })
-  return inheritance ? [...links, ...inheritEdges(p, visible)] : links
+  return inheritance ? [...links, ...inheritEdges(p, shown)] : links
 }
 
 export interface ConnectEnd {

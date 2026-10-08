@@ -4,6 +4,7 @@
 import { absoluteRect, allImported, MODULE_HEADER, PORT_BAND, PORT_ROW, subtreeIds } from '@/model/project'
 import type { Id, LinkAnchor, Orientation, PortRole, Project, Rect } from '@/model/types'
 import type { Side } from './linkEnds'
+import { outsideOf } from '@/model/viewLayout'
 import { anchorPoint } from './linkRoute'
 
 export interface PortPlacement {
@@ -41,14 +42,12 @@ export function facingSide(a: Rect, b: Rect, o: Orientation): Side {
 }
 
 /** Stand-in of a module outside a drill-down view: its rect and its ports, in order, on one edge. */
-export interface StandIn {
-  rect: Rect
-  side: Side
-  ports: Id[]
+/** Modules drawn with content: holding others, unless outside a drill-down view. */
+export function containerIds(p: Project): Set<Id> {
+  const outside = outsideOf(p)
+  return new Set(p.modules.flatMap((m) => (m.parentId && !outside.has(m.parentId) ? m.parentId : [])))
 }
 
-/** Height of a stand-in's label, above its port rows. */
-export const STAND_IN_HEADER = 34
 /** Barycenter sweeps ordering the ports along their edges. */
 const SWEEPS = 4
 
@@ -143,31 +142,21 @@ export function freePorts<T extends { id: Id }>(ports: T[], anchors: Map<Id, Lin
   return ports.filter((pt) => !anchors.has(pt.id))
 }
 
-/** Where the ports of the stand-ins are drawn. */
-function placeStandIns(standIns: Map<Id, StandIn>, out: Map<Id, Point>): void {
-  for (const s of standIns.values())
-    s.ports.forEach((id, i) => out.set(id, portPoint(s.rect, s.side, i, s.ports.length, STAND_IN_HEADER)))
-}
-
 /**
  * Placement of the ports of the visible modules (imported ones included). A port linked several
  * times goes where most of its links go; unlinked ports, links to hidden or enclosing modules, and
  * container ports linked to their content keep the orientation's default edge, unless a link is
- * attached by hand elsewhere. `standIns` are the
- * modules outside a drill-down view, drawn at their stand-in.
+ * attached by hand elsewhere. Modules outside a drill-down view (see outsideOf) are drawn
+ * without their content.
  *
  * Along an edge, ports follow the ports they are linked to (barycenter sweeps), so that the links
  * between two edges do not cross.
  */
-export function floatingPortSides(
-  p: Project,
-  visible: Set<Id>,
-  standIns = new Map<Id, StandIn>()
-): PortSides {
-  const parents = new Set(p.modules.flatMap((m) => m.parentId ?? []))
+export function floatingPortSides(p: Project, visible: Set<Id>): PortSides {
+  const parents = containerIds(p)
   const rects = new Map<Id, Rect>()
   const rect = (id: Id): Rect => {
-    let r = standIns.get(id)?.rect ?? rects.get(id)
+    let r = rects.get(id)
     if (!r) rects.set(id, (r = absoluteRect(p, id)))
     return r
   }
@@ -188,12 +177,7 @@ export function floatingPortSides(
       if (parents.has(end.moduleId) && subtreeIds(p, end.moduleId).has(other.moduleId)) pinned.add(end.portId)
       // A hand-set attachment takes its port to its side, whatever the other end.
       const anchor = end === l.from ? l.route?.from : l.route?.to
-      if (
-        !anchor &&
-        (!(visible.has(other.moduleId) || standIns.has(other.moduleId)) ||
-          nested(end.moduleId, other.moduleId))
-      )
-        continue
+      if (!anchor && (!visible.has(other.moduleId) || nested(end.moduleId, other.moduleId))) continue
       const side = anchor?.side ?? facingSide(rect(end.moduleId), rect(other.moduleId), p.orientation)
       const list = ends.get(end.portId) ?? []
       list.push({ side, other, index, anchored: !!anchor })
@@ -226,7 +210,6 @@ export function floatingPortSides(
   const top = (m: (typeof modules)[number], placements: Record<Id, PortPlacement>): number =>
     rowsTop(m.ports, placements, anchors, rect(m.id), parents.has(m.id), p.orientation, true)
   const points = new Map<Id, Point>()
-  placeStandIns(standIns, points)
   for (const m of modules)
     placePorts(m.ports, out.get(m.id)!, anchors, rect(m.id), top(m, out.get(m.id)!), points)
   for (let sweep = 0; sweep < SWEEPS; sweep++)
@@ -255,7 +238,7 @@ export function floatingPortSides(
 
 /** Where the ports of the visible modules are drawn, placed by `sides` or on their default edges. */
 export function portPoints(p: Project, visible: Set<Id>, sides: PortSides | null): Map<Id, Point> {
-  const parents = new Set(p.modules.flatMap((m) => m.parentId ?? []))
+  const parents = containerIds(p)
   const anchors = portAnchors(p, sides)
   const points = new Map<Id, Point>()
   for (const m of [...p.modules, ...allImported(p)]) {

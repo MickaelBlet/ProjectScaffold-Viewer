@@ -28,8 +28,10 @@ import {
   modulePath,
   newId,
   subtreeIds,
-  uniqueName
+  uniqueName,
+  viewNotes
 } from '@/model/project'
+import { hasOwnLayout, inView, outsideOf, shownModuleIds } from '@/model/viewLayout'
 import { targetAt, type SourceTarget } from '@/components/sourceTarget'
 import { targetPath } from '@/model/locate'
 import type { ProblemTarget } from '@/model/validate'
@@ -109,6 +111,15 @@ export function selectedIds(): Id[] {
   return s && 'id' in s && s.kind !== 'dependency' ? [s.id] : []
 }
 
+/**
+ * Selected entities whose structure the focused view edits (delete, copy, group...): not the
+ * modules outside a drill-down view, only laid out there (see outsideOf).
+ */
+function structuralIds(): Id[] {
+  const outside = outsideOf(getLayout())
+  return selectedIds().filter((id) => !outside.has(id))
+}
+
 export function selectionOf(p: Project, id: Id): Selection {
   if (p.modules.some((m) => m.id === id)) return { kind: 'module', id }
   if (p.notes.some((n) => n.id === id)) return { kind: 'note', id }
@@ -131,11 +142,18 @@ export function selectAll(): void {
   const view = findView(p, activeDoc().activeViewId)
   const scope = view.rootModuleId
   // Top-level entities of the view: selecting them moves their content along.
-  selectMany([...childModules(p, scope).map((m) => m.id), ...(scope ? [] : p.notes.map((n) => n.id))])
+  selectMany([...childModules(p, scope).map((m) => m.id), ...viewNotes(p, view).map((n) => n.id)])
 }
 
-/** Select an entity and bring it into view (zoomed on it with `zoom`). */
-export function navigate(target: ProblemTarget, { zoom = false }: { zoom?: boolean } = {}): void {
+/**
+ * Select an entity and bring it into view (zoomed on it with `zoom`): in the focused view, else
+ * in the _Project_ view, showing its hidden ancestors. With `stay` (following the text cursor),
+ * the focused view stays as it is: shown only when it draws it.
+ */
+export function navigate(
+  target: ProblemTarget,
+  { zoom = false, stay = false }: { zoom?: boolean; stay?: boolean } = {}
+): void {
   const before = activeDoc().selection
   if (target.kind === 'project' || target.kind === 'const') select({ kind: 'project' })
   else
@@ -156,10 +174,16 @@ export function navigate(target: ProblemTarget, { zoom = false }: { zoom?: boole
   const p = getProject()
   const link = target.kind === 'link' ? p.links.find((l) => l.id === target.id) : undefined
   const ids = link ? [link.from.moduleId, link.to.moduleId] : [target.id]
-  // Show the module (a link: at least one end) in a view that contains it.
   let view = findView(p, activeDoc().activeViewId)
+  if (stay) {
+    const shown = shownModuleIds(inView(p, view), view)
+    if (ids.some((id) => shown.has(id))) revealWhenDrawn(link ? [link.id] : ids, zoom, ids)
+    return
+  }
+  // Show the module (a link: at least one end) in a view that draws it (outside a drill-down view too).
   const root = view.rootModuleId
-  if (root && !ids.some((id) => subtreeIds(p, root).has(id))) {
+  const outside = outsideOf(inView(p, view))
+  if (root && !ids.some((id) => subtreeIds(p, root).has(id) || outside.has(id))) {
     openView(GLOBAL_VIEW)
     view = findView(p, GLOBAL_VIEW)
   }
@@ -187,8 +211,8 @@ export function navigateToPath(path: (string | number)[], names: (string | undef
   if (!target || isSelected(target)) return
   revealing = true
   try {
-    if (target.kind === 'note') navigateToNote(target.id, { zoom: true })
-    else navigate(target, { zoom: true })
+    if (target.kind === 'note') navigateToNote(target.id, { zoom: true, stay: true })
+    else navigate(target, { zoom: true, stay: true })
   } finally {
     revealing = false
   }
@@ -240,10 +264,18 @@ export function runDiagramAction(action: Exclude<DiagramAction, { kind: 'command
   if (target?.kind === action.editor) openEditor(action.editor, target.id, { split: action.split })
 }
 
-/** Select a note and show it (notes are drawn in the global view only). */
-export function navigateToNote(id: Id, { zoom = false }: { zoom?: boolean } = {}): void {
+/** Select a note and show it, in its view (with `stay`: only when the focused view draws it). */
+export function navigateToNote(
+  id: Id,
+  { zoom = false, stay = false }: { zoom?: boolean; stay?: boolean } = {}
+): void {
   select({ kind: 'note', id })
-  if (findView(getProject(), activeDoc().activeViewId).rootModuleId) openView(GLOBAL_VIEW)
+  const p = getProject()
+  const note = p.notes.find((n) => n.id === id)
+  if (note && !viewNotes(p, findView(p, activeDoc().activeViewId)).includes(note)) {
+    if (stay) return
+    openView(note.viewId ?? GLOBAL_VIEW)
+  }
   revealWhenDrawn([id], zoom)
 }
 
@@ -291,7 +323,7 @@ function writeClip(clip: Clip, data?: DataTransfer | null): void {
 
 /** Copy the selection. With a clipboard event, writes to it; else to the system clipboard when allowed. */
 export function copySelection(data?: DataTransfer | null): boolean {
-  const clip = copyItems(getLayout(), selectedIds())
+  const clip = copyItems(getLayout(), structuralIds())
   if (!clip) return false
   writeClip(clip, data)
   const n =
@@ -314,8 +346,8 @@ export function pasteItems(clip: Clip, place?: { at: { x: number; y: number }; p
   let pasted: Id[] = []
   updateLayout((d) => {
     pasted = place
-      ? pasteClip(d, clip, { parent: place.parent, at: place.at })
-      : pasteClip(d, clip, { parent: 'original', offset: 30 * pasteCount })
+      ? pasteClip(d, clip, { parent: place.parent, at: place.at, viewId: drillViewId() })
+      : pasteClip(d, clip, { parent: 'original', offset: 30 * pasteCount, viewId: drillViewId() })
   })
   selectMany(pasted)
   setStatus('info', `Pasted ${pasted.length} item${pasted.length > 1 ? 's' : ''}`)
@@ -335,10 +367,12 @@ export async function paste(
 }
 
 export function duplicateSelection(): void {
-  const clip = copyItems(getLayout(), selectedIds())
+  const clip = copyItems(getLayout(), structuralIds())
   if (!clip) return
   let pasted: Id[] = []
-  updateLayout((d) => void (pasted = pasteClip(d, clip, { parent: 'original', offset: 30 })))
+  updateLayout(
+    (d) => void (pasted = pasteClip(d, clip, { parent: 'original', offset: 30, viewId: drillViewId() }))
+  )
   selectMany(pasted)
 }
 
@@ -346,7 +380,7 @@ export function duplicateSelection(): void {
 
 export function deleteSelection(): void {
   const p = getProject()
-  const ids = selectedIds()
+  const ids = structuralIds()
   const sel = activeDoc().selection
   if (sel?.kind === 'link' && !activeDoc().selectedIds.length) {
     deleteLink(sel.id)
@@ -380,6 +414,11 @@ function viewParent(): Id | null {
   return findView(getProject(), activeDoc().activeViewId).rootModuleId
 }
 
+/** The focused view when it is a drill-down view (with notes of its own). */
+function drillViewId(): Id | undefined {
+  return viewParent() ? activeDoc().activeViewId : undefined
+}
+
 export function addModuleAt(pos?: { x: number; y: number }, parentId: Id | null = viewParent()): Id {
   const p = getLayout()
   const c = pos ?? activeCanvas()?.center() ?? { x: 80, y: 80 }
@@ -405,7 +444,7 @@ export function addPortToSelection(role: 'in' | 'out'): void {
 
 export function addNoteAt(kind: 'note' | 'frame', pos?: { x: number; y: number }): void {
   const c = pos ?? activeCanvas()?.center() ?? { x: 80, y: 80 }
-  const id = addNote(kind, Math.round(c.x), Math.round(c.y))
+  const id = addNote(kind, Math.round(c.x), Math.round(c.y), drillViewId())
   select({ kind: 'note', id })
 }
 
@@ -1108,7 +1147,7 @@ export function nudgeSelection(dx: number, dy: number): void {
 /** Group sibling modules into a new parent module. */
 export function groupSelection(): void {
   const p = getLayout()
-  const mods = selectedIds().flatMap((id) => p.modules.find((m) => m.id === id) ?? [])
+  const mods = structuralIds().flatMap((id) => p.modules.find((m) => m.id === id) ?? [])
   if (!mods.length) return
   const parentId = mods[0]!.parentId
   if (mods.some((m) => m.parentId !== parentId))
@@ -1194,6 +1233,7 @@ export async function arrangeLayout(
       }
       // Hand-set bends do not fit the new layout; attachments and badges do not fit a new orientation.
       const moved = scopeId ? subtreeIds(p, scopeId) : null
+      if (target !== p.orientation) for (const v of d.views) delete v.routes
       for (const l of d.links) {
         if (!l.route || (moved && !moved.has(l.from.moduleId) && !moved.has(l.to.moduleId))) continue
         if (target !== p.orientation) delete l.route
@@ -1263,7 +1303,7 @@ export function hideSelection(): void {
 }
 
 export function activeViewHasLayouts(): boolean {
-  return !!findView(getProject(), activeDoc().activeViewId).layouts
+  return hasOwnLayout(findView(getProject(), activeDoc().activeViewId))
 }
 
 export function resetViewLayout(): void {

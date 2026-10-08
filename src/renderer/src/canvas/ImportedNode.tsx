@@ -7,6 +7,7 @@ import { Icon } from '@/components/Icon'
 import type { PortNodeData } from './flowGraph'
 import { anchorStyle, inward, PortPoint } from './PortPoint'
 import { usePortLayout } from './usePortLayout'
+import { useDrawn } from './viewContext'
 
 /**
  * Module of another project: its ports floating (see portSides.ts) or on the orientation's default
@@ -17,7 +18,8 @@ export const ImportedNode = memo(function ImportedNode({
   selected,
   data
 }: NodeProps<Node<PortNodeData>>): ReactNode {
-  const dep = useProjectStore((s) => s.project.dependencies.find((x) => x.modules.some((m) => m.id === id)))
+  // As the canvas's view draws it (outside a drill-down view: its ports linked to the view).
+  const dep = useDrawn((p) => p.dependencies.find((x) => x.modules.some((m) => m.id === id)))
   const interfaces = useProjectStore((s) => s.project.interfaces)
   const orientation = useProjectStore((s) => s.project.orientation)
   const module = dep?.modules.find((m) => m.id === id)
@@ -61,7 +63,7 @@ export const ImportedNode = memo(function ImportedNode({
 
   return (
     <div
-      className={`module imported ${vertical ? 'vertical' : ''} ${selected ? 'selected' : ''}`}
+      className={`module imported ${vertical ? 'vertical' : ''} ${data.outside ? 'outside' : ''} ${selected ? 'selected' : ''}`}
       title={`${module.path} in ${dep.file}`}
     >
       <NodeResizer

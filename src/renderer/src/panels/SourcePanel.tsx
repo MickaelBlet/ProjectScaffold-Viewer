@@ -8,7 +8,7 @@ import { getChunks, unifiedMergeView } from '@codemirror/merge'
 import type { EditorState, Extension } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import { FileProjectSchema } from '@/model/schema'
-import { modulePaths } from '@/model/project'
+import { modulePaths, notePath } from '@/model/project'
 import { locateValidation, targetPath } from '@/model/locate'
 import {
   LoadError,
@@ -245,8 +245,9 @@ export function SourcePanel({ format }: { format: Format }): ReactNode {
         const key = target ? `${target.kind}:${'id' in target ? target.id : ''}` : ''
         if (!target || key === followed) return
         followed = key
-        if (target.kind === 'note') navigateToNote(target.id, { zoom: true })
-        else navigate(target, { zoom: true })
+        // The views stay as they are: the entity is shown where drawn.
+        if (target.kind === 'note') navigateToNote(target.id, { zoom: true, stay: true })
+        else navigate(target, { zoom: true, stay: true })
         // Showing it may activate a view: typing goes on here.
         if (!v.hasFocus) v.focus()
       }, FOLLOW_MS)
@@ -265,9 +266,9 @@ export function SourcePanel({ format }: { format: Format }): ReactNode {
       }
       let path: (string | number)[]
       if (selection.kind === 'note') {
-        const i = p.notes.findIndex((n) => n.id === selection.id)
-        if (i < 0) return
-        path = ['editor', 'notes', i]
+        const at = notePath(p, selection.id)
+        if (!at) return
+        path = at
       } else {
         const target =
           selection.kind === 'imported' ? { kind: 'module' as const, id: selection.id } : selection

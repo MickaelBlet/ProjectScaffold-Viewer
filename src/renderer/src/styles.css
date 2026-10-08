@@ -2191,37 +2191,19 @@ ul.plain {
   height: auto;
   color: #fff;
 }
-.external {
-  width: 100%;
-  height: 100%;
-  border: 1.5px dashed var(--muted);
-  border-radius: 8px;
-  background: var(--panel-2);
-  opacity: 0.85;
-  cursor: pointer;
+/* Module outside a drill-down view: compact, dashed, its path for a name; see-through, so that
+   the links and badges under it show (a placed module of another project too). */
+.module.outside,
+.module.imported.outside {
+  border-style: dashed;
+  background: color-mix(in srgb, var(--node-bg) 80%, transparent);
+  box-shadow: none;
 }
-.external-label {
-  padding: 6px 10px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  border-bottom: 1px dashed var(--border);
-}
-/* Vertical orientation: the ports on a band facing the view. */
-.external.vertical {
-  display: flex;
-  flex-direction: column;
-}
-.external.vertical .port-band.bottom {
-  position: static;
-  margin-top: auto;
-}
-.external.vertical .port-band.top + .external-label {
-  border-bottom: none;
-  border-top: 1px dashed var(--border);
+/* Its header stays opaque, tinted with its color (else a neutral one): its name reads over the
+   links and badges under it. */
+.module.outside .module-header {
+  background: color-mix(in srgb, var(--module-color, var(--muted)) 25%, transparent);
+  border-bottom-color: var(--module-color, var(--border));
 }
 .edge-label.compact {
   padding: 4px;

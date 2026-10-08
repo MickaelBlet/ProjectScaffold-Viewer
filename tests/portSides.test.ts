@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { produce } from 'immer'
 import { defaultConstraints, emptyProject } from '@/model/project'
-import { facingSide, floatingPortSides, neededHeight, portsOn, type StandIn } from '@/canvas/portSides'
+import { facingSide, floatingPortSides, neededHeight, portsOn } from '@/canvas/portSides'
+import { inView, outsideOf, shownModuleIds } from '@/model/viewLayout'
 import type { Module, Project } from '@/model/types'
 
 const mod = (
@@ -153,14 +154,14 @@ describe('floatingPortSides', () => {
     expect(portsOn(p.modules[0]!.ports, a, 'right').map((x) => x.id)).toEqual(['a_free', 'a_out', 'a_in'])
   })
 
-  it('turns ports towards the stand-ins of outside modules', () => {
+  it('turns ports towards the modules outside a drill-down view, and theirs back', () => {
     const p = project(500, 0)
-    // B drawn as a stand-in on the right of A, its ports in reverse order.
-    const standIns = new Map<string, StandIn>([
-      ['B', { rect: { x: 300, y: 0, width: 180, height: 82 }, side: 'left', ports: ['b_cmd', 'b_in'] }]
-    ])
-    const a = floatingPortSides(p, new Set(['A']), standIns).get('A')!
-    expect(a).toMatchObject({ a_in: { side: 'right' }, a_out: { side: 'right' } })
-    expect(portsOn(p.modules[0]!.ports, a, 'right').map((x) => x.id)).toEqual(['a_in', 'a_out', 'a_free'])
+    // A's own view, B outside it on its right.
+    const view = { id: 'v', name: 'A', rootModuleId: 'A', hidden: [], standIns: { B: { x: 300, y: 0 } } }
+    const drawn = inView(p, view)
+    expect([...outsideOf(drawn)]).toEqual(['B'])
+    const sides = floatingPortSides(drawn, shownModuleIds(drawn, view))
+    expect(sides.get('A')).toMatchObject({ a_in: { side: 'right' }, a_out: { side: 'right' } })
+    expect(sides.get('B')).toMatchObject({ b_in: { side: 'left' }, b_cmd: { side: 'left' } })
   })
 })

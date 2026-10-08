@@ -1,5 +1,5 @@
 // The entity of the project that a place in its file text describes, for following the caret.
-import { modulePaths } from '@/model/project'
+import { modulePaths, noteAtPath } from '@/model/project'
 import { toFile } from '@/model/serialize'
 import type { FileModule } from '@/model/schema'
 import type { Id, Project } from '@/model/types'
@@ -77,16 +77,31 @@ export function targetAt(p: Project, path: Path, names: (string | undefined)[]):
       return m ? { kind: 'module', id: m.id } : null
     }
     case 'editor': {
-      // Editor data keyed by module path, and notes.
-      if (path[1] === 'notes') {
-        const note = p.notes[index(2) ?? -1]
-        return note ? { kind: 'note', id: note.id } : null
-      }
-      if (path[1] === 'layout' || path[1] === 'style') {
-        const id = moduleAt(typeof path[2] === 'string' ? path[2] : undefined)
+      // Editor data keyed by module path or link name, notes, and the same in the views.
+      const note = noteAtPath(p, path)
+      if (note) return { kind: 'note', id: note.id }
+      const key = (k: number): string | undefined => (typeof path[k] === 'string' ? path[k] : undefined)
+      const moduleTarget = (modulePath: string | undefined): SourceTarget | null => {
+        const id = moduleAt(modulePath)
         return id ? { kind: 'module', id } : null
       }
-      return null
+      const linkTarget = (name: string | undefined): SourceTarget | null => {
+        const l = byName(p.links, name)
+        return l ? { kind: 'link', id: l.id } : null
+      }
+      if (path[1] === 'layout' || path[1] === 'style') return moduleTarget(key(2))
+      if (path[1] === 'links') return linkTarget(key(2))
+      if (path[1] !== 'views') return null
+      const view = p.views[index(2) ?? -1]
+      if (!view) return null
+      if (path[3] === 'layout' || path[3] === 'labels' || path[3] === 'outside') return moduleTarget(key(4))
+      if (path[3] === 'links') return linkTarget(key(4))
+      if (path[3] === 'hidden') {
+        const id = view.hidden[index(4) ?? -1]
+        return id ? { kind: 'module', id } : null
+      }
+      // The view itself: its root.
+      return view.rootModuleId ? { kind: 'module', id: view.rootModuleId } : null
     }
     default:
       return null

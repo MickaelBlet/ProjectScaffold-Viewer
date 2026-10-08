@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { structureAt } from '@/components/completion'
+import { produce } from 'immer'
 import { targetAt } from '@/components/sourceTarget'
 import { loadText, saveText } from '@/model/serialize'
 
@@ -41,5 +42,35 @@ describe('caret target', () => {
 
   it('finds modules from their editor data', () => {
     expect(at('  Core.Logger:')).toBe('module:Logger')
+  })
+
+  it('finds links and modules from the editor data of the views', () => {
+    const p = produce(project, (d) => {
+      const core = d.modules.find((m) => m.name === 'Core')!
+      const operator = d.modules.find((m) => m.name === 'Operator')!
+      d.links[0]!.route = { points: [{ x: 1, y: 2 }] }
+      d.views.push({
+        id: 'core-view',
+        name: 'Core view',
+        rootModuleId: core.id,
+        hidden: [],
+        routes: { [d.links[2]!.id]: { points: [{ x: 3, y: 4 }] } },
+        standIns: { [operator.id]: { x: -300, y: 0 } }
+      })
+    })
+    const t = saveText(p, 'yaml', { editor: true })
+    const find = (marker: string, from = 0) => {
+      const { path, names } = structureAt(t, t.indexOf(marker, from) + marker.length)
+      const target = targetAt(p, path, names)
+      const name = [...p.modules, ...p.links].find(
+        (e) => target && 'id' in target && e.id === target.id
+      )?.name
+      return `${target?.kind}:${name}`
+    }
+    const views = t.indexOf('  views:')
+    expect(find(`  links:\n    ${p.links[0]!.name}:`)).toBe(`link:${p.links[0]!.name}`)
+    expect(find(`${p.links[2]!.name}:`, views)).toBe(`link:${p.links[2]!.name}`)
+    expect(find('Operator:', t.indexOf('outside:', views))).toBe('module:Operator')
+    expect(find('- name: Core view')).toBe('module:Core')
   })
 })

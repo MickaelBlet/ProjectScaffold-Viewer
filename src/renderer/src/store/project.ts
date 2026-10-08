@@ -34,7 +34,7 @@ import {
   type DependencySource
 } from '@/model/dependencies'
 import { snapChanges } from '@/model/grid'
-import { foldLayouts, inView } from '@/model/viewLayout'
+import { foldLayouts, inView, storeView } from '@/model/viewLayout'
 import { binarySnapshot, settleBinaries } from '@/model/binaries'
 import type {
   Endpoint,
@@ -271,6 +271,7 @@ export function deletePort(moduleId: Id, portId: Id): void {
     if (!m) return
     m.ports = m.ports.filter((p) => p.id !== portId)
     d.links = d.links.filter((l) => l.from.portId !== portId && l.to.portId !== portId)
+    pruneViews(d)
   })
 }
 
@@ -328,6 +329,7 @@ function pushLink(d: Project, id: Id, from: Endpoint, to: Endpoint): void {
 export function deleteLink(id: Id): void {
   update((d) => {
     d.links = d.links.filter((l) => l.id !== id)
+    pruneViews(d)
   })
 }
 
@@ -497,14 +499,29 @@ export function renameView(id: Id, name: string): void {
 export function deleteView(id: Id): void {
   update((d) => {
     d.views = d.views.filter((v) => v.id !== id)
+    pruneViews(d)
   })
 }
 
-/** Draw the modules of a stored view at their own layout again. */
+/** Draw the modules of a stored view at their own layout again, links and port names in their automatic shape. */
 export function resetViewLayouts(viewId: Id): void {
   update((d) => {
     const v = d.views.find((v) => v.id === viewId)
-    if (v) delete v.layouts
+    if (!v) return
+    delete v.layouts
+    delete v.routes
+    delete v.portLabels
+    delete v.standIns
+  })
+}
+
+/** Put modules outside a drill-down view back in line along it (see inView). */
+export function lineUpOutside(viewId: Id, ids: Id[]): void {
+  update((d) => {
+    const v = d.views.find((v) => v.id === viewId)
+    if (!v?.standIns) return
+    for (const id of ids) delete v.standIns[id]
+    if (!Object.keys(v.standIns).length) delete v.standIns
   })
 }
 
@@ -524,14 +541,18 @@ export function setHidden(viewId: Id, ids: Id[], hidden: boolean): void {
 
 // Notes
 
-export function addNote(kind: 'note' | 'frame', x: number, y: number): Id {
+/** New note at a place of the view `viewId`: a drill-down view's own (stored if temporary). */
+export function addNote(kind: 'note' | 'frame', x: number, y: number, viewId?: Id): Id {
   const id = newId()
   update((d) => {
+    const rootId = viewId ? findView(d, viewId).rootModuleId : null
+    const view = viewId && rootId ? storeView(d, viewId, rootId) : undefined
     d.notes.push({
       id,
       kind,
       text: kind === 'note' ? 'Note' : 'Group',
-      layout: kind === 'note' ? { x, y, width: 180, height: 100 } : { x, y, width: 420, height: 280 }
+      layout: kind === 'note' ? { x, y, width: 180, height: 100 } : { x, y, width: 420, height: 280 },
+      ...(view && { viewId: view.id })
     })
   })
   return id
@@ -570,26 +591,29 @@ export function reverseLink(id: Id): void {
     const l = d.links.find((l) => l.id === id)
     if (!l) return
     ;[l.from, l.to] = [l.to, l.from]
-    if (l.route) {
-      const { from, to, label } = l.route
-      l.route = {
-        ...clean({
-          from: to,
-          to: from,
-          label: label === undefined ? undefined : Math.round((1 - label) * 1000) / 1000
-        }),
-        points: l.route.points.reverse()
-      }
-    }
+    if (l.route) l.route = mirrorRoute(l.route)
+    for (const v of d.views) if (v.routes?.[id]) v.routes[id] = mirrorRoute(v.routes[id])
   })
+}
+
+/** The shape of a link drawn the other way round. */
+function mirrorRoute({ from, to, label, points }: LinkRoute): LinkRoute {
+  return {
+    ...clean({
+      from: to,
+      to: from,
+      label: label === undefined ? undefined : Math.round((1 - label) * 1000) / 1000
+    }),
+    points: [...points].reverse()
+  }
 }
 
 const clean = <T extends object>(o: T): T =>
   Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as T
 
-/** Set or clear (undefined: the default) where a port's name is drawn around its handle. */
+/** Set or clear (undefined: the default) in the focused view where a port's name is drawn around its handle. */
 export function setPortLabel(moduleId: Id, portId: Id, label: Side | undefined): void {
-  update((d) => {
+  updateLayout((d) => {
     const m = d.modules.find((m) => m.id === moduleId) ?? findImported(d, moduleId)?.module
     const pt = m?.ports.find((pt) => pt.id === portId)
     if (!pt) return
@@ -598,9 +622,9 @@ export function setPortLabel(moduleId: Id, portId: Id, label: Side | undefined):
   })
 }
 
-/** Set or clear (undefined, or nothing left) the hand-set shape of a link. */
+/** Set or clear (undefined, or nothing left) the hand-set shape of a link in the focused view. */
 export function setLinkRoute(id: Id, route: LinkRoute | undefined): void {
-  update((d) => {
+  updateLayout((d) => {
     const l = d.links.find((l) => l.id === id)
     if (!l) return
     if (route && (route.points.length || route.from || route.to || route.label !== undefined))

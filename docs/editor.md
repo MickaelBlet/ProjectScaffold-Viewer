@@ -28,10 +28,13 @@ Explorer, Inspector, Problems, Output, Search, Settings and Code generation are 
 
 Each document has a _Project_ view plus any number of stored views, opened as tabs and splittable side by side.
 
-- _Open module in its own view_ (Alt+Enter, or ⤢ on a container) shows one module's content, with stand-ins for the outside modules it is linked to and a breadcrumb back to the parents.
+- _Open module in its own view_ (Alt+Enter, or ⤢ on a container) shows one module's content, with the outside modules it is linked to (drawn compact: their path and the ports linked to the content, dashed, see-through but for their header) and a breadcrumb back to the parents.
 - It opens in a temporary tab (italic title, not saved in the file). _Keep view_ (double-click the tab, its right-click menu, the breadcrumb or _View › Keep view_) stores it with the document; closing the tab discards it.
 - Modules can be hidden per view: H, or _Hide in view_ in the right-click menu of a module in the Explorer; Shift+H shows them again.
-- A module's own view has its own layout: moving or resizing modules there (the module itself included: it is resized, not moved), arranging or aligning them leaves the _Project_ view as it is, and keeps a temporary view. New modules, and modules moved to another parent, take their place in the view in the _Project_ view too. Link bend points are shared by all views. _View › Reset view layout_ draws the modules at their place in the _Project_ view again.
+- A module's own view has its own layout: moving or resizing modules there (the module itself included, moved with its content, never into another module; the outside modules not placed by hand stay lined up along it), arranging or aligning them leaves the _Project_ view as it is, and keeps a temporary view. New modules, and modules moved to another parent, take their place in the view in the _Project_ view too.
+- It also has its own link shapes (bends, attachments, badges), port name places, notes and frames: set there, they leave the _Project_ view as it is, and the other way round. Links and port names it has not set are drawn automatically.
+- Outside modules are selected, moved, resized, aligned, locked and hidden like the others, and the links to them shaped the same way; their place is the view's own. Their content and structure are edited elsewhere: delete, cut, copy, duplicate and group leave them out, and they never move into a module of the view. _Line up along the view_ (right-click) puts one back in line along the view.
+- _View › Reset view layout_ draws the modules at their place in the _Project_ view again, the links and port names automatically, and lines the outside modules up.
 
 ### Editor tabs
 
@@ -48,7 +51,7 @@ _View › Edit as text_ (Alt+U) opens the project file's YAML (or JSON) in a cod
 - Changes since the last save shown in the text, the minimap and the scrollbar (_Changes_, on by default), with a button to revert each.
 - A minimap on the right (_View › Text minimap_): the lines in view, selections, search matches, matching brackets, problems, changes and section headers.
 - Valid edits apply to the project after a pause, one undo step each.
-- _Sync selection_: the element under the cursor is selected in the diagram; the cursor moves to the element selected in the diagram or a list.
+- _Sync selection_: the element under the cursor is selected in the diagram; the cursor moves to the element selected in the diagram or a list. In a view's data (`editor.views`, `editor.links`), the module or link it is about is selected. Following the cursor never opens or switches a view: the element is shown when the focused view draws it.
 
 Font, tab size, whitespace, word wrap (_View › Word wrap_, Alt+Z), the minimap and the editor's helpers are set in _Settings › Text editor_.
 
@@ -88,7 +91,7 @@ Ctrl+Shift+F searches names, descriptions and metadata of the project, then the 
 
 ### Link shape
 
-Like draw.io; saved in `editor.links`.
+Like draw.io; saved in `editor.links` (a module's own view: `editor.views[].links`, see [Views](#views)).
 
 - Select a link, then drag its line to add a bend, drag a bend to move it (snaps to the grid and in line with its neighbours; Alt: free), double-click a bend to remove it.
 - Drag an end square along its module's border to attach the link there; double-click it to attach at the port again.
@@ -135,7 +138,7 @@ Generated code for links between binaries: [Links between binaries](remote.md).
 
 ### Notes, frames, colors
 
-Module colors, sticky notes and titled frames (right click the canvas) help organize the diagram; dragging a frame moves what lies fully inside it. They are editor data only.
+Module colors, sticky notes and titled frames (right click the canvas) help organize the diagram; dragging a frame moves what lies fully inside it. They are editor data only. A module's own view has its own notes and frames.
 
 ### Export
 

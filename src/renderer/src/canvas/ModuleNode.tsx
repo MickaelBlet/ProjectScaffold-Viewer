@@ -1,6 +1,6 @@
 import { memo, type CSSProperties, type ReactNode } from 'react'
 import { Handle, NodeResizer, Position, type Node, type NodeProps } from '@xyflow/react'
-import { indexById, minSize, nameError, parentIds } from '@/model/project'
+import { indexById, minSize, modulePath, nameError, parentIds } from '@/model/project'
 import { getProject, setLocked, setModuleLayout, update, useProjectStore } from '@/store/project'
 import { useUiStore } from '@/store/ui'
 import { openModuleView } from '@/actions'
@@ -20,6 +20,7 @@ import { Icon } from '@/components/Icon'
 import { MODULE_HANDLE } from './constants'
 import type { PortNodeData } from './flowGraph'
 import { anchorStyle, inward, PortPoint } from './PortPoint'
+import { useDrawn } from './viewContext'
 import { usePortLayout } from './usePortLayout'
 
 function RenameInput({
@@ -147,10 +148,14 @@ export const ModuleNode = memo(function ModuleNode({
   draggable,
   data
 }: NodeProps<Node<PortNodeData>>): ReactNode {
-  const mod = useProjectStore((s) => indexById(s.project.modules).get(id))
+  // Port name sides of the canvas's view.
+  const mod = useDrawn((p) => indexById(p.modules).get(id))
   const interfaces = useProjectStore((s) => s.project.interfaces)
   const types = useProjectStore((s) => s.project.types)
-  const hasChildren = useProjectStore((s) => parentIds(s.project.modules).has(id))
+  // A module outside a drill-down view is drawn compact: its path, its ports linked to the view.
+  const outside = !!data.outside
+  const path = useProjectStore((s) => (outside ? modulePath(s.project, id) : null))
+  const hasChildren = useProjectStore((s) => !outside && parentIds(s.project.modules).has(id))
   const orientation = useProjectStore((s) => s.project.orientation)
   const binary = useProjectStore((s) => {
     const m = indexById(s.project.modules).get(id)
@@ -208,9 +213,9 @@ export const ModuleNode = memo(function ModuleNode({
 
   return (
     <div
-      className={`module ${vertical ? 'vertical' : ''} ${hasChildren ? 'container' : ''} ${selected ? 'selected' : ''} ${mod.color ? 'colored' : ''}`}
+      className={`module ${vertical ? 'vertical' : ''} ${hasChildren ? 'container' : ''} ${outside ? 'outside' : ''} ${selected ? 'selected' : ''} ${mod.color ? 'colored' : ''}`}
       style={style}
-      title={mod.description}
+      title={outside ? `${path} (outside this view)` : mod.description}
     >
       <NodeResizer
         isVisible={selected && (draggable || (!!data.frame && !mod.locked))}
@@ -225,7 +230,7 @@ export const ModuleNode = memo(function ModuleNode({
         ) : (
           <span className={`module-name ${mod.kind ?? ''}`}>
             {mod.kind && <span className="module-kind">«{mod.kind}» </span>}
-            {mod.name}
+            {path ?? mod.name}
             {bases && <span className="module-bases"> : {bases}</span>}
             {binary && (
               <small

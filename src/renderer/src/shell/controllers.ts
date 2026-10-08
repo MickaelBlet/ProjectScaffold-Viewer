@@ -50,14 +50,7 @@ export function activeCanvas(): CanvasController | undefined {
 
 // Dock layouts
 
-export type ToolId =
-  | 'explorer'
-  | 'generation'
-  | 'inspector'
-  | 'problems'
-  | 'output'
-  | 'search'
-  | 'settings'
+export type ToolId = 'explorer' | 'generation' | 'inspector' | 'problems' | 'output' | 'search' | 'settings'
 
 export const TOOL_TITLES: Record<ToolId, string> = {
   explorer: 'Explorer',
@@ -427,6 +420,8 @@ export function viewOfRef(p: Project, ref: ViewRef): Id | undefined {
 }
 
 export function openView(viewId: Id = GLOBAL_VIEW, options: { split?: boolean } = {}): void {
+  // A new tab goes with the view shown until now (not with a text editor that has the focus).
+  const current = editor?.getPanel(viewPanelId(activeDoc().activeViewId))
   patchDoc({ activeViewId: viewId })
   if (IN_PANEL)
     return sendToDiagram({ kind: 'openView', view: viewRef(getProject(), viewId), split: options.split })
@@ -434,10 +429,10 @@ export function openView(viewId: Id = GLOBAL_VIEW, options: { split?: boolean } 
   const id = viewPanelId(viewId)
   const existing = editor.getPanel(id)
   if (existing) return existing.api.setActive()
-  const active = editor.activePanel
+  const reference = current ?? editor.activePanel
   addViewPanel(
     viewId,
-    active ? { referencePanel: active.id, direction: options.split ? 'right' : 'within' } : undefined
+    reference ? { referencePanel: reference.id, direction: options.split ? 'right' : 'within' } : undefined
   )
 }
 
