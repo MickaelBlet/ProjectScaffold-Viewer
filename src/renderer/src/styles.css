@@ -2591,6 +2591,9 @@ ul.plain {
   width: var(--icon-size);
   color: var(--accent);
 }
+.menu-check.menu-icon {
+  color: inherit;
+}
 .menu-label {
   flex: 1;
 }
@@ -2872,10 +2875,6 @@ mark {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-}
-.toolbar-editor-add select {
-  flex: 1;
-  min-width: 140px;
 }
 
 /* Tool tabs (shell/DockShell.tsx): icon only, title as tooltip */

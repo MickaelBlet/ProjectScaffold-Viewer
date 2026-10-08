@@ -15,6 +15,7 @@ import { commands, getCommand, type Category } from '@/commands'
 import { Icon } from '@/components/Icon'
 import { IconButton, Row, Section, Select } from '@/components/fields'
 import { resetLayout } from '@/shell/controllers'
+import { openContextMenu, type MenuItem } from '@/store/ui'
 import { commandIcon } from '@/shell/toolbar'
 
 /** Number field kept within its bounds; empty or invalid input gives the default. */
@@ -88,8 +89,22 @@ function ToolbarEditor(): ReactNode {
     ;[next[i], next[i + step]] = [next[i + step]!, next[i]!]
     set(next)
   }
-  const addable = commands.filter((c) => !c.hidden && !ids.includes(c.id))
-  const categories = [...new Set(addable.map((c) => c.category))] as Category[]
+  /** Menu of the commands not in the toolbar yet, by category, below the button. */
+  const addMenu = (button: HTMLElement): void => {
+    const addable = commands.filter((c) => !c.hidden && !ids.includes(c.id))
+    const categories = [...new Set(addable.map((c) => c.category))] as Category[]
+    const r = button.getBoundingClientRect()
+    openContextMenu({ clientX: r.left, clientY: r.bottom + 2 }, [
+      { label: 'Separator', disabled: !ids.length || ids.at(-1) === '-', run: () => set([...ids, '-']) },
+      'separator',
+      ...categories.map((cat): MenuItem => ({
+        label: cat,
+        submenu: addable
+          .filter((c) => c.category === cat)
+          .map((c) => ({ label: c.title, icon: commandIcon(c.id), run: () => set([...ids, c.id]) }))
+      }))
+    ])
+  }
   return (
     <div className="toolbar-editor">
       <ul>
@@ -113,27 +128,10 @@ function ToolbarEditor(): ReactNode {
         {!ids.length && <li className="muted">No buttons</li>}
       </ul>
       <div className="toolbar-editor-add">
-        <select
-          aria-label="Add a command"
-          value=""
-          onChange={(e) => e.target.value && set([...ids, e.target.value])}
-        >
-          <option value="">Add a command…</option>
-          <option value="-" disabled={!ids.length || ids.at(-1) === '-'}>
-            Separator
-          </option>
-          {categories.map((cat) => (
-            <optgroup key={cat} label={cat}>
-              {addable
-                .filter((c) => c.category === cat)
-                .map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.title}
-                  </option>
-                ))}
-            </optgroup>
-          ))}
-        </select>
+        <button type="button" aria-haspopup="menu" onClick={(e) => addMenu(e.currentTarget)}>
+          <Icon name="plus" />
+          Add…
+        </button>
         <button type="button" onClick={() => set(DEFAULT_SETTINGS.toolbar)}>
           Reset
         </button>

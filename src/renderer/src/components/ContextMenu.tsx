@@ -11,10 +11,21 @@ function Submenu({
   onDone: () => void
 }): ReactNode {
   const ref = useRef<HTMLDivElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
   const [rect, setRect] = useState<DOMRect | null>(null)
+  const [pos, setPos] = useState({ x: 0, y: 0 })
   const show = (): void => {
     if (!item.disabled) setRect(ref.current?.getBoundingClientRect() ?? null)
   }
+  // Kept in the window: on the left of the item when no room on its right, raised near the bottom.
+  useLayoutEffect(() => {
+    if (!rect || !menuRef.current) return
+    const m = menuRef.current.getBoundingClientRect()
+    setPos({
+      x: rect.right + m.width > window.innerWidth - 4 ? Math.max(4, rect.left - m.width) : rect.right,
+      y: Math.max(4, Math.min(rect.top - 5, window.innerHeight - m.height - 4))
+    })
+  }, [rect])
   return (
     <div ref={ref} onMouseEnter={show} onMouseLeave={() => setRect(null)}>
       <button
@@ -33,7 +44,7 @@ function Submenu({
         </span>
       </button>
       {rect && (
-        <div className="context-menu" role="menu" style={{ left: rect.right, top: rect.top - 5 }}>
+        <div ref={menuRef} className="context-menu" role="menu" style={{ left: pos.x, top: pos.y }}>
           <MenuList items={item.submenu} onDone={onDone} />
         </div>
       )}
@@ -62,7 +73,9 @@ export function MenuList({ items, onDone }: { items: MenuItem[]; onDone: () => v
               it.run()
             }}
           >
-            <span className="menu-check">{it.checked && <Icon name="check" />}</span>
+            <span className={`menu-check ${!it.checked && it.icon ? 'menu-icon' : ''}`}>
+              {it.checked ? <Icon name="check" /> : it.icon && <Icon name={it.icon} />}
+            </span>
             <span className="menu-label">{it.label}</span>
             {it.keys && <kbd>{it.keys}</kbd>}
           </button>

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { create } from 'zustand'
 import type { Id } from '@/model/types'
+import type { IconName } from '@/components/Icon'
 import { patchDoc, useDoc, type Selection } from './documents'
 import { log } from './output'
 
@@ -14,6 +15,8 @@ export interface ActionItem {
   danger?: boolean
   checked?: boolean
   title?: string
+  /** Shown where the check mark goes, when not checked. */
+  icon?: IconName
 }
 export type MenuItem = ActionItem | { label: string; submenu: MenuItem[]; disabled?: boolean } | 'separator'
 
