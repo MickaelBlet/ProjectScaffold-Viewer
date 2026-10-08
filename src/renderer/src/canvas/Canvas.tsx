@@ -768,12 +768,8 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
     const parent = moduleAt(at) ?? view.rootModuleId
     openContextMenu(e, [
       { label: 'Add module here', run: () => void addModuleAt(at, parent) },
-      ...(view.rootModuleId
-        ? []
-        : [
-            { label: 'Add note here', run: () => addNoteAt('note', at) },
-            { label: 'Add frame here', run: () => addNoteAt('frame', at) }
-          ]),
+      { label: 'Add note here', run: () => addNoteAt('note', at) },
+      { label: 'Add frame here', run: () => addNoteAt('frame', at) },
       'separator',
       { label: 'Link to another project…', run: () => linkOtherProject(at) },
       { label: 'Import projects or IDL files here…', run: () => importProjectContent(parent, at) },
