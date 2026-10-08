@@ -11,7 +11,7 @@ import {
   type WhitespaceShown
 } from '@/store/settings'
 import { IN_VSCODE } from '@/host'
-import { availableIds, commands, getCommand, type Category } from '@/commands'
+import { commands, getCommand, type Category } from '@/commands'
 import { Icon } from '@/components/Icon'
 import { IconButton, Row, Section, Select } from '@/components/fields'
 import { resetLayout } from '@/shell/controllers'
@@ -79,7 +79,8 @@ function Check(props: {
 
 /** Buttons of the toolbar right of the menus, in order: commands and separators. */
 function ToolbarEditor(): ReactNode {
-  const ids = availableIds(useSettings((s) => s.toolbar))
+  // Separators kept as placed (the toolbar drops those at its ends), not to lose one added last.
+  const ids = useSettings((s) => s.toolbar).filter((id) => id === '-' || commands.some((c) => c.id === id))
   if (!useShown('Toolbar buttons', 'Commands and separators right of the menus')) return null
   const set = (next: string[]): void => setSetting('toolbar', next)
   const move = (i: number, step: -1 | 1): void => {
@@ -118,6 +119,9 @@ function ToolbarEditor(): ReactNode {
           onChange={(e) => e.target.value && set([...ids, e.target.value])}
         >
           <option value="">Add a command…</option>
+          <option value="-" disabled={!ids.length || ids.at(-1) === '-'}>
+            Separator
+          </option>
           {categories.map((cat) => (
             <optgroup key={cat} label={cat}>
               {addable
@@ -130,9 +134,6 @@ function ToolbarEditor(): ReactNode {
             </optgroup>
           ))}
         </select>
-        <button type="button" disabled={!ids.length || ids.at(-1) === '-'} onClick={() => set([...ids, '-'])}>
-          Add separator
-        </button>
         <button type="button" onClick={() => set(DEFAULT_SETTINGS.toolbar)}>
           Reset
         </button>
