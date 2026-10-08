@@ -200,6 +200,37 @@ describe('view layouts', () => {
     expect(gone.views.find((v) => v.id === viewId)?.standIns).toBeUndefined()
   })
 
+  it('keeps the place of a placed module of a dependency outside the view, saved and reloaded', () => {
+    const ground = fromFile(YAML.parse(readFileSync('examples/fleet/ground.scaffold.yaml', 'utf8')))
+    const datalink = idOf(ground, 'Datalink')
+    const radio = ground.dependencies.flatMap((x) => x.modules).find((m) => m.path === 'Radio')!.id
+    const id = ground.views.find((v) => v.rootModuleId === datalink)!.id
+    const base = inView(ground, findView(ground, id))
+    expect(outsideOf(base).has(radio)).toBe(true)
+    const next = foldLayouts(
+      ground,
+      base,
+      produce(base, (d) => {
+        const im = d.dependencies.flatMap((x) => x.modules).find((m) => m.id === radio)!
+        im.position = { x: -400, y: 30 }
+      }),
+      id
+    )
+    // Kept by the edits that follow.
+    const pruned = produce(next, (d) => pruneViews(d))
+    expect(pruned.views.find((v) => v.id === id)?.standIns?.[radio]).toMatchObject({ x: -400, y: 30 })
+    const saved = toFile(pruned, { editor: true })
+    expect(saved.editor?.views?.find((v) => v.name === 'Datalink')?.outside?.['Drone/Radio']).toMatchObject({
+      x: -400,
+      y: 30
+    })
+    const back = fromFile(JSON.parse(JSON.stringify(saved)))
+    expect(back.views.find((v) => v.id === id)?.standIns?.[radio]).toMatchObject({
+      x: -400,
+      y: 30
+    })
+  })
+
   it('draws the modules outside a drill-down view compact, at the top level, lined up along it', () => {
     const operator = idOf(example, 'Operator')
     const drawn = inView(example, findView(example, viewId))

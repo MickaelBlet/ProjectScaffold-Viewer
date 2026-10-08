@@ -24,8 +24,9 @@ export function targetAt(p: Project, path: Path, names: (string | undefined)[]):
   const byName = <T extends { id: Id; name: string }>(list: T[], name: string | undefined) =>
     name === undefined ? undefined : list.find((e) => e.name === name)
   const paths = modulePaths(p)
+  // Placed modules of dependencies too ('Dependency/Module').
   const moduleAt = (modulePath: string | undefined): Id | undefined =>
-    modulePath === undefined ? undefined : p.modules.find((m) => paths.get(m.id) === modulePath)?.id
+    modulePath === undefined ? undefined : [...paths].find(([, path]) => path === modulePath)?.[0]
 
   switch (path[0]) {
     case 'project':
