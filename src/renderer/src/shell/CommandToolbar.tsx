@@ -31,13 +31,7 @@ export function CommandToolbar(): ReactNode {
   useSettings()
   useProjectStore((s) => s.project)
   useDoc((d) => d.selection)
-  if (!ids.length) return null
-  return (
-    <>
-      <span className="sep" />
-      {ids.map((id, i) =>
-        id === '-' ? <span key={i} className="sep" /> : <CommandButton key={i} id={id} />
-      )}
-    </>
+  return ids.map((id, i) =>
+    id === '-' ? <span key={i} className="sep" /> : <CommandButton key={i} id={id} />
   )
 }
