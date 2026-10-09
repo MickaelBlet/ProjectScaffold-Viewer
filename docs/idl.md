@@ -3,7 +3,7 @@
 ProjectScaffold reads OMG IDL files (IDL 4.2: CORBA, CCM, DDS / XTypes) in three ways:
 
 - **Import**: _Insert › Import projects or IDL files_ (or right click the canvas / a module) adds one of their interfaces or components, or all, with the types they use (files without interfaces nor components: all their types). Types and interfaces this project has by name are used as they are.
-- **Dependency**: an IDL file can be a [dependency](dependencies.md). It stands for a project named after the file (types, interfaces, constants, components as modules to place; without components, its IDL modules as nested modules providing their interfaces on `in` ports), the files it includes being its dependencies. `scaffold-gen -d` generates it like a project file.
+- **Dependency**: an IDL file can be a [dependency](dependencies.md). It stands for a project named after the file (types, interfaces, constants, components as modules to place; without components, its IDL modules as nested modules providing their interfaces on `in` ports, parents delegating the ports of their content), the files it includes being its dependencies. `scaffold-gen -d` generates it like a project file.
 - **Text**: see [Editing IDL files](#editing-idl-files).
 
 The import dialog lists what was approximated.
