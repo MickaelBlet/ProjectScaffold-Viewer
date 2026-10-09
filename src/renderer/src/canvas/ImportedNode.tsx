@@ -1,6 +1,6 @@
 import { memo, type ReactNode } from 'react'
 import { NodeResizer, type Node, type NodeProps } from '@xyflow/react'
-import { importedParent, importedSize, LAYOUT_PAD, minSize } from '@/model/project'
+import { contentBottom, importedParent, importedSize, LAYOUT_PAD, minSize } from '@/model/project'
 import type { ImportedPort, LinkAnchor, Side } from '@/model/types'
 import { setModuleLayout, useProjectStore } from '@/store/project'
 import { Icon } from '@/components/Icon'
@@ -31,15 +31,15 @@ export const ImportedNode = memo(function ImportedNode({
   )
   if (!dep || !module) return null
   const vertical = orientation === 'vertical'
-  // Content of a placed module: drawn in it where its project puts it, not moved nor resized.
+  // Content of a placed module: drawn in it, at its place there.
   const parent = !data.outside && importedParent(dep, module)
   const content = data.outside ? [] : dep.modules.filter((x) => importedParent(dep, x) === module)
   const own = minSize(module, orientation)
   const min = content.reduce((m, c) => {
     const size = importedSize(c, orientation)
     return {
-      width: Math.max(m.width, c.position.x + size.width + LAYOUT_PAD / 2),
-      height: Math.max(m.height, c.position.y + size.height + LAYOUT_PAD / 2)
+      width: Math.max(m.width, c.position.x + size.width + LAYOUT_PAD),
+      height: Math.max(m.height, c.position.y + size.height + contentBottom(orientation))
     }
   }, own)
   const iface = (p: ImportedPort): string | undefined => p.interface ?? undefined
@@ -77,7 +77,7 @@ export const ImportedNode = memo(function ImportedNode({
       title={`${module.path} in ${dep.file}`}
     >
       <NodeResizer
-        isVisible={selected && !parent}
+        isVisible={selected}
         minWidth={min.width}
         minHeight={min.height}
         onResizeEnd={(_, r) => setModuleLayout(id, { x: r.x, y: r.y, width: r.width, height: r.height })}

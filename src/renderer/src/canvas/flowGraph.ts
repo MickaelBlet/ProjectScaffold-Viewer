@@ -133,8 +133,7 @@ export function toNodes(
             : size.height
         ),
         selected: selected.has(m.id),
-        // Content stays where its project puts it.
-        draggable: !parent && movable(m.id),
+        draggable: movable(m.id),
         zIndex: holds ? Z.container : Z.module,
         data: { ...portData(m.ports, placements), ...(outside.has(m.id) && { outside: true as const }) }
       })

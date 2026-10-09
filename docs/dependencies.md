@@ -29,7 +29,7 @@ _Insert › Add dependency…_ (or + in the Explorer's _Dependencies_) picks an 
 _Insert › Link to another project…_ (or the canvas menu) picks a dependency or another project, then one of its top-level modules.
 
 - The module is drawn in the project view (dashed, `↗ Project`, resizable), with ports linked to like any other.
-- It comes with all the modules inside it, drawn where its project puts them (neither moved nor resized here, removed with it); their ports are linked to as well. A module placed alone by an earlier version is placed with its top-level module on the next refresh, its links kept.
+- It comes with all the modules inside it, drawn where its project puts them; move and resize them in it (it grows to hold them; kept on refresh), they are removed with it; their ports are linked to as well. A module placed alone by an earlier version is placed with its top-level module on the next refresh, its links kept.
 - The project becomes a dependency if it was not one, so the interfaces of its ports are used here, not copied.
 - Double-click a placed module to switch to its project's tab.
 

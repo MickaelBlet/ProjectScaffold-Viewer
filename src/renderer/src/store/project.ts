@@ -7,6 +7,7 @@ import {
   defaultSize,
   globalTypeNames,
   findImported,
+  growImportedAncestors,
   findPort,
   findView,
   growAncestors,
@@ -170,7 +171,10 @@ export function setLayouts(layouts: Map<Id, Partial<Rect>>): void {
       const im = findImported(d, id)?.module
       if (im) setImportedRect(im, r)
     }
-    for (const id of layouts.keys()) growAncestors(d, id)
+    for (const id of layouts.keys()) {
+      growAncestors(d, id)
+      growImportedAncestors(d, id)
+    }
   })
 }
 
@@ -212,7 +216,10 @@ function shiftBends(d: Project, layouts: Map<Id, Partial<Rect>>): void {
 export function setModuleLayout(id: Id, layout: Partial<Rect>): void {
   updateLayout((d) => {
     const im = findImported(d, id)?.module
-    if (im) return setImportedRect(im, layout)
+    if (im) {
+      setImportedRect(im, layout)
+      return growImportedAncestors(d, id)
+    }
     const m = d.modules.find((m) => m.id === id)
     if (!m) return
     Object.assign(m.layout, layout)

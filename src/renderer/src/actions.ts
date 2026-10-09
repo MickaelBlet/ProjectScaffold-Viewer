@@ -25,7 +25,6 @@ import {
   LAYOUT_PAD,
   contentBottom,
   contentTop,
-  importedParent,
   modulePath,
   newId,
   subtreeIds,
@@ -1173,9 +1172,7 @@ export function nudgeSelection(dx: number, dy: number): void {
   for (const id of selectedIds()) {
     const e = p.modules.find((m) => m.id === id) ?? p.notes.find((n) => n.id === id)
     if (e && !e.locked) layouts.set(id, { x: e.layout.x + dx, y: e.layout.y + dy })
-    const found = findImported(p, id)
-    // Content of a placed module moves with it.
-    const im = found && !importedParent(found.dep, found.module) ? found.module : undefined
+    const im = findImported(p, id)?.module
     if (im) layouts.set(id, { x: im.position.x + dx, y: im.position.y + dy })
   }
   if (layouts.size) setLayouts(layouts)
