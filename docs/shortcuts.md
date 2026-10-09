@@ -12,7 +12,6 @@
 | Ctrl+Shift+S | Save as…       |
 | Ctrl+Alt+S   | Save all       |
 | Alt+W        | Close document |
-| Ctrl+Alt+G   | Generate code  |
 
 ## Edit
 
@@ -78,12 +77,11 @@
 
 ## Panels and text editor
 
-| Shortcut                          | Where                             | Action                   |
-| --------------------------------- | --------------------------------- | ------------------------ |
-| Alt+↑ / Alt+↓                     | Explorer, Code generation         | Move the focused section |
-| Ctrl+F / Ctrl+H                   | Text editor                       | Find / replace           |
-| Ctrl+Space                        | Text editor                       | Completion               |
-| Ctrl+S                            | Template, generated file, IDL tab | Save the file            |
-| Alt+click                         | Code generation                   | Open a file to the side  |
-| Double-click / Shift+double-click | Canvas                            | Zoom in / out            |
-| Alt while dragging a bend         | Canvas                            | No snapping              |
+| Shortcut                          | Where       | Action                   |
+| --------------------------------- | ----------- | ------------------------ |
+| Alt+↑ / Alt+↓                     | Explorer    | Move the focused section |
+| Ctrl+F / Ctrl+H                   | Text editor | Find / replace           |
+| Ctrl+Space                        | Text editor | Completion               |
+| Ctrl+S                            | IDL tab     | Save the file            |
+| Double-click / Shift+double-click | Canvas      | Zoom in / out            |
+| Alt while dragging a bend         | Canvas      | No snapping              |

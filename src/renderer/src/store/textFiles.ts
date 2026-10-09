@@ -1,20 +1,15 @@
-// Text files edited in tabs beside a document's views: its templates, its generated files, IDL files.
+// Text files edited in tabs beside a document's views: IDL files.
 import { create } from 'zustand'
-import type { OutputDir } from '@/codegen/run'
-import { builtinFile, knownOutputDir, templateFolder } from '@/generateCode'
 import type { TextSpot } from '@/model/search'
 import type { Id } from '@/model/types'
-import { findDoc, type DocState } from './documents'
+import { findDoc } from './documents'
 
-/**
- * Where a text file is: the document's template folder, its output directory (generated files, and
- * the `.scaffold/templates` there), the built-in templates (read-only), or a file opened on its own.
- */
-export type TextSource = 'templates' | 'output' | 'builtin' | 'file'
+/** Where a text file is: a file opened on its own. */
+export type TextSource = 'file'
 
 export interface TextFileRef {
   source: TextSource
-  /** Relative to the folder of the source; the path (name) the host gave for `file`. */
+  /** The path (name) the host gave. */
   path: string
 }
 
@@ -39,7 +34,6 @@ export const useTextFiles = create<TextFilesState>(() => ({ files: {} }))
 export const useTextReveals = create<Record<string, TextSpot>>(() => ({}))
 
 export const textFileKey = (docId: Id, ref: TextFileRef): string => `${docId}|${ref.source}:${ref.path}`
-export const isReadOnly = (ref: TextFileRef): boolean => ref.source === 'builtin'
 export const isFileDirty = (f: TextFile | undefined): boolean => !!f && f.saved !== null && f.text !== f.saved
 export const fileBaseName = (path: string): string => path.split(/[\\/]/).pop() ?? path
 
@@ -60,27 +54,8 @@ function patch(key: string, p: Partial<TextFile>): void {
 
 const message = (e: unknown): string => (e instanceof Error ? e.message : String(e))
 
-/** Folder the files of a source are read from and written to; null when there is none (yet). */
-export async function sourceDir(doc: DocState, source: TextSource): Promise<OutputDir | null> {
-  if (source === 'templates') return templateFolder(doc)
-  if (source === 'output') return knownOutputDir(doc)
-  return null
-}
-
-/** Content of a file; null when it does not exist. `file`: only when it changed since last read. */
-export async function readTextFile(doc: DocState, ref: TextFileRef): Promise<string | null> {
-  switch (ref.source) {
-    case 'builtin':
-      return builtinFile(ref.path)
-    case 'file':
-      return window.api.changedOnDisk(ref.path)
-    default: {
-      const dir = await sourceDir(doc, ref.source)
-      if (!dir) throw new Error(ref.source === 'templates' ? 'no template folder' : 'no output directory')
-      return dir.read(ref.path)
-    }
-  }
-}
+/** Content of a file when it changed since last read; null otherwise. */
+export const readTextFile = (ref: TextFileRef): Promise<string | null> => window.api.changedOnDisk(ref.path)
 
 /** Starts editing a file: with its content when the caller has it, else read (see `loadTextFile`). */
 export function addTextFile(docId: Id, ref: TextFileRef, content?: string): void {
@@ -102,25 +77,14 @@ export function addTextFile(docId: Id, ref: TextFileRef, content?: string): void
 
 /** Reads a file again: its edits are dropped. */
 export async function loadTextFile(docId: Id, ref: TextFileRef): Promise<void> {
-  const doc = findDoc(docId)
   const key = textFileKey(docId, ref)
-  if (!doc) return
-  if (ref.source === 'file') {
-    // Read again only when it changed since: as it was read or written here otherwise.
-    const f = useTextFiles.getState().files[key]
-    const text = (await window.api.changedOnDisk(ref.path).catch(() => null)) ?? f?.saved ?? null
-    if (text === null)
-      patch(key, { error: 'This file is no longer at hand: open it again (File › Open IDL file…).' })
-    else patch(key, { text, saved: text, error: null, stale: false })
-    return
-  }
-  try {
-    const text = await readTextFile(doc, ref)
-    if (text === null) patch(key, { error: `${ref.path} does not exist` })
-    else patch(key, { text, saved: text, error: null, stale: false })
-  } catch (e) {
-    patch(key, { error: message(e) })
-  }
+  if (!findDoc(docId)) return
+  // Read again only when it changed since: as it was read or written here otherwise.
+  const f = useTextFiles.getState().files[key]
+  const text = (await readTextFile(ref).catch(() => null)) ?? f?.saved ?? null
+  if (text === null)
+    patch(key, { error: 'This file is no longer at hand: open it again (File › Open IDL file…).' })
+  else patch(key, { text, saved: text, error: null, stale: false })
 }
 
 /** Takes the changes made elsewhere to a file: in place when it holds no edits, else marked stale. */
@@ -128,12 +92,12 @@ export async function checkTextFile(docId: Id, ref: TextFileRef): Promise<void> 
   const doc = findDoc(docId)
   const key = textFileKey(docId, ref)
   const f = useTextFiles.getState().files[key]
-  if (!doc || !f || f.saved === null || ref.source === 'builtin') return
+  if (!doc || !f || f.saved === null) return
   let text: string | null
   try {
-    text = await readTextFile(doc, ref)
+    text = await readTextFile(ref)
   } catch {
-    // Not readable without a user gesture (folder access): checked again on the next focus.
+    // Not readable now: checked again on the next focus.
     return
   }
   const now = useTextFiles.getState().files[key]
@@ -151,22 +115,16 @@ export async function saveTextFile(docId: Id, ref: TextFileRef): Promise<boolean
   const doc = findDoc(docId)
   const key = textFileKey(docId, ref)
   const f = useTextFiles.getState().files[key]
-  if (!doc || !f || isReadOnly(ref)) return false
+  if (!doc || !f) return false
   const text = f.text
   try {
-    if (ref.source === 'file') {
-      const path = await window.api.saveFile({
-        path: ref.path,
-        content: text,
-        defaultName: fileBaseName(ref.path),
-        format: 'text'
-      })
-      if (!path) return false
-    } else {
-      const dir = await sourceDir(doc, ref.source)
-      if (!dir) throw new Error(ref.source === 'templates' ? 'no template folder' : 'no output directory')
-      await dir.write(ref.path, text)
-    }
+    const path = await window.api.saveFile({
+      path: ref.path,
+      content: text,
+      defaultName: fileBaseName(ref.path),
+      format: 'text'
+    })
+    if (!path) return false
     patch(key, { saved: text, error: null, stale: false })
     return true
   } catch (e) {

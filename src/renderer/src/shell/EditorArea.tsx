@@ -161,11 +161,7 @@ function EntityTab(props: IDockviewPanelHeaderProps<{ kind: EditorKind | 'source
 const FILE_ICON: Record<LanguageId, string> = {
   yaml: '{}',
   json: '{}',
-  cpp: 'C',
-  python: 'Py',
-  cmake: 'Mk',
   idl: 'I',
-  liquid: '{%',
   text: '¶'
 }
 
@@ -243,6 +239,9 @@ function DocEditor({ docId }: { docId: Id }): ReactNode {
       const layout = findDoc(docId)?.layout
       try {
         if (layout) e.api.fromJSON(layout as SerializedDockview)
+        // Tabs of templates and generated files, from versions that generated code.
+        for (const p of e.api.panels)
+          if (p.id.startsWith('file:') && !p.id.startsWith('file:file:')) p.api.close()
       } catch {
         e.api.clear()
       }

@@ -39,7 +39,7 @@ import { dirtyFiles, dropDocTextFiles } from '@/store/textFiles'
 import { log } from '@/store/output'
 import { FULL_LAYOUT } from '@/host'
 import { setStatus, showDialog, useUiStore } from '@/store/ui'
-import type { DiagramAction } from '../../../vscode/src/protocol'
+import type { DiagramAction } from '@/vscodeProtocol'
 import type { OpenResult, Session } from './api'
 
 export const fileName = (path: string): string => path.split(/[\\/]/).pop() ?? path
@@ -52,7 +52,7 @@ export function isDirty(): boolean {
   return isDocDirty(activeDoc())
 }
 
-/** Some document or text file (template, generated file...) holds unsaved changes. */
+/** Some document or text file (IDL file) holds unsaved changes. */
 export function anyDirty(): boolean {
   return useDocs.getState().docs.some(isDocDirty) || dirtyFiles().length > 0
 }
@@ -309,7 +309,7 @@ function clearReadError(name: string): void {
   if (readError?.name !== name) return
   const text = `${name} can be read again`
   if (useUiStore.getState().status === readError.status) setStatus('info', text)
-  else log('info', 'app', text)
+  else log('info', text)
   readError = null
 }
 

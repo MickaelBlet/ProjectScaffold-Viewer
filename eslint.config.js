@@ -4,19 +4,7 @@ import reactHooks from 'eslint-plugin-react-hooks'
 
 export default tseslint.config(
   {
-    ignores: [
-      'dist-web',
-      'dist-tauri',
-      'dist-electron',
-      'dist-vscode',
-      'dist-cli',
-      'release',
-      'vscode/out',
-      'vscode/media',
-      'node_modules',
-      'schema',
-      'src-tauri'
-    ]
+    ignores: ['dist-web', 'dist-tauri', 'dist-electron', 'release', 'node_modules', 'schema', 'src-tauri']
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,

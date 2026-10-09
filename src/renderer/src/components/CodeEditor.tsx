@@ -1,5 +1,4 @@
-// Code editor (CodeMirror) for the project text and the other text files: IDL, templates,
-// generated code.
+// Code editor (CodeMirror) for the project text and the other text files: IDL.
 import { useEffect, useLayoutEffect, useRef, type CSSProperties, type ReactNode } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import {
@@ -10,9 +9,7 @@ import {
   type CompletionSource
 } from '@codemirror/autocomplete'
 import { defaultKeymap, history, historyKeymap, indentWithTab, redo, undo } from '@codemirror/commands'
-import { cpp } from '@codemirror/lang-cpp'
 import { json } from '@codemirror/lang-json'
-import { python } from '@codemirror/lang-python'
 import {
   bracketMatching,
   foldGutter,
@@ -24,7 +21,6 @@ import {
   type StringStream
 } from '@codemirror/language'
 import { clike } from '@codemirror/legacy-modes/mode/clike'
-import { cmake } from '@codemirror/legacy-modes/mode/cmake'
 import { lintGutter, lintKeymap } from '@codemirror/lint'
 import { highlightSelectionMatches, searchKeymap } from '@codemirror/search'
 import { Annotation, Compartment, EditorState, Prec, type Extension } from '@codemirror/state'
@@ -46,7 +42,6 @@ import {
 import type { TextSpot } from '@/model/search'
 import { useSettings, type Settings } from '@/store/settings'
 import { languageOf, type FileLanguage } from './codeLanguages'
-import { fixedLiquid } from './liquidSyntax'
 import { richYaml } from './yamlSyntax'
 import { codeTheme } from './codeTheme'
 import { indentGuides } from './indentGuides'
@@ -84,18 +79,12 @@ const idl = clike({
   }
 })
 
-function plainSupport(id: Exclude<FileLanguage['id'], 'liquid'>): LanguageSupport | null {
+function plainSupport(id: FileLanguage['id']): LanguageSupport | null {
   switch (id) {
     case 'yaml':
       return richYaml()
     case 'json':
       return json()
-    case 'cpp':
-      return cpp()
-    case 'python':
-      return python()
-    case 'cmake':
-      return new LanguageSupport(StreamLanguage.define(cmake))
     case 'idl':
       return new LanguageSupport(StreamLanguage.define(idl))
     case 'text':
@@ -103,18 +92,9 @@ function plainSupport(id: Exclude<FileLanguage['id'], 'liquid'>): LanguageSuppor
   }
 }
 
-/** The `user` tag of the templates (`codegen/sections.ts`). */
-const LIQUID_TAGS = [
-  { label: 'user', type: 'keyword', detail: 'user section' },
-  { label: 'enduser', type: 'keyword' }
-]
-
 /** Syntax support of a file, by its name. */
 export function languageSupport(fileName: string): Extension {
-  const lang = languageOf(fileName)
-  if (lang.id !== 'liquid') return plainSupport(lang.id) ?? []
-  const base = lang.base && plainSupport(lang.base)
-  return fixedLiquid({ tags: LIQUID_TAGS, ...(base ? { base } : {}) })
+  return plainSupport(languageOf(fileName).id) ?? []
 }
 
 // Application shortcuts (save, palette...), run before the editor's own keys: set by the keyboard

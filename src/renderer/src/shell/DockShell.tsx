@@ -13,7 +13,6 @@ import { Inspector } from '@/panels/Inspector'
 import { ProblemsPanel, useProblemCounts } from '@/panels/ProblemsPanel'
 import { SearchPanel } from '@/panels/SearchPanel'
 import { SettingsPanel } from '@/panels/SettingsPanel'
-import { GenerationPanel } from '@/panels/GenerationPanel'
 import { OutputPanel } from '@/panels/OutputPanel'
 import { EditorArea } from './EditorArea'
 import {
@@ -60,7 +59,6 @@ function ProblemsToolPanel(props: IDockviewPanelProps): ReactNode {
 
 export const TOOL_ICONS: Record<ToolId, IconName> = {
   explorer: 'tree',
-  generation: 'code',
   inspector: 'info',
   problems: 'warning',
   output: 'output',
@@ -109,7 +107,6 @@ function ToolTab({ api }: IDockviewPanelHeaderProps): ReactNode {
 const components = {
   editorArea: EditorArea,
   explorer: tool('explorer', ExplorerPanel),
-  generation: tool('generation', GenerationPanel),
   inspector: tool('inspector', Inspector),
   problems: ProblemsToolPanel,
   output: tool('output', OutputPanel),

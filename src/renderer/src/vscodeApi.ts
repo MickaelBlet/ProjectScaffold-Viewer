@@ -1,20 +1,11 @@
-// VS Code webview implementation of the file API (extension: vscode/src/session.ts).
+// VS Code webview implementation of the file API (extension: ProjectScaffold-VsCode, src/session.ts).
 // The page edits a single document: VS Code owns its text, dirty state and file. A side panel
 // (IN_PANEL) changes document with the active project document.
 // Project changes are written to the text (see installHostSync in fileOps.ts); text changes made
 // elsewhere come back through onExternalChange.
-import type {
-  DiagramAction,
-  OutputDirReply,
-  OutputFileReply,
-  SidePanel,
-  ToHost,
-  ToPage,
-  ViewRef
-} from '../../../vscode/src/protocol'
-import type { Api, OpenResult, OutputDirRequest, Session, TemplateDirRequest } from './api'
-import type { OutputDir } from './codegen/run'
-import { FULL_LAYOUT, IN_PANEL, IN_PREVIEW, vscode } from './host'
+import type { DiagramAction, SidePanel, ToHost, ToPage, ViewRef } from '@/vscodeProtocol'
+import type { Api, OpenResult, Session } from './api'
+import { IN_PANEL, IN_PREVIEW, vscode } from './host'
 import { storageChanged } from './storage'
 
 const post = (msg: ToHost): void => vscode!.postMessage(msg)
@@ -37,7 +28,6 @@ const revealListeners = new Set<(path: (string | number)[], names: (string | und
 const documentListeners = new Set<(file: OpenResult) => void>()
 const viewListeners = new Set<(view: ViewRef) => void>()
 const actionListeners = new Set<(action: DiagramAction) => void>()
-const codegenListeners = new Set<() => void>()
 const showPanelListeners = new Set<(panel: SidePanel) => void>()
 /** Latest text received while the document was still loading. */
 let unheard: string | null = null
@@ -74,9 +64,6 @@ function onMessage(e: MessageEvent<ToPage>): void {
     case 'action':
       actionListeners.forEach((cb) => cb(msg.action))
       break
-    case 'codegen':
-      codegenListeners.forEach((cb) => cb())
-      break
     case 'showPanel':
       showPanelListeners.forEach((cb) => cb(msg.panel))
       break
@@ -95,51 +82,6 @@ function dataUrlPayload(url: string): { data: string; encoding: 'utf8' | 'base64
   return meta.endsWith(';base64')
     ? { data: payload, encoding: 'base64' }
     : { data: decodeURIComponent(payload), encoding: 'utf8' }
-}
-
-/** Directory given by the extension (`outputDir`, `templateDir`), its files read and written by it,
- *  opened in VS Code's editors (in the page's tabs in the full layout). */
-function hostDir(found: OutputDirReply): OutputDir {
-  const file = async (
-    op: 'read' | 'write' | 'remove',
-    path: string,
-    text?: string
-  ): Promise<string | null> => {
-    const r = await request<OutputFileReply>((id) => ({
-      type: 'outputFile',
-      id,
-      dir: found.dir,
-      path,
-      op,
-      text
-    }))
-    if ('error' in r) throw new Error(r.error)
-    return r.text
-  }
-  return {
-    label: found.label,
-    read: (path) => file('read', path),
-    write: async (path, text) => void (await file('write', path, text)),
-    remove: async (path) => void (await file('remove', path)),
-    open: FULL_LAYOUT ? undefined : (path, at) => post({ type: 'openOutputFile', dir: found.dir, path, at })
-  }
-}
-
-/** Output directory of the extension (see ToHost `outputDir`). */
-async function outputDir(req: OutputDirRequest): Promise<OutputDir | null> {
-  const found = await request<OutputDirReply | null>((id) => ({
-    type: 'outputDir',
-    id,
-    pick: req.pick,
-    name: req.name
-  }))
-  return found && hostDir(found)
-}
-
-/** Template folder of the extension (see ToHost `templateDir`); the document is the page's. */
-async function templateDir(req: TemplateDirRequest): Promise<OutputDir | null> {
-  const found = await request<OutputDirReply | null>((id) => ({ type: 'templateDir', id, op: req.op }))
-  return found && hostDir(found)
 }
 
 /** Document shown: the initial one, or the one a side panel was given since. Set by installVscodeApi:
@@ -168,7 +110,8 @@ const vscodeApi: Api = {
   onRecentChange: () => () => {},
   // Only the document: VS Code opens the other files in editors of their own.
   saveFile: (req) => {
-    if (req.path !== current.path) return Promise.reject(new Error(`Cannot save ${req.path ?? 'a new file'} here`))
+    if (req.path !== current.path)
+      return Promise.reject(new Error(`Cannot save ${req.path ?? 'a new file'} here`))
     post({ type: 'edit', text: req.content, uri: current.uri })
     post({ type: 'save' })
     return Promise.resolve(currentDoc().path)
@@ -203,15 +146,11 @@ const vscodeApi: Api = {
   },
   onCommand: (cb) => {
     const off = listen(commandListeners, cb)
-    // A diagram runs the commands asked for before it was loaded (Generate Code from the text...).
+    // A diagram runs the commands asked for before it was loaded (Add Module from the text...).
     if (!IN_PANEL) post({ type: 'ready' })
     return off
   },
   onReveal: (cb) => listen(revealListeners, cb),
-  codegenChanged: () => post({ type: 'codegen' }),
-  // Like the other template files: in VS Code's editors, in the page's tabs in the full layout.
-  openBuiltin: FULL_LAYOUT ? undefined : (path, text, at) => post({ type: 'openBuiltin', path, text, at }),
-  onCodegen: (cb) => listen(codegenListeners, cb),
   inDiagram: (action) => post({ type: 'inDiagram', action }),
   onDocument: (cb) => {
     const off = listen(documentListeners, cb)
@@ -225,10 +164,7 @@ const vscodeApi: Api = {
   showPanel: (panel) => post({ type: 'showPanel', panel }),
   onShowPanel: (cb) => listen(showPanelListeners, cb),
   setLayout: IN_PREVIEW ? (layout) => post({ type: 'setLayout', layout }) : undefined,
-  log: (level, text) => post({ type: 'log', level, text }),
-  // Side panels list the files; their Generate runs in the diagram (see generateCode).
-  outputDir,
-  templateDir
+  log: (level, text) => post({ type: 'log', level, text })
 }
 
 export function installVscodeApi(): void {

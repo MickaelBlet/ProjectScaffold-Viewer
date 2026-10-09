@@ -1,4 +1,4 @@
-// Full-text search over the project (names, descriptions and metadata) and over text files.
+// Full-text search over the project (names, descriptions and metadata).
 import { modulePath, typeNames } from './project'
 import type { ProblemTarget } from './validate'
 import type { Project } from './types'
@@ -17,24 +17,6 @@ export interface TextSpot {
   line: number
   column: number
   length: number
-}
-
-export interface LineHit extends TextSpot {
-  /** The line, trimmed. */
-  text: string
-}
-
-/** Lines of `text` holding `query` (ignoring case), at its first match on each; at most `max`. */
-export function searchLines(text: string, query: string, max = Infinity): LineHit[] {
-  const q = query.trim().toLowerCase()
-  const hits: LineHit[] = []
-  if (!q) return hits
-  const lines = text.split(/\r?\n/)
-  for (let i = 0; i < lines.length && hits.length < max; i++) {
-    const column = lines[i]!.toLowerCase().indexOf(q)
-    if (column >= 0) hits.push({ line: i + 1, column, length: q.length, text: lines[i]!.trim() })
-  }
-  return hits
 }
 
 export function searchProject(p: Project, query: string): SearchHit[] {

@@ -21,6 +21,15 @@ export const DEFAULT_HOST = '127.0.0.1'
 export const DEFAULT_BASE_PORT = 47000
 export const DEFAULT_SHM_CAPACITY = 1 << 20
 
+/** Default shared memory name of a link, as the generator names it: `<project>_<link>` in snake_case. */
+export const defaultShmName = (project: string, link: string): string =>
+  `${project}_${link}`
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
+    .match(/[A-Za-z0-9]+/g)
+    ?.map((w) => w.toLowerCase())
+    .join('_') ?? ''
+
 export function isBuiltinTransport(t: string | undefined): t is Transport {
   return (TRANSPORTS as readonly string[]).includes(t ?? '')
 }

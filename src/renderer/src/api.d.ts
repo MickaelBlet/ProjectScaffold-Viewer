@@ -1,12 +1,4 @@
-import type {
-  DiagramAction,
-  PreviewLayout,
-  LogLevel,
-  SidePanel,
-  TextSpot,
-  ViewRef
-} from '../../../vscode/src/protocol'
-import type { OutputDir } from './codegen/run'
+import type { DiagramAction, PreviewLayout, LogLevel, SidePanel, ViewRef } from '@/vscodeProtocol'
 
 export interface OpenResult {
   path: string
@@ -28,24 +20,6 @@ export interface SaveRequest {
   /** `text`: another kind of file (IDL), written as it is. */
   format: 'yaml' | 'json' | 'text'
   title?: string
-}
-
-export interface OutputDirRequest {
-  pick: boolean
-  /** Only a directory already used for the document: null rather than asking for one. */
-  known?: boolean
-  /** File of the document; null for an unsaved project. */
-  document: string | null
-  /** Default directory name (the project's namespace). */
-  name: string
-}
-
-/** Template folder of a document's code generation: the chosen one (`current`, null when none),
- *  one to pick and remember (`pick`, null when cancelled), or none any more (`forget`). */
-export interface TemplateDirRequest {
-  op: 'current' | 'pick' | 'forget'
-  /** File of the document; null for an unsaved project. */
-  document: string | null
 }
 
 /** An open document kept across page reloads. */
@@ -116,16 +90,6 @@ export interface Api {
    * resolves to its name, or null when cancelled.
    */
   saveExport(name: string, dataUrl: string): Promise<string | null>
-  /**
-   * Directory generated code goes to: the one last used for the document, else one to pick (always
-   * with `pick`); null when cancelled. Absent when the host cannot write into a directory.
-   */
-  outputDir?(request: OutputDirRequest): Promise<OutputDir | null>
-  /**
-   * Folder of the template set generating a document's code, used instead of the default one
-   * (see `TemplateDirRequest`); written to only to copy the built-in templates into it.
-   */
-  templateDir?(request: TemplateDirRequest): Promise<OutputDir | null>
 
   // VS Code only: the page edits one document whose text and file VS Code owns (the page keeps its
   // own undo history: VS Code's applies to the text beside).
@@ -151,12 +115,6 @@ export interface Api {
   onDocument?(cb: (file: OpenResult) => void): () => void
   /** Side panel: the view the diagram shows. */
   onView?(cb: (view: ViewRef) => void): () => void
-  /** Shows a built-in template (`<set>/<file>`) read-only in the host's own editor, selecting `at`. */
-  openBuiltin?(path: string, text: string, at?: TextSpot): void
-  /** Code was generated or other templates chosen here: the other pages of the document list their files again. */
-  codegenChanged?(): void
-  /** Another page of the document generated code or chose other templates. */
-  onCodegen?(cb: () => void): () => void
   /** Preview: switches the layout of the previews, which load again. */
   setLayout?(layout: PreviewLayout): void
   /** Diagram: shows another view, for the side panels. */

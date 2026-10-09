@@ -1,8 +1,5 @@
-// Messages between the extension (session.ts) and its webview pages (src/renderer/src/vscodeApi.ts).
-// Types only: the page imports this file too.
-import type { TextSpot } from '../../src/renderer/src/model/search'
-
-export type { TextSpot }
+// Messages between the VS Code extension (ProjectScaffold-VsCode, session.ts) and its webview pages
+// (vscodeApi.ts). Types only, no imports: the extension imports this file too.
 
 /**
  * Diagram preview beside the text, or the ProjectScaffold side bar view, its tools in tabs (following
@@ -11,10 +8,10 @@ export type { TextSpot }
 export type WebviewMode = 'preview' | 'panel'
 
 /** Tools of the ProjectScaffold side bar view, in tabs. */
-export type SidePanel = 'explorer' | 'generation'
+export type SidePanel = 'explorer'
 
 /**
- * Layout of the previews: `integrated` puts the Explorer and Code generation in the VS Code side bar;
+ * Layout of the previews: `integrated` puts the Explorer in the VS Code side bar;
  * `full` docks every tool in the page, like the web app (setting projectScaffold.preview.layout).
  */
 export type PreviewLayout = 'integrated' | 'full'
@@ -50,16 +47,6 @@ export type DiagramAction =
   | { kind: 'openEditor'; editor: 'type' | 'interface' | 'module' | 'link'; path: DataPath; split?: boolean }
   | { kind: 'command'; id: string }
 
-export interface OutputDirReply {
-  /** URI of the directory, given back in `outputFile`. */
-  dir: string
-  /** Shown to the user. */
-  label: string
-}
-
-/** Content of a file read (null: no such file); an error when the operation failed. */
-export type OutputFileReply = { text: string | null } | { error: string }
-
 /** Page → extension. Messages with an `id` get a `reply` with the same id. */
 export type ToHost =
   /** The project changed: new text of the document (an undoable, unsaved edit). */
@@ -83,31 +70,6 @@ export type ToHost =
   | { type: 'readFile'; id: number; path: string }
   /** Opens a project file next to the document in its own editor. */
   | { type: 'openSibling'; file: string }
-  /**
-   * Directory of the code generated from the document: the one picked for it before, else the one
-   * of the settings (`name`: the project's namespace); always picked with `pick`. Replies with an
-   * `OutputDirReply`, or null when cancelled.
-   */
-  | { type: 'outputDir'; id: number; pick: boolean; name: string }
-  /**
-   * Template folder of the document's code generation: the one picked for it, else the one of the
-   * settings, else null (`current`); one to pick and remember (`pick`, null when cancelled); back to
-   * the settings (`forget`, replies null). Replies with an `OutputDirReply`, read with `outputFile`.
-   */
-  | { type: 'templateDir'; id: number; op: 'current' | 'pick' | 'forget' }
-  /** File of a directory given by `outputDir`, by relative path: replies with an `OutputFileReply`. */
-  | {
-      type: 'outputFile'
-      id: number
-      dir: string
-      path: string
-      op: 'read' | 'write' | 'remove'
-      text?: string
-    }
-  /** Shows a built-in template (`path`: `<set>/<file>`) in a read-only VS Code editor, selecting `at`. */
-  | { type: 'openBuiltin'; path: string; text: string; at?: TextSpot }
-  /** Opens a file of a directory given by `outputDir` / `templateDir` in its VS Code editor, selecting `at`. */
-  | { type: 'openOutputFile'; dir: string; path: string; at?: TextSpot }
   /** The selection changed: data path of the selected entity in the file. */
   | { type: 'selected'; path: DataPath }
   /** A diagram shows another view. */
@@ -118,8 +80,6 @@ export type ToHost =
   | { type: 'showPanel'; panel: SidePanel }
   /** Switches the layout of the diagrams (they all load again). */
   | { type: 'setLayout'; layout: PreviewLayout }
-  /** The page generated code or chose other templates: the files to list changed. */
-  | { type: 'codegen' }
   /** A line of the page's Output log, for the ProjectScaffold Output channel (which adds the time). */
   | { type: 'log'; level: LogLevel; text: string }
   /** Side panel: listening for its document, sent again in reply. Diagram: listening for commands. */
@@ -141,8 +101,6 @@ export type ToPage =
   | { type: 'view'; view: ViewRef }
   /** Side bar view: shows a tab. */
   | { type: 'showPanel'; panel: SidePanel }
-  /** Another page generated the document's code or chose other templates. */
-  | { type: 'codegen' }
   /** Diagram: an action asked by a side panel. */
   | { type: 'action'; action: DiagramAction }
   | { type: 'reply'; id: number; result: unknown }

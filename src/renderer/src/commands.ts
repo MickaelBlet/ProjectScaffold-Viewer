@@ -48,7 +48,6 @@ import {
   exportSettings,
   switchPreviewLayout
 } from './fileOps'
-import { chooseTemplates, generateCode } from './generateCode'
 import { focusedEditorHistory, setPassedKeys } from './components/CodeEditor'
 import { openIdlText, saveActiveTextFile } from './textFileOps'
 import { activeDoc, cycleDoc, patchDoc, useDocs, activateDoc } from './store/documents'
@@ -151,7 +150,7 @@ const allCommands: Command[] = [
     category: 'File',
     keys: ['Ctrl+S'],
     global: true,
-    // The text file of the active tab (template, generated file...), else the project.
+    // The text file of the active tab (IDL file), else the project.
     run: () => void (saveActiveTextFile() || saveProject())
   },
   {
@@ -215,30 +214,10 @@ const allCommands: Command[] = [
     run: () => void exportImage('svg')
   },
   {
-    id: 'file.generate',
-    title: 'Generate code',
-    category: 'File',
-    keys: ['Ctrl+Alt+G'],
-    global: true,
-    run: () => void generateCode(false)
-  },
-  {
-    id: 'file.generateInto',
-    title: 'Generate code into…',
-    category: 'File',
-    run: () => void generateCode(true)
-  },
-  {
     id: 'file.openIdlText',
     title: 'Open IDL file as text…',
     category: 'File',
     run: () => void openIdlText()
-  },
-  {
-    id: 'file.codeTemplates',
-    title: 'Code templates…',
-    category: 'File',
-    run: () => void chooseTemplates()
   },
 
   // Edit
@@ -663,7 +642,6 @@ const allCommands: Command[] = [
 
   // Window
   { id: 'window.explorer', title: 'Explorer', category: 'Window', run: tool('explorer') },
-  { id: 'window.generation', title: 'Code generation', category: 'Window', run: tool('generation') },
   {
     id: 'window.inspector',
     title: 'Inspector',

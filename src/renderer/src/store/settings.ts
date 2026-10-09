@@ -79,10 +79,6 @@ export interface Settings {
   explorerOrder: string[]
   /** Explorer sections not shown. */
   explorerHidden: string[]
-  /** Code generation panel sections top to bottom. */
-  generationOrder: string[]
-  /** Code generation panel files as a folder tree, not a list. */
-  generationTree: boolean
   /** Toolbar buttons right of the menus: command ids, '-' for a separator. */
   toolbar: string[]
 }
@@ -124,8 +120,6 @@ export const DEFAULT_SETTINGS: Settings = {
   sourceChanges: true,
   explorerOrder: [],
   explorerHidden: [],
-  generationOrder: [],
-  generationTree: false,
   toolbar: ['edit.undo', 'edit.redo', '-', 'view.back', 'view.forward']
 }
 

@@ -1,20 +1,16 @@
 // Ctrl+Shift+P: commands ('>' prefix). Ctrl+P: go to a module, type, interface, constant, link, dependency
-// (and the types, interfaces, constants and modules it brings), view, template or generated file.
+// (and the types, interfaces, constants and modules it brings), view.
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import { commands, keyLabel, runCommand } from '@/commands'
-import { codegenFiles } from '@/generationFiles'
 import { formatValue } from '@/model/defaults'
 import { fuzzyFilter } from '@/model/fuzzy'
 import { modulePaths } from '@/model/project'
 import { GLOBAL_VIEW, type Id } from '@/model/types'
-import { activeDoc } from '@/store/documents'
 import { getProject } from '@/store/project'
 import { storage } from '@/storage'
 import { useUiStore, type PickEntry } from '@/store/ui'
 import { navigate } from '@/actions'
 import { openView } from '@/shell/controllers'
-import { openTextFile } from '@/textFileOps'
-import { LANGUAGE_BADGES, languageOf } from './codeLanguages'
 import { Icon } from './Icon'
 
 interface Entry extends PickEntry {
@@ -129,20 +125,6 @@ function entityEntries(): Entry[] {
   ]
 }
 
-/** Templates and generated files of the active document. */
-async function codegenEntries(): Promise<Entry[]> {
-  return (await codegenFiles(activeDoc())).map(({ ref, name, kind }) => {
-    const { id } = languageOf(name)
-    return {
-      key: `${ref.source}:${ref.path}`,
-      label: name,
-      detail: kind,
-      kind: <span className={`file-badge file-${id}`}>{LANGUAGE_BADGES[id]}</span>,
-      run: () => void openTextFile(ref)
-    }
-  })
-}
-
 function Highlight({ text, positions }: { text: string; positions: number[] }): ReactNode {
   const set = new Set(positions)
   return <>{[...text].map((ch, i) => (set.has(i) ? <b key={i}>{ch}</b> : ch))}</>
@@ -167,28 +149,10 @@ export function CommandPalette(): ReactNode {
 
   const pickList = palette?.pick
   const isCommands = !pickList && query.startsWith('>')
-  // Read on each opening (the folders may have changed), listed after the entities once read.
-  const [files, setFiles] = useState<Entry[]>([])
-  const goTo = !!palette && !pickList
-  useEffect(() => {
-    if (!goTo) return
-    let current = true
-    void codegenEntries().then((e) => current && setFiles(e))
-    return () => {
-      current = false
-      setFiles([])
-    }
-  }, [goTo])
   const entries = useMemo(
     (): Entry[] =>
-      !palette
-        ? []
-        : pickList
-          ? pickList.entries
-          : isCommands
-            ? commandEntries()
-            : [...entityEntries(), ...files],
-    [palette, pickList, isCommands, files]
+      !palette ? [] : pickList ? pickList.entries : isCommands ? commandEntries() : entityEntries(),
+    [palette, pickList, isCommands]
   )
   const results = useMemo(
     () => fuzzyFilter(isCommands ? query.slice(1) : query, entries, (e) => e.label).slice(0, 60),

@@ -3,17 +3,7 @@
 // through a file input and a download. Paths are file names: browsers never expose real paths.
 // Recent documents live in IndexedDB: their last known content, and their file handle when
 // available so that reopening reads the file again and Save rewrites it.
-import type {
-  Api,
-  FileFilter,
-  OpenResult,
-  OutputDirRequest,
-  SaveRequest,
-  Session,
-  TemplateDirRequest
-} from './api'
-import type { OutputDir } from './codegen/run'
-import { isInsidePath } from './codegen/templateSet'
+import type { Api, FileFilter, OpenResult, SaveRequest, Session } from './api'
 
 type Permission = 'granted' | 'denied' | 'prompt'
 
@@ -32,15 +22,13 @@ interface PickerType {
 
 interface DirHandle {
   name: string
-  getDirectoryHandle(name: string, opts?: { create?: boolean }): Promise<DirHandle>
+  getDirectoryHandle(name: string): Promise<DirHandle>
   getFileHandle(name: string, opts?: { create?: boolean }): Promise<FileHandle>
-  removeEntry(name: string): Promise<void>
   queryPermission?(opts: { mode: 'readwrite' }): Promise<Permission>
   requestPermission?(opts: { mode: 'readwrite' }): Promise<Permission>
   /** Names from this folder down to the entry; null when it is not inside. */
   resolve?(entry: FileHandle | DirHandle): Promise<string[] | null>
   isSameEntry?(other: DirHandle): Promise<boolean>
-  keys?(): AsyncIterator<string>
 }
 
 interface FsAccessWindow {
@@ -436,6 +424,16 @@ async function granted(dir: DirHandle, ask: boolean): Promise<boolean> {
   }
 }
 
+/** Whether a path is relative, `/`-separated and stays inside its folder. */
+function isInsidePath(path: string): boolean {
+  const p = path.trim().replace(/\/+/g, '/')
+  if (!p || p.startsWith('/') || p.includes('\\') || /^[A-Za-z]:/.test(p)) return false
+  return !p.split('/').some((s) => s === '..' || s === '')
+}
+
+const notFound = (e: unknown): boolean =>
+  e instanceof DOMException && (e.name === 'NotFoundError' || e.name === 'TypeMismatchError')
+
 /** Handle of the file at a `/`-separated path in a folder; null when absent or out of it. */
 async function fileAt(dir: DirHandle, path: string): Promise<FileHandle | null> {
   if (!isInsidePath(path)) return null
@@ -574,163 +572,6 @@ async function readWorkspace(path: string, files: string[]): Promise<(OpenResult
   return results
 }
 
-// Output directories of generated code and template folders, by document; kept in IndexedDB when
-// handles can be stored.
-const dirHandles = new Map<string, DirHandle>()
-const outputKey = (doc: string | null): string => `outputDir:${doc ?? ''}`
-const templateKey = (doc: string | null): string => `templateDir:${doc ?? ''}`
-
-async function rememberedDir(key: string): Promise<DirHandle | undefined> {
-  const known = dirHandles.get(key)
-  if (known) return known
-  try {
-    return await withStore<DirHandle | undefined>(
-      'readonly',
-      (s) => s.get(key) as IDBRequest<DirHandle | undefined>
-    )
-  } catch {
-    return undefined
-  }
-}
-
-async function rememberDir(key: string, handle: DirHandle | null): Promise<void> {
-  if (handle) dirHandles.set(key, handle)
-  else dirHandles.delete(key)
-  try {
-    if (handle) await withStore('readwrite', (s) => s.put(handle, key))
-    else await withStore('readwrite', (s) => s.delete(key))
-  } catch {
-    // Handles cannot be stored (file:// origin, private browsing): remembered for the session.
-  }
-}
-
-/** Folder picked by the user; null when cancelled. */
-async function pickDir(id: string, startIn?: DirHandle): Promise<DirHandle | null> {
-  try {
-    return await fs.showDirectoryPicker!({ id, mode: 'readwrite', startIn })
-  } catch (e) {
-    if (isAbort(e)) return null
-    throw e
-  }
-}
-
-const notFound = (e: unknown): boolean =>
-  e instanceof DOMException && (e.name === 'NotFoundError' || e.name === 'TypeMismatchError')
-
-/** Whether a remembered folder still exists: deleted or recreated since, its handle finds nothing. */
-async function exists(dir: DirHandle): Promise<boolean> {
-  try {
-    await dir.keys?.().next()
-    return true
-  } catch (e) {
-    if (notFound(e)) return false
-    throw e
-  }
-}
-
-/** A directory handle as an output directory: paths are `/`-separated, relative to it. */
-function handleDir(root: DirHandle): OutputDir {
-  const locate = async (path: string, create: boolean): Promise<[DirHandle, string]> => {
-    if (!isInsidePath(path)) throw new Error(`invalid path '${path}': not inside ${root.name}`)
-    const parts = path.split('/')
-    const name = parts.pop()!
-    let dir = root
-    for (const p of parts) if (p && p !== '.') dir = await dir.getDirectoryHandle(p, { create })
-    return [dir, name]
-  }
-  return {
-    label: root.name,
-    read: async (path) => {
-      try {
-        const [dir, name] = await locate(path, false)
-        return await (await (await dir.getFileHandle(name)).getFile()).text()
-      } catch (e) {
-        if (notFound(e)) return null
-        throw e
-      }
-    },
-    write: async (path, text) => {
-      const [dir, name] = await locate(path, true)
-      const w = await (await dir.getFileHandle(name, { create: true })).createWritable()
-      await w.write(text)
-      await w.close()
-    },
-    remove: async (path) => {
-      try {
-        const [dir, name] = await locate(path, false)
-        await dir.removeEntry(name)
-      } catch (e) {
-        if (!notFound(e)) throw e
-      }
-    }
-  }
-}
-
-async function outputDir(req: OutputDirRequest): Promise<OutputDir | null> {
-  const key = outputKey(req.document)
-  const previous = await rememberedDir(key)
-  // Asked for without a user gesture (listing its files): access is asked for on first use.
-  if (req.known) return previous && !req.pick ? knownDir(key, previous) : null
-  let handle = req.pick ? undefined : previous
-  if (handle && !(await granted(handle, true))) handle = undefined
-  const gone = !!handle && !(await exists(handle))
-  if (gone) handle = undefined
-  if (!handle) {
-    const picked = await pickDir('generate', gone ? undefined : previous)
-    if (!picked) return null
-    await rememberDir(key, picked)
-    handle = picked
-  }
-  return handleDir(handle)
-}
-
-/** A remembered folder as a directory, asking for access to it on first use (after a user gesture). */
-function askingDir(handle: DirHandle): OutputDir {
-  const dir = handleDir(handle)
-  let access: Promise<boolean> | undefined
-  const ensure = async (): Promise<void> => {
-    if (await (access ??= granted(handle, true))) return
-    access = undefined
-    throw new Error(`access to the folder ${handle.name} is not granted`)
-  }
-  return {
-    label: dir.label,
-    read: async (path) => {
-      await ensure()
-      return dir.read(path)
-    },
-    write: async (path, text) => {
-      await ensure()
-      await dir.write(path, text)
-    },
-    remove: async (path) => {
-      await ensure()
-      await dir.remove(path)
-    }
-  }
-}
-
-/**
- * A remembered folder: picked in this session, it is granted already (WebView2 may not say so, and
- * asking without a user gesture can stay pending); else access is asked for on first use.
- */
-const knownDir = (key: string, handle: DirHandle): OutputDir =>
-  dirHandles.get(key) === handle ? handleDir(handle) : askingDir(handle)
-
-async function templateDir(req: TemplateDirRequest): Promise<OutputDir | null> {
-  const key = templateKey(req.document)
-  if (req.op === 'forget') {
-    await rememberDir(key, null)
-    return null
-  }
-  const previous = await rememberedDir(key)
-  if (req.op === 'current') return previous ? knownDir(key, previous) : null
-  const picked = await pickDir('templates', previous)
-  if (!picked) return null
-  await rememberDir(key, picked)
-  return handleDir(picked)
-}
-
 let dirty = false
 
 function deleteDatabase(name: string): Promise<void> {
@@ -801,9 +642,7 @@ const webApi: Api = {
   saveExport: (name, dataUrl) => {
     downloadUrl(name, dataUrl)
     return Promise.resolve(name)
-  },
-  outputDir: fs.showDirectoryPicker ? outputDir : undefined,
-  templateDir: fs.showDirectoryPicker ? templateDir : undefined
+  }
 }
 
 export function installWebApi(): void {

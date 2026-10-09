@@ -37,9 +37,7 @@ import {
 } from './actions'
 import { showTauriWindow } from './tauriDesktop'
 import { ExplorerPanel } from './panels/ExplorerPanel'
-import { GenerationPanel } from './panels/GenerationPanel'
-import { notifyCodegen } from './generateCode'
-import type { SidePanel } from '../../../vscode/src/protocol'
+import type { SidePanel } from '@/vscodeProtocol'
 
 /** How often open files are checked for changes made by other programs. */
 const DISK_CHECK_MS = 2000
@@ -74,14 +72,10 @@ function Dialog(): ReactNode {
 }
 
 const SIDE_PANELS: Record<SidePanel, () => ReactNode> = {
-  explorer: ExplorerPanel,
-  generation: GenerationPanel
+  explorer: ExplorerPanel
 }
 
-const SIDE_TABS: [SidePanel, string][] = [
-  ['explorer', 'Explorer'],
-  ['generation', 'Code generation']
-]
+const SIDE_TABS: [SidePanel, string][] = [['explorer', 'Explorer']]
 /** Tab of the side bar view shown last. */
 const SIDE_TAB_KEY = 'project-scaffold:side-tab'
 
@@ -190,7 +184,6 @@ export function App(): ReactNode {
       window.api.onCommand!(runCommand),
       window.api.onReveal!(navigateToPath),
       installSelectionSync(),
-      window.api.onCodegen!(notifyCodegen),
       // A side panel follows the active document and the view of its diagram, which acts for it.
       ...(IN_PANEL
         ? [window.api.onDocument!(showHostDocument), window.api.onView!(showDiagramView)]

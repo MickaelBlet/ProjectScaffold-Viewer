@@ -2,9 +2,7 @@
 # Desktop builds, one stage per OS so BuildKit runs them in parallel on top of a single web build:
 #   tauri:    Linux amd64 (deb, rpm, AppImage), Windows amd64 (NSIS + portable exe, cargo-xwin)
 #   electron: Linux x64 (AppImage, tar.gz), Windows x64 (portable exe, zip; Wine stamps icon and version)
-#   vscode:   VS Code extension (.vsix)
-# Usage: scripts/build_desktop.sh (both), scripts/build_tauri.sh, scripts/build_electron.sh,
-#        scripts/build_vscode.sh
+# Usage: scripts/build_desktop.sh (both), scripts/build_tauri.sh, scripts/build_electron.sh
 
 # ---------- web: dist-web/index.html, shared by every desktop target ----------
 FROM node:22-bookworm-slim AS deps
@@ -109,10 +107,3 @@ RUN --mount=type=cache,id=electron-windows,target=/root/.cache/electron \
 FROM scratch AS electron
 COPY --from=electron-linux /out /
 COPY --from=electron-windows /out /
-
-# ---------- vscode ----------
-FROM web AS vscode-package
-RUN npm run vscode:package
-
-FROM scratch AS vscode
-COPY --from=vscode-package /app/dist-vscode /

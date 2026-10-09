@@ -17,7 +17,6 @@
     "vitest.config.ts",
     "scripts/**/*",
     "tests/**/*",
-    "src/renderer/src/model/**/*",
-    "src/renderer/src/codegen/**/*"
+    "src/renderer/src/model/**/*"
   ]
 }

@@ -18,7 +18,7 @@ Several projects open at once, in tabs, each with its own undo history.
 
 ### Panels
 
-Explorer, Inspector, Problems, Output, Search, Settings and Code generation are dockable panels.
+Explorer, Inspector, Problems, Output, Search and Settings are dockable panels.
 
 - Drag a tab to dock it on any side, stack it with others or float it. The layout is kept; _Window › Reset panel layout_ restores the default one.
 - The Explorer's sections are reordered by dragging their header (or Alt+↑ / Alt+↓) and hidden from their right-click menu (_Reset sections_ restores them).
@@ -59,12 +59,12 @@ IDL files can be edited as text too: see [IDL files](idl.md#editing-idl-files).
 
 ### Search
 
-Ctrl+Shift+F searches names, descriptions and metadata of the project, then the templates and generated files by name and content. A matching line opens its file with the match selected.
+Ctrl+Shift+F searches names, descriptions and metadata of the project.
 
 ### Command palette
 
 - Ctrl+Shift+P (or F1) runs any command.
-- Ctrl+P goes to a module, type, interface, constant, link, dependency (and what it defines), view, template or generated file.
+- Ctrl+P goes to a module, type, interface, constant, link, dependency (and what it defines) or view.
 - `?` lists every shortcut.
 
 ## Diagram
@@ -144,7 +144,7 @@ Binaries are the executables the project is split into.
 - Links between two binaries become remote (dashed): choose their transport. Links back inside one binary become local again when they have none.
 - A module moved into a container runs in the container's binary; one moved out keeps running where it ran.
 
-Generated code for links between binaries: [Links between binaries](remote.md).
+Generated code for links between binaries: [ProjectScaffold-Generator › Links between binaries](https://github.com/MickaelBlet/ProjectScaffold-Generator/blob/master/docs/remote.md).
 
 ### Notes, frames, colors
 
@@ -158,8 +158,7 @@ The diagram exports as PNG or SVG from the _File_ menu.
 
 - **Explorer**: types (struct / exception / enum / bitmask / union / alias / custom primitive), constants (edited in the project inspector) and interfaces (messages with typed `in` / `out` / `inout` parameters and optional return). Type fields accept expressions with completion (`map<string, vector<uint16>>`), or the structured editor (⋮). Inspectors list where a type or interface is used.
 - **Problems**: validates live (filter by severity or text). Errors block export, warnings do not.
-- **Output** (Ctrl+Shift+U): logs code generation file by file (click a generated file to open it) and every status message and dialog, with their time; filter by source, level or text.
-- **Code generation**: see [Code generation › Code generation panel](code-generation.md#code-generation-panel).
+- **Output** (Ctrl+Shift+U): logs every status message and dialog, with their time; filter by level or text.
 
 ## Files and settings
 

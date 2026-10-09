@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Build every distributable: web, standalone code generator, VS Code extension, desktop apps (Docker).
-# Usage: scripts/build_all.sh [--check] [web|cli|vscode|desktop]...   (default: all;
+# Build every distributable: web, desktop apps (Docker).
+# Usage: scripts/build_all.sh [--check] [web|desktop]...   (default: all;
 # --check: run lint and unit tests first)
-# Output: dist-web/, dist-cli/, dist-vscode/, dist-tauri/, dist-electron/
+# Output: dist-web/, dist-tauri/, dist-electron/
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -11,11 +11,11 @@ targets=()
 for arg in "$@"; do
   case "$arg" in
     --check) check=true ;;
-    web | cli | vscode | desktop) targets+=("$arg") ;;
-    *) echo "usage: $0 [--check] [web|cli|vscode|desktop]..." >&2; exit 1 ;;
+    web | desktop) targets+=("$arg") ;;
+    *) echo "usage: $0 [--check] [web|desktop]..." >&2; exit 1 ;;
   esac
 done
-[ ${#targets[@]} -gt 0 ] || targets=(web cli vscode desktop)
+[ ${#targets[@]} -gt 0 ] || targets=(web desktop)
 
 has() { [[ " ${targets[*]} " == *" $1 "* ]]; }
 
@@ -30,6 +30,4 @@ if $check; then
 fi
 
 if has web; then scripts/build_web.sh; fi
-if has cli; then scripts/build_cli.sh; fi
-if has vscode; then scripts/build_vscode.sh; fi
 if has desktop; then scripts/build_desktop.sh; fi

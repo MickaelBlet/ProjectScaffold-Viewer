@@ -14,11 +14,11 @@ import {
   TextArea
 } from '@/components/fields'
 import { dependencyName } from '@/model/dependencies'
-import { snake } from '@/codegen/filters'
 import {
   DEFAULT_BASE_PORT,
   DEFAULT_HOST,
   DEFAULT_SHM_CAPACITY,
+  defaultShmName,
   pruneSettings,
   transportFields
 } from '@/model/transports'
@@ -124,7 +124,7 @@ function TransportSettingsFields({ project, link }: { project: Project; link: Li
   }
   const placeholders: Partial<Record<Text | Count, string>> = {
     path: `/${name}`,
-    name: snake(`${dependencyName(project.name)}_${name}`),
+    name: defaultShmName(dependencyName(project.name), name),
     capacity: String(DEFAULT_SHM_CAPACITY)
   }
   const text = (f: Text): ReactNode => (

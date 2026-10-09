@@ -213,4 +213,4 @@ remoteDefaults: { client?: { host? }, server?: { host? }, basePort? } # optional
 - An http path not starting with `/` and an invalid shared memory name are errors.
 - Two links listening on the same port, or sharing a segment, are warnings.
 
-What the generated code does with them: [Links between binaries](remote.md).
+What the generated code does with them: [ProjectScaffold-Generator › Links between binaries](https://github.com/MickaelBlet/ProjectScaffold-Generator/blob/master/docs/remote.md).

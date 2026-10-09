@@ -1,5 +1,5 @@
 // Collapsible panel section whose header drags to reorder it among the sections of the same drag type
-// (Alt+Up / Alt+Down on its toggle as well). Used by the Explorer and the Code generation panel.
+// (Alt+Up / Alt+Down on its toggle as well). Used by the Explorer.
 import {
   useId,
   useLayoutEffect,

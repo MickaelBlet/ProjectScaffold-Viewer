@@ -100,7 +100,7 @@ import {
   viewRef
 } from '@/shell/controllers'
 import { IN_PANEL } from '@/host'
-import type { DiagramAction, ViewRef } from '../../../vscode/src/protocol'
+import type { DiagramAction, ViewRef } from '@/vscodeProtocol'
 
 // Selection
 

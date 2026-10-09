@@ -17,7 +17,7 @@ import { sendToDiagram } from '@/fileOps'
 import { fileBaseName, type TextFileRef } from '@/store/textFiles'
 import { targetPath } from '@/model/locate'
 import { toFile } from '@/model/serialize'
-import type { SidePanel, ViewRef } from '../../../../vscode/src/protocol'
+import type { SidePanel, ViewRef } from '@/vscodeProtocol'
 
 export interface CanvasController {
   viewId: Id
@@ -50,11 +50,10 @@ export function activeCanvas(): CanvasController | undefined {
 
 // Dock layouts
 
-export type ToolId = 'explorer' | 'generation' | 'inspector' | 'problems' | 'output' | 'search' | 'settings'
+export type ToolId = 'explorer' | 'inspector' | 'problems' | 'output' | 'search' | 'settings'
 
 export const TOOL_TITLES: Record<ToolId, string> = {
   explorer: 'Explorer',
-  generation: 'Code generation',
   inspector: 'Inspector',
   problems: 'Problems',
   output: 'Output',
@@ -65,7 +64,6 @@ export const TOOL_TITLES: Record<ToolId, string> = {
 /** Width of the side tools, height of the bottom ones, when first opened. */
 const TOOL_SIZES: Record<ToolId, number> = {
   explorer: 300,
-  generation: 300,
   inspector: 440,
   settings: 440,
   problems: 170,
@@ -89,8 +87,8 @@ const LAYOUT_KEY = FULL_LAYOUT
     ? 'project-scaffold:layout:vscode'
     : 'project-scaffold:layout'
 
-/** Tools of the VS Code side bar (see vscode/package.json). */
-const SIDE_TOOLS = new Set<ToolId>(['explorer', 'generation'])
+/** Tools of the VS Code side bar (see the extension's package.json). */
+const SIDE_TOOLS = new Set<ToolId>(['explorer'])
 const inSideBar = (id: ToolId): id is SidePanel => INTEGRATED && SIDE_TOOLS.has(id)
 
 /**
@@ -124,14 +122,13 @@ export function buildDefaultLayout(api: DockviewApi): void {
     initialWidth: TOOL_SIZES.explorer,
     position: { referencePanel: EDITOR_AREA, direction: 'left' }
   })
-  for (const id of ['generation', 'search'] as const)
-    api.addPanel({
-      id,
-      component: id,
-      title: TOOL_TITLES[id],
-      inactive: true,
-      position: { referencePanel: 'explorer', direction: 'within' }
-    })
+  api.addPanel({
+    id: 'search',
+    component: 'search',
+    title: TOOL_TITLES.search,
+    inactive: true,
+    position: { referencePanel: 'explorer', direction: 'within' }
+  })
   api.addPanel({
     id: 'inspector',
     component: 'inspector',
@@ -183,7 +180,7 @@ export function loadOuterLayout(api: DockviewApi): void {
     // A layout with panels no longer there (removed tools) is dropped for the default one.
     if (layout && Object.keys(layout.panels).every((id) => id === EDITOR_AREA || id in TOOL_TITLES)) {
       api.fromJSON(layout)
-      // Tools now in the VS Code side bar (Code generation was docked before).
+      // Tools now in the VS Code side bar.
       if (INTEGRATED) for (const id of SIDE_TOOLS) api.getPanel(id)?.api.close()
       if (api.getPanel(EDITOR_AREA)) return lockEditorArea(api)
     }
@@ -312,18 +309,11 @@ type Place = [ref: string, direction: Direction] | [ref: null, direction: Exclud
 /** Where a closed tool goes back: beside the first open reference, else on an edge of the window. */
 const TOOL_PLACES: Record<ToolId, Place[]> = {
   explorer: [
-    ['generation', 'within'],
-    ['search', 'within'],
-    [null, 'left']
-  ],
-  generation: [
-    ['explorer', 'within'],
     ['search', 'within'],
     [null, 'left']
   ],
   search: [
     ['explorer', 'within'],
-    ['generation', 'within'],
     [null, 'left']
   ],
   inspector: [
@@ -483,7 +473,7 @@ export function openSource(options: { split?: boolean } = { split: true }): void
   })
 }
 
-/** Tab of a text file (template, generated file, IDL file), see store/textFiles.ts. */
+/** Tab of a text file (IDL file), see store/textFiles.ts. */
 export const filePanelId = (ref: TextFileRef): string => `file:${ref.source}:${ref.path}`
 
 /** Open a text file in a tab of the editor area, beside the focused one with `split`. */

@@ -32,10 +32,6 @@ const MENUS: [Category, string[]][] = [
       'file.exportPng',
       'file.exportSvg',
       '-',
-      'file.generate',
-      'file.generateInto',
-      'file.codeTemplates',
-      '-',
       'file.close'
     ]
   ],
@@ -125,7 +121,6 @@ const MENUS: [Category, string[]][] = [
     'Window',
     [
       'window.explorer',
-      'window.generation',
       'window.inspector',
       'window.problems',
       'window.output',

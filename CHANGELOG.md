@@ -28,6 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 - The eye button of the modules in the Explorer: _Hide in view_ / _Show in view_ stay in their right-click menu (and H / Shift+H).
+- Code generation, split into [ProjectScaffold-Generator](https://github.com/MickaelBlet/ProjectScaffold-Generator) (command line, standalone `scaffold-gen`, template sets): _File › Generate code_ (Ctrl+Alt+G), _Generate code into…_, _Code templates…_, the _Code generation_ panel, templates and generated files in editor tabs, the search and the command palette, Liquid, C++, Python and CMake highlighting. The project inspector still sets the template set the generator uses (`generation.templates`).
+- The VS Code extension, split into [ProjectScaffold-VsCode](https://github.com/MickaelBlet/ProjectScaffold-VsCode), which builds its pages from this repository; the page side of its protocol stays here (`src/renderer/src/vscodeProtocol.ts`).
 
 ### Fixed
 
@@ -289,7 +291,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - _Swap ends_ in the link inspector also swaps the link's attachments and reverses its bends, like _Reverse direction_.
 - Hints no longer tell to double-click the canvas to add a module (right-click it).
 
-[Unreleased]: https://github.com/MickaelBlet/ProjectScaffold/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/MickaelBlet/ProjectScaffold-Viewer/compare/v1.0.0...HEAD
 [1.0.0]: https://github.com/MickaelBlet/ProjectScaffold/compare/v0.2.0...v1.0.0
 [0.2.0]: https://github.com/MickaelBlet/ProjectScaffold/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/MickaelBlet/ProjectScaffold/releases/tag/v0.1.0

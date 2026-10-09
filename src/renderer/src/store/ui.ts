@@ -72,16 +72,14 @@ export const useSelection = (): Selection => useDoc((d) => d.selection)
 
 /** Shows a message in the status bar, logged to the Output panel. */
 export function setStatus(kind: 'info' | 'error', text: string): void {
-  log(kind, 'app', text)
+  log(kind, text)
   useUiStore.setState({ status: { kind, text } })
 }
 
-/** Shows a dialog, logged to the Output panel unless `logged` (the caller logged it its own way). */
-export function showDialog(title: string, lines: string[], options: { logged?: boolean } = {}): void {
-  if (!options.logged) {
-    log('error', 'app', title)
-    for (const line of lines) log('error', 'app', `  ${line}`)
-  }
+/** Shows a dialog, logged to the Output panel. */
+export function showDialog(title: string, lines: string[]): void {
+  log('error', title)
+  for (const line of lines) log('error', `  ${line}`)
   useUiStore.setState({ dialog: { title, lines } })
 }
 

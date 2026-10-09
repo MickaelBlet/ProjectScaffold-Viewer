@@ -78,4 +78,4 @@ _File › Open IDL file as text…_ edits IDL files in a tab of the code editor:
 
 ## Generating IDL
 
-The [`sca-cpp98`](sca.md) template set writes the project as IDL.
+The `sca-cpp98` template set of [ProjectScaffold-Generator](https://github.com/MickaelBlet/ProjectScaffold-Generator) writes the project as IDL ([SCA mapping](https://github.com/MickaelBlet/ProjectScaffold-Generator/blob/master/docs/sca.md)).

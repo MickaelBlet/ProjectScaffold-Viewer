@@ -7,7 +7,6 @@ import { valueExample } from '@/model/defaults'
 import { DEFAULT_TEMPLATE_SET, TEMPLATE_SETS } from '@/model/templateSets'
 import { DefaultInput, FieldList } from './TypeInspector'
 import { update, useProjectStore } from '@/store/project'
-import { setTemplateSet } from '@/generateCode'
 import {
   ColorPicker,
   CommitInput,
@@ -41,6 +40,14 @@ function withRemoteDefaults(fn: (r: RemoteDefaults) => void): void {
   })
 }
 
+/** Built-in template set generating the project's code; the default one leaves the file without it. */
+function setTemplateSet(name: string): void {
+  update((d) => {
+    if (name === DEFAULT_TEMPLATE_SET) delete d.templates
+    else d.templates = name
+  })
+}
+
 export function ProjectInspector(): ReactNode {
   const p = useProjectStore((s) => s.project)
   const own = p.consts.filter((c) => !c.dependency)
@@ -69,8 +76,8 @@ export function ProjectInspector(): ReactNode {
           </select>
         </Row>
         <p className="muted">
-          Built-in template set, unless a template folder is chosen for the document or the output directory
-          holds its own (.scaffold/templates).
+          Built-in template set of the code generator (ProjectScaffold-Generator), unless it is given other
+          templates.
         </p>
       </Section>
       <Section title={`Constants (${own.length})`}>

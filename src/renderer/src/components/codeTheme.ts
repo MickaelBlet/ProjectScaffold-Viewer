@@ -3,7 +3,6 @@ import { HighlightStyle, syntaxHighlighting } from '@codemirror/language'
 import { EditorView } from '@codemirror/view'
 import type { Extension } from '@codemirror/state'
 import { tags as t } from '@lezer/highlight'
-import { liquidDelimiter, liquidPunctuation } from './liquidSyntax'
 
 const MONO = "ui-monospace, 'SF Mono', Consolas, monospace"
 
@@ -163,8 +162,6 @@ export const highlight = HighlightStyle.define([
     fontStyle: 'italic'
   },
   { tag: [t.punctuation, t.separator, t.bracket, t.brace, t.squareBracket, t.paren], color: 'var(--muted)' },
-  { tag: liquidDelimiter, color: 'var(--syn-liquid)', fontWeight: '700' },
-  { tag: liquidPunctuation, color: 'var(--syn-liquid)' },
   { tag: t.invalid, color: 'var(--danger)' },
   { tag: t.strong, fontWeight: '700' },
   { tag: t.emphasis, fontStyle: 'italic' }

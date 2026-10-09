@@ -23,7 +23,6 @@
   --syn-type: var(--accent);
   --syn-string: #2b7a3f;
   --syn-literal: #b0480b;
-  --syn-liquid: #8a3fc7;
   --scrollbar-thumb: color-mix(in srgb, var(--text) 16%, transparent);
   --scrollbar-thumb-hover: color-mix(in srgb, var(--text) 32%, transparent);
   color-scheme: light;
@@ -49,7 +48,6 @@
     --syn-key: #82aaff;
     --syn-string: #9ccc7a;
     --syn-literal: #f0a45d;
-    --syn-liquid: #c792ea;
     color-scheme: dark;
   }
 }
@@ -81,7 +79,6 @@
   --syn-key: #82aaff;
   --syn-string: #9ccc7a;
   --syn-literal: #f0a45d;
-  --syn-liquid: #c792ea;
   color-scheme: dark;
 }
 /* Color themes: dark surfaces tinted with the theme color, and that color as the accent. */
@@ -216,7 +213,6 @@
   --syn-key: var(--vscode-debugTokenExpression-name, var(--vscode-symbolIcon-propertyForeground));
   --syn-string: var(--vscode-debugTokenExpression-string, var(--vscode-charts-green));
   --syn-literal: var(--vscode-debugTokenExpression-number, var(--vscode-charts-orange));
-  --syn-liquid: var(--vscode-charts-purple, #c792ea);
   --scrollbar-thumb: var(
     --vscode-scrollbarSlider-background,
     color-mix(in srgb, var(--text) 16%, transparent)
@@ -622,7 +618,7 @@ button.link-button:hover {
 .source-counts .zero {
   color: var(--muted);
 }
-/* Text file tabs (templates, generated files, IDL files). */
+/* Text file tabs (IDL files). */
 .file-editor .file-path {
   min-width: 0;
   overflow: hidden;
@@ -632,14 +628,7 @@ button.link-button:hover {
 .file-editor .source-stale.error {
   color: var(--danger);
 }
-.source-note {
-  margin: 0;
-  padding: 4px 8px;
-  font-size: 12px;
-  color: var(--muted);
-  border-bottom: 1px solid var(--border);
-}
-:is(.source-stale, .source-note) .link {
+.source-stale .link {
   padding: 0;
   border: none;
   background: none;
@@ -647,16 +636,10 @@ button.link-button:hover {
   font: inherit;
   text-decoration: underline;
 }
-.code-editor .cm-userSection {
-  background-color: color-mix(in srgb, var(--ok) 9%, transparent);
-}
-.code-editor .cm-userMarker {
-  background-color: color-mix(in srgb, var(--ok) 16%, transparent);
-}
-/* Explorer and Code generation panel: the filter stays on top, the sections scroll under it. Sections there
-   have no box of their own, so every header sticks in the whole list: always in view, stacked at its top
-   or bottom (top / bottom offsets set by StackedSections). */
-:is(.explorer, .generation-panel) {
+/* Explorer: the filter stays on top, the sections scroll under it. Sections there have no box of their
+   own, so every header sticks in the whole list: always in view, stacked at its top or bottom (top /
+   bottom offsets set by StackedSections). */
+.explorer {
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -690,104 +673,6 @@ button.link-button:hover {
 }
 .stacked-sections > .explorer-section.drop-after > :last-child {
   box-shadow: inset 0 -2px 0 var(--accent);
-}
-.generation-section > header {
-  /* The toggle (title, listing label truncated) takes the row. */
-  grid-template-columns: minmax(0, 1fr) auto;
-}
-.generation-section .explorer-title {
-  flex: none;
-}
-.generation-actions {
-  /* Above the filter, so they stay in view while the lists scroll. */
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 2px;
-  margin-bottom: 4px;
-}
-.generation-actions .spacer {
-  flex: 1;
-}
-.file-folder {
-  display: inline-flex;
-  color: var(--muted);
-}
-.generation-actions button.icon {
-  padding: 0 4px;
-  color: var(--text);
-}
-.generation-section > header small {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  text-transform: none;
-  font-weight: 400;
-}
-.generation-section .empty {
-  margin: 2px 12px 8px;
-  font-size: 12px;
-}
-.generation-section .empty .link {
-  padding: 0;
-  border: none;
-  background: none;
-  color: var(--accent);
-  font: inherit;
-  text-decoration: underline;
-}
-.file-list .result-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-/* Generated and template files: a page with a folded corner, unlike the square entity badges. */
-.file-badge {
-  position: relative;
-  flex-shrink: 0;
-  display: inline-grid;
-  place-items: end center;
-  width: 14px;
-  height: 18px;
-  margin: 0 2px;
-  padding-bottom: 1px;
-  border-radius: 2px;
-  clip-path: polygon(0 0, calc(100% - 5px) 0, 100% 5px, 100% 100%, 0 100%);
-  font-size: 10px;
-  font-weight: 700;
-  line-height: 1;
-  color: #fff;
-  background: #6b7384;
-}
-.file-badge::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 5px;
-  height: 5px;
-  background: rgb(255 255 255 / 0.5);
-  clip-path: polygon(0 0, 0 100%, 100% 100%);
-}
-.file-badge.file-liquid {
-  background: #7a55c7;
-}
-.file-badge.file-cpp {
-  background: #3b6fe0;
-}
-.file-badge.file-python {
-  background: #2e8a8a;
-}
-.file-badge.file-cmake {
-  background: #b0480b;
-}
-.file-badge.file-yaml,
-.file-badge.file-json {
-  background: #6b7384;
-}
-.file-badge.file-idl {
-  background: #2e9e5b;
 }
 .statusbar {
   display: flex;
@@ -2772,45 +2657,6 @@ ul.plain {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-.results li.file-hit {
-  margin-top: 4px;
-  flex-wrap: nowrap;
-}
-.results li.file-hit .result-label {
-  white-space: nowrap;
-}
-.results li.file-hit small {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.hit-count {
-  margin-left: auto;
-  padding: 0 6px;
-  border-radius: 8px;
-  background: var(--panel-2);
-  color: var(--muted);
-  font-size: 11px;
-}
-.results li.line-hit {
-  flex-wrap: nowrap;
-  padding-left: 28px;
-}
-.line-number {
-  flex-shrink: 0;
-  min-width: 3ch;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-.result-line {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: pre;
-  font-family: ui-monospace, 'SF Mono', Consolas, monospace;
-  font-size: 12px;
 }
 mark {
   background: color-mix(in srgb, var(--warning) 40%, transparent);

@@ -10,32 +10,21 @@ import {
   isFileDirty,
   loadTextFile,
   saveTextFile,
-  sourceDir,
   textFileKey,
   useTextFiles,
   useTextReveals,
   type TextFileRef
 } from '@/store/textFiles'
 import { activeFilePanel, openFilePanel } from '@/shell/controllers'
-import { builtinFile } from '@/generateCode'
 
 const IDL_FILES = { description: 'IDL files', extensions: ['idl'] }
 
-/**
- * Opens a text file in a tab of the active document, read from its source unless `content` is given,
- * selecting `at`; in its own editor when the host has one for it (VS Code).
- */
+/** Opens a text file in a tab of the active document, read unless `content` is given, selecting `at`. */
 export async function openTextFile(
   ref: TextFileRef,
   options: { content?: string; split?: boolean; at?: TextSpot } = {}
 ): Promise<void> {
   const doc = activeDoc()
-  if (ref.source === 'templates' || ref.source === 'output') {
-    const dir = await sourceDir(doc, ref.source).catch(() => null)
-    if (dir?.open) return dir.open(ref.path, options.at)
-  }
-  const builtin = ref.source === 'builtin' && window.api.openBuiltin ? builtinFile(ref.path) : null
-  if (builtin !== null) return window.api.openBuiltin?.(ref.path, builtin, options.at)
   const at = options.at
   if (at) useTextReveals.setState({ [textFileKey(doc.id, ref)]: at })
   addTextFile(doc.id, ref, options.content)

@@ -1,6 +1,6 @@
 // Host of the page: a browser or desktop window, or a VS Code webview editing one project file
 // (see vscodeApi.ts).
-import type { ToHost, WebviewInit } from '../../../vscode/src/protocol'
+import type { ToHost, WebviewInit } from '@/vscodeProtocol'
 
 interface VsCodeApi {
   postMessage(msg: ToHost): void
@@ -36,7 +36,7 @@ export const FIRST_SIDE_TAB = (IN_PANEL && window.scaffoldInit?.panel) || null
 /** VS Code preview in the full layout: every tool docked in the page, like the web app. */
 export const FULL_LAYOUT = IN_PREVIEW && window.scaffoldInit?.layout === 'full'
 
-/** VS Code page whose Explorer and Code generation are in the VS Code side bar (not the full layout). */
+/** VS Code page whose Explorer is in the VS Code side bar (not the full layout). */
 export const INTEGRATED = IN_VSCODE && !FULL_LAYOUT
 
 /** Light or dark, after the VS Code color theme (class of the body). */

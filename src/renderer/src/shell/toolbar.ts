@@ -14,9 +14,6 @@ const COMMAND_ICONS: Partial<Record<string, IconName>> = {
   'file.openIdlText': 'file-text',
   'file.exportPng': 'image',
   'file.exportSvg': 'vector',
-  'file.generate': 'play',
-  'file.generateInto': 'generate-into',
-  'file.codeTemplates': 'templates',
   'file.close': 'x',
   'edit.undo': 'undo',
   'edit.redo': 'redo',
@@ -75,7 +72,6 @@ const COMMAND_ICONS: Partial<Record<string, IconName>> = {
   'arrange.guides': 'guides',
   // As the tabs of the tool panels (TOOL_ICONS, DockShell.tsx, which imports the Settings panel).
   'window.explorer': 'tree',
-  'window.generation': 'code',
   'window.inspector': 'info',
   'window.problems': 'warning',
   'window.output': 'output',

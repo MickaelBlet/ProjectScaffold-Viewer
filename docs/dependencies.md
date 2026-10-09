@@ -108,7 +108,7 @@ links:
 - A placed port's interface is matched by name with those of this project and its dependencies.
 - One end of a link must be in this project.
 
-Generated code: the types and interfaces of dependencies are included from their own generated code; `scaffold-gen -d` generates the dependencies too ([Code generation › Command line](code-generation.md#command-line)).
+Generated code: the types and interfaces of dependencies are included from their own generated code; `scaffold-gen -d` generates the dependencies too ([ProjectScaffold-Generator › Command line](https://github.com/MickaelBlet/ProjectScaffold-Generator/blob/master/docs/code-generation.md#command-line)).
 
 ## Workspace files
 
