@@ -1,9 +1,11 @@
 // Modules of the dependencies of the active document, read from their files (open in a tab, or next
-// to this file when the host can read it), for the Explorer to list the ones not placed on the canvas.
+// to this file when the host can read it; IDL files also as edited in a tab or picked this session),
+// for the Explorer to list the ones not placed on the canvas.
 import { useEffect, useState } from 'react'
 import { modulePath } from '@/model/project'
 import type { Dependency, Id, Project } from '@/model/types'
 import { useDocs } from '@/store/documents'
+import { useTextFiles } from '@/store/textFiles'
 import { importSource, openSource } from '@/actions'
 
 /** A module of a dependency, in its own project. */
@@ -21,6 +23,13 @@ const modulesOf = (p: Project): DependencyModule[] =>
 export function useDependencyModules(dependencies: Dependency[]): Map<Id, DependencyModule[]> {
   // Opening or closing a tab can make a dependency readable.
   const openFiles = useDocs((s) => s.docs.map((d) => d.filePath ?? '').join('\n'))
+  // So does opening or saving an IDL file in a text tab.
+  const idlTexts = useTextFiles((s) =>
+    Object.values(s.files)
+      .filter((f) => f.source === 'file' && f.saved !== null)
+      .map((f) => `${f.path}\u0000${f.saved}`)
+      .join('\u0000')
+  )
   const [modules, setModules] = useState<Map<Id, DependencyModule[]>>(new Map())
   useEffect(() => {
     let run = 0
@@ -51,6 +60,6 @@ export function useDependencyModules(dependencies: Dependency[]): Map<Id, Depend
       run = -1
       stops.forEach((stop) => stop())
     }
-  }, [dependencies, openFiles])
+  }, [dependencies, openFiles, idlTexts])
   return modules
 }

@@ -86,6 +86,7 @@ import {
 } from '@/store/ui'
 import { fileName } from '@/fileOps'
 import { openIdlDependency } from '@/textFileOps'
+import { useTextFiles } from '@/store/textFiles'
 import { normalizeFile, relativeFile, resolveRelative, sameFile } from '@/model/sync'
 import { formatFromPath, LoadError, loadText, toFile } from '@/model/serialize'
 import type { OpenResult } from '@/api'
@@ -466,8 +467,22 @@ async function readInclude(path: string): Promise<string | null> {
 }
 
 /**
+ * An IDL file the host cannot read by path (browser): its text in a tab, else the file picked
+ * earlier in this session; null when neither.
+ */
+async function readKnownIdl(path: string): Promise<string | null> {
+  const name = fileName(path)
+  const tab = Object.values(useTextFiles.getState().files).find(
+    (f) => f.source === 'file' && f.saved !== null && fileName(f.path) === name
+  )
+  if (tab) return tab.saved
+  return (await window.api.readPicked?.(name)) ?? null
+}
+
+/**
  * The project a file stands for: a project file, or an IDL file whose includes are read by the
- * host when it can, else looked up among `others` (IDL files by path). Throws when it cannot be read.
+ * host when it can, else looked up among `others` (IDL files by path) and the IDL files known
+ * here (see `readKnownIdl`). Throws when it cannot be read.
  */
 async function projectOfFile(
   path: string,
@@ -477,7 +492,7 @@ async function projectOfFile(
   if (!isIdl(path)) return { project: loadText(content, formatFromPath(path)), warnings: [] }
   let files = new Map([...others, [path, content]])
   const host = !!(window.api.readFile || window.api.readSibling)
-  if (host) files = await readIdlIncludes(files, readInclude)
+  files = await readIdlIncludes(files, host ? readInclude : readKnownIdl)
   const { project, warnings, missing } = idlProject(path, files)
   if (missing.length && !host) warnings.push('Pick the included files along with the IDL file to read them.')
   return { project, warnings }
@@ -918,11 +933,18 @@ export function openSource(file: string): DocState | undefined {
     .docs.find((d) => d.id !== activeDoc().id && d.filePath && fileName(d.filePath) === fileName(file))
 }
 
-/** The project saved as `file`: open in a tab, else read next to this file when the host can. */
+/**
+ * The project saved as `file`: open in a tab, else read next to this file when the host can, else
+ * (an IDL file) its text known here (see `readKnownIdl`).
+ */
 export async function importSource(file: string): Promise<Project | null> {
   const doc = openSource(file)
   if (doc) return doc.store.getState().project
-  const text = await window.api.readSibling?.(file)
+  const text = window.api.readSibling
+    ? await window.api.readSibling(file)
+    : isIdl(file)
+      ? await readKnownIdl(file)
+      : null
   if (!text) return null
   try {
     return (await projectOfFile(file, text)).project
