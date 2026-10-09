@@ -74,6 +74,7 @@ Bounds (`max`, optional) are written `string<16>`, `bytes<4>`, `vector<T, 8>`, `
 
 - A union case has `labels`, the discriminator values selecting it, or `default: true`.
 - An exception is listed by the `raises` of messages and methods: `raises: [Busy]`.
+- Modules have [types of their own](#types-of-modules), named `Core.Sensor.Filter`.
 
 ## Constants
 
@@ -109,7 +110,34 @@ interfaces: # { name, description?, messages }
   - Parameters take `const: true` too, `in` parameters only.
 - **Kind** (optional): `class` (default, left out), `abstract` or `interface`. A `class` has no pure methods and implements every pure method it inherits; an `interface` has only pure methods and no attributes.
 - **Bases** (optional): `bases: [IShape, Core.Base]`, paths of modules of this project it derives from, in order; no cycles, no repeats. A method redefining a virtual one of a base without `override` is a warning.
+- **Types** (optional): see [Types of modules](#types-of-modules).
 - **Ports** and **submodules** (`modules`): see below.
+
+### Types of modules
+
+A module has types of its own, like types nested in a C++ class: user types (as in `types`) with an `access`.
+
+```yaml
+modules:
+  - name: Core
+    modules:
+      - name: Sensor
+        types:
+          - {
+              kind: enum,
+              name: Filter,
+              underlying: uint8,
+              values: [{ name: None, value: 0 }, { name: LowPass, value: 1 }]
+            }
+          - { kind: struct, name: Sample, access: protected, fields: [...] }
+        attributes:
+          - { name: filter, type: { kind: ref, name: Core.Sensor.Filter }, default: LowPass }
+```
+
+- They are named by their module's path: `Core.Sensor.Filter`; `Robot/Core.Sensor.Filter` for one of a module of dependency `Robot` (in `raises` too).
+- Their names are unique in their module, and apart from its attributes, methods, ports and submodules.
+- Modules only use them (attributes, methods, types of modules), not the project's types, interfaces and constants.
+- `access`: `public` (default, left out) for any module, `protected` for the module and those deriving from it, `private` for the module. A public member (or type of a module) using a less accessible type is a warning.
 
 ## Default values
 

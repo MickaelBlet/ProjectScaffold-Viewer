@@ -141,8 +141,25 @@ export function QualifierToggles(props: {
   )
 }
 
+/** Letter of each kind of type, in badges. */
+export const TYPE_KIND_BADGE = {
+  struct: 'S',
+  enum: 'E',
+  bitmask: 'B',
+  union: 'U',
+  exception: 'X',
+  alias: 'A',
+  primitive: 'P'
+} as const
+
+/** Kinds of types, in the order of the buttons adding them. */
+export const TYPE_KINDS = ['struct', 'enum', 'bitmask', 'union', 'exception', 'alias', 'primitive'] as const
+
 /** Toggle buttons of the access level of a type, attribute or method, by UML mark (`+ # -`). */
-export function AccessToggles(props: { value: Access | undefined; onChange: (a: Access) => void }): ReactNode {
+export function AccessToggles(props: {
+  value: Access | undefined
+  onChange: (a: Access) => void
+}): ReactNode {
   const value = props.value ?? 'public'
   return (
     <span className="qualifiers access">

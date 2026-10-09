@@ -4,6 +4,7 @@ import {
   canDerive,
   childModules,
   modulePath,
+  moduleTypes,
   nameError,
   newId,
   setAccess,
@@ -14,6 +15,7 @@ import {
 import {
   addPort,
   addSubmodule,
+  addType,
   deleteItems,
   deletePort,
   reparentModule,
@@ -35,12 +37,29 @@ import {
   Row,
   Section,
   Select,
-  TextArea
+  TextArea,
+  TYPE_KIND_BADGE,
+  TYPE_KINDS
 } from '@/components/fields'
-import { METHOD_QUALIFIERS, MODULE_KINDS, QUALIFIERS, type Module, type Project } from '@/model/types'
+import { TypeScopeContext } from '@/components/TypeEditor'
+import {
+  METHOD_QUALIFIERS,
+  MODULE_KINDS,
+  QUALIFIERS,
+  type Module,
+  type Project,
+  type TypeDef
+} from '@/model/types'
 import { Icon } from '@/components/Icon'
 import { DefaultInput, FieldList, setDefault } from './TypeInspector'
 import { addMessage, MessageList } from './MessageList'
+
+function withTypeOf(id: string, fn: (t: TypeDef) => void): void {
+  update((d) => {
+    const t = d.types.find((t) => t.id === id)
+    if (t) fn(t)
+  })
+}
 
 function withModule(id: string, fn: (m: Module, d: Project) => void): void {
   update((d) => {
@@ -74,8 +93,11 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
     ...project.interfaces.map((i) => ({ value: i.id, label: i.name }))
   ]
 
+  const types = moduleTypes(project, id)
+
   return (
-    <>
+    // Its attributes and methods name types as it does.
+    <TypeScopeContext.Provider value={id}>
       <h2>
         Module <small className="muted">{modulePath(project, id)}</small>
       </h2>
@@ -166,6 +188,41 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
             onChange={(b) => b && withModule(id, (m) => void (m.bases = [...(m.bases ?? []), b]))}
           />
         )}
+      </Section>
+
+      <Section
+        title={`Types (${types.length})`}
+        actions={TYPE_KINDS.map((k) => (
+          <button
+            key={k}
+            type="button"
+            className="icon"
+            title={`New ${k} of the module`}
+            onClick={() => select({ kind: 'type', id: addType(k, id) })}
+          >
+            <Icon name="plus" />
+            {TYPE_KIND_BADGE[k]}
+          </button>
+        ))}
+      >
+        <ul className="plain">
+          {types.map((t) => (
+            <li key={t.id} className="row-inline">
+              <AccessToggles value={t.access} onChange={(a) => withTypeOf(t.id, (x) => setAccess(x, a))} />
+              <span className={`kind-badge ${t.kind}`} title={t.kind}>
+                {TYPE_KIND_BADGE[t.kind]}
+              </span>
+              <button
+                type="button"
+                className="link-button"
+                onClick={() => navigate({ kind: 'type', id: t.id })}
+              >
+                {t.name}
+              </button>
+            </li>
+          ))}
+        </ul>
+        {!types.length && <p className="muted">No types.</p>}
       </Section>
 
       <Section title={`Attributes (${mod.attributes.length})`}>
@@ -390,6 +447,6 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
           Delete module
         </button>
       </div>
-    </>
+    </TypeScopeContext.Provider>
   )
 }

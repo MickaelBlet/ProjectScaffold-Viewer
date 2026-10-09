@@ -1,12 +1,30 @@
 import { Fragment, useState, type ReactNode } from 'react'
-import { IDENTIFIER_RE, nameError, newId, typeUsageTargets, uniqueName } from '@/model/project'
-import { deleteType, update, useProjectStore } from '@/store/project'
+import {
+  IDENTIFIER_RE,
+  modulePaths,
+  nameError,
+  newId,
+  setAccess,
+  typeQualifiedName,
+  typeUsageTargets,
+  uniqueName
+} from '@/model/project'
+import { deleteType, setTypeModule, update, useProjectStore } from '@/store/project'
 import { dependencyOf } from '@/model/dependencies'
 import { DependencyBanner } from './DependencyBanner'
 import { openContextMenu, select } from '@/store/ui'
 import { navigate } from '@/actions'
-import { CommitInput, IconButton, NumberInput, Row, Section, Select, TextArea } from '@/components/fields'
-import { TypeEditor, TypeTree } from '@/components/TypeEditor'
+import {
+  AccessToggles,
+  CommitInput,
+  IconButton,
+  NumberInput,
+  Row,
+  Section,
+  Select,
+  TextArea
+} from '@/components/fields'
+import { TypeEditor, TypeScopeContext, TypeTree } from '@/components/TypeEditor'
 import {
   INT_PRIMITIVES,
   UNSIGNED_PRIMITIVES,
@@ -277,21 +295,44 @@ export function TypeInspector({ id }: { id: string }): ReactNode {
   if (!t) return <p className="muted">Type deleted.</p>
   const usages = typeUsageTargets(project, id)
   const dependency = dependencyOf(project, id)
+  const paths = modulePaths(project)
 
   return (
-    <>
+    // Its fields name types as its module does.
+    <TypeScopeContext.Provider value={t.module ?? null}>
       <h2>
-        {t.kind} <small className="muted">{t.name}</small>
+        {t.kind} <small className="muted">{typeQualifiedName(project, t)}</small>
       </h2>
       {dependency && <DependencyBanner dependency={dependency} />}
       <fieldset className="readonly" disabled={!!dependency}>
         <Row label="Name">
           <CommitInput
             value={t.name}
-            validate={(n) => nameError(project, { kind: 'type', id }, n)}
+            validate={(n) => nameError(project, { kind: 'type', id, module: t.module }, n)}
             onCommit={(n) => withType(id, (x) => void (x.name = n))}
           />
         </Row>
+        <Row label="Module">
+          {t.modulePath ? (
+            <span>{t.modulePath}</span>
+          ) : (
+            <Select
+              value={t.module ?? ''}
+              options={[
+                { value: '', label: '(project)' },
+                ...project.modules
+                  .map((m) => ({ value: m.id, label: paths.get(m.id)! }))
+                  .sort((a, b) => a.label.localeCompare(b.label))
+              ]}
+              onChange={(v) => setTypeModule(id, v || null)}
+            />
+          )}
+        </Row>
+        {(t.module || t.modulePath) && (
+          <Row label="Access">
+            <AccessToggles value={t.access} onChange={(a) => withType(id, (x) => setAccess(x, a))} />
+          </Row>
+        )}
         <TextArea value={t.description} onChange={(v) => withType(id, (x) => void (x.description = v))} />
 
         {(t.kind === 'struct' || t.kind === 'exception') && (
@@ -517,6 +558,6 @@ export function TypeInspector({ id }: { id: string }): ReactNode {
           </ul>
         </div>
       )}
-    </>
+    </TypeScopeContext.Provider>
   )
 }

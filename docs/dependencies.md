@@ -56,7 +56,7 @@ The dependencies of a dependency come with it (`indirect`). They are read from t
 
 ## Renames stay in sync
 
-Renaming a module (or a parent), a port, a type or an interface in one project renames it in the open projects depending on it. Each document gets the change as its own undoable edit (and becomes unsaved).
+Renaming a module (or a parent), a port, a type (of a module too) or an interface in one project renames it in the open projects depending on it. Each document gets the change as its own undoable edit (and becomes unsaved).
 
 Files that are not open catch up on _Refresh dependencies_: a placed module no longer found by its path is matched to the only other module with the same name (moved) or the same ports (renamed). The dialog lists what was renamed.
 
@@ -81,6 +81,9 @@ dependencies:
     types: [...] # its own types, as in `types`
     interfaces: [...] # its own interfaces, as in `interfaces`
     constants: [...] # its own constants, as in `constants` (optional)
+    moduleTypes: # the types of its modules, by module path (optional): the public ones are used as Robot/Core.Sensor.Filter
+      - module: Core.Sensor
+        types: [...]
     modules: # its modules placed on this canvas, with their ports (optional): top-level ones with their content
       - module: Core
         ports: [{ name: control, role: in, interface: Control }]
@@ -100,6 +103,7 @@ links:
 ```
 
 - Generators read the project's `types` and `interfaces` plus those of every dependency.
+- The modules of this project use the public types of a dependency's modules by their path after the dependency's name: `Robot/Core.Sensor.Filter`.
 - A dependency's types and interfaces only reference their own dependency's and those of the dependencies it `uses`.
 - A placed port's interface is matched by name with those of this project and its dependencies.
 - One end of a link must be in this project.

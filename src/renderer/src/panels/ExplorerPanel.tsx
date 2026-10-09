@@ -14,7 +14,7 @@ import {
   type MouseEvent,
   type ReactNode
 } from 'react'
-import { endpointLabel, findView, importedParent, modulePaths, newId, uniqueName } from '@/model/project'
+import { ACCESS_MARKS, endpointLabel, findView, importedParent, modulePaths, newId, uniqueName } from '@/model/project'
 import { removeBinary } from '@/model/binaries'
 import { formatValue } from '@/model/defaults'
 import {
@@ -60,18 +60,11 @@ import { useDependencyModules, type DependencyModule } from './dependencyModules
 import { childrenByParent, dropModule, matching, MODULE_DRAG, toggleHidden } from './moduleTree'
 import { openEditor, openView, revealInspector } from '@/shell/controllers'
 import { Icon } from '@/components/Icon'
+import { TYPE_KIND_BADGE, TYPE_KINDS } from '@/components/fields'
 import { FoldSection, placed, sectionOrder, StackedSections } from '@/components/FoldSection'
 import { onListKeyDown, tabStop } from '@/components/listKeys'
 
-const KIND_BADGE = {
-  struct: 'S',
-  enum: 'E',
-  bitmask: 'B',
-  union: 'U',
-  exception: 'X',
-  alias: 'A',
-  primitive: 'P'
-} as const
+const KIND_BADGE = TYPE_KIND_BADGE
 
 const SECTIONS = [
   'views',
@@ -361,6 +354,16 @@ function moduleMenu(e: MouseEvent, id: Id, hidden: boolean): void {
     'separator',
     commandItem('edit.rename'),
     commandItem('insert.submodule'),
+    {
+      label: 'New type of the module',
+      submenu: TYPE_KINDS.map((k) => ({
+        label: k,
+        run: () => {
+          revealInspector()
+          select({ kind: 'type', id: addType(k, id) })
+        }
+      }))
+    },
     commandItem('edit.cut'),
     commandItem('edit.copy'),
     commandItem('edit.paste'),
@@ -471,7 +474,14 @@ export function ExplorerPanel(): ReactNode {
     ...(match(GLOBAL.name) ? [GLOBAL_VIEW] : []),
     ...views.filter((v) => match(v.name)).map((v) => v.id)
   ]
-  const ownTypes = types.filter((t) => !t.dependency)
+  const ownTypes = types.filter((t) => !t.dependency && !t.module)
+  const typesOfModules = new Map<Id, TypeDef[]>()
+  for (const t of types)
+    if (t.module) {
+      const list = typesOfModules.get(t.module) ?? []
+      if (!list.length) typesOfModules.set(t.module, list)
+      list.push(t)
+    }
   const ownInterfaces = interfaces.filter((i) => !i.dependency)
   const shownTypes = ownTypes.filter((t) => match(t.name))
   const shownInterfaces = ownInterfaces.filter((i) => match(i.name))
@@ -536,20 +546,27 @@ export function ExplorerPanel(): ReactNode {
   }
   // Folds every module with submodules, dependency and dependency group, or unfolds them all.
   const foldable = [
-    ...modules.filter((m) => moduleChildren.has(m.id)).map((m) => m.id),
+    ...modules.filter((m) => moduleChildren.has(m.id) || typesOfModules.has(m.id)).map((m) => m.id),
     ...dependencies.flatMap((d) => [d.id, ...DEPENDENCY_GROUPS.map((g) => `${d.id}/${g}`)])
   ]
   const someOpen = foldable.some((key) => !collapsed.has(key))
   const foldAll = (): void => setCollapsed(new Set(someOpen ? foldable : []))
-  // Modules nested under their parent, in project order (all open while filtering).
-  const shownModules: { m: Module; depth: number; parent: boolean; open: boolean }[] = []
+  // Modules nested under their parent, in project order (all open while filtering), each with its
+  // types first.
+  const shownModules: (
+    | { kind: 'module'; m: Module; depth: number; parent: boolean; open: boolean }
+    | { kind: 'type'; t: TypeDef; depth: number }
+  )[] = []
   const walk = (list: Module[], depth: number): void => {
     for (const m of list) {
       if (moduleMatches && !moduleMatches.has(m.id)) continue
       const children = moduleChildren.get(m.id) ?? []
+      const own = typesOfModules.get(m.id) ?? []
       const open = !!moduleMatches || !collapsed.has(m.id)
-      shownModules.push({ m, depth, parent: children.length > 0, open })
-      if (open) walk(children, depth + 1)
+      shownModules.push({ kind: 'module', m, depth, parent: children.length > 0 || own.length > 0, open })
+      if (!open) continue
+      for (const t of own) if (match(t.name)) shownModules.push({ kind: 'type', t, depth: depth + 1 })
+      walk(children, depth + 1)
     }
   }
   walk(moduleChildren.get(null) ?? [], 0)
@@ -561,7 +578,10 @@ export function ExplorerPanel(): ReactNode {
   const shownLinks = allLinks.filter((x) => match(x.l.name) || match(x.from) || match(x.to))
   const typeIds = shownTypes.map((t) => t.id)
   const interfaceIds = shownInterfaces.map((i) => i.id)
-  const moduleIds = [...shownModules.map((x) => x.m.id), ...shownImported.map((x) => x.m.id)]
+  const moduleIds = [
+    ...shownModules.map((x) => (x.kind === 'module' ? x.m.id : x.t.id)),
+    ...shownImported.map((x) => x.m.id)
+  ]
   const linkIds = shownLinks.map((x) => x.l.id)
   const viewStop = tabStop(viewItems, (id) => id === activeViewId)
   const typeStop = tabStop(typeIds, isSelected)
@@ -883,20 +903,18 @@ export function ExplorerPanel(): ReactNode {
         id="types"
         title="Types"
         count={ownTypes.length}
-        actions={(['struct', 'enum', 'bitmask', 'union', 'exception', 'alias', 'primitive'] as const).map(
-          (k) => (
-            <button
-              key={k}
-              type="button"
-              className="icon"
-              title={`New ${k}`}
-              onClick={() => select({ kind: 'type', id: addType(k) })}
-            >
-              <Icon name="plus" />
-              {KIND_BADGE[k]}
-            </button>
-          )
-        )}
+        actions={TYPE_KINDS.map((k) => (
+          <button
+            key={k}
+            type="button"
+            className="icon"
+            title={`New ${k}`}
+            onClick={() => select({ kind: 'type', id: addType(k) })}
+          >
+            <Icon name="plus" />
+            {KIND_BADGE[k]}
+          </button>
+        ))}
       >
         <EntityList label="Types" multiselectable>
           {shownTypes.map((t) => (
@@ -1028,50 +1046,76 @@ export function ExplorerPanel(): ReactNode {
             dropModule(e.dataTransfer.getData(MODULE_DRAG), null)
           }}
         >
-          {shownModules.map(({ m, depth, parent, open }) => (
-            <Item
-              key={m.id}
-              selected={isSelected(m.id)}
-              tabStop={m.id === moduleStop}
-              className={`${isSelected(m.id) ? 'active' : ''} ${hiddenIds.includes(m.id) ? 'is-hidden' : ''} ${dropTarget === m.id ? 'drop' : ''}`}
-              title={paths.get(m.id)}
-              style={indent(depth)}
-              onClick={(e) => clickItem(e, m.id, moduleIds)}
-              onDragStart={(e) => e.dataTransfer.setData(MODULE_DRAG, m.id)}
-              onDragOver={(e) => dragOver(e) && setDropTarget(m.id)}
-              onDragLeave={() => setDropTarget(undefined)}
-              onDrop={(e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                setDropTarget(undefined)
-                dropModule(e.dataTransfer.getData(MODULE_DRAG), m.id)
-              }}
-              onKeyDown={(e) => {
-                // Right expands, Left collapses.
-                if (!parent || moduleMatches || e.key !== (open ? 'ArrowLeft' : 'ArrowRight')) return
-                e.preventDefault()
-                toggle(m.id)
-              }}
-              onDoubleClick={() => openEditor('module', m.id)}
-              onContextMenu={(e) => moduleMenu(e, m.id, hiddenIds.includes(m.id))}
-            >
-              <span
-                className="chevron"
-                aria-hidden
-                onClick={(e) => {
+          {shownModules.map((row) => {
+            if (row.kind === 'type') {
+              const t = row.t
+              return (
+                <Item
+                  key={t.id}
+                  selected={isSelected(t.id)}
+                  tabStop={t.id === moduleStop}
+                  className={`module-type ${isSelected(t.id) ? 'active' : ''}`}
+                  title={`${t.access ?? 'public'} ${t.kind} ${paths.get(t.module!)}.${t.name}`}
+                  style={indent(row.depth)}
+                  onClick={(e) => clickItem(e, t.id, moduleIds)}
+                  onDoubleClick={() => openEditor('type', t.id)}
+                  onContextMenu={(e) => entityMenu(e, 'type', t.id)}
+                >
+                  {leaf}
+                  <span className={`kind-badge ${t.kind}`} title={t.kind}>
+                    {KIND_BADGE[t.kind]}
+                  </span>
+                  <span className="tree-name">{t.name}</span>
+                  <small>{ACCESS_MARKS[t.access ?? 'public']}</small>
+                </Item>
+              )
+            }
+            const { m, depth, parent, open } = row
+            return (
+              <Item
+                key={m.id}
+                selected={isSelected(m.id)}
+                tabStop={m.id === moduleStop}
+                className={`${isSelected(m.id) ? 'active' : ''} ${hiddenIds.includes(m.id) ? 'is-hidden' : ''} ${dropTarget === m.id ? 'drop' : ''}`}
+                title={paths.get(m.id)}
+                style={indent(depth)}
+                onClick={(e) => clickItem(e, m.id, moduleIds)}
+                onDragStart={(e) => e.dataTransfer.setData(MODULE_DRAG, m.id)}
+                onDragOver={(e) => dragOver(e) && setDropTarget(m.id)}
+                onDragLeave={() => setDropTarget(undefined)}
+                onDrop={(e) => {
+                  e.preventDefault()
                   e.stopPropagation()
-                  if (parent) toggle(m.id)
+                  setDropTarget(undefined)
+                  dropModule(e.dataTransfer.getData(MODULE_DRAG), m.id)
                 }}
+                onKeyDown={(e) => {
+                  // Right expands, Left collapses.
+                  if (!parent || moduleMatches || e.key !== (open ? 'ArrowLeft' : 'ArrowRight')) return
+                  e.preventDefault()
+                  toggle(m.id)
+                }}
+                onDoubleClick={() => openEditor('module', m.id)}
+                onContextMenu={(e) => moduleMenu(e, m.id, hiddenIds.includes(m.id))}
               >
-                {parent && <Icon name={open ? 'chevron-down' : 'chevron-right'} />}
-              </span>
-              <span className="kind-badge mod" style={m.color ? { background: m.color } : undefined}>
-                M
-              </span>
-              <span className="tree-name">{m.name}</span>
-              <small>{m.ports.length ? `${m.ports.length}p` : ''}</small>
-            </Item>
-          ))}
+                <span
+                  className="chevron"
+                  aria-hidden
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (parent) toggle(m.id)
+                  }}
+                >
+                  {parent && <Icon name={open ? 'chevron-down' : 'chevron-right'} />}
+                </span>
+                <span className="kind-badge mod" style={m.color ? { background: m.color } : undefined}>
+                  M
+                </span>
+                <span className="tree-name">{m.name}</span>
+                <small>{m.ports.length ? `${m.ports.length}p` : ''}</small>
+              </Item>
+            )
+          })}
           {shownImported.map(({ dep, m }) => (
             <Item
               key={m.id}

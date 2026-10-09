@@ -6,6 +6,8 @@ import {
   defaultConstraints,
   defaultSize,
   globalTypeNames,
+  memberNames,
+  moduleTypes,
   findImported,
   growImportedAncestors,
   findPort,
@@ -148,6 +150,9 @@ export function deleteItems(ids: Id[]): void {
     for (const id of ids)
       if (d.modules.some((m) => m.id === id)) for (const s of subtreeIds(d, id)) gone.add(s)
     d.modules = d.modules.filter((m) => !gone.has(m.id))
+    // Types of removed modules go with them.
+    if (d.types.some((t) => t.module && gone.has(t.module)))
+      d.types = d.types.filter((t) => !t.module || !gone.has(t.module))
     for (const m of d.modules)
       if (m.bases?.some((b) => gone.has(b))) {
         m.bases = m.bases.filter((b) => !gone.has(b))
@@ -406,13 +411,15 @@ export function detachDependencyById(id: Id): string[] {
 
 // Types & interfaces
 
-export function addType(kind: TypeDef['kind']): Id {
+/** Add a type to the project, or to a module (`moduleId`, public). */
+export function addType(kind: TypeDef['kind'], moduleId?: Id): Id {
   const id = newId()
   update((d) => {
     const base = {
       id,
       description: '',
-      name: uniqueName(kind[0]!.toUpperCase() + kind.slice(1), globalTypeNames(d))
+      name: uniqueName(kind[0]!.toUpperCase() + kind.slice(1), typeScopeNames(d, moduleId ?? null)),
+      ...(moduleId && { module: moduleId })
     }
     if (kind === 'struct' || kind === 'exception') d.types.push({ ...base, kind, fields: [] })
     else if (kind === 'enum') d.types.push({ ...base, kind, underlying: 'uint8', values: [] })
@@ -423,6 +430,32 @@ export function addType(kind: TypeDef['kind']): Id {
     else d.types.push({ ...base, kind })
   })
   return id
+}
+
+/** Names a new type of the project (null) or of a module may not take. */
+function typeScopeNames(d: Project, moduleId: Id | null, exceptId?: Id): string[] {
+  const mod = moduleId ? d.modules.find((m) => m.id === moduleId) : undefined
+  if (!mod) return globalTypeNames(d, exceptId)
+  return [
+    ...moduleTypes(d, mod.id)
+      .filter((t) => t.id !== exceptId)
+      .map((t) => t.name),
+    ...memberNames(d, mod)
+  ]
+}
+
+/** Move a type to a module (public) or to the project (null), renamed if its name is taken there. */
+export function setTypeModule(id: Id, moduleId: Id | null): void {
+  update((d) => {
+    const t = d.types.find((x) => x.id === id)
+    if (!t || t.dependency || (t.module ?? null) === moduleId) return
+    t.name = uniqueName(t.name, typeScopeNames(d, moduleId, id))
+    if (moduleId) t.module = moduleId
+    else {
+      delete t.module
+      delete t.access
+    }
+  })
 }
 
 /** Add a constant (shown in the project inspector). */

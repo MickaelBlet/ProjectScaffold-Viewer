@@ -29,7 +29,21 @@ export function targetPath(data: unknown, p: Project, target: ProblemTarget): Da
     case 'const': {
       const key = target.kind === 'type' ? 'types' : target.kind === 'interface' ? 'interfaces' : 'constants'
       const e = [...p.types, ...p.interfaces, ...p.consts].find((x) => x.id === target.id)
+      // A module's: modules.i...types.j
+      if (e && 'module' in e && e.module) {
+        const path = modulePathIn(file, p, e.module)
+        const items = dig(file, path) as { types?: { name: string }[] } | undefined
+        return path.length ? [...path, ...named('types', items?.types, e.name)] : ['modules']
+      }
       const dep = e?.dependency && p.dependencies.find((x) => x.id === e.dependency)
+      if (dep && e && 'modulePath' in e && e.modulePath) {
+        // A type of a module of a dependency: dependencies.i.moduleTypes.k.types.j
+        const path = named('dependencies', file.dependencies, dep.name)
+        const i = path[1] as number | undefined
+        const groups = i === undefined ? undefined : file.dependencies![i]!.moduleTypes
+        const k = groups?.findIndex((g) => g.module === e.modulePath) ?? -1
+        return k < 0 ? path : [...path, 'moduleTypes', k, ...named('types', groups![k]!.types, e.name)]
+      }
       if (!dep) return named(key, file[key], e?.name)
       // A dependency's: dependencies.i.types.j
       const path = named('dependencies', file.dependencies, dep.name)
@@ -51,18 +65,30 @@ export function targetPath(data: unknown, p: Project, target: ProblemTarget): Da
             : (file.dependencies![i]!.modules ?? []).findIndex((m) => m.module === imported.module.path)
         return j < 0 ? path : [...path, 'modules', j]
       }
-      // Nested modules: modules.i.modules.j...
-      const path: DataPath = []
-      let items = file.modules
-      for (const name of modulePath(p, target.id).split('.')) {
-        const i = items?.findIndex((m) => m.name === name) ?? -1
-        if (i < 0) break
-        path.push('modules', i)
-        items = items![i]!.modules
-      }
+      const path = modulePathIn(file, p, target.id)
       return path.length ? path : ['modules']
     }
   }
+}
+
+/** Data path of a module of the project: modules.i.modules.j... (as far as the file has it). */
+function modulePathIn(file: Partial<FileProject>, p: Project, id: string): DataPath {
+  const path: DataPath = []
+  let items = file.modules
+  for (const name of modulePath(p, id).split('.')) {
+    const i = items?.findIndex((m) => m.name === name) ?? -1
+    if (i < 0) break
+    path.push('modules', i)
+    items = items![i]!.modules
+  }
+  return path
+}
+
+/** Value at a data path. */
+function dig(data: unknown, path: DataPath): unknown {
+  let cur = data
+  for (const k of path) cur = (cur as Record<string | number, unknown> | undefined)?.[k]
+  return cur
 }
 
 /** Load errors when the text cannot be read, else the validation problems. */
