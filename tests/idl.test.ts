@@ -11,7 +11,7 @@ import {
 } from '@/model/idl'
 import { addDependency, dependencyOf } from '@/model/dependencies'
 import { pasteClip } from '@/model/clipboard'
-import { emptyProject, modulePath } from '@/model/project'
+import { constNames, emptyProject, modulePath, typeNames } from '@/model/project'
 import { printTypeExpr, printTypeRef } from '@/model/typeExpr'
 import { validate } from '@/model/validate'
 import type { Id } from '@/model/types'
@@ -381,6 +381,51 @@ describe('IDL import', () => {
     // A file with components: only those.
     files.set('idl/main.idl', 'interface I { void go(); };\ncomponent C { provides I i; };')
     expect(idlProject('idl/main.idl', files).project.modules.map((m) => m.name)).toEqual(['C'])
+  })
+
+  it('gives the types and constants of IDL modules to their modules, named simply there', () => {
+    const files = new Map([
+      [
+        'idl/main.idl',
+        [
+          '#include "inc.idl"',
+          'struct Top { long t; };',
+          'module A { const long MAX = 3; struct Status { long a; }; interface Arm { Status get(); }; };',
+          'module B { struct Status { long b; }; module Deep { enum Mode { ON, OFF }; }; };',
+          'interface Mixed { A::Status a(); B::Status b(); Common::Kind k(); };'
+        ].join('\n')
+      ],
+      ['idl/inc.idl', 'module Common { enum Kind { X, Y }; const short N = 2; };']
+    ])
+    const { project: p, warnings } = idlProject('idl/main.idl', files)
+    expect(warnings).toEqual([])
+    // Modules holding only types or constants are modules too.
+    expect(p.modules.map((m) => modulePath(p, m.id))).toEqual(['A', 'B', 'B.Deep', 'main'])
+    const names = typeNames(p)
+    expect(p.types.filter((t) => !t.dependency).map((t) => names.get(t.id))).toEqual([
+      'Top',
+      'A.Status',
+      'B.Status',
+      'B.Deep.Mode'
+    ])
+    expect([...constNames(p).values()].sort()).toEqual(['A.MAX', 'inc/Common.N'])
+    // Those of included files: of their module by path, in their own project.
+    expect(p.types.find((t) => t.name === 'Kind')).toMatchObject({ modulePath: 'Common' })
+    // Public: used by interfaces outside their module.
+    expect(validate(p).filter((x) => x.severity === 'error')).toEqual([])
+
+    // Depended on: under their module's path.
+    const d = emptyProject()
+    addDependency(d, p, 'idl/main.idl', null)
+    const depNames = typeNames(d)
+    expect(d.types.map((t) => depNames.get(t.id)).sort()).toEqual([
+      'Top',
+      'inc/Common.Kind',
+      'main/A.Status',
+      'main/B.Deep.Mode',
+      'main/B.Status'
+    ])
+    expect([...constNames(d).values()].sort()).toEqual(['inc/Common.N', 'main/A.MAX'])
   })
 
   it('resolves scoped names and qualifies names several modules use', () => {

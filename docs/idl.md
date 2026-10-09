@@ -3,7 +3,7 @@
 ProjectScaffold reads OMG IDL files (IDL 4.2: CORBA, CCM, DDS / XTypes) in three ways:
 
 - **Import**: _Insert › Import projects or IDL files_ (or right click the canvas / a module) adds one of their interfaces or components, or all, with the types they use (files without interfaces nor components: all their types). Types and interfaces this project has by name are used as they are.
-- **Dependency**: an IDL file can be a [dependency](dependencies.md). It stands for a project named after the file (types, interfaces, constants, components as modules to place; without components, its IDL modules as nested modules providing their interfaces on `in` ports), the files it includes being its dependencies. `scaffold-gen -d` generates it like a project file.
+- **Dependency**: an IDL file can be a [dependency](dependencies.md). It stands for a project named after the file (types, interfaces, constants, components as modules to place; without components, its IDL modules as nested modules providing their interfaces on `in` ports and holding their types and constants), the files it includes being its dependencies. `scaffold-gen -d` generates it like a project file.
 - **Text**: see [Editing IDL files](#editing-idl-files).
 
 The import dialog lists what was approximated.
@@ -31,7 +31,8 @@ In [`examples/idl/`](../examples/idl):
 
 ### Scopes
 
-- Modules are flattened: entities keep their simple name, qualified with their modules (`Robot_Status`) when several share it.
+- Imported, modules are flattened: entities keep their simple name, qualified with their modules (`Robot_Status`) when several share it.
+- As a dependency without components, every IDL module holding definitions is a module (nested like them); the types and constants it defines are [those of that module](file-format.md#types-and-constants-of-modules), named simply there (`Robot.Status`), public. Those defined at file scope, interfaces, and those of files with components stay the project's.
 - Scoped names (`::A::B`, inherited scopes) are resolved.
 - Template modules are instantiated (`module Buffers<long, 8> Longs;`).
 

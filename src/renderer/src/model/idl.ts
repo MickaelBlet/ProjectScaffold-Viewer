@@ -80,8 +80,13 @@ export interface IdlFile {
   needs: Record<string, string[]>
   /** File defining each type, interface, constant and component, by name. */
   origins: Record<string, string>
-  /** IDL module defining each interface written in the files (`Robot::Control`, '' at file scope), by name. */
+  /**
+   * Innermost IDL module defining each type, interface and constant written in the files
+   * (`Robot::Control`, '' at file scope), by name.
+   */
   scopes: Record<string, string>
+  /** Qualified IDL name of each type, interface and constant written in the files (`Robot::Status`), by name. */
+  qualified: Record<string, string>
   /** Files each file includes. */
   includes: Record<string, string[]>
   /** Included files found nowhere. */
@@ -929,6 +934,13 @@ class Parser {
 
   private qualified(name: string): string {
     return [...this.scope, name].join('::')
+  }
+
+  /** Innermost IDL module holding the definition `q` ('' at file scope). */
+  private moduleOf(q: string): string {
+    const parts = q.split('::').slice(0, -1)
+    while (parts.length && this.decls.get(parts.join('::')) !== 'module') parts.pop()
+    return parts.join('::')
   }
 
   /** Qualified name a written name refers to from `scope`, among declarations `ok` accepts. */
@@ -2184,6 +2196,12 @@ class Parser {
 
     const pick = <K extends Entity['kind']>(kind: K) =>
       all.filter((e): e is Extract<Entity, { kind: K }> => e.kind === kind)
+    const written: [string, string][] = [
+      ...all
+        .filter((e) => !e.synthetic && e.kind !== 'component')
+        .map((e): [string, string] => [e.def.name, e.q]),
+      ...this.constDefs.map((c): [string, string] => [c.def.name, c.q])
+    ]
     return {
       types: pick('type').map((e) => e.def),
       interfaces: pick('interface').map((e) => e.def),
@@ -2198,11 +2216,8 @@ class Parser {
         ...all.map((e): [string, string] => [e.def.name, e.file ?? this.main]),
         ...this.constDefs.map((c): [string, string] => [c.def.name, c.file])
       ]),
-      scopes: Object.fromEntries(
-        pick('interface')
-          .filter((e) => !e.synthetic)
-          .map((e) => [e.def.name, e.q.slice(0, Math.max(e.q.lastIndexOf('::'), 0)).replace(/^::/, '')])
-      ),
+      scopes: Object.fromEntries(written.map(([n, q]) => [n, this.moduleOf(q)])),
+      qualified: Object.fromEntries(written),
       includes: {},
       missing,
       warnings: this.warnings
@@ -2523,14 +2538,19 @@ interface IdlServer {
   component: IdlComponent
 }
 
+/** Whether the file `file` defines components: then its IDL modules are not modules (see `interfaceServers`). */
+const hasComponents = (idl: IdlFile, file: string, main: string): boolean =>
+  idl.components.some((c) => (idl.origins[c.name] ?? main) === file)
+
 /**
- * Modules of a file `main` defining interfaces but no components (plain CORBA IDL): one per IDL
- * module holding interfaces, and per IDL module enclosing those (the file's own module at file
- * scope), providing each of its interfaces on an `in` port.
+ * Modules of a file `main` without components (plain CORBA IDL, DDS types): one per IDL module
+ * holding definitions, and per IDL module enclosing those (the file's own module at file scope
+ * when it has interfaces there), providing each of its interfaces on an `in` port. Types and
+ * constants of IDL modules are theirs (see `idlProject`).
  */
 function interfaceServers(idl: IdlFile, main: string): IdlServer[] {
   const own = (name: string): boolean => (idl.origins[name] ?? main) === main
-  if (idl.components.some((c) => own(c.name))) return []
+  if (hasComponents(idl, main, main)) return []
   const byScope = new Map<string, FileInterface[]>()
   const add = (scope: string): FileInterface[] => {
     const parent = scope.lastIndexOf('::')
@@ -2538,9 +2558,11 @@ function interfaceServers(idl: IdlFile, main: string): IdlServer[] {
     if (!byScope.has(scope)) byScope.set(scope, [])
     return byScope.get(scope)!
   }
-  for (const i of idl.interfaces) {
-    const scope = idl.scopes[i.name]
-    if (scope !== undefined && own(i.name)) add(scope).push(i)
+  for (const e of [...idl.types, ...idl.interfaces, ...idl.constants]) {
+    const scope = idl.scopes[e.name]
+    if (scope === undefined || !own(e.name)) continue
+    if ('messages' in e) add(scope).push(e)
+    else if (scope) add(scope)
   }
   const taken = idl.components.map((c) => c.name)
   return [...byScope].map(([scope, interfaces]) => {
@@ -2573,8 +2595,9 @@ function interfaceServers(idl: IdlFile, main: string): IdlServer[] {
 /**
  * Nest the modules of `servers` in `p` like their IDL modules, named after them: the innermost
  * first, each laid out in a row in its parent, which grows to fit; the outermost in a row.
+ * Returns the module of each IDL module.
  */
-function nestServers(p: Project, servers: IdlServer[]): void {
+function nestServers(p: Project, servers: IdlServer[]): Map<string, Module> {
   const modules = new Map(
     servers.flatMap((s) => {
       const m = p.modules.find((x) => x.name === s.component.name && !x.parentId)
@@ -2615,6 +2638,48 @@ function nestServers(p: Project, servers: IdlServer[]): void {
     roots.filter((m) => [...modules.values()].includes(m)),
     0
   )
+  return modules
+}
+
+/**
+ * Make the types and constants of the IDL modules of `p` those of their modules (`modules`, of
+ * the file `main`), or of the modules of the included file defining them (by path, when it has no
+ * components), named simply there. Returns the qualified IDL names of those named simply.
+ */
+function scopeDefinitions(
+  p: Project,
+  idl: IdlFile,
+  main: string,
+  modules: ReadonlyMap<string, Module>
+): Set<string> {
+  const simply = new Set<string>()
+  const taken = new Map<string, string[]>()
+  for (const e of [...p.types, ...p.consts]) {
+    const scope = idl.scopes[e.name]
+    const q = idl.qualified[e.name]
+    if (!scope || !q) continue
+    const file = idl.origins[e.name] ?? main
+    const module = file === main ? modules.get(scope) : undefined
+    if (file === main ? !module : hasComponents(idl, file, main)) continue
+    // Unique among the definitions of the module and its submodules.
+    const key = `${file}|${scope}`
+    if (!taken.has(key))
+      taken.set(key, [
+        ...new Set(
+          Object.values(idl.scopes)
+            .filter((s) => s.startsWith(`${scope}::`))
+            .map((s) => s.slice(scope.length + 2).split('::')[0]!)
+        )
+      ])
+    const names = taken.get(key)!
+    const simple = lastSegment(q)
+    if (!isReservedTypeName(simple)) e.name = uniqueName(simple, names)
+    if (e.name === simple) simply.add(q)
+    names.push(e.name)
+    if (module) e.module = module.id
+    else e.modulePath = scope.split('::').join('.')
+  }
+  return simply
 }
 
 /**
@@ -2674,11 +2739,15 @@ export function idlProject(path: string, files: ReadonlyMap<string, string>): Id
     project.modules = project.modules.filter((m) => !theirs.has(m.id))
     for (const m of project.modules) if (m.bases) m.bases = m.bases.filter((b) => !theirs.has(b))
   }
-  nestServers(project, servers)
+  const simply = scopeDefinitions(project, idl, main, nestServers(project, servers))
   return {
     project,
     warnings: [
-      ...idl.warnings,
+      // Renames the modules made needless.
+      ...idl.warnings.filter((w) => {
+        const at = w.indexOf(' imported as ')
+        return at < 0 || !simply.has(w.slice(0, at))
+      }),
       ...unresolved.map((n) => `${n} is defined in none of the files: added empty`)
     ],
     missing: idl.missing

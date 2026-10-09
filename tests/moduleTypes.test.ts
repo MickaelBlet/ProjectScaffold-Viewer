@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { fromFile, loadText, saveText, toFile } from '@/model/serialize'
 import { validate } from '@/model/validate'
 import { parseTypeExpr, printTypeExpr } from '@/model/typeExpr'
-import { canUseType, modulePath, nameError, typeNames, typeScope } from '@/model/project'
+import { canUseType, constNames, modulePath, nameError, typeNames, typeScope } from '@/model/project'
 import { diffRenames } from '@/model/sync'
 import { applyDependencyRenames } from '@/model/dependencies'
 import { outline } from '@/model/outline'
@@ -80,7 +80,10 @@ describe('types of modules', () => {
     expect(other.idOf('Core.Sensor.Filter')).toBe(filter.id)
     expect(other.usable.map((u) => u.name)).toContain('Core.Sensor.Filter')
     expect(other.usable.map((u) => u.name)).not.toContain('Core.Sensor.Sample')
-    expect(typeScope(p, null).usable.some((u) => u.type.module)).toBe(false)
+    // Outside modules: the public ones only, by qualified name.
+    const outside = typeScope(p, null).usable.filter((u) => u.type.module)
+    expect(outside.map((u) => u.name)).toContain('Core.Sensor.Filter')
+    expect(outside.some((u) => u.type.access)).toBe(false)
   })
 
   it('lets modules use them as their access allows', () => {
@@ -88,7 +91,8 @@ describe('types of modules', () => {
     const sample = typeOf(p, 'Core.Sensor.Sample')
     expect(canUseType(p, byPath(p, 'Core.Sensor').id, sample)).toBe(true)
     expect(canUseType(p, byPath(p, 'Core.Logger').id, sample)).toBe(false)
-    expect(canUseType(p, null, typeOf(p, 'Core.Sensor.Filter'))).toBe(false)
+    expect(canUseType(p, null, typeOf(p, 'Core.Sensor.Filter'))).toBe(true)
+    expect(canUseType(p, null, sample)).toBe(false)
     const derived = produce(p, (d) => void (byPath(d, 'Core.Logger').bases = [byPath(d, 'Core.Sensor').id]))
     expect(canUseType(derived, byPath(derived, 'Core.Logger').id, sample)).toBe(true)
   })
@@ -106,17 +110,20 @@ describe('types of modules', () => {
       })
     })
     expect(messages(logger)).toEqual(["Core.Logger.sample: 'Core.Sensor.Sample' is protected in Core.Sensor"])
-    const outside = produce(p, (d) => {
-      const vec3 = d.types.find((t) => t.name === 'Vec3') as StructDef
-      vec3.fields.push({
-        id: 'y',
-        name: 'filter',
-        type: { kind: 'ref', id: typeOf(d, 'Core.Sensor.Filter').id },
-        description: ''
+    const outside = (key: string) =>
+      produce(p, (d) => {
+        const vec3 = d.types.find((t) => t.name === 'Vec3') as StructDef
+        vec3.fields.push({
+          id: 'y',
+          name: 'field',
+          type: { kind: 'ref', id: typeOf(d, key).id },
+          description: ''
+        })
       })
-    })
-    expect(messages(outside)).toEqual([
-      "Vec3.filter: 'Core.Sensor.Filter' is a type of module Core.Sensor, used by modules only"
+    // Public ones are used anywhere.
+    expect(messages(outside('Core.Sensor.Filter'))).toEqual([])
+    expect(messages(outside('Core.Sensor.Sample'))).toEqual([
+      "Vec3.field: 'Core.Sensor.Sample' is a protected type of module Core.Sensor, used by modules only"
     ])
   })
 
@@ -138,7 +145,9 @@ describe('types of modules', () => {
     expect(nameError(p, { kind: 'type', module: sensor.id }, 'Mode')).toBeNull()
     expect(nameError(p, { kind: 'type' }, 'Filter')).toBeNull()
     const clash = produce(p, (d) => void (typeOf(d, 'Core.Sensor.Filter').name = 'filter'))
-    expect(messages(clash)).toEqual(["Core.Sensor: 'filter' is both a type and a member or submodule"])
+    expect(messages(clash)).toEqual([
+      "Core.Sensor: 'filter' is both a type or constant and a member or submodule"
+    ])
   })
 
   it('carries renames of modules and of their types to dependent projects', () => {
@@ -192,6 +201,83 @@ describe('types of modules', () => {
       0,
       'types',
       1
+    ])
+  })
+})
+
+describe('constants of modules', () => {
+  const constOf = (p: Project, key: string) => p.consts.find((c) => constNames(p).get(c.id) === key)!
+
+  it('loads them owned by their module, and writes them back there', () => {
+    const p = fromFile(example)
+    const history = constOf(p, 'Core.Sensor.HISTORY')
+    expect(history.module).toBe(byPath(p, 'Core.Sensor').id)
+    const file = toFile(p, { editor: false })
+    expect(file.constants ?? []).toEqual([])
+    expect(file.modules[0]!.modules![0]!.constants).toEqual(example.modules[0].modules[0].constants)
+    expect(messages(load())).toEqual([])
+  })
+
+  it('reads those of the modules of a dependency by their path', () => {
+    const station = fromFile(YAML.parse(readFileSync('examples/station.scaffold.yaml', 'utf8')))
+    expect(constOf(station, 'Robot/Core.Sensor.HISTORY')).toMatchObject({
+      modulePath: 'Core.Sensor',
+      value: 64
+    })
+    expect(
+      toFile(station, { editor: false }).dependencies!.find((x) => x.name === 'Robot')!.moduleConstants
+    ).toEqual([{ module: 'Core.Sensor', constants: [expect.objectContaining({ name: 'HISTORY' })] }])
+  })
+
+  it('names them uniquely in their module, with its types and members', () => {
+    const p = load()
+    const sensor = byPath(p, 'Core.Sensor')
+    expect(nameError(p, { kind: 'const', module: sensor.id }, 'Filter')).toMatch(
+      /already has a type or constant/
+    )
+    expect(nameError(p, { kind: 'type', module: sensor.id }, 'HISTORY')).toMatch(
+      /already has a type or constant/
+    )
+    expect(nameError(p, { kind: 'const', module: sensor.id }, 'rateHz')).toMatch(/attribute, method/)
+    expect(nameError(p, { kind: 'const' }, 'HISTORY')).toBeNull()
+    const clash = produce(p, (d) => void (constOf(d, 'Core.Sensor.HISTORY').name = 'Filter'))
+    expect(messages(clash)).toEqual(["Core.Sensor: duplicate type or constant 'Filter'"])
+  })
+
+  it('carries their renames to dependent projects', () => {
+    const p = load()
+    const next = produce(p, (d) => void (byPath(d, 'Core.Sensor').name = 'Lidar'))
+    const r = diffRenames(p, next)!
+    expect(r.moduleConsts).toEqual(new Map([['Core.Sensor.HISTORY', 'Core.Lidar.HISTORY']]))
+    expect(r.consts.size).toBe(0)
+    const station = fromFile(YAML.parse(readFileSync('examples/station.scaffold.yaml', 'utf8')))
+    const after = produce(station, (d) => applyDependencyRenames(d, 'robot.scaffold.yaml', r))
+    expect(constOf(after, 'Robot/Core.Lidar.HISTORY')).toBeDefined()
+  })
+
+  it('copies them with their module', () => {
+    const p = load()
+    const q = produce(
+      p,
+      (d) => void pasteClip(d, copyItems(p, [byPath(p, 'Core.Sensor').id])!, { parent: 'original' })
+    )
+    const copy = q.modules.find((m) => m.name === 'Sensor2')!
+    expect(q.consts.filter((c) => c.module === copy.id).map((c) => c.name)).toEqual(['HISTORY'])
+    expect(messages(q)).toEqual([])
+  })
+
+  it('outlines and locates them in the text', () => {
+    const core = outline(exampleText).find((n) => n.name === 'Modules')!.children[0]!
+    const sensor = core.children.find((n) => n.name === 'Sensor')!
+    expect(sensor.children.find((n) => n.name === 'HISTORY')?.kind).toBe('constant')
+    const p = fromFile(example)
+    expect(targetPath(example, p, { kind: 'const', id: constOf(p, 'Core.Sensor.HISTORY').id })).toEqual([
+      'modules',
+      0,
+      'modules',
+      0,
+      'constants',
+      0
     ])
   })
 })

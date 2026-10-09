@@ -29,20 +29,23 @@ export function targetPath(data: unknown, p: Project, target: ProblemTarget): Da
     case 'const': {
       const key = target.kind === 'type' ? 'types' : target.kind === 'interface' ? 'interfaces' : 'constants'
       const e = [...p.types, ...p.interfaces, ...p.consts].find((x) => x.id === target.id)
-      // A module's: modules.i...types.j
+      const inModule = target.kind === 'type' ? 'types' : 'constants'
+      // A module's: modules.i...types.j (or constants.j)
       if (e && 'module' in e && e.module) {
         const path = modulePathIn(file, p, e.module)
-        const items = dig(file, path) as { types?: { name: string }[] } | undefined
-        return path.length ? [...path, ...named('types', items?.types, e.name)] : ['modules']
+        const items = dig(file, path) as Record<string, { name: string }[] | undefined> | undefined
+        return path.length ? [...path, ...named(inModule, items?.[inModule], e.name)] : ['modules']
       }
       const dep = e?.dependency && p.dependencies.find((x) => x.id === e.dependency)
       if (dep && e && 'modulePath' in e && e.modulePath) {
-        // A type of a module of a dependency: dependencies.i.moduleTypes.k.types.j
+        // Of a module of a dependency: dependencies.i.moduleTypes.k.types.j (moduleConstants.k.constants.j)
         const path = named('dependencies', file.dependencies, dep.name)
         const i = path[1] as number | undefined
-        const groups = i === undefined ? undefined : file.dependencies![i]!.moduleTypes
+        const groupsKey = target.kind === 'type' ? 'moduleTypes' : 'moduleConstants'
+        const groups = (i === undefined ? undefined : file.dependencies![i]![groupsKey]) as
+          ({ module: string } & Record<string, { name: string }[]>)[] | undefined
         const k = groups?.findIndex((g) => g.module === e.modulePath) ?? -1
-        return k < 0 ? path : [...path, 'moduleTypes', k, ...named('types', groups![k]!.types, e.name)]
+        return k < 0 ? path : [...path, groupsKey, k, ...named(inModule, groups![k]![inModule], e.name)]
       }
       if (!dep) return named(key, file[key], e?.name)
       // A dependency's: dependencies.i.types.j

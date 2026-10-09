@@ -85,8 +85,8 @@ export interface Owned {
 }
 
 /**
- * Module owning a type, like a type nested in a C++ class: usable by modules only (attributes,
- * methods, the module's other types), as its access allows.
+ * Module owning a type or constant, like one nested in a C++ class (or in an IDL module): public
+ * ones are usable anywhere by their qualified name, others by modules only, as their access allows.
  */
 export interface Scoped {
   /** Module of this project owning it. */
@@ -491,13 +491,8 @@ export interface ImportedModule {
   size?: { width: number; height: number }
 }
 
-/**
- * Another project file this one uses: its types and interfaces are kept in the project's `types`
- * and `interfaces` with `dependency` set, as last read from the file (read-only here, one
- * namespace), and some of its modules may be placed on the canvas so that links reach them.
- */
 /** Named constant: a value of a type. */
-export interface ConstDef extends Owned {
+export interface ConstDef extends Owned, Scoped {
   id: Id
   name: string
   description: string
@@ -506,6 +501,11 @@ export interface ConstDef extends Owned {
   value: Value
 }
 
+/**
+ * Another project file this one uses: its types and interfaces are kept in the project's `types`
+ * and `interfaces` with `dependency` set, as last read from the file (read-only here, one
+ * namespace), and some of its modules may be placed on the canvas so that links reach them.
+ */
 export interface Dependency {
   id: Id
   /** Identifier naming the dependency in `uses` and link ends. */
@@ -536,7 +536,7 @@ export interface Project {
   binaries: Binary[]
   types: TypeDef[]
   interfaces: Interface[]
-  /** Named constants; their names share the namespace of the types and interfaces. */
+  /** Named constants; their names share the namespace of the types and interfaces (those of modules, their module's). */
   consts: ConstDef[]
   modules: Module[]
   links: Link[]

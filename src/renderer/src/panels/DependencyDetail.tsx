@@ -297,7 +297,9 @@ export function DependencyDetail({ lib }: { lib: Dependency }): ReactNode {
               {KIND_BADGE[e.kind]}
             </span>
           )}
-          <span className="lib-entity-name">{e.name}</span>
+          <span className="lib-entity-name">
+            {'modulePath' in e && e.modulePath ? `${e.modulePath}.${e.name}` : e.name}
+          </span>
           <small>{summary(e, print)}</small>
           <small className={`lib-usage ${used ? '' : 'unused'}`} title="Uses in this project">
             {used ? `used ${used}×` : 'unused'}
@@ -399,7 +401,9 @@ export function DependencyDetail({ lib }: { lib: Dependency }): ReactNode {
                 <div className="lib-entity-head">
                   <span className="chevron" aria-hidden />
                   <span className="kind-badge const">C</span>
-                  <span className="lib-entity-name">{c.name}</span>
+                  <span className="lib-entity-name">
+                    {c.modulePath ? `${c.modulePath}.${c.name}` : c.name}
+                  </span>
                   <small>
                     {print(c.type)} = {formatValue(c.value)}
                   </small>

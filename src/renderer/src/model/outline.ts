@@ -206,6 +206,7 @@ const module: Make = (item, path, names) =>
     detail: moduleText(item),
     children: [
       ...list(item, 'types', path, names, type),
+      ...list(item, 'constants', path, names, constant),
       ...list(item, 'attributes', path, names, (a, p, n) =>
         entry(a, 'attribute', p, n, { detail: valueText(a) })
       ),
@@ -231,6 +232,9 @@ const dependency: Make = (item, path, names) =>
       ...list(item, 'constants', path, names, constant),
       ...list(item, 'moduleTypes', path, names, (g, p, n) =>
         entry(g, 'module', p, n, { name: text(g, 'module'), children: list(g, 'types', p, n, type) })
+      ),
+      ...list(item, 'moduleConstants', path, names, (g, p, n) =>
+        entry(g, 'module', p, n, { name: text(g, 'module'), children: list(g, 'constants', p, n, constant) })
       ),
       ...list(item, 'modules', path, names, (m, p, n) =>
         entry(m, 'module', p, n, { name: text(m, 'module'), children: list(m, 'ports', p, n, port) })

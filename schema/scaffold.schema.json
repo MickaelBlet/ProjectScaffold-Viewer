@@ -331,7 +331,7 @@
                 }
               },
               "moduleTypes": {
-                "description": "types of its modules, as last read from it, by module path: its public ones are used by the modules of this project as Dependency/Module.Path.Name",
+                "description": "types of its modules, as last read from it, by module path: its public ones are used by this project as Dependency/Module.Path.Name",
                 "type": "array",
                 "items": {
                   "type": "object",
@@ -350,6 +350,29 @@
                   "required": [
                     "module",
                     "types"
+                  ]
+                }
+              },
+              "moduleConstants": {
+                "description": "constants of its modules, as last read from it, by module path",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "module": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$"
+                    },
+                    "constants": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/$defs/ModuleConstant"
+                      }
+                    }
+                  },
+                  "required": [
+                    "module",
+                    "constants"
                   ]
                 }
               },
@@ -1634,10 +1657,17 @@
           "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
         },
         "types": {
-          "description": "types of the module, like types nested in a class: used by modules only (attributes, methods, types of modules), named Module.Path.Name",
+          "description": "types of the module, like types nested in a class (or in an IDL module), named Module.Path.Name",
           "type": "array",
           "items": {
             "$ref": "#/$defs/ModuleTypeDef"
+          }
+        },
+        "constants": {
+          "description": "constants of the module, like constants nested in a class, named Module.Path.Name",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ModuleConstant"
           }
         },
         "attributes": {
@@ -1848,7 +1878,7 @@
               "const": "struct"
             },
             "access": {
-              "description": "public (default): used by any module; protected: by the module and the modules deriving from it; private: by the module",
+              "description": "public (default): used anywhere; protected: by the module and the modules deriving from it; private: by the module",
               "type": "string",
               "enum": [
                 "public",
@@ -1904,7 +1934,7 @@
               "const": "enum"
             },
             "access": {
-              "description": "public (default): used by any module; protected: by the module and the modules deriving from it; private: by the module",
+              "description": "public (default): used anywhere; protected: by the module and the modules deriving from it; private: by the module",
               "type": "string",
               "enum": [
                 "public",
@@ -1969,7 +1999,7 @@
               "const": "exception"
             },
             "access": {
-              "description": "public (default): used by any module; protected: by the module and the modules deriving from it; private: by the module",
+              "description": "public (default): used anywhere; protected: by the module and the modules deriving from it; private: by the module",
               "type": "string",
               "enum": [
                 "public",
@@ -2026,7 +2056,7 @@
               "const": "bitmask"
             },
             "access": {
-              "description": "public (default): used by any module; protected: by the module and the modules deriving from it; private: by the module",
+              "description": "public (default): used anywhere; protected: by the module and the modules deriving from it; private: by the module",
               "type": "string",
               "enum": [
                 "public",
@@ -2089,7 +2119,7 @@
               "const": "union"
             },
             "access": {
-              "description": "public (default): used by any module; protected: by the module and the modules deriving from it; private: by the module",
+              "description": "public (default): used anywhere; protected: by the module and the modules deriving from it; private: by the module",
               "type": "string",
               "enum": [
                 "public",
@@ -2170,7 +2200,7 @@
               "const": "alias"
             },
             "access": {
-              "description": "public (default): used by any module; protected: by the module and the modules deriving from it; private: by the module",
+              "description": "public (default): used anywhere; protected: by the module and the modules deriving from it; private: by the module",
               "type": "string",
               "enum": [
                 "public",
@@ -2203,7 +2233,7 @@
               "const": "primitive"
             },
             "access": {
-              "description": "public (default): used by any module; protected: by the module and the modules deriving from it; private: by the module",
+              "description": "public (default): used anywhere; protected: by the module and the modules deriving from it; private: by the module",
               "type": "string",
               "enum": [
                 "public",
@@ -2225,6 +2255,39 @@
           ],
           "description": "custom primitive: an opaque type that generators map to a native type"
         }
+      ]
+    },
+    "ModuleConstant": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+        },
+        "description": {
+          "type": "string"
+        },
+        "type": {
+          "$ref": "#/$defs/TypeRef"
+        },
+        "value": {
+          "description": "checked against the type, as default values are",
+          "$ref": "#/$defs/__schema1"
+        },
+        "access": {
+          "description": "public (default): used anywhere; protected: by the module and the modules deriving from it; private: by the module",
+          "type": "string",
+          "enum": [
+            "public",
+            "protected",
+            "private"
+          ]
+        }
+      },
+      "required": [
+        "name",
+        "type",
+        "value"
       ]
     },
     "TransportSettings": {

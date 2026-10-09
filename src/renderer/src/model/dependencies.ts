@@ -39,10 +39,10 @@ const entities = (p: Pick<Project, Kind>): Entity[] => [...p.types, ...p.interfa
 const isInterface = (e: Entity): e is Interface => 'messages' in e
 const isConst = (e: Entity): e is ConstDef => 'value' in e
 const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b)
-/** Whether an entity is a type of a module (never shared between dependencies, never conflicting). */
-const scoped = (e: Entity): e is TypeDef => !isInterface(e) && !isConst(e) && isModuleType(e)
+/** Whether an entity is a type or constant of a module (never shared between dependencies, never conflicting). */
+const scoped = (e: Entity): e is TypeDef | ConstDef => !isInterface(e) && isModuleType(e)
 
-/** Name of an entity in its project: `Path.Name` for a type of a module. */
+/** Name of an entity in its project: `Path.Name` for a type or constant of a module. */
 function keyer(p: Pick<Project, 'modules' | 'dependencies'>): (e: Entity) => string {
   const paths = modulePaths(p)
   return (e) => {
@@ -170,7 +170,7 @@ function rebind(e: Entity, idOf: (id: Id) => Id): void {
 
 /**
  * Names binding the references of the entities of `source` (saved as `file`) once copied: their
- * names, a type of a module by the file of its project and its `Path.Name`.
+ * names, a type or constant of a module by the file of its project and its `Path.Name`.
  */
 function refNames(source: Project, file: string): Map<Id, string> {
   const paths = modulePaths(source)
@@ -270,7 +270,7 @@ class Sync {
 
   /**
    * Make the entities of `dep` those of `source` (saved as `file`) owned by `owner` (its own ones
-   * when undefined). Types of modules come with the path of their module.
+   * when undefined). Types and constants of modules come with the path of their module.
    */
   entities(dep: Dependency, source: Project, owner: Id | undefined, file: string): void {
     const names = refNames(source, file)
@@ -306,7 +306,7 @@ class Sync {
         }
         if (target) {
           kept.add(target)
-          // A type of a module in a renamed module is not renamed itself.
+          // A type or constant of a module in a renamed module is not renamed itself.
           if (target.name !== e.name) this.result.renamed.push(`${hereKey(target)} → ${sourceKey(e)}`)
           else if (hereKey(target) === sourceKey(e) && here(target) === sourceShape(e)) continue
         }
@@ -713,14 +713,18 @@ export function applyDependencyRenames(d: Project, file: string, r: Renames): vo
         if (to && !entities(d).some((x) => !scoped(x) && x.name === to)) e.name = to
       }
     }
-    for (const t of d.types) {
-      const to =
-        t.dependency === dep.id && t.modulePath ? r.moduleTypes.get(`${t.modulePath}.${t.name}`) : undefined
-      if (!to) continue
-      const at = to.lastIndexOf('.')
-      t.modulePath = to.slice(0, at)
-      t.name = to.slice(at + 1)
+    const renameScoped = (list: (TypeDef | ConstDef)[], renames: Map<string, string>): void => {
+      for (const e of list) {
+        const to =
+          e.dependency === dep.id && e.modulePath ? renames.get(`${e.modulePath}.${e.name}`) : undefined
+        if (!to) continue
+        const at = to.lastIndexOf('.')
+        e.modulePath = to.slice(0, at)
+        e.name = to.slice(at + 1)
+      }
     }
+    renameScoped(d.types, r.moduleTypes)
+    renameScoped(d.consts, r.moduleConsts)
     rename('types', r.types)
     rename('interfaces', r.interfaces)
     rename('consts', r.consts)

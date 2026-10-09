@@ -83,7 +83,7 @@ constants: # { name, description?, type, value }
   - { name: MaxSpeed, type: { kind: primitive, name: float32 }, value: 2.5 }
 ```
 
-A constant's value is checked against its type, as [default values](#default-values) are.
+A constant's value is checked against its type, as [default values](#default-values) are. Modules have [constants of their own](#types-and-constants-of-modules), named `Core.Sensor.HISTORY`.
 
 ## Interfaces
 
@@ -110,12 +110,12 @@ interfaces: # { name, description?, messages }
   - Parameters take `const: true` too, `in` parameters only.
 - **Kind** (optional): `class` (default, left out), `abstract` or `interface`. A `class` has no pure methods and implements every pure method it inherits; an `interface` has only pure methods and no attributes.
 - **Bases** (optional): `bases: [IShape, Core.Base]`, paths of modules of this project it derives from, in order; no cycles, no repeats. A method redefining a virtual one of a base without `override` is a warning.
-- **Types** (optional): see [Types of modules](#types-of-modules).
+- **Types** and **constants** (optional): see [Types and constants of modules](#types-and-constants-of-modules).
 - **Ports** and **submodules** (`modules`): see below.
 
-### Types of modules
+### Types and constants of modules
 
-A module has types of its own, like types nested in a C++ class: user types (as in `types`) with an `access`.
+A module has types and constants of its own, like those nested in a C++ class (or in an IDL module): user types (as in `types`) and constants (as in `constants`) with an `access`.
 
 ```yaml
 modules:
@@ -130,14 +130,15 @@ modules:
               values: [{ name: None, value: 0 }, { name: LowPass, value: 1 }]
             }
           - { kind: struct, name: Sample, access: protected, fields: [...] }
+        constants:
+          - { name: HISTORY, type: { kind: primitive, name: uint16 }, value: 64 }
         attributes:
           - { name: filter, type: { kind: ref, name: Core.Sensor.Filter }, default: LowPass }
 ```
 
 - They are named by their module's path: `Core.Sensor.Filter`; `Robot/Core.Sensor.Filter` for one of a module of dependency `Robot` (in `raises` too).
-- Their names are unique in their module, and apart from its attributes, methods, ports and submodules.
-- Modules only use them (attributes, methods, types of modules), not the project's types, interfaces and constants.
-- `access`: `public` (default, left out) for any module, `protected` for the module and those deriving from it, `private` for the module. A public member (or type of a module) using a less accessible type is a warning.
+- Their names are unique in their module (types and constants together), and apart from its attributes, methods, ports and submodules.
+- `access`: `public` (default, left out) for anyone, by path (the project's types, interfaces and constants too); `protected` for the module and those deriving from it; `private` for the module. A public member (or type of a module) using a less accessible type is a warning.
 
 ## Default values
 

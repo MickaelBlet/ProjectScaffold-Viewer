@@ -4,6 +4,7 @@ import {
   canDerive,
   childModules,
   modulePath,
+  moduleConsts,
   moduleTypes,
   nameError,
   newId,
@@ -46,18 +47,27 @@ import {
   METHOD_QUALIFIERS,
   MODULE_KINDS,
   QUALIFIERS,
+  type ConstDef,
   type Module,
   type Project,
   type TypeDef
 } from '@/model/types'
 import { Icon } from '@/components/Icon'
 import { DefaultInput, FieldList, setDefault } from './TypeInspector'
+import { valueExample } from '@/model/defaults'
 import { addMessage, MessageList } from './MessageList'
 
 function withTypeOf(id: string, fn: (t: TypeDef) => void): void {
   update((d) => {
     const t = d.types.find((t) => t.id === id)
     if (t) fn(t)
+  })
+}
+
+function withConstOf(id: string, fn: (c: ConstDef, d: Project) => void): void {
+  update((d) => {
+    const c = d.consts.find((c) => c.id === id)
+    if (c) fn(c, d)
   })
 }
 
@@ -94,6 +104,7 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
   ]
 
   const types = moduleTypes(project, id)
+  const consts = moduleConsts(project, id)
 
   return (
     // Its attributes and methods name types as it does.
@@ -223,6 +234,34 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
           ))}
         </ul>
         {!types.length && <p className="muted">No types.</p>}
+      </Section>
+
+      <Section title={`Constants (${consts.length})`}>
+        <FieldList<ConstDef>
+          fields={consts}
+          addLabel="Add constant"
+          baseName="Constant"
+          extra={{ value: 0, module: id }}
+          onChange={(fn) =>
+            update((d) => {
+              const list = d.consts.filter((c) => c.module === id)
+              fn(list)
+              d.consts = [...d.consts.filter((c) => c.module !== id), ...list]
+            })
+          }
+          column={(c) => (
+            <AccessToggles value={c.access} onChange={(a) => withConstOf(c.id, (x) => setAccess(x, a))} />
+          )}
+          value={(c) => (
+            <DefaultInput
+              field={{ ...c, default: c.value }}
+              types={project.types}
+              onChange={(v) =>
+                withConstOf(c.id, (x, d) => void (x.value = v ?? valueExample(x.type, d.types)))
+              }
+            />
+          )}
+        />
       </Section>
 
       <Section title={`Attributes (${mod.attributes.length})`}>

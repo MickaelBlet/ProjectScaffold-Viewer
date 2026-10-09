@@ -50,7 +50,9 @@ function setTemplateSet(name: string): void {
 
 export function ProjectInspector(): ReactNode {
   const p = useProjectStore((s) => s.project)
-  const own = p.consts.filter((c) => !c.dependency)
+  // Constants of modules are edited in their module's inspector.
+  const isOwn = (c: ConstDef): boolean => !c.dependency && !c.module
+  const own = p.consts.filter(isOwn)
   return (
     <>
       <h2>Project</h2>
@@ -88,9 +90,9 @@ export function ProjectInspector(): ReactNode {
           extra={{ value: 0 }}
           onChange={(fn) =>
             update((d) => {
-              const list = d.consts.filter((c) => !c.dependency)
+              const list = d.consts.filter(isOwn)
               fn(list)
-              d.consts = [...list, ...d.consts.filter((c) => c.dependency)]
+              d.consts = [...list, ...d.consts.filter((c) => !isOwn(c))]
             })
           }
           value={(c) => (
