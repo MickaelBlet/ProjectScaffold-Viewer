@@ -716,11 +716,11 @@ export function ExplorerPanel(): ReactNode {
               revealInspector()
               showDependency(dep.id)
             }}
-            onDoubleClick={() => placeDependencyModuleOf(dep.id, m.id)}
+            onDoubleClick={() => placeDependencyModuleOf(dep.id, m.path)}
             onContextMenu={(ev) => {
               ev.preventDefault()
               openContextMenu(ev, [
-                { label: 'Place on the canvas', run: () => placeDependencyModuleOf(dep.id, m.id) },
+                { label: 'Place on the canvas', run: () => placeDependencyModuleOf(dep.id, m.path) },
                 { label: `Open ${dep.file}`, run: () => openImportSource(dep.file) }
               ])
             }}

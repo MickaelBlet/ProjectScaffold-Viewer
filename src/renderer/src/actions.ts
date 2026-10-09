@@ -668,13 +668,18 @@ export function placeDependencyModule(id: Id, pos?: { x: number; y: number }): v
   })
 }
 
-/** Place module `moduleId` of a dependency (as read from its file) on the canvas. */
-export function placeDependencyModuleOf(id: Id, moduleId: Id): void {
+/**
+ * Place the module of a dependency at `path` (as read from its file: by path, the ids of an IDL
+ * file's modules changing at each read) on the canvas.
+ */
+export function placeDependencyModuleOf(id: Id, path: string): void {
   const dep = getProject().dependencies.find((x) => x.id === id)
   if (!dep) return
   const at = activeCanvas()?.center() ?? { x: 80, y: 80 }
   void importSource(dep.file).then((project) => {
-    if (project) placeFrom({ project, file: dep.file }, moduleId, at)
+    const m = project?.modules.find((x) => modulePath(project, x.id) === path)
+    if (project && m) placeFrom({ project, file: dep.file }, m.id, at)
+    else if (project) showDialog(`Cannot place ${path}`, [`${path} is no longer in ${dep.file}`])
     else showDialog(`Cannot read ${dep.file}`, [cannotRead(dep.name, dep.file)])
   })
 }
