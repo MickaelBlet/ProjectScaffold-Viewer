@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { findImported, IDENTIFIER_RE } from '@/model/project'
+import { findImported, IDENTIFIER_RE, importedParent } from '@/model/project'
 import { deleteItems, renameDependency, useProjectStore } from '@/store/project'
 import { select } from '@/store/ui'
 import { navigate, openImportSource, refreshDependencies, showDependency } from '@/actions'
@@ -11,6 +11,8 @@ export function ImportedInspector({ id }: { id: string }): ReactNode {
   const found = findImported(project, id)
   if (!found) return <p className="muted">Imported module removed.</p>
   const { dep, module } = found
+  // Content of a placed module: placed and removed with it.
+  const parent = importedParent(dep, module)
   const links = project.links.filter((l) => l.from.moduleId === id || l.to.moduleId === id)
 
   return (
@@ -34,6 +36,7 @@ export function ImportedInspector({ id }: { id: string }): ReactNode {
       <Row label="Module">
         <span>{module.path}</span>
       </Row>
+      {parent && <p className="muted">Inside {parent.path}: placed and removed with it.</p>}
       <p className="muted">
         Ports as last read from {dep.file}. Their interfaces are those of the same name here, from the
         dependency.
@@ -86,16 +89,18 @@ export function ImportedInspector({ id }: { id: string }): ReactNode {
         <button type="button" onClick={() => openImportSource(dep.file)}>
           Open project
         </button>
-        <button
-          type="button"
-          className="danger"
-          onClick={() => {
-            deleteItems([id])
-            select(null)
-          }}
-        >
-          Remove
-        </button>
+        {!parent && (
+          <button
+            type="button"
+            className="danger"
+            onClick={() => {
+              deleteItems([id])
+              select(null)
+            }}
+          >
+            Remove
+          </button>
+        )}
       </div>
     </>
   )

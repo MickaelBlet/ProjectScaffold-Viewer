@@ -3,9 +3,9 @@
 // between two handles.
 import { MarkerType, type Connection, type Edge, type Node } from '@xyflow/react'
 import {
-  allImported,
   compartmentsHeight,
   findPort,
+  importedParent,
   importedSize,
   orderLinkEnds,
   viewNotes
@@ -23,6 +23,8 @@ import {
   type PortPlacement,
   type PortSides
 } from './portSides'
+
+const depth = (path: string): number => path.split('.').length
 
 /** Data of module and imported module nodes: where their ports are drawn. */
 export type PortNodeData = {
@@ -109,27 +111,34 @@ export function toNodes(
       }
     })
   }
-  // Modules of other projects (global view, or outside a drill-down view).
-  for (const m of allImported(p)) {
-    if (!visible.has(m.id)) continue
-    const placements = sides?.get(m.id)
-    const size = importedSize(m, p.orientation)
-    nodes.push({
-      id: m.id,
-      type: 'imported',
-      position: { ...m.position },
-      width: fit(size.width),
-      height: fit(
-        placements
-          ? Math.max(size.height, neededHeight(freePorts(m.ports, anchors), placements))
-          : size.height
-      ),
-      selected: selected.has(m.id),
-      draggable: movable(m.id),
-      zIndex: Z.module,
-      data: { ...portData(m.ports, placements), ...(outside.has(m.id) && { outside: true as const }) }
-    })
-  }
+  // Modules of other projects (global view, or outside a drill-down view), parents first: their
+  // content inside them, in place (outside stand-ins on their own).
+  for (const dep of p.dependencies)
+    for (const m of [...dep.modules].sort((a, b) => depth(a.path) - depth(b.path))) {
+      if (!visible.has(m.id)) continue
+      const parent = outside.has(m.id) ? undefined : importedParent(dep, m)
+      if (parent && (!visible.has(parent.id) || outside.has(parent.id))) continue
+      const placements = sides?.get(m.id)
+      const size = importedSize(m, p.orientation)
+      const holds = !outside.has(m.id) && dep.modules.some((x) => importedParent(dep, x) === m)
+      nodes.push({
+        id: m.id,
+        type: 'imported',
+        position: { ...m.position },
+        parentId: parent?.id,
+        width: fit(size.width),
+        height: fit(
+          placements
+            ? Math.max(size.height, neededHeight(freePorts(m.ports, anchors), placements))
+            : size.height
+        ),
+        selected: selected.has(m.id),
+        // Content stays where its project puts it.
+        draggable: !parent && movable(m.id),
+        zIndex: holds ? Z.container : Z.module,
+        data: { ...portData(m.ports, placements), ...(outside.has(m.id) && { outside: true as const }) }
+      })
+    }
   return nodes
 }
 

@@ -25,6 +25,7 @@ import {
   LAYOUT_PAD,
   contentBottom,
   contentTop,
+  importedParent,
   modulePath,
   newId,
   subtreeIds,
@@ -590,21 +591,28 @@ function placeFrom(
   if (all.length) showDialog(`Linking to ${other.file}`, all)
 }
 
-/** Pick a module of `others` and place it on the canvas at `at`, depending on its project. */
+/**
+ * Pick a top-level module of `others` and place it on the canvas at `at` with its content,
+ * depending on its project.
+ */
 function pickModuleOf(others: OtherProject[], at: { x: number; y: number }, lines: string[] = []): void {
   const entries = others.flatMap((other) =>
-    other.project.modules.map((m) => ({
-      key: `${other.file}:${m.id}`,
-      label: modulePath(other.project, m.id),
-      detail: [
-        others.length > 1 && other.file,
-        m.ports.map((pt) => `${pt.role} ${pt.name}`).join(', ') || 'no ports'
-      ]
-        .filter(Boolean)
-        .join(' · '),
-      kind: 'M',
-      run: () => placeFrom(other, m.id, at, lines)
-    }))
+    childModules(other.project, null).map((m) => {
+      const inside = subtreeIds(other.project, m.id).size - 1
+      return {
+        key: `${other.file}:${m.id}`,
+        label: m.name,
+        detail: [
+          others.length > 1 && other.file,
+          m.ports.map((pt) => `${pt.role} ${pt.name}`).join(', ') || 'no ports',
+          inside > 0 && `${inside} modules inside`
+        ]
+          .filter(Boolean)
+          .join(' · '),
+        kind: 'M',
+        run: () => placeFrom(other, m.id, at, lines)
+      }
+    })
   )
   if (!entries.length) {
     if (lines.length) showDialog(`Read ${namesOf(others)}`, lines)
@@ -1165,7 +1173,9 @@ export function nudgeSelection(dx: number, dy: number): void {
   for (const id of selectedIds()) {
     const e = p.modules.find((m) => m.id === id) ?? p.notes.find((n) => n.id === id)
     if (e && !e.locked) layouts.set(id, { x: e.layout.x + dx, y: e.layout.y + dy })
-    const im = findImported(p, id)?.module
+    const found = findImported(p, id)
+    // Content of a placed module moves with it.
+    const im = found && !importedParent(found.dep, found.module) ? found.module : undefined
     if (im) layouts.set(id, { x: im.position.x + dx, y: im.position.y + dy })
   }
   if (layouts.size) setLayouts(layouts)

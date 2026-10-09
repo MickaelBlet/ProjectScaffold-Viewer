@@ -26,9 +26,10 @@ _Insert › Add dependency…_ (or + in the Explorer's _Dependencies_) picks an 
 
 ### Linking to another project's modules
 
-_Insert › Link to another project…_ (or the canvas menu) picks a dependency or another project, then one of its modules.
+_Insert › Link to another project…_ (or the canvas menu) picks a dependency or another project, then one of its top-level modules.
 
 - The module is drawn in the project view (dashed, `↗ Project`, resizable), with ports linked to like any other.
+- It comes with all the modules inside it, drawn where its project puts them (neither moved nor resized here, removed with it); their ports are linked to as well. A module placed alone by an earlier version is placed with its top-level module on the next refresh, its links kept.
 - The project becomes a dependency if it was not one, so the interfaces of its ports are used here, not copied.
 - Double-click a placed module to switch to its project's tab.
 
@@ -43,7 +44,7 @@ The dependencies of a dependency come with it (`indirect`). They are read from t
 
 ### Explorer and Inspector
 
-- The Explorer shows a dependency's content in folding groups: _Constants_, _Types_, _Interfaces_, _Modules_. Modules are listed placed on the canvas, or dimmed when not (when its file can be read: open in a tab, next to the document in VS Code; in the browser, an IDL file picked in the session or open as text, e.g. by its _Open_ entry after a reload); double-click one to place it.
+- The Explorer shows a dependency's content in folding groups: _Constants_, _Types_, _Interfaces_, _Modules_. Modules are listed as a tree, each under its parent, placed on the canvas, or dimmed when not (when its file can be read: open in a tab, next to the document in VS Code; in the browser, an IDL file picked in the session or open as text, e.g. by its _Open_ entry after a reload); double-click a top-level one to place it with its content.
 - Clicking the dependency shows it in the Inspector: where it comes from, the dependencies it uses and is used by, its types and interfaces with their members and uses, filtered.
 - Its right-click menu opens it, refreshes it, places a module on the canvas, removes it (when nothing here uses it) or _detaches_ it: its types and interfaces become this project's own.
 
@@ -80,7 +81,9 @@ dependencies:
     types: [...] # its own types, as in `types`
     interfaces: [...] # its own interfaces, as in `interfaces`
     constants: [...] # its own constants, as in `constants` (optional)
-    modules: # its modules placed on this canvas, with their ports (optional)
+    modules: # its modules placed on this canvas, with their ports (optional): top-level ones with their content
+      - module: Core
+        ports: [{ name: control, role: in, interface: Control }]
       - module: Core.Sensor
         ports: [{ name: out, role: out, interface: Telemetry }]
   - name: Common

@@ -14,7 +14,7 @@ import {
   type MouseEvent,
   type ReactNode
 } from 'react'
-import { endpointLabel, findView, modulePaths, newId, uniqueName } from '@/model/project'
+import { endpointLabel, findView, importedParent, modulePaths, newId, uniqueName } from '@/model/project'
 import { removeBinary } from '@/model/binaries'
 import { formatValue } from '@/model/defaults'
 import {
@@ -111,10 +111,14 @@ type DependencyRow = { key: string } & (
   | { kind: 'const'; dep: Dependency; c: ConstDef }
   | { kind: 'type'; e: TypeDef }
   | { kind: 'interface'; e: Interface }
-  | { kind: 'module'; dep: Dependency; m: ImportedModule }
-  | { kind: 'unplaced'; dep: Dependency; m: DependencyModule }
+  | { kind: 'module'; dep: Dependency; m: ImportedModule; depth: number }
+  | { kind: 'unplaced'; dep: Dependency; m: DependencyModule; depth: number }
 )
 type ModuleRow = Extract<DependencyRow, { kind: 'module' | 'unplaced' }>
+
+/** Name of a dependency module in its tree: its path at the top level, else its own name. */
+const leafName = (path: string, depth: number): string =>
+  depth ? path.slice(path.lastIndexOf('.') + 1) : path
 
 /** Left padding of a row of a tree at `depth`. */
 const indent = (depth: number): CSSProperties => ({ paddingLeft: 6 + depth * 14 })
@@ -369,11 +373,17 @@ function moduleMenu(e: MouseEvent, id: Id, hidden: boolean): void {
 function importedMenu(e: MouseEvent, dep: Dependency, m: ImportedModule): void {
   e.preventDefault()
   select({ kind: 'imported', id: m.id })
+  // Content goes with its top-level module.
+  const parent = importedParent(dep, m)
   openContextMenu(e, [
     { label: 'Show on the canvas', run: () => navigate({ kind: 'module', id: m.id }) },
     { label: `Open ${dep.file}`, run: () => openImportSource(dep.file) },
-    'separator',
-    { label: 'Remove from this project', danger: true, run: () => deleteItems([m.id]) }
+    ...(parent
+      ? []
+      : [
+          'separator' as const,
+          { label: 'Remove from this project', danger: true, run: () => deleteItems([m.id]) }
+        ])
   ])
 }
 
@@ -478,16 +488,18 @@ export function ExplorerPanel(): ReactNode {
       all ? list : list.filter((x) => match(name(x)))
     const read = dependencyModules.get(dep.id) ?? []
     const known = new Set(read.map((m) => m.path))
+    // A tree: each module followed by its content, placed with it.
+    const depth = (path: string): number => path.split('.').length - 1
     const moduleRows: ModuleRow[] = [
       ...read.map((m): ModuleRow => {
         const placed = dep.modules.find((x) => x.path === m.path)
         return placed
-          ? { kind: 'module', key: placed.id, dep, m: placed }
-          : { kind: 'unplaced', key: `${dep.id}:${m.id}`, dep, m }
+          ? { kind: 'module', key: placed.id, dep, m: placed, depth: depth(m.path) }
+          : { kind: 'unplaced', key: `${dep.id}:${m.id}`, dep, m, depth: depth(m.path) }
       }),
       ...dep.modules
         .filter((m) => !known.has(m.path))
-        .map((m): ModuleRow => ({ kind: 'module', key: m.id, dep, m }))
+        .map((m): ModuleRow => ({ kind: 'module', key: m.id, dep, m, depth: depth(m.path) }))
     ]
     const groups: { [G in DependencyGroup]: DependencyRow[] } = {
       constants: pick(
@@ -690,44 +702,53 @@ export function ExplorerPanel(): ReactNode {
             selected={isSelected(m.id)}
             className={isSelected(m.id) ? 'active' : ''}
             title={`${m.path}, placed on the canvas`}
-            style={indent(2)}
+            style={indent(2 + r.depth)}
             onClick={(ev) => clickItem(ev, m.id, dependencyIds)}
             onDoubleClick={() => navigate({ kind: 'module', id: m.id })}
             onContextMenu={(ev) => importedMenu(ev, dep, m)}
           >
             {leaf}
             <span className="kind-badge mod">M</span>
-            {m.path}
+            {leafName(m.path, r.depth)}
             <small>{m.ports.length ? `${m.ports.length}p` : ''}</small>
           </Item>
         )
       }
       case 'unplaced': {
         const { dep, m } = r
+        // Only top-level modules are placed, with their content.
+        const top = r.depth === 0
+        const root = m.path.split('.')[0]!
         return (
           <Item
             key={r.key}
             tabStop={stop}
             selected={false}
             className="unplaced"
-            title={`${m.path}, not placed on the canvas: double-click to place it`}
-            style={indent(2)}
+            title={
+              top
+                ? `${m.path}, not placed on the canvas: double-click to place it with its content`
+                : `${m.path}, placed with ${root}`
+            }
+            style={indent(2 + r.depth)}
             onClick={() => {
               revealInspector()
               showDependency(dep.id)
             }}
-            onDoubleClick={() => placeDependencyModuleOf(dep.id, m.path)}
+            onDoubleClick={top ? () => placeDependencyModuleOf(dep.id, m.path) : undefined}
             onContextMenu={(ev) => {
               ev.preventDefault()
               openContextMenu(ev, [
-                { label: 'Place on the canvas', run: () => placeDependencyModuleOf(dep.id, m.path) },
+                ...(top
+                  ? [{ label: 'Place on the canvas', run: () => placeDependencyModuleOf(dep.id, m.path) }]
+                  : []),
                 { label: `Open ${dep.file}`, run: () => openImportSource(dep.file) }
               ])
             }}
           >
             {leaf}
             <span className="kind-badge mod">M</span>
-            {m.path}
+            {leafName(m.path, r.depth)}
             <small>{m.ports ? `${m.ports}p` : ''}</small>
           </Item>
         )

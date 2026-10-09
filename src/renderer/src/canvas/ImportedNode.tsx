@@ -1,6 +1,6 @@
 import { memo, type ReactNode } from 'react'
 import { NodeResizer, type Node, type NodeProps } from '@xyflow/react'
-import { minSize } from '@/model/project'
+import { importedParent, importedSize, LAYOUT_PAD, minSize } from '@/model/project'
 import type { ImportedPort, LinkAnchor, Side } from '@/model/types'
 import { setModuleLayout, useProjectStore } from '@/store/project'
 import { Icon } from '@/components/Icon'
@@ -10,7 +10,7 @@ import { usePortLayout } from './usePortLayout'
 import { useDrawn } from './viewContext'
 
 /**
- * Module of another project: its ports floating (see portSides.ts) or on the orientation's default
+ * Module of another project, with its content (placed with it, in place): its ports floating (see portSides.ts) or on the orientation's default
  * edges, linkable; resizable.
  */
 export const ImportedNode = memo(function ImportedNode({
@@ -31,7 +31,17 @@ export const ImportedNode = memo(function ImportedNode({
   )
   if (!dep || !module) return null
   const vertical = orientation === 'vertical'
-  const min = minSize(module, orientation)
+  // Content of a placed module: drawn in it where its project puts it, not moved nor resized.
+  const parent = !data.outside && importedParent(dep, module)
+  const content = data.outside ? [] : dep.modules.filter((x) => importedParent(dep, x) === module)
+  const own = minSize(module, orientation)
+  const min = content.reduce((m, c) => {
+    const size = importedSize(c, orientation)
+    return {
+      width: Math.max(m.width, c.position.x + size.width + LAYOUT_PAD / 2),
+      height: Math.max(m.height, c.position.y + size.height + LAYOUT_PAD / 2)
+    }
+  }, own)
   const iface = (p: ImportedPort): string | undefined => p.interface ?? undefined
   const unknown = (p: ImportedPort): boolean =>
     !!p.interface && !interfaces.some((i) => i.name === p.interface)
@@ -63,11 +73,11 @@ export const ImportedNode = memo(function ImportedNode({
 
   return (
     <div
-      className={`module imported ${vertical ? 'vertical' : ''} ${data.outside ? 'outside' : ''} ${selected ? 'selected' : ''}`}
+      className={`module imported ${vertical ? 'vertical' : ''} ${content.length ? 'container' : ''} ${data.outside ? 'outside' : ''} ${selected ? 'selected' : ''}`}
       title={`${module.path} in ${dep.file}`}
     >
       <NodeResizer
-        isVisible={selected}
+        isVisible={selected && !parent}
         minWidth={min.width}
         minHeight={min.height}
         onResizeEnd={(_, r) => setModuleLayout(id, { x: r.x, y: r.y, width: r.width, height: r.height })}
@@ -75,14 +85,21 @@ export const ImportedNode = memo(function ImportedNode({
       {(top.length > 0 || (!floating && vertical)) && band(top, 'top')}
       <div className="module-header">
         <span className="module-name">
-          <small className="imported-project">
-            <Icon name="arrow-up-right" /> {dep.name}
-          </small>{' '}
-          {module.path}
+          {parent ? (
+            module.path.slice(parent.path.length + 1)
+          ) : (
+            <>
+              <small className="imported-project">
+                <Icon name="arrow-up-right" /> {dep.name}
+              </small>{' '}
+              {module.path}
+            </>
+          )}
         </span>
       </div>
       {rows > 0 && (
-        <div className="module-ports">
+        // A container's side ports are centered on its frame, over its content.
+        <div className={`module-ports ${content.length ? 'framed' : ''}`}>
           {Array.from({ length: rows }, (_, i) => {
             const pl = left[i]
             const pr = right[i]

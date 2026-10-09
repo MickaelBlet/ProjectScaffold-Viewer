@@ -2,7 +2,7 @@
 // to this file when the host can read it; IDL files also as edited in a tab or picked this session),
 // for the Explorer to list the ones not placed on the canvas.
 import { useEffect, useState } from 'react'
-import { modulePath } from '@/model/project'
+import { childModules, modulePath } from '@/model/project'
 import type { Dependency, Id, Project } from '@/model/types'
 import { useDocs } from '@/store/documents'
 import { useTextFiles } from '@/store/textFiles'
@@ -16,8 +16,18 @@ export interface DependencyModule {
   ports: number
 }
 
-const modulesOf = (p: Project): DependencyModule[] =>
-  p.modules.map((m) => ({ id: m.id, path: modulePath(p, m.id), ports: m.ports.length }))
+/** Modules of a project as a tree: each followed by its content, in project order. */
+function modulesOf(p: Project): DependencyModule[] {
+  const out: DependencyModule[] = []
+  const visit = (parentId: Id | null): void => {
+    for (const m of childModules(p, parentId)) {
+      out.push({ id: m.id, path: modulePath(p, m.id), ports: m.ports.length })
+      visit(m.id)
+    }
+  }
+  visit(null)
+  return out
+}
 
 /** Modules of each dependency by id; dependencies whose file cannot be read are left out. */
 export function useDependencyModules(dependencies: Dependency[]): Map<Id, DependencyModule[]> {

@@ -3,7 +3,7 @@ import { produce } from 'immer'
 import ELK from 'elkjs/lib/elk.bundled.js'
 import type { ElkExtendedEdge, ElkNode, ElkPort } from 'elkjs/lib/elk-api'
 import {
-  allImported,
+  importedRoots,
   boundsOf,
   childModules,
   contentBottom,
@@ -181,8 +181,8 @@ export async function computeArrangement(
     }
   }
 
-  // Imported modules sit at the top level, fixed size.
-  const imported = scopeId ? [] : allImported(p)
+  // Imported modules sit at the top level, fixed size, with their content.
+  const imported = scopeId ? [] : importedRoots(p)
   const importedNode = (m: ImportedModule): ElkNode => {
     const { width, height } = importedSize(m, o)
     return {

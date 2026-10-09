@@ -21,7 +21,15 @@ import {
 } from '@xyflow/react'
 import { useShallow } from 'zustand/react/shallow'
 import { toSvg } from 'html-to-image'
-import { findImported, findView, isImportedId, minSize, orderLinkEnds, subtreeIds } from '@/model/project'
+import {
+  findImported,
+  findView,
+  importedParent,
+  isImportedId,
+  minSize,
+  orderLinkEnds,
+  subtreeIds
+} from '@/model/project'
 import { NOTE_MIN, snapRect, snapValue } from '@/model/grid'
 import { hasOwnLayout, inView, outsideOf, shownModuleIds } from '@/model/viewLayout'
 import { ViewContext } from './viewContext'
@@ -634,7 +642,10 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
       ])
     }
     if (node.type === 'imported') {
-      const dep = findImported(getProject(), node.id)?.dep
+      const found = findImported(getProject(), node.id)
+      const dep = found?.dep
+      // Content of a placed module goes with it.
+      const content = !!found && !!importedParent(found.dep, found.module)
       return openContextMenu(e, [
         ...(dep
           ? [
@@ -643,8 +654,7 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
               { label: `Show dependency ${dep.name}`, run: () => showDependency(dep.id) }
             ]
           : []),
-        'separator',
-        item('edit.delete', 'Remove from this project')
+        ...(content ? [] : ['separator' as const, item('edit.delete', 'Remove from this project')])
       ])
     }
     const multiple = activeDoc().selectedIds.length > 1
