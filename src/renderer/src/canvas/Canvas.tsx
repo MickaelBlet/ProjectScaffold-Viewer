@@ -1,0 +1,907 @@
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import {
+  Background,
+  ConnectionMode,
+  Controls,
+  MiniMap,
+  Panel,
+  ReactFlow,
+  ViewportPortal,
+  getViewportForBounds,
+  useEdgesState,
+  useNodesState,
+  useReactFlow,
+  type Connection,
+  type Edge,
+  type Node,
+  type NodeChange,
+  type OnConnectEnd,
+  type OnNodeDrag,
+  type Viewport
+} from '@xyflow/react'
+import { useShallow } from 'zustand/react/shallow'
+import { toSvg } from 'html-to-image'
+import {
+  findImported,
+  findView,
+  importedParent,
+  isImportedId,
+  minSize,
+  orderLinkEnds,
+  subtreeIds
+} from '@/model/project'
+import { NOTE_MIN, snapRect, snapValue } from '@/model/grid'
+import { hasOwnLayout, inView, outsideOf, shownModuleIds } from '@/model/viewLayout'
+import { ViewContext } from './viewContext'
+import { assignBinary } from '@/model/binaries'
+import { GLOBAL_VIEW, type Id, type Project, type View } from '@/model/types'
+import {
+  connect,
+  deleteLink,
+  getProject,
+  reparentModule,
+  reverseLink,
+  setLayouts,
+  lineUpOutside,
+  setLinkRoute,
+  update,
+  updateNote,
+  useProjectStore
+} from '@/store/project'
+import { activeDoc, patchDoc, useDoc } from '@/store/documents'
+import { themeScheme, useSettings } from '@/store/settings'
+import { openContextMenu, select, setStatus, useUiStore, type MenuItem } from '@/store/ui'
+import {
+  addModuleAt,
+  addNoteAt,
+  importProjectContent,
+  keepView,
+  linkOtherProject,
+  navigate,
+  openImportSource,
+  openModuleView,
+  paste,
+  refreshDependencies,
+  showDependency,
+  selectionOf,
+  showAllInView
+} from '@/actions'
+import { commandItem as item, commands, keyLabel, runCommand } from '@/commands'
+import { Icon } from '@/components/Icon'
+import { fileName } from '@/fileOps'
+import { openView, registerCanvas, revealInspector } from '@/shell/controllers'
+import { endOf, linkEnds, toEdges, toNodes } from './flowGraph'
+import { INHERIT } from './inheritEdges'
+import { reuseUnchanged } from './reuseUnchanged'
+import { floatingPortSides } from './portSides'
+import { ModuleNode } from './ModuleNode'
+import { NoteNode } from './NoteNode'
+import { ImportedNode } from './ImportedNode'
+import { LinkEdge } from './LinkEdge'
+import { InheritEdge } from './InheritEdge'
+import { compactSvg, svgToPng } from './exportImage'
+
+const nodeTypes = { module: ModuleNode, note: NoteNode, imported: ImportedNode }
+const edgeTypes = { link: LinkEdge, inherit: InheritEdge }
+
+const GUIDE_PX = 6
+
+const NOTE_COLORS: [string, string | undefined][] = [
+  ['default', undefined],
+  ['yellow', '#f5d76e'],
+  ['green', '#7ed6a5'],
+  ['blue', '#7fb3f5'],
+  ['pink', '#f5a3c7'],
+  ['purple', '#b9a3f5'],
+  ['grey', '#b8bec9']
+]
+
+interface Guide {
+  /** Vertical line at x, or horizontal line at y (absolute flow coordinates). */
+  x?: number
+  y?: number
+}
+
+type Point = { x: number; y: number }
+
+/** Nodes inside the dragged frames, with their positions when the drag started. */
+interface FrameDrag {
+  /** Dragged node whose moves give the offset. */
+  id: string
+  from: Point
+  nodes: Map<string, Point>
+}
+
+type Box = Point & { width: number; height: number }
+
+const within = (r: Box, f: Box): boolean =>
+  r.x >= f.x && r.y >= f.y && r.x + r.width <= f.x + f.width && r.y + r.height <= f.y + f.height
+
+/** Nodes inside a dragged frame follow it. */
+function followFrame(changes: NodeChange<Node>[], drag: FrameDrag | null): void {
+  if (!drag) return
+  const c = changes.find(
+    (x): x is Extract<NodeChange<Node>, { type: 'position' }> =>
+      x.type === 'position' && x.id === drag.id && !!x.position
+  )
+  if (!c?.position) return
+  const dx = c.position.x - drag.from.x
+  const dy = c.position.y - drag.from.y
+  for (const [id, at] of drag.nodes)
+    changes.push({ id, type: 'position', position: { x: at.x + dx, y: at.y + dy } })
+}
+
+const sameIds = (a: Id[], b: Id[]): boolean => a.length === b.length && a.every((x, i) => x === b[i])
+
+function Breadcrumbs({ view }: { view: View }): ReactNode {
+  const project = useProjectStore((s) => s.project)
+  const chain: { id: Id; name: string }[] = []
+  let cur = project.modules.find((m) => m.id === view.rootModuleId)
+  while (cur) {
+    chain.unshift({ id: cur.id, name: cur.name })
+    const parentId = cur.parentId
+    cur = parentId ? project.modules.find((m) => m.id === parentId) : undefined
+  }
+  if (!chain.length && !view.hidden.length) return null
+  return (
+    <nav className="breadcrumbs">
+      {chain.length > 0 && (
+        <>
+          <button type="button" className="link-button" onClick={() => openView(GLOBAL_VIEW)}>
+            Project
+          </button>
+          {chain.map((c, i) => (
+            <span key={c.id}>
+              <span className="crumb-sep">›</span>
+              {i === chain.length - 1 ? (
+                <strong>{c.name}</strong>
+              ) : (
+                <button type="button" className="link-button" onClick={() => openModuleView(c.id)}>
+                  {c.name}
+                </button>
+              )}
+            </span>
+          ))}
+        </>
+      )}
+      {view.temporary && (
+        <button
+          type="button"
+          className="link-button keep-view"
+          title="Save this view in the project (double-click its tab)"
+          onClick={() => keepView(view.id)}
+        >
+          Keep view
+        </button>
+      )}
+      {view.hidden.length > 0 && (
+        <span className="hidden-chip">
+          {view.hidden.length} hidden ·{' '}
+          <button type="button" className="link-button" onClick={showAllInView}>
+            show all
+          </button>
+        </span>
+      )}
+    </nav>
+  )
+}
+
+export function Canvas({ viewId }: { viewId: Id }): ReactNode {
+  const project = useProjectStore((s) => s.project)
+  const selection = useDoc((d) => d.selection)
+  const selectedIds = useDoc((d) => d.selectedIds)
+  const viewEpoch = useDoc((d) => d.viewEpoch)
+  // Viewport of this view when last shown, read once.
+  const [savedViewport] = useState(() => activeDoc().viewports[viewId])
+  const settings = useSettings(
+    useShallow((s) => ({
+      autoOrientLinks: s.autoOrientLinks,
+      snapToGrid: s.snapToGrid,
+      gridSize: s.gridSize,
+      theme: s.theme,
+      minimap: s.minimap,
+      inheritance: s.inheritance,
+      selectToMove: s.selectToMove
+    }))
+  )
+  const flow = useReactFlow()
+  const { screenToFlowPosition, getInternalNode, fitView } = flow
+  const container = useRef<HTMLDivElement>(null)
+  const [guides, setGuides] = useState<Guide[]>([])
+
+  const view = useMemo(() => findView(project, viewId), [project, viewId])
+  // Modules at the view's own rects, with the modules outside a drill-down view.
+  const drawn = useMemo(() => inView(project, view), [project, view])
+  const shown = useMemo(() => shownModuleIds(drawn, view), [drawn, view])
+  const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds])
+  const selectedLink = selection?.kind === 'link' ? selection.id : null
+  const colors = useMemo(() => {
+    const m = new Map<Id, string>()
+    for (const x of [...project.modules, ...project.notes]) if (x.color) m.set(x.id, x.color)
+    return m
+  }, [project])
+
+  const [nodes, setNodes, onNodesChangeBase] = useNodesState<Node>([])
+  const frameDrag = useRef<FrameDrag | null>(null)
+  // Ports follow their links when link ends are auto-oriented.
+  const sides = useMemo(
+    () => (settings.autoOrientLinks ? floatingPortSides(drawn, shown) : null),
+    [drawn, shown, settings.autoOrientLinks]
+  )
+  const grid = settings.snapToGrid ? settings.gridSize : null
+  // Nodes and links are rebuilt on every edit; only those that changed get new objects (and render again).
+  const selectToMove = settings.selectToMove
+  useEffect(
+    () =>
+      setNodes((prev) => reuseUnchanged(prev, toNodes(drawn, view, selectedSet, sides, grid, selectToMove))),
+    [drawn, view, selectedSet, sides, grid, selectToMove, setNodes]
+  )
+  const [edges, setEdges] = useEdgesState<Edge>([])
+  useEffect(
+    () => setEdges((prev) => reuseUnchanged(prev, toEdges(drawn, shown, selectedLink, settings.inheritance))),
+    [drawn, shown, selectedLink, settings.inheritance, setEdges]
+  )
+
+  const absolute = useCallback(
+    (id: string) => getInternalNode(id)?.internals.positionAbsolute ?? { x: 0, y: 0 },
+    [getInternalNode]
+  )
+
+  /** Absolute rect of a node; `measured` is lost while nodes are rebuilt, the given size is not. */
+  const nodeRect = useCallback(
+    (id: string) => {
+      const n = getInternalNode(id)
+      return n
+        ? {
+            ...n.internals.positionAbsolute,
+            width: n.measured.width ?? n.width ?? 0,
+            height: n.measured.height ?? n.height ?? 0
+          }
+        : null
+    },
+    [getInternalNode]
+  )
+
+  /** Rect of a node, or of a link's path as drawn. */
+  const rectOf = useCallback(
+    (id: string) => {
+      const r = nodeRect(id)
+      if (r) return r
+      const path = container.current?.querySelector<SVGPathElement>(
+        `.react-flow__edge[data-id="${CSS.escape(id)}"] .react-flow__edge-path`
+      )
+      if (!path) return null
+      const { x, y, width, height } = path.getBBox()
+      return { x, y, width, height }
+    },
+    [nodeRect]
+  )
+
+  /** Center on `ids` at the zoom `pick` chooses from the one fitting them. */
+  const centerOn = useCallback(
+    (ids: Id[], pick: (fit: number) => number, duration: number) => {
+      const rects = ids.map(rectOf).filter((r) => !!r)
+      if (!rects.length) return
+      const x = Math.min(...rects.map((r) => r.x))
+      const y = Math.min(...rects.map((r) => r.y))
+      const width = Math.max(...rects.map((r) => r.x + r.width)) - x
+      const height = Math.max(...rects.map((r) => r.y + r.height)) - y
+      const box = container.current?.getBoundingClientRect()
+      const fit = box ? Math.min((box.width * 0.85) / width, (box.height * 0.85) / height) : Infinity
+      void flow.setCenter(x + width / 2, y + height / 2, { zoom: Math.max(pick(fit), 0.1), duration })
+    },
+    [flow, rectOf]
+  )
+
+  // Canvas controller for commands.
+  useEffect(
+    () =>
+      registerCanvas({
+        viewId,
+        fit: (ids) =>
+          ids?.length
+            ? centerOn(ids, (fit) => Math.min(fit, 1.5), 200)
+            : void fitView({ padding: 0.15, duration: 200, maxZoom: 1.5 }),
+        center: () => {
+          const r = container.current?.getBoundingClientRect()
+          return r ? screenToFlowPosition({ x: r.x + r.width / 2, y: r.y + r.height / 2 }) : { x: 80, y: 80 }
+        },
+        // Keep the zoom unless the target does not fit.
+        reveal: (ids) => centerOn(ids, (fit) => Math.min(Math.max(flow.getZoom(), 0.8), fit), 250),
+        zoomBy: (f) => void flow.zoomTo(flow.getZoom() * f, { duration: 150 }),
+        zoomTo: (z) => void flow.zoomTo(z, { duration: 150 }),
+        rect: rectOf,
+        exportImage: async (format) => {
+          const el = container.current?.querySelector<HTMLElement>('.react-flow__viewport')
+          if (!el) return
+          // The hook resolves the absolute position of nested modules.
+          const bounds = flow.getNodesBounds(flow.getNodes())
+          const width = Math.min(8000, Math.max(200, bounds.width + 80))
+          const height = Math.min(8000, Math.max(200, bounds.height + 80))
+          const vp = getViewportForBounds(bounds, width, height, 0.1, 2, 0.05)
+          const options = {
+            width,
+            height,
+            style: {
+              width: `${width}px`,
+              height: `${height}px`,
+              transform: `translate(${vp.x}px, ${vp.y}px) scale(${vp.zoom})`
+            }
+          }
+          const svg = compactSvg(await toSvg(el, options), el)
+          const url = format === 'png' ? await svgToPng(svg, width, height) : svg
+          const doc = activeDoc()
+          const base = doc.filePath
+            ? fileName(doc.filePath).replace(/\.[^.]+$/, '')
+            : getProject().name || 'diagram'
+          const saved = await window.api.saveExport(`${base}-${view.name}.${format}`, url)
+          if (saved) setStatus('info', `Exported ${saved}`)
+        }
+      }),
+    [viewId, view.name, flow, fitView, screenToFlowPosition, centerOn, rectOf]
+  )
+
+  useEffect(() => {
+    if (viewEpoch <= 1 && savedViewport) return
+    const t = setTimeout(() => void fitView({ padding: 0.15, duration: 200 }), 50)
+    return () => clearTimeout(t)
+  }, [viewEpoch, savedViewport, fitView])
+
+  const focusView = (): void => {
+    if (activeDoc().activeViewId !== viewId) patchDoc({ activeViewId: viewId })
+  }
+
+  /** User selection on the canvas (click, Ctrl+click, box): React Flow reports it as `select` changes. */
+  const applySelect = useCallback((changes: NodeChange<Node>[]): void => {
+    const selects = changes.filter(
+      (c): c is Extract<NodeChange<Node>, { type: 'select' }> => c.type === 'select'
+    )
+    if (!selects.length) return
+    const doc = activeDoc()
+    const p = getProject()
+    const onCanvas = (id: Id): boolean =>
+      p.modules.some((m) => m.id === id) || p.notes.some((n) => n.id === id) || !!findImported(p, id)
+    // Explorer items leave the selection when the canvas one changes.
+    const ids = new Set(doc.selectedIds.filter(onCanvas))
+    let added: Id | null = null
+    for (const c of selects) {
+      if (c.selected) {
+        ids.add(c.id)
+        added = c.id
+      } else ids.delete(c.id)
+    }
+    const list = [...ids]
+    if (sameIds(list, doc.selectedIds)) return
+    const current = doc.selection && 'id' in doc.selection ? doc.selection.id : null
+    const shown = added ?? (current && ids.has(current) ? current : list[0])
+    patchDoc({
+      selectedIds: list,
+      selection: shown ? selectionOf(p, shown) : doc.selection?.kind === 'link' ? doc.selection : null
+    })
+    if (added) revealInspector()
+  }, [])
+
+  /** Smallest size of a resizable node, as the view draws it. */
+  const minOf = useCallback(
+    (id: string) => {
+      const p = inView(getProject(), findView(getProject(), viewId))
+      const m = p.modules.find((m) => m.id === id) ?? findImported(p, id)?.module
+      return m ? minSize(m, p.orientation) : NOTE_MIN
+    },
+    [viewId]
+  )
+
+  /** Grid: every dragged node lands on it, a resized node keeps both edges on it. */
+  const snapToGrid = useCallback(
+    (changes: NodeChange<Node>[], grid: number): void => {
+      const originOf = (id: string): { x: number; y: number } => {
+        const parentId = flow.getNode(id)?.parentId
+        return parentId ? absolute(parentId) : { x: 0, y: 0 }
+      }
+      for (const c of [...changes]) {
+        if (c.type === 'position' && c.dragging && c.position) {
+          const o = originOf(c.id)
+          c.position = {
+            x: snapValue(o.x + c.position.x, grid) - o.x,
+            y: snapValue(o.y + c.position.y, grid) - o.y
+          }
+        }
+        if (c.type !== 'dimensions' || c.resizing === undefined || !c.dimensions) continue
+        const node = flow.getNode(c.id)
+        if (!node) continue
+        const move = changes.find(
+          (x): x is Extract<NodeChange<Node>, { type: 'position' }> =>
+            x.type === 'position' && x.id === c.id && !!x.position
+        )
+        const o = originOf(c.id)
+        const at = move?.position ?? node.position
+        // Resizing from the left (top) moves the node: the other edge stays.
+        const r = snapRect({ x: o.x + at.x, y: o.y + at.y, ...c.dimensions }, grid, minOf(c.id), {
+          right: at.x !== node.position.x,
+          bottom: at.y !== node.position.y
+        })
+        c.dimensions = { width: r.width, height: r.height }
+        const position = { x: r.x - o.x, y: r.y - o.y }
+        if (move) move.position = position
+        else if (c.resizing && (position.x !== node.position.x || position.y !== node.position.y))
+          changes.push({ id: c.id, type: 'position', position })
+      }
+    },
+    [flow, absolute, minOf]
+  )
+
+  // Alignment guides: snap a dragged node to its siblings' edges and centers.
+  const onNodesChange = useCallback(
+    (changes: NodeChange<Node>[]): void => {
+      applySelect(changes)
+      const { snapToGrid: onGrid, gridSize, guides: showGuides } = useSettings.getState()
+      const grid = onGrid ? gridSize : null
+      if (grid) snapToGrid(changes, grid)
+      const moving = changes.filter((c) => c.type === 'position' && c.dragging && c.position)
+      if (moving.length !== 1 || !showGuides) {
+        if (guides.length) setGuides([])
+        followFrame(changes, frameDrag.current)
+        return onNodesChangeBase(changes)
+      }
+      const change = moving[0] as Extract<NodeChange<Node>, { type: 'position' }>
+      const node = flow.getNode(change.id)
+      const pos = change.position!
+      const w = node?.measured?.width ?? node?.width ?? 0
+      const h = node?.measured?.height ?? node?.height ?? 0
+      const zoom = flow.getZoom()
+      const threshold = GUIDE_PX / zoom
+      const siblings = flow.getNodes().filter((n) => n.id !== change.id && n.parentId === node?.parentId)
+      const found: Guide[] = []
+      // On the grid, a guide only shows an alignment: it never pulls the node off the grid.
+      const offGrid = (delta: number): boolean =>
+        !!grid && Math.abs(delta / grid - Math.round(delta / grid)) > 1e-6
+      const snapAxis = (axis: 'x' | 'y', size: number): void => {
+        const mine = [pos[axis], pos[axis] + size / 2, pos[axis] + size]
+        let best: { delta: number; at: number } | null = null
+        for (const s of siblings) {
+          const ss =
+            axis === 'x' ? (s.measured?.width ?? s.width ?? 0) : (s.measured?.height ?? s.height ?? 0)
+          for (const theirs of [s.position[axis], s.position[axis] + ss / 2, s.position[axis] + ss])
+            for (const m of mine) {
+              const delta = theirs - m
+              if (offGrid(delta)) continue
+              if (Math.abs(delta) <= threshold && (!best || Math.abs(delta) < Math.abs(best.delta)))
+                best = { delta, at: theirs }
+            }
+        }
+        if (!best) return
+        pos[axis] += best.delta
+        const origin = node?.parentId ? absolute(node.parentId) : { x: 0, y: 0 }
+        found.push(axis === 'x' ? { x: best.at + origin.x } : { y: best.at + origin.y })
+      }
+      snapAxis('x', w)
+      snapAxis('y', h)
+      setGuides(found)
+      followFrame(changes, frameDrag.current)
+      onNodesChangeBase(changes)
+    },
+    [flow, guides.length, onNodesChangeBase, absolute, applySelect, snapToGrid]
+  )
+
+  const isValidConnection = useCallback((c: Connection | Edge): boolean => {
+    if (!c.sourceHandle || !c.targetHandle || c.source === c.target) return false
+    // A link to another project needs one end here.
+    if (isImportedId(c.source) && isImportedId(c.target)) return false
+    return !!linkEnds(getProject(), c)
+  }, [])
+
+  const onConnect = useCallback((c: Connection): void => {
+    const ends = linkEnds(getProject(), c)
+    if (!ends) return
+    const [from, to] = ends
+    const id = connect(from, to)
+    if (id) select({ kind: 'link', id })
+  }, [])
+
+  /** Deepest visible module under a flow point (excluding `exclude`'s subtree). */
+  const moduleAt = useCallback(
+    (point: { x: number; y: number }, exclude?: Set<Id>): Id | null => {
+      const p = getProject()
+      let best: { id: Id; depth: number } | null = null
+      for (const n of flow.getNodes()) {
+        if (n.type !== 'module' || exclude?.has(n.id)) continue
+        const a = absolute(n.id)
+        const w = n.measured?.width ?? 0
+        const h = n.measured?.height ?? 0
+        if (point.x < a.x || point.x > a.x + w || point.y < a.y || point.y > a.y + h) continue
+        let depth = 0
+        for (let m = p.modules.find((m) => m.id === n.id); m?.parentId; depth++) {
+          const parentId: Id = m.parentId
+          m = p.modules.find((x) => x.id === parentId)
+        }
+        if (!best || depth > best.depth) best = { id: n.id, depth }
+      }
+      return best?.id ?? null
+    },
+    [flow, absolute]
+  )
+
+  // Dropped on a module rather than a port: link to a new port there.
+  const onConnectEnd: OnConnectEnd = useCallback(
+    (e, state) => {
+      const origin = state.fromHandle
+      if (state.isValid || !origin?.id) return
+      const { clientX, clientY } = 'changedTouches' in e ? e.changedTouches[0]! : e
+      const target = moduleAt(flow.screenToFlowPosition({ x: clientX, y: clientY }))
+      if (!target || target === origin.nodeId) return
+      const ends = orderLinkEnds(getProject(), endOf(getProject(), origin.nodeId, origin.id), {
+        moduleId: target,
+        portId: null,
+        role: null
+      })
+      if (!ends) return
+      const id = connect(ends[0], ends[1])
+      if (id) select({ kind: 'link', id })
+    },
+    [flow, moduleAt]
+  )
+
+  // A dragged frame carries the top-level nodes lying fully inside it.
+  const onNodeDragStart: OnNodeDrag = useCallback(
+    (_, node, dragged) => {
+      frameDrag.current = null
+      const p = getProject()
+      const notes = p.notes
+      const frames = dragged
+        .filter((n) => notes.find((x) => x.id === n.id)?.kind === 'frame')
+        .map((n) => nodeRect(n.id))
+        .filter((r) => !!r)
+      if (!frames.length) return
+      const moving = new Set(dragged.map((n) => n.id))
+      const nodes = new Map<string, Point>()
+      for (const n of flow.getNodes()) {
+        // Unselected nodes are not draggable with `selectToMove`, yet still carried: only locked ones stay.
+        const locked = [...p.modules, ...notes].find((x) => x.id === n.id)?.locked
+        if (moving.has(n.id) || n.parentId || locked) continue
+        const r = nodeRect(n.id)
+        if (r && frames.some((f) => within(r, f))) nodes.set(n.id, { ...n.position })
+      }
+      if (nodes.size) frameDrag.current = { id: node.id, from: { ...node.position }, nodes }
+    },
+    [flow, nodeRect]
+  )
+
+  const onNodeDragStop: OnNodeDrag = useCallback(
+    (_, node, dragged) => {
+      setGuides([])
+      const p = getProject()
+      const carried = [...(frameDrag.current?.nodes.keys() ?? [])].flatMap((id) => flow.getNode(id) ?? [])
+      frameDrag.current = null
+      // The root of a drill-down view and the modules outside it are moved in it, never into
+      // another module.
+      const outside = outsideOf(drawn)
+      if (
+        dragged.length > 1 ||
+        node.type === 'note' ||
+        node.type === 'imported' ||
+        outside.has(node.id) ||
+        node.id === view.rootModuleId
+      ) {
+        // Several items: move them, keeping their parents.
+        setLayouts(
+          new Map(
+            [...dragged, ...carried].map((n) => [
+              n.id,
+              { x: Math.round(n.position.x), y: Math.round(n.position.y) }
+            ])
+          )
+        )
+        return
+      }
+      const abs = absolute(node.id)
+      const w = node.measured?.width ?? node.width ?? 0
+      const h = node.measured?.height ?? node.height ?? 0
+      const center = { x: abs.x + w / 2, y: abs.y + h / 2 }
+      // Deepest module under the dragged module's center becomes its parent.
+      const own = new Set([...subtreeIds(p, node.id), ...outside])
+      const target = moduleAt(center, own) ?? view.rootModuleId
+      const parent =
+        node.parentId ??
+        (node.id === view.rootModuleId ? p.modules.find((m) => m.id === node.id)?.parentId : null) ??
+        null
+      if (target !== parent) {
+        const base = target ? absolute(target) : { x: 0, y: 0 }
+        reparentModule(node.id, target, Math.round(abs.x - base.x), Math.round(abs.y - base.y))
+      } else {
+        setLayouts(new Map([[node.id, { x: Math.round(node.position.x), y: Math.round(node.position.y) }]]))
+      }
+    },
+    [flow, absolute, moduleAt, view.rootModuleId, drawn]
+  )
+
+  const onMoveEnd = useCallback(
+    (_: unknown, vp: Viewport): void => patchDoc((d) => ({ viewports: { ...d.viewports, [viewId]: vp } })),
+    [viewId]
+  )
+
+  const nodeMenu = (e: React.MouseEvent, node: Node): void => {
+    e.preventDefault()
+    if (!activeDoc().selectedIds.includes(node.id)) select(selectionOf(getProject(), node.id))
+    // A module outside a drill-down view: layout only, its structure is edited in its own view.
+    if (outsideOf(drawn).has(node.id)) {
+      const id = node.id
+      return openContextMenu(e, [
+        {
+          label: 'Show in project view',
+          run: () => (openView(GLOBAL_VIEW), navigate({ kind: 'module', id }))
+        },
+        ...(node.type === 'module' ? [item('view.openModule')] : []),
+        ...(view.standIns?.[id]
+          ? [{ label: 'Line up along the view', run: () => lineUpOutside(viewId, [id]) }]
+          : []),
+        ...(activeDoc().selectedIds.length > 1
+          ? ['separator' as const, item('arrange.left'), item('arrange.top')]
+          : []),
+        'separator',
+        item('arrange.lock', 'Locked')
+      ])
+    }
+    if (node.type === 'imported') {
+      const found = findImported(getProject(), node.id)
+      const dep = found?.dep
+      // Content of a placed module goes with it.
+      const content = !!found && !!importedParent(found.dep, found.module)
+      return openContextMenu(e, [
+        ...(dep
+          ? [
+              { label: 'Refresh from its project', run: () => void refreshDependencies([dep.id]) },
+              { label: `Open ${dep.file}`, run: () => openImportSource(dep.file) },
+              { label: `Show dependency ${dep.name}`, run: () => showDependency(dep.id) }
+            ]
+          : []),
+        ...(content ? [] : ['separator' as const, item('edit.delete', 'Remove from this project')])
+      ])
+    }
+    const multiple = activeDoc().selectedIds.length > 1
+    const at = screenToFlowPosition({ x: e.clientX, y: e.clientY })
+    const project = getProject()
+    const topLevel = activeDoc().selectedIds.filter((id) =>
+      project.modules.some((m) => m.id === id && !m.parentId)
+    )
+    const current = new Set(topLevel.map((id) => project.modules.find((m) => m.id === id)!.binaryId ?? ''))
+    const binaryMenu: MenuItem[] =
+      project.binaries.length && topLevel.length
+        ? [
+            {
+              label: 'Binary',
+              submenu: [
+                ...[...project.binaries, { id: '', name: 'None' }].map((b) => ({
+                  label: b.name,
+                  checked: current.size === 1 && current.has(b.id),
+                  run: () => update((d) => assignBinary(d, topLevel, b.id || null))
+                }))
+              ]
+            }
+          ]
+        : []
+    if (node.type === 'note') {
+      return openContextMenu(e, [
+        item('edit.cut'),
+        item('edit.copy'),
+        item('edit.duplicate'),
+        item('arrange.lock', 'Locked'),
+        'separator',
+        ...NOTE_COLORS.map(([label, color]) => ({
+          label: `Color: ${label}`,
+          run: () => updateNote(node.id, (n) => (color ? void (n.color = color) : void delete n.color))
+        })),
+        'separator',
+        item('edit.delete')
+      ])
+    }
+    openContextMenu(e, [
+      ...(multiple
+        ? [
+            item('arrange.group'),
+            item('arrange.left'),
+            item('arrange.top'),
+            item('arrange.distH'),
+            item('arrange.distV')
+          ]
+        : [item('edit.rename'), item('insert.inPort'), item('insert.outPort'), item('insert.submodule')]),
+      ...binaryMenu,
+      'separator',
+      item('view.openModule'),
+      item('view.openModuleSplit'),
+      item('arrange.horizontal', 'Arrange content horizontally'),
+      item('arrange.vertical', 'Arrange content vertically'),
+      item('view.hide'),
+      item('arrange.lock', 'Locked'),
+      'separator',
+      item('edit.cut'),
+      item('edit.copy'),
+      { label: 'Paste into', run: () => void paste(undefined, { at, parent: node.id }) },
+      { label: 'Import projects or IDL files into…', run: () => importProjectContent(node.id) },
+      item('edit.duplicate'),
+      'separator',
+      item('edit.delete')
+    ])
+  }
+
+  const edgeMenu = (e: React.MouseEvent, edge: Edge): void => {
+    e.preventDefault()
+    if (edge.id.startsWith(INHERIT)) {
+      select({ kind: 'module', id: edge.source })
+      openContextMenu(e, [
+        { label: 'Go to base', run: () => navigate({ kind: 'module', id: edge.target }) },
+        {
+          label: 'Remove base',
+          run: () =>
+            update((d) => {
+              const m = d.modules.find((m) => m.id === edge.source)
+              if (!m?.bases) return
+              m.bases = m.bases.filter((b) => b !== edge.target)
+              if (!m.bases.length) delete m.bases
+            })
+        }
+      ])
+      return
+    }
+    select({ kind: 'link', id: edge.id })
+    const toggle = (fn: (l: Project['links'][number]) => void) => () =>
+      update((d) => {
+        const l = d.links.find((l) => l.id === edge.id)
+        if (l) fn(l)
+      })
+    openContextMenu(e, [
+      { label: 'Reverse direction', run: () => reverseLink(edge.id) },
+      {
+        label: 'Bidirectional',
+        checked: getProject().links.find((l) => l.id === edge.id)?.constraints.direction === 'bidirectional',
+        run: toggle(
+          (l) =>
+            void (l.constraints.direction =
+              l.constraints.direction === 'bidirectional' ? 'unidirectional' : 'bidirectional')
+        )
+      },
+      {
+        label: 'Acknowledged',
+        checked: getProject().links.find((l) => l.id === edge.id)?.constraints.ack.required,
+        run: toggle((l) => void (l.constraints.ack.required = !l.constraints.ack.required))
+      },
+      ...(drawn.links.find((l) => l.id === edge.id)?.route
+        ? [{ label: 'Reset shape', run: () => setLinkRoute(edge.id, undefined) }]
+        : []),
+      'separator',
+      { label: 'Delete link', danger: true, keys: 'Delete', run: () => (deleteLink(edge.id), select(null)) }
+    ])
+  }
+
+  const paneMenu = (e: React.MouseEvent | MouseEvent): void => {
+    e.preventDefault()
+    const at = screenToFlowPosition({ x: e.clientX, y: e.clientY })
+    const parent = moduleAt(at) ?? view.rootModuleId
+    openContextMenu(e, [
+      { label: 'Add module here', run: () => void addModuleAt(at, parent) },
+      { label: 'Add note here', run: () => addNoteAt('note', at) },
+      { label: 'Add frame here', run: () => addNoteAt('frame', at) },
+      'separator',
+      { label: 'Link to another project…', run: () => linkOtherProject(at) },
+      { label: 'Import projects or IDL files here…', run: () => importProjectContent(parent, at) },
+      'separator',
+      { label: 'Paste here', keys: keyLabel('Ctrl+V'), run: () => void paste(undefined, { at, parent }) },
+      'separator',
+      item('arrange.horizontal', view.rootModuleId ? 'Arrange view horizontally' : 'Arrange horizontally'),
+      item('arrange.vertical', view.rootModuleId ? 'Arrange view vertically' : 'Arrange vertically'),
+      item('view.fitAll'),
+      item('edit.selectAll'),
+      ...(view.hidden.length ? [item('view.showAll')] : []),
+      ...(hasOwnLayout(view) ? [item('view.resetLayout')] : []),
+      'separator',
+      item('file.exportPng'),
+      item('file.exportSvg')
+    ])
+  }
+
+  const selectionMenu = (e: React.MouseEvent): void => {
+    e.preventDefault()
+    openContextMenu(e, [
+      item('arrange.group'),
+      item('arrange.left'),
+      item('arrange.hcenter'),
+      item('arrange.right'),
+      item('arrange.top'),
+      item('arrange.vcenter'),
+      item('arrange.bottom'),
+      item('arrange.distH'),
+      item('arrange.distV'),
+      item('arrange.sameSize'),
+      item('arrange.lock', 'Locked'),
+      'separator',
+      item('edit.cut'),
+      item('edit.copy'),
+      item('edit.duplicate'),
+      item('view.hide'),
+      'separator',
+      item('edit.delete')
+    ])
+  }
+
+  return (
+    <div className="canvas" ref={container} onPointerDownCapture={focusView}>
+      <Breadcrumbs view={view} />
+      <ViewContext.Provider value={viewId}>
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
+          onNodesChange={onNodesChange}
+          onNodeDragStart={onNodeDragStart}
+          onNodeDragStop={onNodeDragStop}
+          onNodeClick={(e, n) => {
+            revealInspector()
+            if (e.shiftKey || e.ctrlKey || e.metaKey) return
+            // A click on an already selected node keeps the group but shows that node.
+            const doc = activeDoc()
+            if (!doc.selection || !('id' in doc.selection) || doc.selection.id !== n.id)
+              patchDoc({ selection: selectionOf(getProject(), n.id) })
+          }}
+          onNodeDoubleClick={(_, n) => {
+            const dep = n.type === 'imported' ? findImported(getProject(), n.id)?.dep : undefined
+            if (dep) openImportSource(dep.file)
+          }}
+          onEdgeClick={(_, e) => {
+            select(e.type === 'inherit' ? { kind: 'module', id: e.source } : { kind: 'link', id: e.id })
+            revealInspector()
+          }}
+          onPaneClick={() => select(null)}
+          onNodeContextMenu={nodeMenu}
+          onEdgeContextMenu={edgeMenu}
+          onPaneContextMenu={paneMenu}
+          onSelectionContextMenu={selectionMenu}
+          onConnect={onConnect}
+          onConnectEnd={onConnectEnd}
+          isValidConnection={isValidConnection}
+          // Links go either way between ports (see linkEnds), into a container from its in ports.
+          connectionMode={ConnectionMode.Loose}
+          onMove={(_, vp) => useUiStore.setState({ zoom: vp.zoom })}
+          onMoveEnd={onMoveEnd}
+          deleteKeyCode={null}
+          selectionKeyCode="Shift"
+          multiSelectionKeyCode={['Control', 'Meta']}
+          // Fixed stacking (see Z), even when selected; link badges (1001) stay above everything.
+          zIndexMode="manual"
+          snapToGrid={settings.snapToGrid}
+          snapGrid={[settings.gridSize, settings.gridSize]}
+          colorMode={themeScheme(settings.theme)}
+          minZoom={0.1}
+          defaultViewport={savedViewport}
+          fitView={!savedViewport}
+          proOptions={{ hideAttribution: true }}
+        >
+          <Background gap={settings.gridSize} />
+          <Controls />
+          {/* Not in the VS Code preview: the text editor is beside it. */}
+          {viewId === GLOBAL_VIEW && commands.some((c) => c.id === 'view.source') && (
+            <Panel position="top-right">
+              <button
+                type="button"
+                className="canvas-source"
+                title={`Edit as text (YAML) (${keyLabel('Alt+U')})`}
+                onClick={() => runCommand('view.source')}
+              >
+                <Icon name="code" /> YAML
+              </button>
+            </Panel>
+          )}
+          {settings.minimap && <MiniMap pannable zoomable nodeColor={(n) => colors.get(n.id) ?? ''} />}
+          <ViewportPortal>
+            {guides.map((g, i) =>
+              g.x !== undefined ? (
+                <div key={i} className="guide v" style={{ transform: `translate(${g.x}px, -100000px)` }} />
+              ) : (
+                <div key={i} className="guide h" style={{ transform: `translate(-100000px, ${g.y}px)` }} />
+              )
+            )}
+          </ViewportPortal>
+        </ReactFlow>
+      </ViewContext.Provider>
+    </div>
+  )
+}

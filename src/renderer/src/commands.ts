@@ -1,0 +1,902 @@
+// Command registry: toolbar menus, context menus, the command palette and keyboard shortcuts
+// all run the same commands.
+import {
+  activeViewHasLayouts,
+  activeViewTemporary,
+  addModuleAt,
+  addNoteAt,
+  addPortToSelection,
+  addSubmoduleToSelection,
+  alignSelection,
+  arrangeLayout,
+  copySelection,
+  cutSelection,
+  deleteSelection,
+  distributeSelection,
+  duplicateSelection,
+  hasCanvasSelection,
+  exportImage,
+  groupSelection,
+  hideSelection,
+  importProjectContent,
+  keepView,
+  linkOtherProject,
+  newView,
+  nudgeSelection,
+  openModuleView,
+  paste,
+  refreshDependencies,
+  pickDependency,
+  resetViewLayout,
+  sameSizeSelection,
+  selectAll,
+  selectedIds,
+  selectionLocked,
+  showAllInView,
+  startRename,
+  toggleLockSelection,
+  travelSelection
+} from './actions'
+import {
+  closeDocument,
+  newProject,
+  openProject,
+  saveAll,
+  saveProject,
+  saveWorkspace,
+  importSettings,
+  exportSettings,
+  switchPreviewLayout
+} from './fileOps'
+import { chooseTemplates, generateCode } from './generateCode'
+import { focusedEditorHistory, setPassedKeys } from './components/CodeEditor'
+import { openIdlText, saveActiveTextFile } from './textFileOps'
+import { activeDoc, cycleDoc, patchDoc, useDocs, activateDoc } from './store/documents'
+import { getProject, redo, undo } from './store/project'
+import { setSetting, useSettings } from './store/settings'
+import { clearOutput } from './store/output'
+import { useUiStore, type ActionItem } from './store/ui'
+import {
+  activeCanvas,
+  openSource,
+  openView,
+  resetLayout,
+  showTool,
+  toggleTool,
+  type ToolId
+} from './shell/controllers'
+import { GLOBAL_VIEW } from './model/types'
+import { FULL_LAYOUT, IN_PREVIEW, IN_VSCODE } from './host'
+
+export type Category = 'File' | 'Edit' | 'Insert' | 'View' | 'Arrange' | 'Window' | 'Help'
+
+export interface Command {
+  id: string
+  title: string
+  category: Category
+  /** Shortcuts, e.g. `Ctrl+Shift+S`, `Alt+1`, `Delete`. Ctrl also matches Cmd. */
+  keys?: string[]
+  /** Also runs while typing in a text field. */
+  global?: boolean
+  /** Not listed in menus / palette (shortcut only). */
+  hidden?: boolean
+  enabled?: () => boolean
+  checked?: () => boolean
+  run: () => void
+}
+
+export function isEditable(el: Element | null): boolean {
+  return (
+    !!el &&
+    (el.tagName === 'INPUT' ||
+      el.tagName === 'TEXTAREA' ||
+      el.tagName === 'SELECT' ||
+      (el as HTMLElement).isContentEditable)
+  )
+}
+
+const hasSelection = (): boolean => selectedIds().length > 0
+const multi = (n: number) => (): boolean => selectedIds().length >= n
+const moduleSelected = (): boolean => activeDoc().selection?.kind === 'module'
+/** Arrow keys move by a grid cell (five when far) on the grid, else by 2px (20px). */
+function nudgeStep(far: boolean): number {
+  const { snapToGrid, gridSize } = useSettings.getState()
+  return snapToGrid ? gridSize * (far ? 5 : 1) : far ? 20 : 2
+}
+
+type Toggle = 'snapToGrid' | 'guides' | 'editorWordWrap'
+const setting =
+  <K extends Toggle>(key: K) =>
+  (): boolean =>
+    useSettings.getState()[key]
+const toggle = (key: Toggle) => (): void => setSetting(key, !useSettings.getState()[key])
+const tool = (id: ToolId) => (): void => showTool(id)
+
+const docCommands: Command[] = Array.from({ length: 9 }, (_, i) => ({
+  id: `doc.${i + 1}`,
+  title: `Go to document ${i + 1}`,
+  category: 'Window' as const,
+  keys: [`Alt+${i + 1}`],
+  global: true,
+  hidden: true,
+  run: () => {
+    const doc = useDocs.getState().docs[i]
+    if (doc) activateDoc(doc.id)
+  }
+}))
+
+/** Clears everything the page stores in the browser, then reloads it. */
+async function resetAppData(): Promise<void> {
+  const message =
+    'Reset all data stored in this browser (settings, panel layout, recent files, open documents) and reload? Unsaved changes are lost.'
+  if (!window.confirm(message)) return
+  await window.api.clearStorage?.()
+  location.reload()
+}
+
+const allCommands: Command[] = [
+  // File
+  { id: 'file.new', title: 'New project', category: 'File', keys: ['Alt+N'], global: true, run: newProject },
+  {
+    id: 'file.open',
+    title: 'Open…',
+    category: 'File',
+    keys: ['Ctrl+O'],
+    global: true,
+    run: () => void openProject()
+  },
+  {
+    id: 'file.save',
+    title: 'Save',
+    category: 'File',
+    keys: ['Ctrl+S'],
+    global: true,
+    // The text file of the active tab (template, generated file...), else the project.
+    run: () => void (saveActiveTextFile() || saveProject())
+  },
+  {
+    id: 'file.saveAs',
+    title: 'Save as…',
+    category: 'File',
+    keys: ['Ctrl+Shift+S'],
+    global: true,
+    run: () => void saveProject(true)
+  },
+  {
+    id: 'file.saveAll',
+    title: 'Save all',
+    category: 'File',
+    keys: ['Ctrl+Alt+S'],
+    global: true,
+    run: () => void saveAll()
+  },
+  {
+    id: 'file.saveWorkspace',
+    title: 'Save workspace',
+    category: 'File',
+    run: () => void saveWorkspace()
+  },
+  {
+    id: 'file.saveWorkspaceAs',
+    title: 'Save workspace as…',
+    category: 'File',
+    run: () => void saveWorkspace(true)
+  },
+  {
+    id: 'file.importSettings',
+    title: 'Import settings…',
+    category: 'File',
+    run: () => void importSettings()
+  },
+  {
+    id: 'file.exportSettings',
+    title: 'Export settings…',
+    category: 'File',
+    run: () => void exportSettings()
+  },
+  {
+    id: 'file.close',
+    title: 'Close document',
+    category: 'File',
+    keys: ['Alt+W'],
+    global: true,
+    run: () => closeDocument()
+  },
+  {
+    id: 'file.exportPng',
+    title: 'Export diagram as PNG',
+    category: 'File',
+    run: () => void exportImage('png')
+  },
+  {
+    id: 'file.exportSvg',
+    title: 'Export diagram as SVG',
+    category: 'File',
+    run: () => void exportImage('svg')
+  },
+  {
+    id: 'file.generate',
+    title: 'Generate code',
+    category: 'File',
+    keys: ['Ctrl+Alt+G'],
+    global: true,
+    run: () => void generateCode(false)
+  },
+  {
+    id: 'file.generateInto',
+    title: 'Generate code into…',
+    category: 'File',
+    run: () => void generateCode(true)
+  },
+  {
+    id: 'file.openIdlText',
+    title: 'Open IDL file as text…',
+    category: 'File',
+    run: () => void openIdlText()
+  },
+  {
+    id: 'file.codeTemplates',
+    title: 'Code templates…',
+    category: 'File',
+    run: () => void chooseTemplates()
+  },
+
+  // Edit
+  {
+    id: 'edit.undo',
+    title: 'Undo',
+    category: 'Edit',
+    keys: ['Ctrl+Z'],
+    global: true,
+    // Inside a text field, undo the typing instead of the model.
+    run: () =>
+      focusedEditorHistory('undo') ||
+      (isEditable(document.activeElement) ? document.execCommand('undo') : undo())
+  },
+  {
+    id: 'edit.redo',
+    title: 'Redo',
+    category: 'Edit',
+    keys: ['Ctrl+Y', 'Ctrl+Shift+Z'],
+    global: true,
+    run: () =>
+      focusedEditorHistory('redo') ||
+      (isEditable(document.activeElement) ? document.execCommand('redo') : redo())
+  },
+  // Ctrl+X / C / V go through the clipboard events (see installClipboard); listed for menus.
+  {
+    id: 'edit.cut',
+    title: 'Cut',
+    category: 'Edit',
+    keys: ['Ctrl+X'],
+    enabled: hasSelection,
+    run: () => void cutSelection()
+  },
+  {
+    id: 'edit.copy',
+    title: 'Copy',
+    category: 'Edit',
+    keys: ['Ctrl+C'],
+    enabled: hasSelection,
+    run: () => void copySelection()
+  },
+  { id: 'edit.paste', title: 'Paste', category: 'Edit', keys: ['Ctrl+V'], run: () => void paste() },
+  {
+    id: 'edit.duplicate',
+    title: 'Duplicate',
+    category: 'Edit',
+    keys: ['Ctrl+D'],
+    enabled: hasSelection,
+    run: duplicateSelection
+  },
+  {
+    id: 'edit.delete',
+    title: 'Delete',
+    category: 'Edit',
+    keys: ['Delete', 'Backspace'],
+    enabled: () => hasSelection() || activeDoc().selection?.kind === 'link',
+    run: deleteSelection
+  },
+  { id: 'edit.selectAll', title: 'Select all', category: 'Edit', keys: ['Ctrl+A'], run: selectAll },
+  {
+    id: 'edit.deselect',
+    title: 'Clear selection',
+    category: 'Edit',
+    keys: ['Escape'],
+    hidden: true,
+    run: () => patchDoc({ selectedIds: [], selection: null })
+  },
+  {
+    id: 'edit.rename',
+    title: 'Rename module',
+    category: 'Edit',
+    keys: ['F2'],
+    enabled: moduleSelected,
+    run: startRename
+  },
+  ...(
+    [
+      ['Up', 0, -1],
+      ['Down', 0, 1],
+      ['Left', -1, 0],
+      ['Right', 1, 0]
+    ] as const
+  ).flatMap(([dir, dx, dy]) => [
+    {
+      id: `edit.nudge${dir}`,
+      title: `Move selection ${dir.toLowerCase()}`,
+      category: 'Edit' as const,
+      keys: [`Arrow${dir}`],
+      hidden: true,
+      run: () => nudgeSelection(dx * nudgeStep(false), dy * nudgeStep(false))
+    },
+    {
+      id: `edit.nudge${dir}Far`,
+      title: `Move selection ${dir.toLowerCase()} (far)`,
+      category: 'Edit' as const,
+      keys: [`Shift+Arrow${dir}`],
+      hidden: true,
+      run: () => nudgeSelection(dx * nudgeStep(true), dy * nudgeStep(true))
+    }
+  ]),
+
+  // Insert
+  {
+    id: 'insert.module',
+    title: 'Add module',
+    category: 'Insert',
+    keys: ['Ctrl+M'],
+    global: true,
+    run: () => void addModuleAt()
+  },
+  {
+    id: 'insert.submodule',
+    title: 'Add submodule',
+    category: 'Insert',
+    keys: ['Alt+M'],
+    enabled: moduleSelected,
+    run: addSubmoduleToSelection
+  },
+  {
+    id: 'insert.inPort',
+    title: 'Add in port',
+    category: 'Insert',
+    keys: ['Alt+I'],
+    enabled: moduleSelected,
+    run: () => addPortToSelection('in')
+  },
+  {
+    id: 'insert.outPort',
+    title: 'Add out port',
+    category: 'Insert',
+    keys: ['Alt+O'],
+    enabled: moduleSelected,
+    run: () => addPortToSelection('out')
+  },
+  { id: 'insert.note', title: 'Add note', category: 'Insert', run: () => addNoteAt('note') },
+  { id: 'insert.frame', title: 'Add frame', category: 'Insert', run: () => addNoteAt('frame') },
+  {
+    id: 'insert.imported',
+    title: 'Link to another project…',
+    category: 'Insert',
+    run: () => linkOtherProject()
+  },
+  {
+    id: 'insert.projectContent',
+    title: 'Import projects or IDL files…',
+    category: 'Insert',
+    run: () => importProjectContent()
+  },
+  {
+    id: 'insert.dependency',
+    title: 'Add dependency…',
+    category: 'Insert',
+    run: () => pickDependency()
+  },
+  {
+    id: 'insert.refreshDependencies',
+    title: 'Refresh dependencies',
+    category: 'Insert',
+    enabled: () => getProject().dependencies.length > 0,
+    run: () => void refreshDependencies()
+  },
+
+  // View
+  {
+    id: 'view.palette',
+    title: 'Command palette…',
+    category: 'View',
+    keys: ['Ctrl+Shift+P', 'F1'],
+    global: true,
+    run: () => useUiStore.setState({ palette: { query: '>' } })
+  },
+  {
+    id: 'view.goto',
+    title: 'Go to…',
+    category: 'View',
+    keys: ['Ctrl+P'],
+    global: true,
+    run: () => useUiStore.setState({ palette: { query: '' } })
+  },
+  {
+    id: 'view.back',
+    title: 'Previous selection',
+    category: 'View',
+    keys: ['Alt+ArrowLeft'],
+    run: () => travelSelection(-1)
+  },
+  {
+    id: 'view.forward',
+    title: 'Next selection',
+    category: 'View',
+    keys: ['Alt+ArrowRight'],
+    run: () => travelSelection(1)
+  },
+  {
+    id: 'view.fit',
+    title: 'Fit selection',
+    category: 'View',
+    keys: ['F'],
+    run: () => activeCanvas()?.fit(selectedIds())
+  },
+  {
+    id: 'view.fitAll',
+    title: 'Fit all',
+    category: 'View',
+    keys: ['Shift+F'],
+    run: () => activeCanvas()?.fit()
+  },
+  {
+    id: 'view.zoomIn',
+    title: 'Zoom in',
+    category: 'View',
+    keys: ['+', '='],
+    run: () => activeCanvas()?.zoomBy(1.25)
+  },
+  {
+    id: 'view.zoomOut',
+    title: 'Zoom out',
+    category: 'View',
+    keys: ['-'],
+    run: () => activeCanvas()?.zoomBy(0.8)
+  },
+  {
+    id: 'view.zoomReset',
+    title: 'Zoom 100%',
+    category: 'View',
+    keys: ['Ctrl+0'],
+    run: () => activeCanvas()?.zoomTo(1)
+  },
+  {
+    id: 'view.global',
+    title: 'Open project view',
+    category: 'View',
+    keys: ['Alt+G'],
+    run: () => openView(GLOBAL_VIEW)
+  },
+  {
+    id: 'view.openModule',
+    title: 'Open module in its own view',
+    category: 'View',
+    keys: ['Alt+Enter'],
+    enabled: moduleSelected,
+    run: () => openModuleView()
+  },
+  {
+    id: 'view.openModuleSplit',
+    title: 'Open module view to the side',
+    category: 'View',
+    enabled: moduleSelected,
+    run: () => openModuleView(undefined, true)
+  },
+  {
+    id: 'view.keep',
+    title: 'Keep view',
+    category: 'View',
+    enabled: activeViewTemporary,
+    run: () => void keepView()
+  },
+  { id: 'view.new', title: 'New view', category: 'View', run: newView },
+  {
+    id: 'view.source',
+    title: 'Edit as text (YAML)',
+    category: 'View',
+    keys: ['Alt+U'],
+    run: () => openSource()
+  },
+  {
+    id: 'view.hide',
+    title: 'Hide selection in view',
+    category: 'View',
+    keys: ['H'],
+    enabled: hasSelection,
+    run: hideSelection
+  },
+  {
+    id: 'view.resetLayout',
+    title: 'Reset view layout',
+    category: 'View',
+    enabled: activeViewHasLayouts,
+    run: resetViewLayout
+  },
+  {
+    id: 'view.showAll',
+    title: 'Show hidden modules',
+    category: 'View',
+    keys: ['Shift+H'],
+    run: showAllInView
+  },
+  {
+    id: 'view.wordWrap',
+    title: 'Word wrap',
+    category: 'View',
+    keys: ['Alt+Z'],
+    global: true,
+    checked: setting('editorWordWrap'),
+    run: toggle('editorWordWrap')
+  },
+
+  // Arrange
+  {
+    id: 'arrange.auto',
+    title: 'Auto-arrange (selection content / view)',
+    category: 'Arrange',
+    keys: ['Ctrl+Alt+L'],
+    run: () => void arrangeLayout('auto')
+  },
+  {
+    id: 'arrange.all',
+    title: 'Auto-arrange everything',
+    category: 'Arrange',
+    run: () => void arrangeLayout('all')
+  },
+  {
+    id: 'arrange.horizontal',
+    title: 'Auto-arrange horizontally (ports left / right)',
+    category: 'Arrange',
+    keys: ['Ctrl+Alt+H'],
+    checked: () => getProject().orientation === 'horizontal',
+    run: () => void arrangeLayout('auto', 'horizontal')
+  },
+  {
+    id: 'arrange.vertical',
+    title: 'Auto-arrange vertically (ports top / bottom)',
+    category: 'Arrange',
+    keys: ['Ctrl+Alt+V'],
+    checked: () => getProject().orientation === 'vertical',
+    run: () => void arrangeLayout('auto', 'vertical')
+  },
+  {
+    id: 'arrange.group',
+    title: 'Group into a module',
+    category: 'Arrange',
+    keys: ['Ctrl+G'],
+    enabled: hasSelection,
+    run: groupSelection
+  },
+  {
+    id: 'arrange.lock',
+    title: 'Lock position and size',
+    category: 'Arrange',
+    keys: ['Ctrl+L'],
+    enabled: hasCanvasSelection,
+    checked: selectionLocked,
+    run: toggleLockSelection
+  },
+  {
+    id: 'arrange.left',
+    title: 'Align left',
+    category: 'Arrange',
+    enabled: multi(2),
+    run: () => alignSelection('left')
+  },
+  {
+    id: 'arrange.hcenter',
+    title: 'Align centers horizontally',
+    category: 'Arrange',
+    enabled: multi(2),
+    run: () => alignSelection('hcenter')
+  },
+  {
+    id: 'arrange.right',
+    title: 'Align right',
+    category: 'Arrange',
+    enabled: multi(2),
+    run: () => alignSelection('right')
+  },
+  {
+    id: 'arrange.top',
+    title: 'Align top',
+    category: 'Arrange',
+    enabled: multi(2),
+    run: () => alignSelection('top')
+  },
+  {
+    id: 'arrange.vcenter',
+    title: 'Align middles vertically',
+    category: 'Arrange',
+    enabled: multi(2),
+    run: () => alignSelection('vcenter')
+  },
+  {
+    id: 'arrange.bottom',
+    title: 'Align bottom',
+    category: 'Arrange',
+    enabled: multi(2),
+    run: () => alignSelection('bottom')
+  },
+  {
+    id: 'arrange.distH',
+    title: 'Distribute horizontally',
+    category: 'Arrange',
+    enabled: multi(3),
+    run: () => distributeSelection('h')
+  },
+  {
+    id: 'arrange.distV',
+    title: 'Distribute vertically',
+    category: 'Arrange',
+    enabled: multi(3),
+    run: () => distributeSelection('v')
+  },
+  {
+    id: 'arrange.sameSize',
+    title: 'Same size',
+    category: 'Arrange',
+    enabled: multi(2),
+    run: () => sameSizeSelection('both')
+  },
+  {
+    id: 'arrange.snap',
+    title: 'Snap to grid',
+    category: 'Arrange',
+    checked: setting('snapToGrid'),
+    run: toggle('snapToGrid')
+  },
+  {
+    id: 'arrange.guides',
+    title: 'Alignment guides',
+    category: 'Arrange',
+    checked: setting('guides'),
+    run: toggle('guides')
+  },
+
+  // Window
+  { id: 'window.explorer', title: 'Explorer', category: 'Window', run: tool('explorer') },
+  { id: 'window.generation', title: 'Code generation', category: 'Window', run: tool('generation') },
+  {
+    id: 'window.inspector',
+    title: 'Inspector',
+    category: 'Window',
+    keys: ['Ctrl+I'],
+    global: true,
+    run: tool('inspector')
+  },
+  {
+    id: 'window.problems',
+    title: 'Problems',
+    category: 'Window',
+    keys: ['Ctrl+Shift+M'],
+    global: true,
+    run: tool('problems')
+  },
+  {
+    id: 'window.output',
+    title: 'Output',
+    category: 'Window',
+    keys: ['Ctrl+Shift+U'],
+    global: true,
+    run: tool('output')
+  },
+  { id: 'window.clearOutput', title: 'Clear output', category: 'Window', run: clearOutput },
+  {
+    id: 'window.search',
+    title: 'Search',
+    category: 'Window',
+    keys: ['Ctrl+Shift+F'],
+    global: true,
+    run: tool('search')
+  },
+  {
+    id: 'window.settings',
+    title: 'Settings',
+    category: 'Window',
+    keys: ['Ctrl+,'],
+    global: true,
+    run: () => toggleTool('settings')
+  },
+  {
+    id: 'window.nextDoc',
+    title: 'Next document',
+    category: 'Window',
+    keys: ['Alt+PageDown'],
+    global: true,
+    run: () => cycleDoc(1)
+  },
+  {
+    id: 'window.prevDoc',
+    title: 'Previous document',
+    category: 'Window',
+    keys: ['Alt+PageUp'],
+    global: true,
+    run: () => cycleDoc(-1)
+  },
+  { id: 'window.resetLayout', title: 'Reset panel layout', category: 'Window', run: resetLayout },
+  {
+    id: 'window.fullLayout',
+    title: 'Full layout',
+    category: 'Window',
+    checked: () => FULL_LAYOUT,
+    run: switchPreviewLayout
+  },
+  ...docCommands,
+
+  // Help
+  {
+    id: 'help.shortcuts',
+    title: 'Keyboard shortcuts',
+    category: 'Help',
+    keys: ['?'],
+    run: () => useUiStore.setState({ shortcutsOpen: true })
+  },
+  {
+    id: 'help.resetData',
+    title: 'Reset app data…',
+    category: 'Help',
+    run: () => void resetAppData()
+  },
+  {
+    id: 'help.about',
+    title: 'About ProjectScaffold',
+    category: 'Help',
+    run: () => useUiStore.setState({ aboutOpen: true })
+  }
+]
+
+/** Documents are opened, saved as and closed by VS Code, one per editor. A preview has its text beside. */
+const DOCUMENT_COMMANDS = new Set([
+  // VS Code edits IDL files itself.
+  'file.openIdlText',
+  'file.new',
+  'file.open',
+  'file.saveAs',
+  'file.saveAll',
+  'file.saveWorkspace',
+  'file.saveWorkspaceAs',
+  'file.close',
+  'window.nextDoc',
+  'window.prevDoc',
+  ...docCommands.map((c) => c.id),
+  // VS Code keeps the preferences in its own state.
+  'help.resetData'
+])
+
+/** The VS Code previews switch between their layouts. */
+const EDITOR_COMMANDS = new Set(['window.fullLayout'])
+
+export const commands: Command[] = IN_VSCODE
+  ? allCommands.filter(
+      (c) =>
+        !DOCUMENT_COMMANDS.has(c.id) &&
+        !(IN_PREVIEW && c.id === 'view.source') &&
+        (IN_PREVIEW || !EDITOR_COMMANDS.has(c.id))
+    )
+  : allCommands.filter((c) => !EDITOR_COMMANDS.has(c.id))
+
+const byId = new Map(commands.map((c) => [c.id, c]))
+
+/** Command ids and '-' separators without the commands the host leaves out (or unknown ids, but
+ *  the `extra` ones), nor the separators they leave at the ends or next to each other. */
+export function availableIds(ids: readonly string[], extra: readonly string[] = []): string[] {
+  const kept = ids.filter((id) => id === '-' || byId.has(id) || extra.includes(id))
+  return kept.filter(
+    (id, i) =>
+      id !== '-' ||
+      (kept.slice(0, i).some((x) => x !== '-') && kept[i + 1] !== undefined && kept[i + 1] !== '-')
+  )
+}
+
+export function getCommand(id: string): Command {
+  const c = byId.get(id)
+  if (!c) throw new Error(`Unknown command ${id}`)
+  return c
+}
+
+export function runCommand(id: string): void {
+  const c = getCommand(id)
+  if (c.enabled?.() ?? true) c.run()
+}
+
+/** Menu entry running a command. */
+export function commandItem(id: string, label?: string): ActionItem {
+  const c = getCommand(id)
+  return {
+    label: label ?? c.title,
+    keys: c.keys?.[0] ? keyLabel(c.keys[0]) : undefined,
+    disabled: !(c.enabled?.() ?? true),
+    checked: c.checked?.(),
+    run: () => runCommand(id)
+  }
+}
+
+const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
+
+/** Shortcut text for display. */
+export function keyLabel(keys: string): string {
+  return isMac ? keys.replace('Ctrl+', '⌘').replace('Alt+', '⌥').replace('Shift+', '⇧') : keys
+}
+
+/** Shortcut of a key event, in the `keys` notation. */
+export function keyOf(e: KeyboardEvent): string {
+  let key = e.key
+  // Layout independent digits (Alt+1 on AZERTY).
+  if (/^(Digit|Numpad)\d$/.test(e.code)) key = e.code.slice(-1)
+  else if (key.length === 1) key = key.toUpperCase()
+  // Shift is part of symbols ('?', '+'): not a modifier for them.
+  const symbol = key.length === 1 && !/[A-Z0-9]/.test(key)
+  return `${e.ctrlKey || e.metaKey ? 'Ctrl+' : ''}${e.altKey ? 'Alt+' : ''}${e.shiftKey && !symbol ? 'Shift+' : ''}${key}`
+}
+
+/** Keys VS Code prevents the default of in webviews (print, find, save, undo) before the page sees them. */
+const VSCODE_PREVENTED = /^Ctrl\+(Shift\+)?[PFSZY]$/
+
+export function installKeyboard(): () => void {
+  const byKey = new Map<string, Command>()
+  for (const c of commands) for (const k of c.keys ?? []) byKey.set(k, c)
+  /** Runs the command of a key event; whether it did. */
+  const run = (e: KeyboardEvent): boolean => {
+    if (e.isComposing) return false
+    const key = keyOf(e)
+    if (e.defaultPrevented && !(IN_VSCODE && VSCODE_PREVENTED.test(key))) return false
+    const c = byKey.get(key)
+    if (!c) return false
+    // Clipboard shortcuts go through the copy / cut / paste events.
+    if (c.id === 'edit.copy' || c.id === 'edit.cut' || c.id === 'edit.paste') return false
+    if (!c.global && isEditable(document.activeElement)) return false
+    // Modal UI (palette, menus) handles its own keys.
+    const ui = useUiStore.getState()
+    if ((ui.palette || ui.contextMenu || ui.shortcutsOpen || ui.aboutOpen || ui.dialog) && !c.global)
+      return false
+    if (!(c.enabled?.() ?? true)) return false
+    e.preventDefault()
+    c.run()
+    return true
+  }
+  const listener = (e: KeyboardEvent): void => void run(e)
+  // Code editors run the app's global shortcuts before their own keys (a key they handle never
+  // reaches the window), but keep their own undo history.
+  setPassedKeys((e) => {
+    const c = byKey.get(keyOf(e))
+    return !!c?.global && c.id !== 'edit.undo' && c.id !== 'edit.redo' && run(e)
+  })
+  window.addEventListener('keydown', listener)
+  return () => {
+    setPassedKeys(() => false)
+    window.removeEventListener('keydown', listener)
+  }
+}
+
+/** Copy / cut / paste of canvas and explorer items through the system clipboard. */
+export function installClipboard(): () => void {
+  const onCopy = (e: ClipboardEvent): void => {
+    if (isEditable(document.activeElement) || window.getSelection()?.toString()) return
+    if (copySelection(e.clipboardData)) e.preventDefault()
+  }
+  const onCut = (e: ClipboardEvent): void => {
+    if (isEditable(document.activeElement) || window.getSelection()?.toString()) return
+    if (cutSelection(e.clipboardData)) e.preventDefault()
+  }
+  const onPaste = (e: ClipboardEvent): void => {
+    if (isEditable(document.activeElement)) return
+    e.preventDefault()
+    void paste(e.clipboardData)
+  }
+  document.addEventListener('copy', onCopy)
+  document.addEventListener('cut', onCut)
+  document.addEventListener('paste', onPaste)
+  return () => {
+    document.removeEventListener('copy', onCopy)
+    document.removeEventListener('cut', onCut)
+    document.removeEventListener('paste', onPaste)
+  }
+}

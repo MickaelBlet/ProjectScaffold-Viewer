@@ -1,0 +1,3267 @@
+:root {
+  --icon-size: 14px;
+  --bg: #f6f7f9;
+  --panel: #ffffff;
+  --panel-2: #f0f2f5;
+  --row: #f3f5f8;
+  --border: #d9dde3;
+  --text: #1d2330;
+  --muted: #6b7384;
+  --accent: #3b6fe0;
+  --accent-soft: #e6eeff;
+  --danger: #d23f3f;
+  --warning: #c98a00;
+  --ok: #2e9e5b;
+  --node-bg: #ffffff;
+  --node-label-bg: rgba(255, 255, 255, 0.7);
+  --node-container: rgba(59, 111, 224, 0.05);
+  --perf-realtime: #e0513b;
+  --perf-low: #d98b00;
+  --perf-normal: #7a8496;
+  --perf-bulk: #3b8fd1;
+  --syn-key: #2757c7;
+  --syn-type: var(--accent);
+  --syn-string: #2b7a3f;
+  --syn-literal: #b0480b;
+  --syn-liquid: #8a3fc7;
+  --scrollbar-thumb: color-mix(in srgb, var(--text) 16%, transparent);
+  --scrollbar-thumb-hover: color-mix(in srgb, var(--text) 32%, transparent);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #15181e;
+    --panel: #1c2028;
+    --panel-2: #232833;
+    --row: #262b36;
+    --border: #363c49;
+    --text: #e3e7ef;
+    --muted: #8b93a5;
+    --accent: #6f9bff;
+    --accent-soft: #24304a;
+    --danger: #ff6b6b;
+    --warning: #e8b43c;
+    --ok: #4cc27f;
+    --node-bg: #222733;
+    --node-label-bg: rgba(34, 39, 51, 0.7);
+    --node-container: rgba(111, 155, 255, 0.07);
+    --perf-normal: #9aa3b5;
+    --syn-key: #82aaff;
+    --syn-string: #9ccc7a;
+    --syn-literal: #f0a45d;
+    --syn-liquid: #c792ea;
+    color-scheme: dark;
+  }
+}
+/* Dark, and the base of the color themes below. */
+:root[data-theme='dark'],
+:root[data-theme='black'],
+:root[data-theme='red'],
+:root[data-theme='orange'],
+:root[data-theme='yellow'],
+:root[data-theme='green'],
+:root[data-theme='pink'],
+:root[data-theme='violet'] {
+  --bg: #15181e;
+  --panel: #1c2028;
+  --panel-2: #232833;
+  --row: #262b36;
+  --border: #363c49;
+  --text: #e3e7ef;
+  --muted: #8b93a5;
+  --accent: #6f9bff;
+  --accent-soft: #24304a;
+  --danger: #ff6b6b;
+  --warning: #e8b43c;
+  --ok: #4cc27f;
+  --node-bg: #222733;
+  --node-label-bg: rgba(34, 39, 51, 0.7);
+  --node-container: rgba(111, 155, 255, 0.07);
+  --perf-normal: #9aa3b5;
+  --syn-key: #82aaff;
+  --syn-string: #9ccc7a;
+  --syn-literal: #f0a45d;
+  --syn-liquid: #c792ea;
+  color-scheme: dark;
+}
+/* Color themes: dark surfaces tinted with the theme color, and that color as the accent. */
+:root[data-theme='black'] {
+  --bg: #000000;
+  --panel: #0b0b0c;
+  --panel-2: #151516;
+  --row: #19191b;
+  --border: #2a2a2d;
+  --text: #e8e8ea;
+  --muted: #8c8c92;
+  --accent: #d4d6dc;
+  --accent-soft: #2a2b2f;
+  --on-accent: #0b0b0c;
+  --node-bg: #121214;
+}
+:root[data-theme='red'] {
+  --bg: #190f11;
+  --panel: #211417;
+  --panel-2: #2b1a1e;
+  --row: #2f1d21;
+  --border: #47292f;
+  --text: #f2e5e7;
+  --muted: #aa8f94;
+  --accent: #e5484d;
+  --accent-soft: #4a1e25;
+  --on-accent: #ffffff;
+  --node-bg: #29181c;
+}
+:root[data-theme='orange'] {
+  --bg: #19130d;
+  --panel: #221911;
+  --panel-2: #2c2016;
+  --row: #302318;
+  --border: #4a3524;
+  --text: #f4e9df;
+  --muted: #ad9682;
+  --accent: #ff8b3d;
+  --accent-soft: #4a2c14;
+  --on-accent: #2a1200;
+  --node-bg: #2a1f15;
+}
+:root[data-theme='yellow'] {
+  --bg: #16140b;
+  --panel: #1e1b10;
+  --panel-2: #272315;
+  --row: #2b2717;
+  --border: #433c22;
+  --text: #f3efdd;
+  --muted: #a69e80;
+  --accent: #f5c518;
+  --accent-soft: #3d3412;
+  --on-accent: #1e1700;
+  --node-bg: #25220f;
+}
+:root[data-theme='green'] {
+  --bg: #0e1611;
+  --panel: #131d17;
+  --panel-2: #1a271f;
+  --row: #1d2b22;
+  --border: #2c4134;
+  --text: #e3efe7;
+  --muted: #8ba695;
+  --accent: #4cd27f;
+  --accent-soft: #1d3a28;
+  --on-accent: #06210f;
+  --node-bg: #18251d;
+}
+:root[data-theme='pink'] {
+  --bg: #1a1017;
+  --panel: #22141e;
+  --panel-2: #2b1a27;
+  --row: #301d2b;
+  --border: #482a40;
+  --text: #f4e5ef;
+  --muted: #ae8fa5;
+  --accent: #ff6fb5;
+  --accent-soft: #4a1f3b;
+  --on-accent: #2a0a1b;
+  --node-bg: #2a1925;
+}
+:root[data-theme='violet'] {
+  --bg: #13111c;
+  --panel: #1a1626;
+  --panel-2: #221d31;
+  --row: #251f36;
+  --border: #382f52;
+  --text: #eae5f6;
+  --muted: #9b91b4;
+  --accent: #a77bff;
+  --accent-soft: #33264f;
+  --on-accent: #14082b;
+  --node-bg: #211c30;
+}
+:root:is(
+  [data-theme='black'],
+  [data-theme='red'],
+  [data-theme='orange'],
+  [data-theme='yellow'],
+  [data-theme='green'],
+  [data-theme='pink'],
+  [data-theme='violet']
+) {
+  --node-label-bg: color-mix(in srgb, var(--node-bg) 70%, transparent);
+  --node-container: color-mix(in srgb, var(--accent) 7%, transparent);
+  --syn-key: color-mix(in srgb, var(--accent) 70%, var(--text));
+}
+/* Black: its gray accent would color keys and types as the text. */
+:root[data-theme='black'] {
+  --syn-key: #82aaff;
+  --syn-type: #4ec9b0;
+}
+/* VS Code, theme "VS Code": the colors of its color theme (variables it gives its webviews), the
+   light / dark ones above as fallbacks. */
+:root[data-vscode-colors] {
+  --bg: var(--vscode-editor-background);
+  --panel: var(--vscode-sideBar-background, var(--vscode-editor-background));
+  --panel-2: var(--vscode-editorGroupHeader-tabsBackground, var(--vscode-editorWidget-background));
+  --row: color-mix(in srgb, var(--text) 5%, var(--panel));
+  --border: var(--vscode-panel-border, var(--vscode-editorGroup-border, var(--vscode-widget-border)));
+  --text: var(--vscode-foreground);
+  --muted: var(--vscode-descriptionForeground);
+  --accent: var(--vscode-button-background, var(--vscode-focusBorder));
+  --on-accent: var(--vscode-button-foreground, #fff);
+  --accent-soft: var(--vscode-list-inactiveSelectionBackground, var(--vscode-list-hoverBackground));
+  --danger: var(--vscode-errorForeground);
+  --warning: var(--vscode-editorWarning-foreground, var(--vscode-charts-yellow));
+  --ok: var(--vscode-testing-iconPassed, var(--vscode-charts-green));
+  --node-bg: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+  --node-label-bg: color-mix(in srgb, var(--node-bg) 70%, transparent);
+  --node-container: color-mix(in srgb, var(--accent) 6%, transparent);
+  --syn-key: var(--vscode-debugTokenExpression-name, var(--vscode-symbolIcon-propertyForeground));
+  --syn-string: var(--vscode-debugTokenExpression-string, var(--vscode-charts-green));
+  --syn-literal: var(--vscode-debugTokenExpression-number, var(--vscode-charts-orange));
+  --syn-liquid: var(--vscode-charts-purple, #c792ea);
+  --scrollbar-thumb: var(
+    --vscode-scrollbarSlider-background,
+    color-mix(in srgb, var(--text) 16%, transparent)
+  );
+  --scrollbar-thumb-hover: var(
+    --vscode-scrollbarSlider-hoverBackground,
+    color-mix(in srgb, var(--text) 32%, transparent)
+  );
+}
+:root[data-vscode-colors] body {
+  font-family: var(--vscode-font-family, system-ui, sans-serif);
+}
+
+* {
+  box-sizing: border-box;
+}
+/* Thin scrollbars on a transparent track. Chromium ignores ::-webkit-scrollbar once scrollbar-width or
+   scrollbar-color is set, so those are for the other engines only. */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  background-clip: padding-box;
+  border: 3px solid transparent;
+  border-radius: 5px;
+}
+::-webkit-scrollbar-thumb:hover,
+::-webkit-scrollbar-thumb:active {
+  background-color: var(--scrollbar-thumb-hover);
+}
+@supports not selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) transparent;
+  }
+}
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  /* VS Code webviews pad the body. */
+  padding: 0;
+}
+body {
+  font:
+    13px/1.4 system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+input,
+select,
+textarea {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 6px;
+  min-width: 0;
+}
+/* As tall as inputs and buttons (line height, padding and border): a select is shorter by default. */
+select {
+  height: calc(1lh + 8px);
+}
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 2px solid var(--accent-soft);
+  border-color: var(--accent);
+}
+input.invalid {
+  border-color: var(--danger);
+}
+textarea {
+  width: 100%;
+  resize: vertical;
+  margin: 6px 0;
+}
+button {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+button:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+/* Cursors: pointer on what a click acts on, default once disabled; grab / grabbing on what drags on the
+ * canvas. */
+select,
+input:is([type='checkbox'], [type='radio'], [type='color']),
+label:has(> input:is([type='checkbox'], [type='radio'])),
+summary {
+  cursor: pointer;
+}
+:is(select, input):disabled,
+label:has(> input:disabled) {
+  cursor: default;
+}
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent, #fff);
+}
+button.danger {
+  color: var(--danger);
+}
+/* Icons (components/Icon.tsx): one size everywhere */
+.ico {
+  flex: none;
+  width: var(--icon-size);
+  height: var(--icon-size);
+  vertical-align: -0.2em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.ico-dot {
+  fill: currentColor;
+  stroke: none;
+}
+button:has(> .ico) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+button.icon {
+  padding: 0 6px;
+  min-width: 24px;
+  background: transparent;
+  border-color: transparent;
+}
+button.icon:hover:not(:disabled) {
+  border-color: var(--border);
+}
+button.icon.danger:hover {
+  border-color: var(--danger);
+}
+button.icon.active {
+  background: var(--accent-soft);
+}
+button.link-button {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent);
+}
+button.link-button:hover {
+  text-decoration: underline;
+}
+.muted {
+  color: var(--muted);
+}
+
+/* Layout */
+.app {
+  display: grid;
+  height: 100%;
+  grid-template-rows: auto 1fr auto;
+}
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  min-width: 0;
+}
+.toolbar .brand {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin-right: 4px;
+}
+.toolbar .sep {
+  width: 1px;
+  height: 20px;
+  background: var(--border);
+  margin: 0 4px;
+}
+.toolbar > button.command {
+  flex: none;
+  white-space: nowrap;
+}
+.toolbar > button.command[aria-pressed='true'] {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+.toolbar .spacer,
+.statusbar .spacer {
+  flex: 1;
+}
+.palette-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 220px;
+  color: var(--muted);
+  background: var(--bg);
+}
+.palette-button kbd {
+  margin-left: auto;
+}
+.dock {
+  min-height: 0;
+  min-width: 0;
+}
+.tool-panel {
+  height: 100%;
+  overflow: auto;
+  background: var(--panel);
+  color: var(--text);
+}
+/* VS Code side bar: one tool panel, on the side bar background. */
+.app.side-panel {
+  grid-template-rows: auto 1fr;
+}
+/* Its tabs, like the ones of the VS Code panel. */
+.side-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--vscode-sideBarSectionHeader-border, var(--border));
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.side-tabs button {
+  flex: none;
+  display: flex;
+  align-items: center;
+  padding: 6px 10px 5px;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  border-radius: 0;
+  background: none;
+  color: var(--vscode-panelTitle-inactiveForeground, var(--muted));
+  font-size: 11px;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.side-tabs button:hover:not([aria-selected='true']) {
+  color: var(--vscode-panelTitle-activeForeground, var(--text));
+  border-color: transparent;
+}
+.side-tabs button[aria-selected='true'] {
+  color: var(--vscode-panelTitle-activeForeground, var(--text));
+  border-bottom-color: var(--vscode-panelTitle-activeBorder, var(--accent));
+}
+.side-panel .tool-panel {
+  background: var(--vscode-sideBar-background, var(--panel));
+}
+.side-panel-empty {
+  margin: 0;
+  padding: 12px;
+  color: var(--muted);
+}
+.canvas {
+  position: relative;
+  height: 100%;
+  min-height: 0;
+}
+.inspector {
+  position: relative;
+  padding: 10px 12px 24px;
+  /* Lists and rows rearrange by the width of the inspector, not of the window. */
+  container-type: inline-size;
+}
+.inspector .open-tab {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+.entity-editor {
+  height: 100%;
+  overflow: auto;
+  background: var(--panel);
+}
+.source-editor {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--panel);
+}
+.source-editor header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+.source-editor header .spacer {
+  flex: 1;
+}
+.source-editor header > * {
+  white-space: nowrap;
+}
+/* Changes toggle with its previous / next buttons, joined into one pill. */
+.source-changes {
+  display: inline-flex;
+}
+.source-changes button.qualifier + button.qualifier {
+  margin-left: -1px;
+  padding: 0 4px;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  --icon-size: 12px;
+}
+.source-changes button.qualifier + button.qualifier:hover {
+  background: color-mix(in srgb, var(--accent) 25%, transparent);
+}
+.source-changes button.qualifier:has(+ button.qualifier) {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.source-editor .source-state.error {
+  color: var(--danger);
+}
+.source-editor .source-stale {
+  margin: 0;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: var(--warning);
+  border-bottom: 1px solid var(--border);
+}
+.code-editor {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.source-problems .link {
+  margin-right: 6px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+}
+.source-problems {
+  margin: 0;
+  padding: 4px 8px 4px 26px;
+  max-height: 30%;
+  overflow: auto;
+  font-size: 12px;
+  color: var(--danger);
+  border-top: 1px solid var(--border);
+}
+.source-problems li.warning {
+  color: var(--warning);
+}
+/* Project text: severity icons in place of bullets, error / warning counts in the header. */
+.source-problems.with-icons {
+  list-style: none;
+  padding-left: 8px;
+}
+.source-problems.with-icons .ico {
+  margin-right: 6px;
+  vertical-align: -2px;
+}
+.source-editor .source-counts {
+  display: inline-flex;
+  gap: 8px;
+  border-color: transparent;
+  background: none;
+}
+.source-editor .source-counts.on {
+  border-color: var(--border);
+}
+.source-counts .error {
+  color: var(--danger);
+}
+.source-counts .warning {
+  color: var(--warning);
+}
+.source-counts .zero {
+  color: var(--muted);
+}
+/* Text file tabs (templates, generated files, IDL files). */
+.file-editor .file-path {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: ui-monospace, 'SF Mono', Consolas, monospace;
+}
+.file-editor .source-stale.error {
+  color: var(--danger);
+}
+.source-note {
+  margin: 0;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+}
+:is(.source-stale, .source-note) .link {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  text-decoration: underline;
+}
+.code-editor .cm-userSection {
+  background-color: color-mix(in srgb, var(--ok) 9%, transparent);
+}
+.code-editor .cm-userMarker {
+  background-color: color-mix(in srgb, var(--ok) 16%, transparent);
+}
+/* Explorer and Code generation panel: the filter stays on top, the sections scroll under it. Sections there
+   have no box of their own, so every header sticks in the whole list: always in view, stacked at its top
+   or bottom (top / bottom offsets set by StackedSections). */
+:is(.explorer, .generation-panel) {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.stacked-sections {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.stacked-sections > .explorer-section {
+  display: contents;
+}
+.stacked-sections {
+  --section-header-bg: var(--panel);
+}
+.side-panel .stacked-sections {
+  --section-header-bg: var(--vscode-sideBar-background, var(--panel));
+}
+/* 1px of background around: stuck at fractional offsets (zoomed), header edges are anti-aliased and the
+   list would show through the seams between headers and at the edges of the list. */
+.stacked-sections > .explorer-section > header {
+  position: sticky;
+  z-index: 1;
+  background: var(--section-header-bg);
+  box-shadow: 0 0 0 1px var(--section-header-bg);
+}
+.stacked-sections > .explorer-section.drop-before > header {
+  box-shadow:
+    inset 0 2px 0 var(--accent),
+    0 0 0 1px var(--section-header-bg);
+}
+.stacked-sections > .explorer-section.drop-after > :last-child {
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+.generation-section > header {
+  /* The toggle (title, listing label truncated) takes the row. */
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.generation-section .explorer-title {
+  flex: none;
+}
+.generation-actions {
+  /* Above the filter, so they stay in view while the lists scroll. */
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  margin-bottom: 4px;
+}
+.generation-actions .spacer {
+  flex: 1;
+}
+.file-folder {
+  display: inline-flex;
+  color: var(--muted);
+}
+.generation-actions button.icon {
+  padding: 0 4px;
+  color: var(--text);
+}
+.generation-section > header small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-transform: none;
+  font-weight: 400;
+}
+.generation-section .empty {
+  margin: 2px 12px 8px;
+  font-size: 12px;
+}
+.generation-section .empty .link {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  text-decoration: underline;
+}
+.file-list .result-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Generated and template files: a page with a folded corner, unlike the square entity badges. */
+.file-badge {
+  position: relative;
+  flex-shrink: 0;
+  display: inline-grid;
+  place-items: end center;
+  width: 14px;
+  height: 18px;
+  margin: 0 2px;
+  padding-bottom: 1px;
+  border-radius: 2px;
+  clip-path: polygon(0 0, calc(100% - 5px) 0, 100% 5px, 100% 100%, 0 100%);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  color: #fff;
+  background: #6b7384;
+}
+.file-badge::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 5px;
+  height: 5px;
+  background: rgb(255 255 255 / 0.5);
+  clip-path: polygon(0 0, 0 100%, 100% 100%);
+}
+.file-badge.file-liquid {
+  background: #7a55c7;
+}
+.file-badge.file-cpp {
+  background: #3b6fe0;
+}
+.file-badge.file-python {
+  background: #2e8a8a;
+}
+.file-badge.file-cmake {
+  background: #b0480b;
+}
+.file-badge.file-yaml,
+.file-badge.file-json {
+  background: #6b7384;
+}
+.file-badge.file-idl {
+  background: #2e9e5b;
+}
+.statusbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 10px;
+  font-size: 12px;
+  color: var(--muted);
+  background: var(--panel);
+  border-top: 1px solid var(--border);
+  white-space: nowrap;
+  min-width: 0;
+}
+.statusbar.error .status-text {
+  color: var(--danger);
+}
+.status-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.status-item {
+  padding: 1px 8px;
+  border: none;
+  background: none;
+  border-radius: 3px;
+  font-size: 12px;
+  color: inherit;
+}
+button.status-item:hover {
+  background: var(--panel-2);
+}
+.status-item.on {
+  color: var(--accent);
+}
+.status-item .error {
+  color: var(--danger);
+}
+.status-item.path {
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+kbd {
+  font:
+    11px ui-monospace,
+    'SF Mono',
+    Consolas,
+    monospace;
+  padding: 0 4px;
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  color: var(--muted);
+  background: var(--panel);
+}
+
+/* Explorer */
+.panel-filter {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 6px 8px;
+  background: var(--panel);
+}
+.panel-filter input {
+  width: 100%;
+}
+/* Fold all button on the right of the filter. */
+.explorer .panel-filter {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.explorer .panel-filter input {
+  flex: 1;
+  min-width: 0;
+}
+.explorer .panel-filter button.icon {
+  flex: none;
+  padding: 0 4px;
+  color: var(--text);
+}
+/* Full width of the inspector, aligned with its content. */
+.inspector .panel-filter {
+  margin: 0 -12px 8px;
+  padding: 6px 12px;
+}
+.explorer-section > header {
+  /* Title left, whole; actions in the rest of the row, on the right, wrapping there. */
+  display: grid;
+  cursor: pointer;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  user-select: none;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+/* Body scrolled into view by a click on its header. */
+.explorer-section > .revealed {
+  animation: section-revealed 5s ease-in forwards;
+}
+@keyframes section-revealed {
+  0%,
+  70% {
+    outline: 1px solid var(--accent);
+    outline-offset: -2px;
+  }
+  100% {
+    outline: 1px solid transparent;
+    outline-offset: -2px;
+  }
+}
+.explorer-section.drop-before {
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+.explorer-section.drop-after {
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+/* Opens the menu of the hidden sections. */
+.explorer-hidden {
+  display: block;
+  margin: 4px 8px;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 11px;
+  color: var(--muted);
+}
+.explorer-hidden:hover:not(:disabled) {
+  border-color: transparent;
+  color: var(--text);
+  text-decoration: underline;
+}
+.explorer-section > header small {
+  font-weight: normal;
+}
+/* Section toggle: the header's look, as a button. */
+.explorer-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  text-align: left;
+}
+.explorer-section > header:not(:has(.explorer-actions button:hover)):hover .explorer-toggle,
+.explorer-toggle:hover:not(:disabled) {
+  border-color: transparent;
+  color: var(--text);
+}
+.explorer-actions {
+  margin-left: auto;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 2px;
+}
+/* Icon buttons beside inputs / selects: as tall as them. */
+:is(.grid, .field-row, .metadata, .row-value, .row-inline, .card-header, .section-actions)
+  button:has(> .ico) {
+  min-height: calc(1lh + 8px);
+}
+.explorer-actions button.icon {
+  font-size: 11px;
+  padding: 0 4px;
+  color: var(--text);
+}
+.chevron {
+  display: inline-flex;
+  width: var(--icon-size);
+  color: var(--muted);
+}
+.entity-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 4px;
+}
+.entity-list li {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.entity-list li small {
+  margin-left: auto;
+  color: var(--muted);
+}
+.entity-list li:hover {
+  background: var(--panel-2);
+}
+.entity-list li.active {
+  background: var(--accent-soft);
+}
+.entity-list li.current {
+  font-weight: 600;
+}
+.entity-list li.empty {
+  color: var(--muted);
+  cursor: default;
+}
+.kind-badge {
+  flex-shrink: 0;
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--perf-normal);
+}
+.kind-badge.struct {
+  background: #3b6fe0;
+}
+.kind-badge.enum {
+  background: #8a4fd1;
+}
+.kind-badge.bitmask {
+  background: #c0567a;
+}
+.kind-badge.union {
+  background: #3f8f3a;
+}
+.kind-badge.const {
+  background: #9a6b2f;
+}
+.kind-badge.exception {
+  background: #c0392b;
+}
+.kind-badge.alias {
+  background: #2e9e8f;
+}
+.kind-badge.primitive {
+  background: #7a7f2a;
+}
+.kind-badge.interface {
+  background: #d98b00;
+}
+.kind-badge.mod {
+  background: #5a6b85;
+}
+.kind-badge.link {
+  background: var(--perf-bulk);
+}
+.kind-badge.project {
+  background: var(--muted);
+}
+.kind-badge.view {
+  background: var(--ok);
+}
+.kind-badge.dependency {
+  background: #6b5a3b;
+}
+.kind-badge.binary {
+  background: #3b6b5a;
+}
+/* Explorer modules: hidden in the focused view (eye), drop target of a dragged module. */
+.entity-list li.is-hidden .tree-name {
+  opacity: 0.45;
+  text-decoration: line-through;
+}
+.entity-list li .tree-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.entity-list li.drop,
+.entity-list.drop {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+/* Explorer: module of a dependency not placed on the canvas. */
+.entity-list li.unplaced {
+  opacity: 0.55;
+}
+/* Explorer: group of the content of a dependency (Constants, Types…). */
+.entity-list li.dependency-group {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.actions[hidden] {
+  display: none;
+}
+.lib-detail {
+  padding: 0 0 12px;
+}
+.lib-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.lib-header h3 {
+  margin: 0;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lib-tag {
+  padding: 0 6px;
+  border-radius: 8px;
+  font-size: 11px;
+  color: var(--ok);
+  border: 1px solid currentColor;
+}
+.lib-tag.indirect {
+  color: var(--muted);
+}
+.lib-file {
+  margin: 2px 0 6px;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lib-relation {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+  font-size: 12px;
+}
+.lib-relation > .muted:first-child {
+  min-width: 56px;
+}
+button.lib-chip {
+  padding: 0 6px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+.lib-entities {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+.lib-group {
+  margin: 10px 0 2px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.lib-group small {
+  font-weight: normal;
+}
+.lib-entity {
+  border-radius: 4px;
+  cursor: pointer;
+}
+.lib-entity:hover {
+  background: var(--panel-2);
+}
+.lib-entity.active {
+  background: var(--accent-soft);
+}
+.lib-entity:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.lib-entity-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 4px;
+}
+.lib-entity-head > small {
+  color: var(--muted);
+  white-space: nowrap;
+}
+.lib-entity-head > small:first-of-type {
+  margin-left: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lib-entity-name {
+  font-weight: 600;
+}
+.lib-usage.unused {
+  font-style: italic;
+}
+.lib-entity-body {
+  padding: 0 8px 6px 44px;
+}
+.lib-description {
+  margin: 0 0 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.lib-members {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 8px;
+  border-left: 1px solid var(--border);
+}
+.lib-members li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 10px;
+  padding: 1px 0;
+}
+.lib-members code {
+  font:
+    12px ui-monospace,
+    'SF Mono',
+    Consolas,
+    monospace;
+}
+.lib-members small {
+  color: var(--muted);
+}
+.lib-member-name {
+  color: var(--syn-key);
+}
+.lib-type {
+  color: var(--syn-string);
+}
+.lib-default,
+.lib-dir {
+  color: var(--syn-literal);
+}
+.lib-none {
+  padding: 0 8px;
+}
+/* Read-only content: a library's type or interface. */
+fieldset.readonly {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+/* Inspector */
+.inspector h2 {
+  font-size: 15px;
+  margin: 0 30px 10px 0;
+  text-transform: capitalize;
+}
+.inspector h2 small {
+  text-transform: none;
+  font-weight: normal;
+  margin-left: 6px;
+}
+.inspector h4 {
+  margin: 8px 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.row {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0;
+}
+.row-label {
+  color: var(--muted);
+}
+.row-value {
+  display: flex;
+  min-width: 0;
+}
+.row-value > input,
+.row-value > select,
+.row-value > .field {
+  flex: 1;
+}
+.row-inline {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.section {
+  margin-top: 14px;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+.inspector > .section:first-child {
+  margin-top: 0;
+  border-top: none;
+  padding-top: 0;
+}
+.section header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.section h3 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin: 0;
+}
+.section-actions {
+  display: flex;
+  gap: 4px;
+}
+.section > select {
+  width: 100%;
+}
+.field {
+  position: relative;
+  flex-direction: column;
+  min-width: 0;
+}
+.field > input {
+  width: 100%;
+  height: 100%;
+}
+.field-error {
+  color: var(--danger);
+  font-size: 11px;
+}
+input.number {
+  width: 90px;
+}
+/* Table rows: the cells carry the look of list entries, the outer ones its rounded ends. */
+.grid {
+  width: 100%;
+  margin: -4px 0;
+  border-collapse: separate;
+  border-spacing: 0 4px;
+}
+.grid td {
+  padding: 8px 2px;
+  vertical-align: top;
+  border-block: 1px solid var(--border);
+  background: var(--row);
+}
+.grid tr:nth-child(even) > td {
+  background: var(--row);
+}
+.grid td:first-child {
+  padding-left: 8px;
+  border-left: 1px solid var(--border);
+  border-radius: 6px 0 0 6px;
+}
+.grid td:last-child {
+  padding-right: 8px;
+  border-right: 1px solid var(--border);
+  border-radius: 0 6px 6px 0;
+}
+.grid td:only-child {
+  border-radius: 6px;
+}
+/* Columns of buttons and numbers as wide as their content; the others share the rest. */
+.grid td:is(:empty, :has(> button.icon, input.number)) {
+  width: 1px;
+  white-space: nowrap;
+}
+/*
+ * Named, typed entries (fields, parameters, attributes): one line when the inspector is wide enough,
+ * the type then the value wrapped onto lines of their own when it is not. Rows share the list's
+ * columns (subgrid) so they stay aligned; columns of controls take the width of their content.
+ */
+.field-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto minmax(0, 2fr) 0 auto;
+  row-gap: 4px;
+}
+.field-list.has-value {
+  grid-template-columns: minmax(0, 1fr) auto auto minmax(0, 2fr) minmax(0, 1fr) auto;
+}
+.field-row {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+}
+/*
+ * Entries of the inspector's lists (fields, metadata, binaries, references; table rows above): rounded,
+ * every other one shaded (type trees between field rows do not count).
+ */
+.field-row,
+.metadata .kv,
+.binary-item,
+ul.plain > li {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px;
+  background: var(--row);
+}
+.field-row:nth-child(even of .field-row),
+.metadata .kv:nth-child(even of .kv),
+.binary-item:nth-child(even of .binary-item),
+ul.plain > li:nth-child(even) {
+  background: var(--row);
+}
+ul.plain > li + li {
+  margin-top: 4px;
+}
+.field-row > * {
+  min-width: 0;
+  padding: 2px;
+}
+.field-row > .name {
+  grid-column: 1;
+}
+.field-row > .column {
+  grid-column: 2;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.field-row > .before {
+  grid-column: 3;
+}
+.field-row > .type {
+  grid-column: 4;
+}
+.field-row > .value {
+  grid-column: 5;
+}
+.field-row > .actions-cell {
+  grid-column: 6;
+  white-space: nowrap;
+}
+.field-row > :is(.name, .value) > input,
+.field-row select {
+  width: 100%;
+}
+.field-tree {
+  grid-column: 1 / -1;
+}
+.field-tree .type-tree {
+  margin: 0 0 4px 4px;
+}
+@container (max-width: 560px) {
+  .field-list.has-value {
+    grid-template-columns: minmax(0, 1fr) auto auto minmax(0, 2fr) 0 auto;
+  }
+  .field-list.has-value > .field-row > .value {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
+@container (max-width: 380px) {
+  .field-list,
+  .field-list.has-value {
+    grid-template-columns: minmax(0, 1fr) auto auto 0 0 auto;
+  }
+  .field-row > .type {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  .field-list.has-value > .field-row > .value {
+    grid-row: 3;
+  }
+}
+.grid select {
+  width: 100%;
+}
+.check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0;
+}
+.qualifiers {
+  /* Columns of equal width, sized to the longest label. */
+  display: inline-grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 4px;
+  margin: 4px 0;
+}
+/* Qualifier toggle: muted when off, accent when on. */
+button.qualifier {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--muted);
+  background: none;
+}
+button.qualifier.on {
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+/* In a field row: single-letter square toggles, centered on the row's inputs. */
+.field-row .qualifiers {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  margin: 0;
+  /* Height of an input: line height plus padding and border. */
+  height: calc(1.4em + 8px);
+}
+/* Access level beside qualifiers: set apart. */
+.qualifiers.access + .qualifiers {
+  margin-left: 6px;
+}
+.field-row > .column .qualifiers.access + .qualifiers {
+  margin-left: 2px;
+}
+.field-row button.qualifier {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border-radius: 4px;
+}
+.metadata .kv {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+/* Narrow inspector: labels above their value, metadata values below their key. */
+@container (max-width: 300px) {
+  .row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+  .metadata .kv {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .metadata .kv > :nth-child(2) {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
+.card {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px;
+  margin-bottom: 8px;
+  background: var(--panel-2);
+}
+.card-header {
+  display: flex;
+  gap: 4px;
+  align-items: flex-start;
+}
+.card-header .field {
+  flex: 1;
+  font-weight: 600;
+}
+.actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+ul.plain {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.callout.error {
+  margin-top: 8px;
+  padding: 8px;
+  border: 1px solid var(--danger);
+  border-radius: 4px;
+  color: var(--danger);
+}
+.callout.dependency {
+  margin-bottom: 10px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel-2);
+}
+.callout.dependency .actions {
+  margin-top: 8px;
+}
+
+/* Type editor */
+.type-editor-line {
+  display: flex;
+  gap: 2px;
+}
+.type-editor-line .field {
+  flex: 1;
+}
+.type-input {
+  font-family: ui-monospace, 'SF Mono', Consolas, monospace;
+  font-size: 12px;
+}
+.suggestions {
+  position: absolute;
+  z-index: 20;
+  top: 100%;
+  left: 0;
+  right: 0;
+  list-style: none;
+  margin: 2px 0 0;
+  padding: 2px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  font-family: ui-monospace, 'SF Mono', Consolas, monospace;
+  font-size: 12px;
+}
+.suggestions li {
+  padding: 2px 6px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.suggestions li.active {
+  background: var(--accent-soft);
+}
+.type-tree {
+  padding-left: 10px;
+  border-left: 1px dashed var(--border);
+  margin-top: 4px;
+}
+.type-tree-node {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.type-tree-node select {
+  flex: 1;
+  min-width: 0;
+}
+.type-tree-node input.number {
+  width: 64px;
+  flex: none;
+}
+.type-tree-label {
+  color: var(--muted);
+  font-size: 11px;
+  min-width: 42px;
+}
+
+/* Canvas nodes */
+.module {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  /* Translucent so links passing behind a module stay visible. */
+  background: color-mix(in srgb, var(--node-bg) 80%, transparent);
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+.module.container {
+  background: var(--node-container);
+  border-style: dashed;
+  box-shadow: none;
+}
+.module.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+.module-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 36px;
+  padding: 0 6px 0 10px;
+  font-weight: 600;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--border);
+  border-radius: 7px 7px 0 0;
+}
+.module-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* UML-like: abstract and interface modules have an italic name after their stereotype. */
+.module-name.abstract,
+.module-name.interface {
+  font-style: italic;
+}
+.module-kind,
+.module-bases {
+  font-style: normal;
+  font-weight: 400;
+  color: var(--muted);
+}
+.module.colored {
+  border-color: var(--module-color);
+}
+.module.colored .module-header {
+  background: color-mix(in srgb, var(--module-color) 22%, transparent);
+  border-bottom-color: var(--module-color);
+}
+.module.colored.container {
+  background: color-mix(in srgb, var(--module-color) 6%, transparent);
+}
+.module.selected.colored {
+  border-color: var(--accent);
+}
+/* Attributes: a compartment below the header, inset from the border where ports and links attach. */
+.module-attrs {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 4px 14px 3px;
+  list-style: none;
+  font-family: ui-monospace, 'SF Mono', Consolas, monospace;
+  font-size: 11px;
+  line-height: 18px;
+  background: color-mix(in srgb, var(--text) 4%, transparent);
+  border-bottom: 1px solid var(--border);
+}
+.module.colored .module-attrs {
+  background: color-mix(in srgb, var(--module-color) 8%, transparent);
+  border-bottom-color: color-mix(in srgb, var(--module-color) 50%, transparent);
+}
+.module-attrs li {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.attr-type {
+  color: var(--muted);
+}
+.attr-type.deleted {
+  color: var(--danger);
+}
+.attr-default {
+  color: var(--accent);
+}
+.attr-qualifier {
+  color: var(--accent);
+  font-style: italic;
+}
+/* UML access mark: + public, # protected, - private. */
+.attr-access {
+  display: inline-block;
+  width: 1.2ch;
+  margin-right: 0.4ch;
+  color: var(--muted);
+}
+.attr-name.pure {
+  font-style: italic;
+}
+.module-rename {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  padding: 1px 4px;
+}
+.module-open {
+  padding: 2px 3px;
+  background: transparent;
+  border-color: transparent;
+  color: var(--muted);
+}
+.module-open:hover {
+  color: var(--accent);
+}
+/* The module's own link handle, a header button rather than a dot on the border. */
+.module-header .react-flow__handle.module-connect {
+  position: static;
+  display: flex;
+  width: auto;
+  height: auto;
+  min-width: 0;
+  min-height: 0;
+  padding: 2px 3px;
+  transform: none;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  color: var(--muted);
+  opacity: 0.35;
+}
+.module-header .react-flow__handle.module-connect:hover {
+  color: var(--accent);
+  opacity: 0.8;
+}
+.module-header .react-flow__handle.module-connect .ico {
+  pointer-events: none;
+}
+.module-lock {
+  opacity: 0.35;
+}
+.module-lock.locked,
+.module-lock:hover {
+  opacity: 0.8;
+}
+.module-ports {
+  padding-top: 6px;
+}
+/* Leaves: side ports centered between the header (and top band) and the bottom band. */
+.module:not(.container) {
+  display: flex;
+  flex-direction: column;
+}
+.module:not(.container) > .module-header,
+.module:not(.container) > .port-band {
+  flex-shrink: 0;
+}
+.module:not(.container) > .module-ports {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding-top: 0;
+}
+.module:not(.container) > .port-band.bottom {
+  position: static;
+  margin-top: auto;
+}
+.lock-badge {
+  display: inline-flex;
+  color: var(--muted);
+  opacity: 0.7;
+  pointer-events: none;
+}
+.note.locked {
+  position: relative;
+}
+.note .lock-badge {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+}
+.port-row {
+  position: relative;
+  height: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+}
+.port {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 0 10px;
+  white-space: nowrap;
+}
+.port small {
+  color: var(--muted);
+  font-size: 10px;
+}
+.port.right {
+  margin-left: auto;
+}
+.handle {
+  width: 10px !important;
+  height: 10px !important;
+  border: 2px solid var(--node-bg) !important;
+}
+.handle.in {
+  background: var(--ok) !important;
+}
+/* Inward twin of a port's handle (see PortPoint): only an end for links, never shown. */
+.react-flow__handle.inner-handle {
+  width: 10px;
+  height: 10px;
+  opacity: 0;
+  pointer-events: none;
+}
+.handle.out {
+  background: var(--accent) !important;
+}
+/* Port style (Settings): shape tells in from out, not only color.
+   arrows: in points into the module, out points away from it.
+   hollow: in is a ring, out is filled. shapes: in is round, out is square. */
+:root[data-port-style='arrows'] .react-flow__handle.handle {
+  width: 12px !important;
+  height: 12px !important;
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+}
+:root[data-port-style='arrows'] .react-flow__handle.handle::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: var(--ok);
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
+:root[data-port-style='arrows'] .react-flow__handle.handle.out::before {
+  background: var(--accent);
+}
+/* Triangle points right by default; rotate it per side and role. */
+:root[data-port-style='arrows'] .react-flow__handle.handle.in.react-flow__handle-right::before,
+:root[data-port-style='arrows'] .react-flow__handle.handle.out.react-flow__handle-left::before {
+  transform: rotate(180deg);
+}
+:root[data-port-style='arrows'] .react-flow__handle.handle.in.react-flow__handle-top::before,
+:root[data-port-style='arrows'] .react-flow__handle.handle.out.react-flow__handle-bottom::before {
+  transform: rotate(90deg);
+}
+:root[data-port-style='arrows'] .react-flow__handle.handle.in.react-flow__handle-bottom::before,
+:root[data-port-style='arrows'] .react-flow__handle.handle.out.react-flow__handle-top::before {
+  transform: rotate(-90deg);
+}
+:root[data-port-style='hollow'] .react-flow__handle.handle.in {
+  background: var(--node-bg) !important;
+  border-color: var(--ok) !important;
+}
+:root[data-port-style='shapes'] .react-flow__handle.handle.out {
+  border-radius: 2px !important;
+}
+.edge-label {
+  position: absolute;
+  pointer-events: all;
+  display: flex;
+  gap: 3px;
+  cursor: pointer;
+}
+.edge-label.movable {
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+/* Hand-set link shape (selected link): drag the line to bend it, the handles to move bends and ends. */
+.route-grab {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 12;
+  pointer-events: stroke;
+  cursor: grab;
+}
+.route-handle {
+  position: absolute;
+  pointer-events: all;
+  z-index: 1002;
+  width: 10px;
+  height: 10px;
+  box-sizing: border-box;
+  border: 1.5px solid var(--accent);
+  background: var(--panel);
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+.route-handle.bend {
+  border-radius: 50%;
+  background: var(--accent);
+}
+:root.grabbing * {
+  cursor: grabbing !important;
+}
+.route-handle.end.set {
+  background: var(--accent);
+}
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 8px;
+  color: var(--panel);
+  background: var(--text);
+  border: 1px solid var(--text);
+  white-space: nowrap;
+}
+.edge-label.selected .badge {
+  border-color: var(--accent);
+}
+.edge-label.selected {
+  border-radius: 10px;
+  animation: edge-label-pulse 1.4s ease-out infinite;
+}
+.edge-halo {
+  fill: none;
+  stroke-width: 12;
+  stroke-linecap: round;
+  pointer-events: none;
+  animation: edge-halo-pulse 1.4s ease-in-out infinite;
+}
+.edge-flow {
+  fill: none;
+  stroke: var(--panel);
+  stroke-width: 1.5;
+  stroke-dasharray: 3 9;
+  stroke-linecap: round;
+  pointer-events: none;
+  animation: edge-flow 0.6s linear infinite;
+}
+@keyframes edge-halo-pulse {
+  0%,
+  100% {
+    stroke-opacity: 0.15;
+  }
+  50% {
+    stroke-opacity: 0.4;
+  }
+}
+@keyframes edge-flow {
+  to {
+    stroke-dashoffset: -12;
+  }
+}
+@keyframes edge-label-pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 60%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 8px transparent;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-force-motion]) .edge-halo,
+  :root:not([data-force-motion]) .edge-flow,
+  :root:not([data-force-motion]) .edge-label.selected {
+    animation: none;
+  }
+  :root:not([data-force-motion]) .edge-halo {
+    stroke-opacity: 0.3;
+  }
+}
+.badge.ack {
+  background: var(--ok);
+  border-color: var(--ok);
+}
+.badge.remote {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+/* Problems */
+.problems {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.problems header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+}
+.problems header input {
+  margin-left: auto;
+  width: 180px;
+}
+.problems .count {
+  border-color: transparent;
+  background: none;
+  opacity: 0.5;
+}
+.problems .count.on {
+  opacity: 1;
+  border-color: var(--border);
+}
+.problems .count.error {
+  color: var(--danger);
+}
+.problems .count.warning {
+  color: var(--warning);
+}
+.problems .count.zero {
+  color: var(--muted);
+}
+.problems ul {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 4px;
+  overflow: auto;
+}
+.problems li {
+  padding: 2px 10px;
+  cursor: pointer;
+  display: flex;
+  gap: 8px;
+}
+.problems li:hover {
+  background: var(--panel-2);
+}
+.problems li.error .sev {
+  color: var(--danger);
+}
+.problems li.warning .sev {
+  color: var(--warning);
+}
+.problems li.ok {
+  color: var(--ok);
+  cursor: default;
+}
+
+/* Output */
+.output ul {
+  flex: 1;
+}
+.output li {
+  cursor: default;
+  padding: 0 10px;
+  font:
+    12px ui-monospace,
+    'SF Mono',
+    Consolas,
+    monospace;
+}
+.output li time {
+  color: var(--muted);
+  flex: none;
+}
+.output li.empty {
+  font: inherit;
+}
+.output .output-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  text-align: left;
+  font: inherit;
+}
+.output li.error .output-text:not(.link-button) {
+  color: var(--danger);
+}
+
+/* Modal */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: grid;
+  place-items: center;
+  z-index: 100;
+}
+.modal {
+  background: var(--panel);
+  border-radius: 8px;
+  padding: 16px 20px;
+  max-width: 640px;
+  max-height: 70vh;
+  overflow: auto;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+.modal h3 {
+  margin-top: 0;
+}
+.modal ul {
+  padding-left: 18px;
+}
+
+/* Dropdown menu */
+.dropdown {
+  position: relative;
+}
+.dropdown-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  min-width: 260px;
+  max-width: 480px;
+  padding: 4px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+}
+.dropdown-menu button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  background: none;
+  border: none;
+  text-align: left;
+  padding: 4px 8px;
+}
+.dropdown-menu button:hover,
+.dropdown-menu button.active {
+  background: var(--accent-soft);
+}
+.dropdown-menu small {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+}
+.dropdown-menu hr {
+  width: 100%;
+  margin: 4px 0;
+  border: none;
+  border-top: 1px solid var(--border);
+}
+
+/* Canvas extras */
+.note {
+  width: 100%;
+  height: 100%;
+  border-radius: 4px;
+  font-size: 13px;
+}
+.note.note {
+  padding: 8px 10px;
+  background: color-mix(in srgb, var(--note-color, #f5d76e) 80%, transparent);
+  color: #3a3320;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+.note.frame {
+  padding: 0px;
+  border: 2px solid var(--note-color, var(--muted));
+  background: color-mix(in srgb, var(--note-color, var(--muted)) 7%, transparent);
+}
+.frame-title {
+  display: inline-block;
+  padding: 2px 10px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--note-color, var(--muted));
+  border-radius: 0 0 4px 0;
+}
+.note.selected {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.note-text {
+  white-space: pre-wrap;
+  overflow: hidden;
+  height: 100%;
+}
+.note-edit {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  resize: none;
+  background: transparent;
+  color: inherit;
+  border: none;
+}
+.frame .note-edit {
+  height: auto;
+  color: #fff;
+}
+/* Module outside a drill-down view: compact, dashed, its path for a name; see-through, so that
+   the links and badges under it show (a placed module of another project too). */
+.module.outside,
+.module.imported.outside {
+  border-style: dashed;
+  background: color-mix(in srgb, var(--node-bg) 80%, transparent);
+  box-shadow: none;
+}
+/* Its header stays opaque, tinted with its color (else a neutral one): its name reads over the
+   links and badges under it. */
+.module.outside .module-header {
+  background: color-mix(in srgb, var(--module-color, var(--muted)) 25%, transparent);
+  border-bottom-color: var(--module-color, var(--border));
+}
+.edge-label.compact {
+  padding: 4px;
+}
+.edge-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 2px solid var(--panel);
+}
+.guide {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  z-index: 2000;
+}
+.guide.v {
+  width: 0;
+  height: 200000px;
+  border-left: 1px dashed var(--danger);
+}
+.guide.h {
+  height: 0;
+  width: 200000px;
+  border-top: 1px dashed var(--danger);
+}
+.breadcrumbs {
+  position: absolute;
+  top: 8px;
+  left: 10px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  font-size: 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+.canvas-source {
+  padding: 3px 10px;
+  font-size: 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+.canvas-source:hover {
+  border-color: var(--accent);
+}
+.crumb-sep {
+  margin: 0 4px;
+  color: var(--muted);
+}
+.hidden-chip {
+  margin-left: 8px;
+  color: var(--muted);
+}
+.keep-view {
+  margin-left: 8px;
+}
+
+/* Editor area and document tabs */
+.editor-area {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg);
+}
+.editor-dock {
+  flex: 1;
+  min-height: 0;
+}
+.doc-tabs {
+  display: flex;
+  align-items: stretch;
+  gap: 1px;
+  padding: 4px 6px 0;
+  background: var(--panel-2);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  flex-shrink: 0;
+}
+.doc-tabs::-webkit-scrollbar {
+  display: none;
+}
+.doc-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px 4px 12px;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  cursor: pointer;
+  white-space: nowrap;
+  color: var(--muted);
+  user-select: none;
+}
+.doc-tab:hover {
+  background: var(--panel);
+}
+.doc-tab.active {
+  background: var(--bg);
+  color: var(--text);
+  border-color: var(--border);
+  margin-bottom: -1px;
+  font-weight: 600;
+}
+.doc-tab.drop {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+.doc-key {
+  font-size: 10px;
+  font-weight: normal;
+  color: var(--muted);
+  opacity: 0;
+}
+.doc-tab:hover .doc-key {
+  opacity: 1;
+}
+.doc-close {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  background: none;
+  border-radius: 3px;
+  line-height: 18px;
+}
+.doc-close:hover {
+  background: var(--panel-2);
+}
+.doc-close .ico-dot {
+  display: none;
+}
+.doc-close .ico-x {
+  visibility: hidden;
+}
+.doc-tab.active .doc-close .ico-x,
+.doc-tab:hover .doc-close .ico-x {
+  visibility: visible;
+}
+.doc-close.dirty .ico-dot {
+  display: block;
+}
+.doc-close.dirty .ico-x {
+  display: none;
+}
+.doc-close.dirty:hover .ico-dot {
+  display: none;
+}
+.doc-close.dirty:hover .ico-x {
+  display: block;
+  visibility: visible;
+}
+.doc-new {
+  border: none;
+  background: none;
+  padding: 0 10px;
+  font-size: 16px;
+  color: var(--muted);
+}
+.watermark {
+  height: 100%;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 6px;
+  color: var(--muted);
+}
+/* Editor tabs by data-tab (EditorArea.tsx). Same outlines as the view / expand icons of components/Icon.tsx */
+.dv-default-tab:is([data-tab='view'], [data-tab='drill']) .dv-default-tab-content::before {
+  content: '';
+  display: inline-block;
+  width: var(--icon-size);
+  height: var(--icon-size);
+  margin-right: 4px;
+  vertical-align: -0.2em;
+  background: var(--ok);
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 2.5 13.5 8 8 13.5 2.5 8z'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+}
+.dv-default-tab[data-tab='drill'] .dv-default-tab-content::before {
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 3h4v4M13 3 9 7M7 13H3V9M3 13l4-4'/%3E%3C/svg%3E");
+}
+/* Temporary view (opened from a module, not saved until kept), as VS Code's preview tabs */
+.dv-default-tab[data-temporary] .dv-default-tab-content {
+  font-style: italic;
+}
+.dv-default-tab[data-tab='entity'] .dv-default-tab-content::before {
+  content: var(--tab-kind);
+  font-weight: 700;
+  color: var(--accent);
+}
+/* Overflow menu (shell/overflowTabs.ts): icons of one width, so titles start on one column */
+.dv-tabs-overflow-container .dv-default-tab[data-tab] .dv-default-tab-content::before {
+  display: inline-block;
+  width: 1.75em;
+  margin-right: 4px;
+  text-align: center;
+}
+
+/* Frameless desktop window (Electron, Tauri): data-frame is 'frameless' or 'maximized' */
+:root[data-frame='frameless'] .app {
+  border: 1px solid var(--border);
+}
+:root[data-frame] .toolbar {
+  -webkit-app-region: drag;
+  user-select: none;
+}
+:root[data-frame] .toolbar button,
+:root[data-frame] .toolbar .menubar,
+:root[data-frame] .toolbar .context-menu {
+  -webkit-app-region: no-drag;
+}
+.window-controls {
+  display: flex;
+  align-self: stretch;
+  margin: -4px -10px -4px 4px;
+}
+.window-controls button {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: none;
+  color: var(--text);
+}
+.window-controls button:hover {
+  background: var(--panel-2);
+}
+.window-controls button.close:hover {
+  background: #e81123;
+  color: #fff;
+}
+.resize-edge {
+  position: fixed;
+  z-index: 2000;
+}
+.resize-edge.n,
+.resize-edge.s {
+  left: 8px;
+  right: 8px;
+  height: 4px;
+  cursor: ns-resize;
+}
+.resize-edge.e,
+.resize-edge.w {
+  top: 8px;
+  bottom: 8px;
+  width: 4px;
+  cursor: ew-resize;
+}
+.resize-edge.ne,
+.resize-edge.nw,
+.resize-edge.se,
+.resize-edge.sw {
+  width: 8px;
+  height: 8px;
+}
+.resize-edge.n,
+.resize-edge.ne,
+.resize-edge.nw {
+  top: 0;
+}
+.resize-edge.s,
+.resize-edge.se,
+.resize-edge.sw {
+  bottom: 0;
+}
+.resize-edge.e,
+.resize-edge.ne,
+.resize-edge.se {
+  right: 0;
+}
+.resize-edge.w,
+.resize-edge.nw,
+.resize-edge.sw {
+  left: 0;
+}
+.resize-edge.ne,
+.resize-edge.sw {
+  cursor: nesw-resize;
+}
+.resize-edge.nw,
+.resize-edge.se {
+  cursor: nwse-resize;
+}
+
+/* Menus */
+.menubar {
+  display: flex;
+}
+.menubar-item {
+  border: none;
+  background: none;
+  padding: 3px 8px;
+}
+.menubar-item:hover,
+.menubar-item.open {
+  background: var(--panel-2);
+}
+.context-menu {
+  position: fixed;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  min-width: 220px;
+  max-height: calc(100vh - 16px);
+  overflow: auto;
+  padding: 4px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.2);
+}
+.dropdown-menu.context-menu {
+  position: absolute;
+}
+.context-menu hr {
+  width: 100%;
+  margin: 4px 0;
+  border: none;
+  border-top: 1px solid var(--border);
+}
+.menu-item {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 6px;
+  width: 100%;
+  padding: 4px 8px !important;
+  border: none;
+  background: none;
+  text-align: left;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+.menu-item:hover:not(:disabled),
+.menu-item.open,
+.menu-item:focus-visible {
+  background: var(--accent-soft);
+  outline: none;
+}
+.menu-item.danger {
+  color: var(--danger);
+}
+.menu-check {
+  display: inline-flex;
+  width: var(--icon-size);
+  color: var(--accent);
+}
+.menu-check.menu-icon {
+  color: inherit;
+}
+.menu-label {
+  flex: 1;
+}
+.menu-arrow {
+  display: inline-flex;
+  color: var(--muted);
+}
+
+/* Command palette */
+.palette-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  background: rgba(0, 0, 0, 0.15);
+}
+.palette {
+  position: absolute;
+  top: 12vh;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(640px, calc(100vw - 32px));
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+}
+.palette input {
+  width: 100%;
+  padding: 10px 14px;
+  font-size: 15px;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  outline: none;
+}
+.palette ul {
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+  max-height: 50vh;
+  overflow: auto;
+}
+.palette li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.palette li.active {
+  background: var(--accent-soft);
+}
+.palette li small {
+  color: var(--muted);
+}
+.palette li kbd {
+  margin-left: auto;
+}
+.palette li.empty {
+  color: var(--muted);
+  cursor: default;
+}
+.palette-kind {
+  display: inline-flex;
+  justify-content: center;
+  width: 18px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+}
+.palette-label b {
+  color: var(--accent);
+}
+
+/* Shortcuts */
+.modal.shortcuts {
+  max-width: 900px;
+}
+.shortcut-columns {
+  columns: 280px 3;
+  column-gap: 24px;
+}
+.shortcut-columns section {
+  break-inside: avoid;
+  margin-bottom: 12px;
+}
+.shortcut-columns h4 {
+  margin: 0 0 4px;
+  color: var(--muted);
+  text-transform: uppercase;
+  font-size: 11px;
+}
+.shortcut-columns dl {
+  margin: 0;
+}
+.shortcut-columns dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 0;
+}
+.shortcut-columns dd {
+  margin: 0;
+  display: flex;
+  gap: 4px;
+}
+
+/* About */
+.modal.about {
+  text-align: center;
+  min-width: 320px;
+}
+.modal.about p {
+  margin: 0 0 8px;
+}
+.modal.about .muted {
+  color: var(--muted);
+}
+
+.hint {
+  padding: 0 10px;
+  font-size: 11px;
+}
+.search-panel .count {
+  margin: 0 10px 4px;
+  font-size: 12px;
+}
+.results {
+  list-style: none;
+  margin: 0;
+  padding: 0 4px;
+}
+.results li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.results li:hover {
+  background: var(--panel-2);
+}
+.results li.active {
+  background: var(--accent-soft);
+}
+.results small {
+  color: var(--muted);
+}
+.result-text {
+  flex-basis: 100%;
+  padding-left: 24px;
+  color: var(--muted);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.results li.file-hit {
+  margin-top: 4px;
+  flex-wrap: nowrap;
+}
+.results li.file-hit .result-label {
+  white-space: nowrap;
+}
+.results li.file-hit small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hit-count {
+  margin-left: auto;
+  padding: 0 6px;
+  border-radius: 8px;
+  background: var(--panel-2);
+  color: var(--muted);
+  font-size: 11px;
+}
+.results li.line-hit {
+  flex-wrap: nowrap;
+  padding-left: 28px;
+}
+.line-number {
+  flex-shrink: 0;
+  min-width: 3ch;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.result-line {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: pre;
+  font-family: ui-monospace, 'SF Mono', Consolas, monospace;
+  font-size: 12px;
+}
+mark {
+  background: color-mix(in srgb, var(--warning) 40%, transparent);
+  color: inherit;
+}
+
+/* Inspector extras */
+.swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+.swatch {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid transparent;
+}
+.swatch.active {
+  border-color: var(--text);
+}
+.swatch.none {
+  background: linear-gradient(135deg, transparent 45%, var(--danger) 45%, var(--danger) 55%, transparent 55%);
+  border-color: var(--border);
+}
+.swatches input[type='color'] {
+  width: 28px;
+  height: 22px;
+  padding: 0 2px;
+}
+.button-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+}
+.settings .check {
+  margin: 6px 0;
+}
+/* Settings the filter leaves out render nothing: hide sections left empty. */
+.settings .section:not(:has(.row, .check, .toolbar-editor)) {
+  display: none;
+}
+.settings-empty {
+  display: none;
+}
+.settings:not(:has(.section .row, .section .check, .section .toolbar-editor)) .settings-empty {
+  display: block;
+}
+/* Toolbar buttons (Settings › Toolbar). */
+.toolbar-editor ul {
+  list-style: none;
+  margin: 0 0 6px;
+  padding: 0;
+}
+.toolbar-editor li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 0;
+}
+.toolbar-editor li.separator .toolbar-editor-label {
+  color: var(--muted);
+}
+.toolbar-editor-icon {
+  display: inline-flex;
+  width: var(--icon-size);
+  flex: none;
+}
+.toolbar-editor-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.toolbar-editor-add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* Tool tabs (shell/DockShell.tsx): icon only, title as tooltip */
+.tool-tab {
+  position: relative;
+  padding: 0 10px;
+}
+.dv-tab .tool-tab .dv-default-tab-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 0;
+}
+.tool-tab-badge {
+  position: absolute;
+  top: 3px;
+  right: 2px;
+  min-width: 12px;
+  padding: 0 3px;
+  border-radius: 6px;
+  font-size: 9px;
+  line-height: 12px;
+  text-align: center;
+  color: #fff;
+}
+.tool-tab-badge.error {
+  background: var(--danger);
+}
+.tool-tab-badge.warning {
+  background: var(--warning);
+}
+
+/* Dockview theme mapped on the app tokens */
+.dockview-theme-scaffold {
+  --dv-paneview-active-outline-color: var(--accent);
+  --dv-tabs-and-actions-container-font-size: 12px;
+  --dv-tabs-and-actions-container-height: 30px;
+  --dv-drag-over-background-color: color-mix(in srgb, var(--accent) 25%, transparent);
+  --dv-drag-over-border-color: var(--accent);
+  --dv-edge-dock-indicator-color: var(--accent);
+  --dv-tabs-container-scrollbar-color: var(--border);
+  --dv-icon-hover-background-color: var(--panel-2);
+  --dv-floating-box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+  --dv-floating-border: 1px solid var(--border);
+  --dv-overlay-z-index: 999;
+  --dv-tab-font-size: inherit;
+  --dv-border-radius: 0px;
+  --dv-tab-margin: 0;
+  --dv-sash-color: transparent;
+  --dv-active-sash-color: var(--accent);
+  --dv-active-sash-transition-duration: 0.1s;
+  --dv-active-sash-transition-delay: 0.3s;
+  --dv-spacing-padding: 0px;
+  --dv-tab-border-radius: 0px;
+  --dv-sash-border-radius: 0px;
+  --dv-dropdown-border-radius: 4px;
+  --dv-tab-close-icon-size: inherit;
+  --dv-floating-group-border: 1px solid var(--border);
+  --dv-drag-over-border: 2px solid var(--accent);
+  --dv-floating-group-dragging-opacity: 0.6;
+  --dv-floating-titlebar-height: 22px;
+  --dv-floating-titlebar-background-color: var(--panel-2);
+  --dv-floating-titlebar-border-bottom: 1px solid var(--border);
+  --dv-group-view-background-color: var(--panel);
+  --dv-tabs-and-actions-container-background-color: var(--panel-2);
+  --dv-activegroup-visiblepanel-tab-background-color: var(--panel);
+  --dv-activegroup-hiddenpanel-tab-background-color: var(--panel-2);
+  --dv-inactivegroup-visiblepanel-tab-background-color: var(--panel);
+  --dv-inactivegroup-hiddenpanel-tab-background-color: var(--panel-2);
+  --dv-tab-divider-color: var(--border);
+  --dv-activegroup-visiblepanel-tab-color: var(--text);
+  --dv-activegroup-hiddenpanel-tab-color: var(--muted);
+  --dv-inactivegroup-visiblepanel-tab-color: var(--text);
+  --dv-inactivegroup-hiddenpanel-tab-color: var(--muted);
+  --dv-separator-border: var(--border);
+  --dv-paneview-header-border-color: var(--border);
+  --dv-scrollbar-background-color: var(--scrollbar-thumb);
+  color: var(--text);
+}
+.dockview-theme-scaffold
+  .dv-groupview.dv-active-group
+  > .dv-tabs-and-actions-container
+  .dv-tab.dv-active-tab {
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+.editor-dock .dv-groupview {
+  background: var(--bg);
+}
+
+/* Vertical orientation: in ports on the top edge, out ports on the bottom edge */
+.module.vertical {
+  position: relative;
+}
+.port-band.top + .module-header {
+  border-radius: 0;
+  border-top: 1px solid var(--border);
+}
+.port-band {
+  display: flex;
+  height: 24px;
+  font-size: 12px;
+}
+.port-band.bottom {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-top: 1px dashed var(--border);
+}
+.module.container .port-band.bottom {
+  border-top: none;
+}
+/* Container ports moved to another edge: outside the frame, the handle on its edge. */
+.module.container {
+  position: relative;
+}
+.port-band.outside {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border: none;
+}
+.port-band.outside.top {
+  top: auto;
+  bottom: 100%;
+}
+.port-band.outside.bottom {
+  top: 100%;
+  bottom: auto;
+}
+.port-band.outside.top .port-point {
+  top: 100%;
+}
+.port-band.outside.bottom .port-point {
+  top: 0;
+}
+.module-ports.framed {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  padding-top: 0;
+  pointer-events: none;
+}
+/* Ports of modules: a point on the border holding the handle (in its row, band or at a hand-set
+   link attachment), the name on one side of it, dragged around it. */
+.port-point {
+  position: absolute;
+  width: 0;
+  height: 0;
+  font-size: 12px;
+}
+/* Name of a container port, in the viewport (placed by transform, see PortPoint). */
+.port-point.lifted {
+  left: 0;
+  top: 0;
+}
+.port-point.at-left {
+  left: 0;
+  top: 50%;
+}
+.port-point.at-right {
+  left: 100%;
+  top: 50%;
+}
+.port-point.at-top {
+  top: 0;
+  left: 50%;
+}
+.port-point.at-bottom {
+  top: 100%;
+  left: 50%;
+}
+.port-label {
+  position: absolute;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  white-space: nowrap;
+  line-height: 16px;
+  cursor: grab;
+  pointer-events: auto;
+  /* Stays readable over the attributes and links it lies on. */
+  z-index: 1;
+  padding: 0 3px;
+  background: var(--node-label-bg);
+  border-radius: 3px;
+}
+.port-label.dragging {
+  cursor: grabbing;
+  opacity: 0.7;
+}
+.port-label.label-right {
+  left: 10px;
+  top: 0;
+  transform: translateY(-50%);
+}
+.port-label.label-left {
+  right: 10px;
+  top: 0;
+  transform: translateY(-50%);
+  flex-direction: row-reverse;
+}
+.port-label.label-top {
+  bottom: 6px;
+  left: 0;
+  transform: translateX(-50%);
+}
+.port-label.label-bottom {
+  top: 6px;
+  left: 0;
+  transform: translateX(-50%);
+}
+.port-label small {
+  color: var(--muted);
+  font-size: 10px;
+}
+.port-label small.no-iface {
+  color: var(--warning);
+}
+.vport {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 4px;
+}
+.vport-label {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.vport small {
+  color: var(--muted);
+  font-size: 10px;
+}
+/* Module of another project (Insert › Link to another project). */
+.module.imported {
+  border-style: dashed;
+  border-color: var(--muted);
+  background: var(--panel-2);
+}
+.module.imported.selected {
+  border-color: var(--accent);
+}
+.imported-project {
+  color: var(--muted);
+  font-weight: 500;
+}
+.module-binary {
+  margin-left: 6px;
+  padding: 0 4px;
+  border-radius: 3px;
+  font-style: normal;
+  font-weight: 500;
+  color: var(--binary-color, var(--muted));
+  background: color-mix(in srgb, var(--binary-color, var(--muted)) 14%, transparent);
+}
+.binary-item {
+  margin-bottom: 4px;
+}
+.module.imported .unknown small {
+  color: var(--danger);
+}
+.port small.no-iface,
+.vport small.no-iface {
+  color: var(--warning);
+}
+.error-text {
+  color: var(--danger);
+}
+
+/* Keyboard focus on list, tree and tab items (see listKeys.ts). */
+:is(.entity-list, .results, .problems ul) > li[data-item]:focus-visible,
+.doc-tab:focus-visible,
+.explorer-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* Inheritance: UML generalization (solid) or realization of an interface (dashed), hollow triangle on the base. */
+.react-flow__edge-path.inherit-edge {
+  stroke: var(--muted);
+  stroke-width: 1.5;
+}
+.react-flow__edge-path.inherit-edge.realization {
+  stroke-dasharray: 6 4;
+}
+.inherit-arrow {
+  fill: var(--bg);
+  stroke: var(--muted);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+
+/* Default value of a bitmask: opens the flags to toggle. */
+.flags-input {
+  width: 100%;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Labels of a union case, then its default checkbox. */
+.case-labels {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.case-labels > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Exceptions a message raises: chips, then a choice of the others. */
+.raises {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+.raises .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 0 0 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 12px;
+}
+.raises select {
+  width: auto;
+}
+
+/* Translucent minimap: the diagram stays visible behind it. */
+.react-flow__minimap {
+  --xy-minimap-background-color: color-mix(in srgb, var(--panel) 70%, transparent);
+}
+
+/* Resizer edges: an 8px grab area centered on the border, still drawn as a 1px line, above the
+   port bands and labels lying on the border; port handles stay on top to start links. */
+.react-flow__resize-control.line {
+  z-index: 2;
+  border-width: 0 !important;
+  --resize-line: var(--xy-resize-background-color, var(--xy-resize-background-color-default));
+}
+.react-flow__resize-control.line.left,
+.react-flow__resize-control.line.right {
+  width: 8px;
+  background: linear-gradient(to right, transparent 3.5px, var(--resize-line) 3.5px 4.5px, transparent 4.5px);
+}
+.react-flow__resize-control.line.top,
+.react-flow__resize-control.line.bottom {
+  height: 8px;
+  background: linear-gradient(
+    to bottom,
+    transparent 3.5px,
+    var(--resize-line) 3.5px 4.5px,
+    transparent 4.5px
+  );
+}
+.react-flow__resize-control.handle {
+  z-index: 3;
+}
+.react-flow__handle.handle {
+  z-index: 4;
+}

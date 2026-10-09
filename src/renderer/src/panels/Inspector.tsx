@@ -1,0 +1,244 @@
+import type { ReactNode } from 'react'
+import { useDoc } from '@/store/documents'
+import { deleteItems, setLocked, setModuleColor, updateNote, useProjectStore } from '@/store/project'
+import { select } from '@/store/ui'
+import { commandItem } from '@/commands'
+import { navigate, navigateToNote } from '@/actions'
+import { frameContents } from '@/model/project'
+import { ColorPicker, Row, Section, Select, TextArea } from '@/components/fields'
+import { openEditor, type EditorKind } from '@/shell/controllers'
+import { ProjectInspector } from './ProjectInspector'
+import { ModuleInspector } from './ModuleInspector'
+import { LinkInspector } from './LinkInspector'
+import { TypeInspector } from './TypeInspector'
+import { InterfaceInspector } from './InterfaceInspector'
+import { ImportedInspector } from './ImportedInspector'
+import { DependencyDetail } from './DependencyDetail'
+import { Icon, type IconName } from '@/components/Icon'
+
+function CommandButton({ id, icon, label }: { id: string; icon?: IconName; label: string }): ReactNode {
+  const c = commandItem(id)
+  return (
+    <button
+      type="button"
+      disabled={c.disabled}
+      title={c.keys ? `${c.label} (${c.keys})` : c.label}
+      onClick={c.run}
+    >
+      {icon && <Icon name={icon} />} {label}
+    </button>
+  )
+}
+
+function MultiInspector({ ids }: { ids: string[] }): ReactNode {
+  const project = useProjectStore((s) => s.project)
+  const modules = project.modules.filter((m) => ids.includes(m.id))
+  const notes = project.notes.filter((n) => ids.includes(n.id))
+  const types = project.types.filter((t) => ids.includes(t.id))
+  const interfaces = project.interfaces.filter((i) => ids.includes(i.id))
+  const parts = [
+    [modules.length, 'module'],
+    [notes.length, 'note'],
+    [types.length, 'type'],
+    [interfaces.length, 'interface']
+  ]
+    .filter(([n]) => n)
+    .map(([n, what]) => `${n} ${what}${(n as number) > 1 ? 's' : ''}`)
+  const onCanvas = modules.length + notes.length
+  return (
+    <>
+      <h2>
+        Selection <small className="muted">{parts.join(', ')}</small>
+      </h2>
+      {onCanvas > 1 && (
+        <Section title="Align">
+          <div className="button-grid">
+            <CommandButton id="arrange.left" icon="align-left" label="Left" />
+            <CommandButton id="arrange.hcenter" icon="align-hcenter" label="Center" />
+            <CommandButton id="arrange.right" icon="align-right" label="Right" />
+            <CommandButton id="arrange.top" icon="align-top" label="Top" />
+            <CommandButton id="arrange.vcenter" icon="align-vcenter" label="Middle" />
+            <CommandButton id="arrange.bottom" icon="align-bottom" label="Bottom" />
+            <CommandButton id="arrange.distH" icon="distribute-h" label="Distribute" />
+            <CommandButton id="arrange.distV" icon="distribute-v" label="Distribute" />
+            <CommandButton id="arrange.sameSize" icon="same-size" label="Same size" />
+          </div>
+        </Section>
+      )}
+      {modules.length > 0 && (
+        <Section title="Color">
+          <ColorPicker
+            value={modules.every((m) => m.color === modules[0]!.color) ? modules[0]!.color : undefined}
+            onChange={(c) =>
+              setModuleColor(
+                modules.map((m) => m.id),
+                c
+              )
+            }
+          />
+        </Section>
+      )}
+      {onCanvas > 0 && (
+        <Section title="Layout">
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={[...modules, ...notes].every((e) => e.locked)}
+              onChange={(e) =>
+                setLocked(
+                  [...modules, ...notes].map((x) => x.id),
+                  e.target.checked
+                )
+              }
+            />
+            Locked (position and size)
+          </label>
+        </Section>
+      )}
+      <Section title="Items">
+        <ul className="plain">
+          {[
+            ...modules,
+            ...notes.map((n) => ({ ...n, name: n.text.split('\n')[0] })),
+            ...types,
+            ...interfaces
+          ].map((e) => (
+            <li key={e.id}>{e.name}</li>
+          ))}
+        </ul>
+      </Section>
+      <div className="actions">
+        {modules.length > 0 && <CommandButton id="arrange.group" label="Group" />}
+        <CommandButton id="edit.copy" label="Copy" />
+        <CommandButton id="edit.duplicate" label="Duplicate" />
+        <CommandButton id="edit.delete" label="Delete" />
+      </div>
+    </>
+  )
+}
+
+function NoteInspector({ id }: { id: string }): ReactNode {
+  const project = useProjectStore((s) => s.project)
+  const note = project.notes.find((n) => n.id === id)
+  if (!note) return <p className="muted">Note deleted.</p>
+  const contents = note.kind === 'frame' ? frameContents(project, id) : []
+  return (
+    <>
+      <h2>{note.kind}</h2>
+      <Row label="Kind">
+        <Select
+          value={note.kind}
+          options={['note', 'frame'] as const}
+          onChange={(k) => updateNote(id, (n) => void (n.kind = k))}
+        />
+      </Row>
+      <TextArea
+        value={note.text}
+        placeholder="Text"
+        onChange={(v) => updateNote(id, (n) => void (n.text = v))}
+      />
+      <Section title="Color">
+        <ColorPicker
+          value={note.color}
+          onChange={(c) => updateNote(id, (n) => (c ? void (n.color = c) : void delete n.color))}
+        />
+      </Section>
+      <Section title="Layout">
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={!!note.locked}
+            onChange={(e) => setLocked([id], e.target.checked)}
+          />
+          Locked (position and size)
+        </label>
+      </Section>
+      {note.kind === 'frame' && (
+        <Section title={`Contents (${contents.length})`}>
+          <ul className="plain">
+            {contents.map((c) => (
+              <li key={c.id}>
+                <button
+                  type="button"
+                  className="link-button"
+                  onClick={() =>
+                    c.kind === 'note' ? navigateToNote(c.id) : navigate({ kind: 'module', id: c.id })
+                  }
+                >
+                  {c.name}
+                </button>
+              </li>
+            ))}
+          </ul>
+          {!contents.length && <p className="muted">Nothing lies fully inside this frame.</p>}
+        </Section>
+      )}
+      <p className="muted">Notes and frames are editor annotations: they are saved but never exported.</p>
+      <div className="actions">
+        <button
+          type="button"
+          className="danger"
+          onClick={() => {
+            deleteItems([id])
+            select(null)
+          }}
+        >
+          Delete {note.kind}
+        </button>
+      </div>
+    </>
+  )
+}
+
+/** A dependency: its relations and content. */
+function DependencyInspector({ id }: { id: string }): ReactNode {
+  const dep = useProjectStore((s) => s.project.dependencies.find((d) => d.id === id))
+  if (!dep) return <p className="muted">Dependency removed.</p>
+  return <DependencyDetail lib={dep} />
+}
+
+export function Inspector(): ReactNode {
+  const sel = useDoc((d) => d.selection)
+  const selectedIds = useDoc((d) => d.selectedIds)
+  const openable: EditorKind | null =
+    sel &&
+    sel.kind !== 'project' &&
+    sel.kind !== 'note' &&
+    sel.kind !== 'imported' &&
+    sel.kind !== 'dependency'
+      ? sel.kind
+      : null
+  return (
+    <div className="inspector">
+      {openable && sel && 'id' in sel && selectedIds.length <= 1 && (
+        <button
+          type="button"
+          className="icon open-tab"
+          title="Open in an editor tab"
+          onClick={() => openEditor(openable, sel.id)}
+        >
+          <Icon name="open-tab" />
+        </button>
+      )}
+      {selectedIds.length > 1 ? (
+        <MultiInspector ids={selectedIds} />
+      ) : !sel || sel.kind === 'project' ? (
+        <ProjectInspector />
+      ) : sel.kind === 'module' ? (
+        <ModuleInspector key={sel.id} id={sel.id} />
+      ) : sel.kind === 'link' ? (
+        <LinkInspector key={sel.id} id={sel.id} />
+      ) : sel.kind === 'type' ? (
+        <TypeInspector key={sel.id} id={sel.id} />
+      ) : sel.kind === 'note' ? (
+        <NoteInspector key={sel.id} id={sel.id} />
+      ) : sel.kind === 'imported' ? (
+        <ImportedInspector key={sel.id} id={sel.id} />
+      ) : sel.kind === 'dependency' ? (
+        <DependencyInspector key={sel.id} id={sel.id} />
+      ) : (
+        <InterfaceInspector key={sel.id} id={sel.id} />
+      )}
+    </div>
+  )
+}
