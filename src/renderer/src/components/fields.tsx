@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
-import { PALETTE } from '@/model/project'
-import type { Qualifier } from '@/model/types'
+import { ACCESS_MARKS, PALETTE } from '@/model/project'
+import { ACCESS_LEVELS, type Access, type Qualifier } from '@/model/types'
 import { Icon, type IconName } from './Icon'
 import { useDraft } from './useDraft'
 
@@ -137,6 +137,27 @@ export function QualifierToggles(props: {
           </button>
         )
       })}
+    </span>
+  )
+}
+
+/** Toggle buttons of the access level of a type, attribute or method, by UML mark (`+ # -`). */
+export function AccessToggles(props: { value: Access | undefined; onChange: (a: Access) => void }): ReactNode {
+  const value = props.value ?? 'public'
+  return (
+    <span className="qualifiers access">
+      {ACCESS_LEVELS.map((a) => (
+        <button
+          type="button"
+          key={a}
+          className={`qualifier ${a === value ? 'on' : ''}`}
+          aria-pressed={a === value}
+          title={a}
+          onClick={() => props.onChange(a)}
+        >
+          {ACCESS_MARKS[a]}
+        </button>
+      ))}
     </span>
   )
 }

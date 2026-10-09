@@ -1,6 +1,6 @@
 import { memo, type CSSProperties, type ReactNode } from 'react'
 import { Handle, NodeResizer, Position, type Node, type NodeProps } from '@xyflow/react'
-import { indexById, minSize, modulePath, nameError, parentIds } from '@/model/project'
+import { ACCESS_MARKS, indexById, minSize, modulePath, nameError, parentIds } from '@/model/project'
 import { getProject, setLocked, setModuleLayout, update, useProjectStore } from '@/store/project'
 import { useUiStore } from '@/store/ui'
 import { openModuleView } from '@/actions'
@@ -91,9 +91,11 @@ function Attributes({ attributes, types }: { attributes: Attribute[]; types: Typ
         const deleted = hasDeletedRef(a.type, nameOf)
         const value = a.default === undefined ? '' : ` = ${formatValue(a.default)}`
         const qualifiers = qualifierText(a)
-        const sig = `${qualifiers}${a.name}: ${type}${value}`
+        const mark = ACCESS_MARKS[a.access ?? 'public']
+        const sig = `${mark} ${qualifiers}${a.name}: ${type}${value}`
         return (
           <li key={a.id} title={a.description ? `${sig}\n${a.description}` : sig}>
+            <span className="attr-access">{mark}</span>
             {qualifiers && <span className="attr-qualifier">{qualifiers}</span>}
             <span className="attr-name">{a.name}</span>
             <span className={`attr-type ${deleted ? 'deleted' : ''}`}>: {type}</span>
@@ -126,9 +128,11 @@ function Methods({ methods, types }: { methods: Method[]; types: TypeDef[] }): R
         const raises = m.raises?.length
           ? ` throws ${m.raises.map((id) => nameOf(id) ?? '<deleted>').join(', ')}`
           : ''
-        const sig = `${before}${m.name}(${params})${returns}${after}${raises}`
+        const mark = ACCESS_MARKS[m.access ?? 'public']
+        const sig = `${mark} ${before}${m.name}(${params})${returns}${after}${raises}`
         return (
           <li key={m.id} title={m.description ? `${sig}\n${m.description}` : sig}>
+            <span className="attr-access">{mark}</span>
             {before && <span className="attr-qualifier">{before}</span>}
             <span className={`attr-name ${m.pure ? 'pure' : ''}`}>{m.name}</span>
             <span className={`attr-type ${deleted ? 'deleted' : ''}`}>

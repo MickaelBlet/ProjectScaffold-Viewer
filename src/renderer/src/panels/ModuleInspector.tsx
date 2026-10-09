@@ -6,6 +6,7 @@ import {
   modulePath,
   nameError,
   newId,
+  setAccess,
   setMethodQualifier,
   setQualifier,
   unimplementedMethods
@@ -25,6 +26,7 @@ import { select } from '@/store/ui'
 import { assignBinary } from '@/model/binaries'
 import { navigate } from '@/actions'
 import {
+  AccessToggles,
   ColorPicker,
   CommitInput,
   IconButton,
@@ -173,12 +175,18 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
           baseName="attribute"
           onChange={(fn) => withModule(id, (m) => fn(m.attributes))}
           column={(a, i) => (
-            <QualifierToggles
-              qualifiers={QUALIFIERS}
-              value={a}
-              short
-              onChange={(q, on) => withModule(id, (m) => setQualifier(m.attributes[i]!, q, on))}
-            />
+            <>
+              <AccessToggles
+                value={a.access}
+                onChange={(v) => withModule(id, (m) => setAccess(m.attributes[i]!, v))}
+              />
+              <QualifierToggles
+                qualifiers={QUALIFIERS}
+                value={a}
+                short
+                onChange={(q, on) => withModule(id, (m) => setQualifier(m.attributes[i]!, q, on))}
+              />
+            </>
           )}
           value={(a, i) => (
             <DefaultInput
@@ -228,11 +236,14 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
           noun="method"
           onChange={(fn) => withModule(id, (m) => fn(m.methods))}
           extra={(x, change) => (
-            <QualifierToggles
-              qualifiers={METHOD_QUALIFIERS}
-              value={x}
-              onChange={(q, on) => change((y) => setMethodQualifier(y, q, on))}
-            />
+            <>
+              <AccessToggles value={x.access} onChange={(v) => change((y) => setAccess(y, v))} />
+              <QualifierToggles
+                qualifiers={METHOD_QUALIFIERS}
+                value={x}
+                onChange={(q, on) => change((y) => setMethodQualifier(y, q, on))}
+              />
+            </>
           )}
           paramExtra={(prm, change) =>
             // Only `in` parameters can be const.

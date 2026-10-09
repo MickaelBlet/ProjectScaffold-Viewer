@@ -109,6 +109,7 @@ Ctrl+C / X / V / D copy, cut, paste and duplicate several items at once: modules
 - **Attributes** are listed as `name: type = default` in a compartment below the module's header, apart from the ports on its border where links attach. Edit them in the module's inspector, with their default value: a choice for `bool` and enums, a YAML flow literal checked against the type otherwise (the placeholder shows the expected shape).
 - **Methods** are prototypes listed as `static name(const a: T, out b: U): R const` in a compartment below the attributes. Edit them in the module's inspector like interface messages: parameters with their direction, an optional return type, `const` on `in` parameters.
 - Both can be `static` and `const` (checkboxes in the inspector), shown before their name on the canvas.
+- Both have an access level, `public` (default), `protected` or `private`, chosen with the `+ # -` buttons of the inspector and shown before their name on the canvas as in UML (`+ name`, `# name`, `- name`).
 
 ### Classes and inheritance
 

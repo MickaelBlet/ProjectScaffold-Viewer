@@ -101,8 +101,9 @@ interfaces: # { name, description?, messages }
 
 ## Modules
 
-- **Attributes** (optional): typed properties, `{ name, static?, const?, type, description?, default? }` like struct fields. `static`: shared by all instances of the module; `const`: not changed after initialization.
-- **Methods** (optional): prototypes, `{ name, description?, static?, const?, virtual?, pure?, override?, params, returns, raises? }` like interface messages. Names are unique among the module's methods and attributes.
+- **Attributes** (optional): typed properties, `{ name, access?, static?, const?, type, description?, default? }` like struct fields. `static`: shared by all instances of the module; `const`: not changed after initialization.
+- **Methods** (optional): prototypes, `{ name, description?, access?, static?, const?, virtual?, pure?, override?, params, returns, raises? }` like interface messages. Names are unique among the module's methods and attributes.
+  - `access`: `public` (default, left out), `protected` (the module and the modules deriving from it) or `private` (the module). An attribute's member stays private: its access is that of its getter and setter (none when `private`). An override with another access than the method it overrides is a warning.
   - `static`: called without a module instance; `const`: leaves the module's state unchanged (not both).
   - `virtual`: can be overridden by derived modules (not `static`); `pure`: pure virtual, `= 0`; `override`: overrides a virtual method of a base, with the same parameters (types, directions, `const`), return type and `const`. `pure` and `override` require `virtual`.
   - Parameters take `const: true` too, `in` parameters only.

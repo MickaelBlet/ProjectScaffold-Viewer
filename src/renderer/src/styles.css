@@ -1406,6 +1406,9 @@ ul.plain > li + li {
 }
 .field-row > .column {
   grid-column: 2;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 .field-row > .before {
   grid-column: 3;
@@ -1497,6 +1500,13 @@ button.qualifier.on {
   margin: 0;
   /* Height of an input: line height plus padding and border. */
   height: calc(1.4em + 8px);
+}
+/* Access level beside qualifiers: set apart. */
+.qualifiers.access + .qualifiers {
+  margin-left: 6px;
+}
+.field-row > .column .qualifiers.access + .qualifiers {
+  margin-left: 2px;
 }
 .field-row button.qualifier {
   width: 20px;
@@ -1722,6 +1732,13 @@ ul.plain {
 .attr-qualifier {
   color: var(--accent);
   font-style: italic;
+}
+/* UML access mark: + public, # protected, - private. */
+.attr-access {
+  display: inline-block;
+  width: 1.2ch;
+  margin-right: 0.4ch;
+  color: var(--muted);
 }
 .attr-name.pure {
   font-style: italic;
