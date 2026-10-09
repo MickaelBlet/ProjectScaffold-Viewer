@@ -87,6 +87,7 @@ Ctrl+Shift+F searches names, descriptions and metadata of the project, then the 
 - `in` ports on the left, `out` ports on the right — or `in` on top, `out` at the bottom in vertical orientation.
 - Drag between an `out` port and an `in` port to create a link. A container's `in` port links to an `in` port inside it; an `out` port inside links to the container's `out` port.
 - Or link modules directly: drag the → in a module's header onto another module (or one of its `in` ports), or drag a port onto a module. The missing `out` / `in` ports are added, typed with the other end's interface.
+- A new link is bidirectional when its interface has a message returning a value or with `out` / `inout` parameters (IDL operations with results), unidirectional otherwise.
 - Ports follow their links: on a module without submodules, each port (dot and name) moves to the edge facing the modules it is linked to — top / bottom for modules one above the other, left / right otherwise. Containers keep their ports on the default edges and their links leave from the facing side (_View › Auto-orient link ends_).
 
 ### Link shape

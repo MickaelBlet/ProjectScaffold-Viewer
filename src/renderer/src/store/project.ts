@@ -330,7 +330,10 @@ function pushLink(d: Project, id: Id, from: Endpoint, to: Endpoint): void {
     `${a}_to_${b}`,
     d.links.map((l) => l.name)
   )
-  d.links.push({ id, name, description: '', from, to, constraints: defaultConstraints() })
+  const interfaceId =
+    findPort(d, from.moduleId, from.portId)?.interfaceId ?? findPort(d, to.moduleId, to.portId)?.interfaceId
+  const iface = d.interfaces.find((i) => i.id === interfaceId)
+  d.links.push({ id, name, description: '', from, to, constraints: defaultConstraints(iface) })
 }
 
 export function deleteLink(id: Id): void {
