@@ -80,6 +80,7 @@ import {
   select,
   setStatus,
   showDialog,
+  type DialogLine,
   useUiStore,
   type PickEntry,
   type Selection
@@ -506,11 +507,12 @@ const problemsOf = (e: unknown): string[] =>
   e instanceof LoadError ? e.problems : [e instanceof Error ? e.message : String(e)]
 
 /** Picked files as projects, and lines telling what could not be read or was approximated. */
-async function readPicked(picked: OpenResult[]): Promise<{ projects: OtherProject[]; lines: string[] }> {
+async function readPicked(picked: OpenResult[]): Promise<{ projects: OtherProject[]; lines: DialogLine[] }> {
   const here = activeDoc().filePath
   const idl = new Map(picked.filter((f) => isIdl(f.path)).map((f) => [f.path, f.content]))
   const projects: OtherProject[] = []
-  const lines: string[] = []
+  // What was approximated, as warnings; what could not be read, as errors.
+  const lines: DialogLine[] = []
   for (const f of picked) {
     const name = fileName(f.path)
     try {
@@ -518,7 +520,7 @@ async function readPicked(picked: OpenResult[]): Promise<{ projects: OtherProjec
       projects.push({ project, file: relativeFile(here, f.path) })
       lines.push(...warnings.map((w) => `${name}: ${w}`))
     } catch (e) {
-      lines.push(...problemsOf(e).map((x) => `${name}: ${x}`))
+      lines.push(...problemsOf(e).map((x) => ({ level: 'error' as const, text: `${name}: ${x}` })))
     }
   }
   return { projects, lines }
@@ -585,20 +587,20 @@ function placeFrom(
   other: OtherProject,
   moduleId: Id,
   at: { x: number; y: number },
-  lines: string[] = []
+  lines: DialogLine[] = []
 ): void {
   if (activeDoc().activeViewId !== GLOBAL_VIEW) openView(GLOBAL_VIEW)
   const { id, result } = placeModuleFrom(other.project, other.file, moduleId, at, selfFile())
   if (id) select({ kind: 'imported', id })
   const all = [...lines, ...dependencyLines(result)]
-  if (all.length) showDialog(`Linking to ${other.file}`, all)
+  if (all.length) showDialog(`Linking to ${other.file}`, all, 'warning')
 }
 
 /**
  * Pick a top-level module of `others` and place it on the canvas at `at` with its content,
  * depending on its project.
  */
-function pickModuleOf(others: OtherProject[], at: { x: number; y: number }, lines: string[] = []): void {
+function pickModuleOf(others: OtherProject[], at: { x: number; y: number }, lines: DialogLine[] = []): void {
   const entries = others.flatMap((other) =>
     childModules(other.project, null).map((m) => {
       const inside = subtreeIds(other.project, m.id).size - 1
@@ -618,7 +620,7 @@ function pickModuleOf(others: OtherProject[], at: { x: number; y: number }, line
     })
   )
   if (!entries.length) {
-    if (lines.length) showDialog(`Read ${namesOf(others)}`, lines)
+    if (lines.length) showDialog(`Read ${namesOf(others)}`, lines, 'warning')
     return setStatus('error', `${namesOf(others)} has no modules`)
   }
   quickPick(`Module of ${namesOf(others)} to link to`, entries)
@@ -789,7 +791,7 @@ async function importProjects(
   others: OtherProject[],
   parent: Id | null,
   pos?: { x: number; y: number },
-  lines: string[] = [],
+  lines: DialogLine[] = [],
   below: Id[] = []
 ): Promise<void> {
   if (!others.length) {
@@ -848,7 +850,7 @@ async function importProjects(
   selectMany(pasted)
   lines.push(...empty)
   const what = `Imported ${modules} modules, ${defs} types and interfaces from ${namesOf(others)}`
-  if (lines.length) showDialog(what, lines)
+  if (lines.length) showDialog(what, lines, 'warning')
   else setStatus('info', what)
 }
 
@@ -902,7 +904,7 @@ async function importIdlFiles(picked: OpenResult[], whole = false): Promise<Id[]
         ? ['Pick the included files along with the IDL file to read their definitions.']
         : [])
     ]
-    if (notes.length) showDialog(`Imported from ${label}`, notes)
+    if (notes.length) showDialog(`Imported from ${label}`, notes, 'warning')
     return pasted
   }
   const entries = idl.components.length + idl.interfaces.length
@@ -1010,7 +1012,7 @@ export function pickDependency(): void {
   ])
 }
 
-async function dependOn(others: OtherProject[], lines: string[] = []): Promise<void> {
+async function dependOn(others: OtherProject[], lines: DialogLine[] = []): Promise<void> {
   if (!others.length) {
     if (lines.length) showDialog('No dependency added', lines)
     return
@@ -1018,7 +1020,7 @@ async function dependOn(others: OtherProject[], lines: string[] = []): Promise<v
   const nested = await readableDependencies(others)
   lines.push(...dependencyLines(addDependenciesFrom([...others, ...nested], selfFile())))
   const what = `Depending on ${namesOf(others)}`
-  if (lines.length) return showDialog(what, lines)
+  if (lines.length) return showDialog(what, lines, 'warning')
   setStatus(
     'info',
     `${what}: ${others.length === 1 ? 'its' : 'their'} types and interfaces are read-only here`
@@ -1027,18 +1029,18 @@ async function dependOn(others: OtherProject[], lines: string[] = []): Promise<v
 
 /** Read dependencies again from their projects (all, or those of these ids). */
 export async function refreshDependencies(ids?: Id[]): Promise<void> {
-  const lines: string[] = []
+  const lines: DialogLine[] = []
   const sources = new Map<Id, Project>()
   for (const x of getProject().dependencies) {
     if (ids && !ids.includes(x.id)) continue
     const source = await importSource(x.file)
     if (source) sources.set(x.id, source)
     // Indirect dependencies also come with the dependencies using them.
-    else if (!x.indirect) lines.push(cannotRead(x.name, x.file))
+    else if (!x.indirect) lines.push({ level: 'error', text: cannotRead(x.name, x.file) })
   }
   if (sources.size) lines.push(...dependencyLines(refreshDependenciesFrom(sources, selfFile())))
   const what = `Refreshed ${sources.size} dependenc${sources.size === 1 ? 'y' : 'ies'}`
-  if (lines.length) showDialog(what, lines)
+  if (lines.length) showDialog(what, lines, 'warning')
   else setStatus('info', what)
 }
 

@@ -3,7 +3,7 @@ import { create } from 'zustand'
 import type { Id } from '@/model/types'
 import type { IconName } from '@/components/Icon'
 import { patchDoc, useDoc, type Selection } from './documents'
-import { log } from './output'
+import { log, type OutputLevel } from './output'
 
 export type { Selection } from './documents'
 
@@ -76,11 +76,19 @@ export function setStatus(kind: 'info' | 'error', text: string): void {
   useUiStore.setState({ status: { kind, text } })
 }
 
-/** Shows a dialog, logged to the Output panel. */
-export function showDialog(title: string, lines: string[]): void {
-  log('error', title)
-  for (const line of lines) log('error', `  ${line}`)
-  useUiStore.setState({ dialog: { title, lines } })
+/** Line of a dialog: logged at the dialog's level, unless it has its own. */
+export type DialogLine = string | { level: OutputLevel; text: string }
+
+/**
+ * Shows a dialog, logged to the Output panel at `level`: `error` for what failed, `warning` for
+ * what was approximated or left out by what succeeded.
+ */
+export function showDialog(title: string, lines: DialogLine[], level: OutputLevel = 'error'): void {
+  log(level, title)
+  for (const line of lines)
+    if (typeof line === 'string') log(level, `  ${line}`)
+    else log(line.level, `  ${line.text}`)
+  useUiStore.setState({ dialog: { title, lines: lines.map((l) => (typeof l === 'string' ? l : l.text)) } })
 }
 
 /** Let the user pick one of `entries` in the command palette. */

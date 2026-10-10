@@ -36,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Output panel: what reading, importing, depending on or refreshing projects and IDL files approximated or left out (an IDL `home` left out, renames, conflicts) is logged as a warning, not an error; only what could not be read stays an error.
 - _File › Open Recent_ shows again in the menu bar.
 - Submenus stay within the window: on the left of their item when there is no room on its right, raised near the bottom.
 - _Sync selection_ no longer opens or switches views to show the element under the text cursor: it is shown when the focused view draws it.
