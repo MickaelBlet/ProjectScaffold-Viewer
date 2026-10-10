@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-ProjectScaffold-Viewer: browser editor for software architecture (modules, ports, typed interfaces, constrained links) that saves a language-agnostic YAML/JSON project file meant to feed code skeleton generators. One React web build (`dist-web/index.html`, a single self-contained file) runs in the browser, in Electron, in Tauri and in VS Code webviews. Sibling repositories: ProjectScaffold-Generator (code generation, its own copy of the model) and ProjectScaffold-VsCode (the extension, with this repository as a submodule).
+ProjectScaffold-Viewer: browser editor for software architecture (modules, ports, typed interfaces, constrained links) that saves a language-agnostic YAML/JSON project file meant to feed code skeleton generators. One React web build (`dist-web/index.html`, a single self-contained file) runs in the browser, in Electron, in Tauri and in VS Code webviews. Sibling repository: ProjectScaffold-VsCode (the extension, with this repository as a submodule).
 
 ## Commands
 
@@ -30,7 +30,6 @@ scripts/build_all.sh [--check] [web|desktop]...   # all of the above (default: a
 ### Model (`src/renderer/src/model/`, pure, no React)
 
 - Two representations: the in-memory `Project` (`types.ts`) references entities by **id**; the file format (`schema.ts`, zod, source of the published JSON Schema) references them by **qualified name** (`Core.Sensor`). `serialize.ts` converts between them and YAML/JSON text; the `editor` section holds layout/view data, stripped on export.
-- File format changes must also be made in ProjectScaffold-Generator (`src/model/`), which reads the same files.
 - `validate.ts`: semantic checks; errors block export, warnings do not. `locate.ts` maps problems to text lines, `outline.ts` reads an outline from the raw YAML (both used by the text editor and the VS Code extension).
 - `dependencies.ts`: other project files a project uses. Their types/interfaces are copied into the project's `types` / `interfaces` with `dependency` set (snapshot, so files stay self-contained for generators); placed modules of dependencies are "imported modules". `sync.ts` carries renames to dependent projects.
 - `reuse.ts`: reloading from text keeps existing entity ids so selection, editors and views survive text edits.
