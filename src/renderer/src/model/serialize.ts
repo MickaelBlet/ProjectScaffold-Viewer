@@ -946,13 +946,6 @@ export function fromFile(data: unknown, prev?: Project): Project {
     const mod = x.module === undefined ? undefined : moduleByPath.get(x.module)
     if (mod) consts[i]!.module = mod.id
   })
-  for (const { mod, path, bases, at } of derived)
-    mod.bases = bases.flatMap((b, j) => {
-      const base = moduleByPath.get(b)
-      if (!base) report(`Module '${path}': unknown base '${b}'`, [...at, j])
-      return base ? [base.id] : []
-    })
-
   // Placed modules of dependencies: on the right of the project's modules when they have no position.
   let importY = PAD
   const importX =
@@ -1026,6 +1019,26 @@ export function fromFile(data: unknown, prev?: Project): Project {
       })
     }
   })
+
+  // Bases: modules of this project, or placed modules of dependencies (`Dependency/Module.Path`).
+  for (const { mod, path, bases, at } of derived)
+    mod.bases = bases.flatMap((b, j) => {
+      const slash = b.indexOf('/')
+      const base =
+        slash < 0
+          ? moduleByPath.get(b)
+          : dependencies
+              .find((x) => x.name === b.slice(0, slash))
+              ?.modules.find((m) => m.path === b.slice(slash + 1))
+      if (!base)
+        report(
+          slash < 0
+            ? `Module '${path}': unknown base '${b}'`
+            : `Module '${path}': base '${b}' is not a placed module of a dependency`,
+          [...at, j]
+        )
+      return base ? [base.id] : []
+    })
 
   const endpoint = (e: { project?: string; module: string; port: string }, where: string, at: DataPath) => {
     if (e.project !== undefined) {

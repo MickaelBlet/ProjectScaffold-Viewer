@@ -473,16 +473,30 @@ export function setMethodQualifier(m: Method, q: Qualifier, on: boolean): void {
   }
 }
 
+/**
+ * A base of a module: one of this project, or a placed module of a dependency (whose own bases are
+ * not known here).
+ */
+export type BaseModule = Module | ImportedModule
+
+/** Module of this project, or placed module of a dependency, a module may derive from. */
+export function baseModule(p: Pick<Project, 'modules' | 'dependencies'>, id: Id): BaseModule | undefined {
+  return isImportedId(id) ? findImported(p, id)?.module : p.modules.find((m) => m.id === id)
+}
+
+/** Methods of a base (as last read for a placed module of a dependency). */
+export const baseMethods = (b: BaseModule): Method[] => b.methods ?? []
+
 /** Bases of a module, direct and indirect, nearest first; a base met twice (or a cycle) is listed once. */
-export function ancestorModules(p: Project, id: Id): Module[] {
+export function ancestorModules(p: Project, id: Id): BaseModule[] {
   const seen = new Set<Id>([id])
-  const out: Module[] = []
+  const out: BaseModule[] = []
   let level = [id]
   while (level.length) {
     const next: Id[] = []
     for (const cur of level)
       for (const b of p.modules.find((m) => m.id === cur)?.bases ?? []) {
-        const base = p.modules.find((m) => m.id === b)
+        const base = baseModule(p, b)
         if (!base || seen.has(b)) continue
         seen.add(b)
         out.push(base)
@@ -509,21 +523,21 @@ export function methodSignature(m: Method): string {
  * Pure methods a module inherits and does not implement: those of its bases not defined (by name)
  * in itself or in a base nearer to it on the way.
  */
-export function unimplementedMethods(p: Project, id: Id): { base: Module; method: Method }[] {
-  const byId = new Map(p.modules.map((m) => [m.id, m]))
-  const out = new Map<string, { base: Module; method: Method }>()
+export function unimplementedMethods(p: Project, id: Id): { base: BaseModule; method: Method }[] {
+  const out = new Map<string, { base: BaseModule; method: Method }>()
   /** Walks the bases of `cur`; `defined` holds the names defined on the way from the module. */
-  const walk = (cur: Module, defined: Set<string>, stack: Set<Id>): void => {
-    for (const b of cur.bases ?? []) {
-      const base = byId.get(b)
+  const walk = (cur: BaseModule, defined: Set<string>, stack: Set<Id>): void => {
+    for (const b of 'bases' in cur ? (cur.bases ?? []) : []) {
+      const base = baseModule(p, b)
       if (!base || stack.has(b)) continue
-      for (const x of base.methods)
+      const methods = baseMethods(base)
+      for (const x of methods)
         if (x.pure && !defined.has(x.name) && !out.has(x.name)) out.set(x.name, { base, method: x })
-      const names = new Set([...defined, ...base.methods.filter((x) => !x.pure).map((x) => x.name)])
+      const names = new Set([...defined, ...methods.filter((x) => !x.pure).map((x) => x.name)])
       walk(base, names, new Set([...stack, b]))
     }
   }
-  const mod = byId.get(id)
+  const mod = p.modules.find((m) => m.id === id)
   if (mod) walk(mod, new Set(mod.methods.map((x) => x.name)), new Set([id]))
   return [...out.values()]
 }
@@ -635,9 +649,14 @@ export function typeScope(p: Project, contextModuleId: Id | null): TypeScope {
   const byId = new Map(p.types.map((t) => [t.id, t]))
   const local = new Map<string, Id>()
   if (contextModuleId)
-    for (const m of [contextModuleId, ...ancestorModules(p, contextModuleId).map((a) => a.id)])
+    for (const m of [contextModuleId, ...ancestorModules(p, contextModuleId).map((a) => a.id)]) {
+      // A placed module of a dependency: the types of that module (public ones).
+      const placed = findImported(p, m)
+      const owns = (t: TypeDef): boolean =>
+        placed ? t.dependency === placed.dep.id && t.modulePath === placed.module.path : t.module === m
       for (const t of p.types)
-        if (t.module === m && !local.has(t.name) && canUseType(p, contextModuleId, t)) local.set(t.name, t.id)
+        if (owns(t) && !local.has(t.name) && canUseType(p, contextModuleId, t)) local.set(t.name, t.id)
+    }
   for (const t of p.types) if (!isModuleType(t) && !local.has(t.name)) local.set(t.name, t.id)
   const nameOf = (id: Id): string | undefined => {
     const t = byId.get(id)

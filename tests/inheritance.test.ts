@@ -4,8 +4,16 @@ import { describe, expect, it } from 'vitest'
 import { fromFile, LoadError, toFile } from '@/model/serialize'
 import { validate } from '@/model/validate'
 import { copyItems, pasteClip } from '@/model/clipboard'
-import { canDerive, contentTop, setMethodQualifier, unimplementedMethods } from '@/model/project'
+import {
+  canDerive,
+  contentTop,
+  modulePath,
+  setMethodQualifier,
+  typeScope,
+  unimplementedMethods
+} from '@/model/project'
 import { inheritEdges } from '@/canvas/inheritEdges'
+import { removePlaced } from '@/model/dependencies'
 import type { Method, Project } from '@/model/types'
 
 const source = `
@@ -171,11 +179,100 @@ describe('inheritance checks', () => {
   it('lists pure methods left to implement', () => {
     const p = load()
     expect(unimplementedMethods(p, mod(p, 'Circle').id)).toEqual([])
-    expect(unimplementedMethods(p, mod(p, 'Base').id).map((u) => [u.base.name, u.method.name])).toEqual([
+    expect(unimplementedMethods(p, mod(p, 'Base').id).map((u) => [modulePath(p, u.base.id), u.method.name])).toEqual([
       ['IShape', 'area']
     ])
     mod(p, 'Circle').methods = []
     expect(unimplementedMethods(p, mod(p, 'Circle').id).map((u) => u.method.name)).toEqual(['area'])
+  })
+})
+
+const dependent = `
+schemaVersion: 1
+project:
+  name: App
+types: []
+interfaces: []
+dependencies:
+  - name: Lib
+    file: lib.scaffold.yaml
+    types: []
+    interfaces: []
+    moduleTypes:
+      - module: Core.IShape
+        types:
+          - kind: enum
+            name: Unit
+            underlying: int32
+            values: [{ name: mm, value: 0 }]
+    modules:
+      - module: Core
+        ports: []
+      - module: Core.IShape
+        methods:
+          - name: area
+            const: true
+            virtual: true
+            pure: true
+            params: []
+            returns: { kind: primitive, name: float64 }
+        ports: []
+modules:
+  - name: Square
+    bases: [Lib/Core.IShape]
+    methods:
+      - name: area
+        const: true
+        virtual: true
+        override: true
+        params: []
+        returns: { kind: primitive, name: float64 }
+    ports: []
+links: []
+`
+
+describe('bases placed from dependencies', () => {
+  const loadDependent = (): Project => fromFile(YAML.parse(dependent))
+  const shape = (p: Project) => p.dependencies[0]!.modules.find((m) => m.path === 'Core.IShape')!
+
+  it('loads them by dependency and path, and writes them back', () => {
+    const p = loadDependent()
+    expect(mod(p, 'Square').bases).toEqual([shape(p).id])
+    expect(toFile(p, { editor: false }).modules[0]!.bases).toEqual(['Lib/Core.IShape'])
+  })
+
+  it('reports a base not placed from its dependency', () => {
+    const data = YAML.parse(dependent)
+    data.modules[0].bases = ['Lib/Core.Other']
+    expect(() => fromFile(data)).toThrow(LoadError)
+  })
+
+  it('checks overrides and pure methods against them', () => {
+    const p = loadDependent()
+    expect(messages(p)).toEqual([])
+    expect(unimplementedMethods(p, mod(p, 'Square').id)).toEqual([])
+    mod(p, 'Square').methods = []
+    expect(unimplementedMethods(p, mod(p, 'Square').id).map((u) => modulePath(p, u.base.id))).toEqual([
+      'Lib/Core.IShape'
+    ])
+    expect(messages(p)).toEqual([
+      'Square does not implement pure method Lib/Core.IShape.area (implement it or make the module abstract)'
+    ])
+  })
+
+  it('names the types of the base by their own name', () => {
+    const p = loadDependent()
+    const unit = p.types.find((t) => t.name === 'Unit')!
+    expect(typeScope(p, mod(p, 'Square').id).nameOf(unit.id)).toBe('Unit')
+    expect(typeScope(p, null).nameOf(unit.id)).toBe('Lib/Core.IShape.Unit')
+  })
+
+  it('draws an edge to a visible base, dropped with the placed module', () => {
+    const p = loadDependent()
+    const square = mod(p, 'Square').id
+    expect(inheritEdges(p, new Set([square, shape(p).id])).map((e) => e.target)).toEqual([shape(p).id])
+    const q = produce(p, (d) => removePlaced(d, new Set([d.dependencies[0]!.modules[0]!.id])))
+    expect(mod(q, 'Square').bases).toBeUndefined()
   })
 })
 

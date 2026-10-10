@@ -490,8 +490,7 @@ class Sync {
     const placedIds = new Set(placed.map((m) => m.id))
     const dropped = new Set(dep.modules.flatMap((m) => (placedIds.has(m.id) ? [] : [m.id])))
     if (!same(dep.modules, placed)) dep.modules = placed
-    if (dropped.size)
-      this.d.links = this.d.links.filter((l) => !dropped.has(l.from.moduleId) && !dropped.has(l.to.moduleId))
+    if (dropped.size) dropPlacedRefs(this.d, dropped)
     const ports = new Set(dep.modules.flatMap((m) => m.ports.map((pt) => pt.id)))
     const ids = new Set(dep.modules.map((m) => m.id))
     const kept = this.d.links.filter(
@@ -692,7 +691,17 @@ export function removePlaced(d: Project, ids: Set<Id>): void {
     for (const m of x.modules) if (under(m.path)) gone.add(m.id)
     x.modules = x.modules.filter((m) => !gone.has(m.id))
   }
-  if (gone.size) d.links = d.links.filter((l) => !gone.has(l.from.moduleId) && !gone.has(l.to.moduleId))
+  if (gone.size) dropPlacedRefs(d, gone)
+}
+
+/** Drop the links to removed placed modules, and the bases they were. */
+function dropPlacedRefs(d: Project, gone: Set<Id>): void {
+  d.links = d.links.filter((l) => !gone.has(l.from.moduleId) && !gone.has(l.to.moduleId))
+  for (const m of d.modules)
+    if (m.bases?.some((b) => gone.has(b))) {
+      m.bases = m.bases.filter((b) => !gone.has(b))
+      if (!m.bases.length) delete m.bases
+    }
 }
 
 /** What keeps a dependency: the dependencies using it and its modules placed here. */

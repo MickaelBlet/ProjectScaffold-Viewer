@@ -1,6 +1,6 @@
 import { memo, type CSSProperties, type ReactNode } from 'react'
 import { Handle, NodeResizer, Position, type Node, type NodeProps } from '@xyflow/react'
-import { ACCESS_MARKS, indexById, minSize, modulePath, nameError, parentIds } from '@/model/project'
+import { ACCESS_MARKS, findImported, indexById, minSize, modulePath, nameError, parentIds } from '@/model/project'
 import { getProject, setLocked, setModuleLayout, update, useProjectStore } from '@/store/project'
 import { useUiStore } from '@/store/ui'
 import { openModuleView } from '@/actions'
@@ -173,7 +173,13 @@ export const ModuleNode = memo(function ModuleNode({
   // Stable string: re-renders only when a base is added, removed or renamed.
   const bases = useProjectStore((s) => {
     const modules = indexById(s.project.modules)
-    return (modules.get(id)?.bases ?? []).map((b) => modules.get(b)?.name ?? '?').join(', ')
+    return (modules.get(id)?.bases ?? [])
+      .map((b) => {
+        // A placed module of a dependency: with its dependency's name.
+        const placed = findImported(s.project, b)
+        return placed ? `${placed.dep.name}/${placed.module.path.split('.').pop()!}` : (modules.get(b)?.name ?? '?')
+      })
+      .join(', ')
   })
   const { floating, anchors, top, bottom, left, right } = usePortLayout(
     id,

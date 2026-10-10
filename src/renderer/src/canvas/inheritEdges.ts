@@ -1,6 +1,6 @@
 // Inheritance edges of a view: from a module to each of its bases (see InheritEdge).
 import type { Edge } from '@xyflow/react'
-import { contentTop } from '@/model/project'
+import { contentTop, findImported } from '@/model/project'
 import type { Id, Module, Project } from '@/model/types'
 import { MODULE_HANDLE, Z } from './constants'
 
@@ -27,11 +27,12 @@ export function inheritEdges(p: Project, visible: Set<Id>): Edge<InheritEdgeData
   return p.modules.flatMap((m) =>
     visible.has(m.id)
       ? (m.bases ?? []).flatMap((b) => {
+          // Or a placed module of a dependency, holding no module of this project.
           const base = byId.get(b)
-          if (!base || b === m.id || !visible.has(b)) return []
-          const outer = holds(base, m) ? base : holds(m, base) ? m : null
+          if ((!base && !findImported(p, b)) || b === m.id || !visible.has(b)) return []
+          const outer = base && holds(base, m) ? base : base && holds(m, base) ? m : null
           const data: InheritEdgeData = {
-            realization: base.kind === 'interface',
+            realization: base?.kind === 'interface',
             ...(outer && { inset: contentTop(p.orientation, outer) })
           }
           return [

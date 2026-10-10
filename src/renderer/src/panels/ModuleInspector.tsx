@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import {
   absolutePosition,
+  allImported,
   canDerive,
   childModules,
   modulePath,
@@ -90,6 +91,11 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
     { value: '', label: '+ add base…' },
     ...project.modules
       .filter((m) => !bases.includes(m.id) && canDerive(project, id, m.id))
+      .map((m) => ({ value: m.id, label: modulePath(project, m.id) }))
+      .sort((a, b) => a.label.localeCompare(b.label)),
+    // Placed modules of dependencies, after this project's.
+    ...allImported(project)
+      .filter((m) => !bases.includes(m.id))
       .map((m) => ({ value: m.id, label: modulePath(project, m.id) }))
       .sort((a, b) => a.label.localeCompare(b.label))
   ]

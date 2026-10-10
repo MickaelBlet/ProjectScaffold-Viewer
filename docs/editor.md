@@ -124,7 +124,7 @@ A module has types and constants of its own, like those nested in a C++ class:
 Modules work as C++-like classes:
 
 - _Kind_: `class` (concrete, default), `abstract` or `interface` (only pure methods, no attributes), shown as `«interface» Name` in italics.
-- _Bases_: modules it derives from, shown as `Name : Base` and as UML arrows from the module to each base (hollow triangle, dashed to an interface). Clicking an arrow selects the module; right click goes to or removes the base. _View › Inheritance arrows_ hides them.
+- _Bases_: modules it derives from (of this project, or placed modules of dependencies, see [Dependencies](dependencies.md#linking-to-a-dependencys-modules)), shown as `Name : Base` and as UML arrows from the module to each base (hollow triangle, dashed to an interface). Clicking an arrow selects the module; right click goes to or removes the base. _View › Inheritance arrows_ hides them.
 - Methods can be `virtual`, `pure` (`= 0`) and `override`, shown as `virtual name(): R const override = 0`.
 - _Implement_ in the Methods section adds the pure methods a module inherits and lacks, as overrides.
 

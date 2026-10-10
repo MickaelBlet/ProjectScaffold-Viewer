@@ -2,6 +2,8 @@
 import {
   allTypeRefs,
   ancestorModules,
+  baseMethods,
+  baseModule,
   canUseType,
   globalTypeNames,
   isModuleType,
@@ -353,7 +355,7 @@ export function validate(p: Project): Problem[] {
       if (m.kind === 'interface' && !x.pure)
         push('error', target, `${where}: methods of an interface module must be pure`)
       const inherited = ancestors
-        .map((a) => ({ base: a, method: a.methods.find((y) => y.name === x.name && y.virtual) }))
+        .map((a) => ({ base: a, method: baseMethods(a).find((y) => y.name === x.name && y.virtual) }))
         .find((e) => e.method)
       if (x.override) {
         if (!inherited) push('error', target, `${where}: overrides no virtual method of a base`)
@@ -389,7 +391,9 @@ export function validate(p: Project): Problem[] {
     if (m.kind === 'interface' && m.attributes.length)
       push('error', target, `${path}: an interface module cannot have attributes`)
     const bases = m.bases ?? []
-    for (const b of bases) if (!modules.has(b)) push('error', target, `${path} derives from a deleted module`)
+    for (const b of bases)
+      if (!baseModule(p, b))
+        push('error', target, `${path} derives from a deleted module${isImportedId(b) ? ' of a dependency' : ''}`)
     if (bases.includes(m.id)) push('error', target, `${path} derives from itself`)
     else if (bases.some((b) => ancestorModules(p, b).some((a) => a.id === m.id)))
       push('error', target, `${path} derives from itself through its bases`)

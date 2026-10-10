@@ -109,7 +109,7 @@ interfaces: # { name, description?, messages }
   - `virtual`: can be overridden by derived modules (not `static`); `pure`: pure virtual, `= 0`; `override`: overrides a virtual method of a base, with the same parameters (types, directions, `const`), return type and `const`. `pure` and `override` require `virtual`.
   - Parameters take `const: true` too, `in` parameters only.
 - **Kind** (optional): `class` (default, left out), `abstract` or `interface`. A `class` has no pure methods and implements every pure method it inherits; an `interface` has only pure methods and no attributes.
-- **Bases** (optional): `bases: [IShape, Core.Base]`, paths of modules of this project it derives from, in order; no cycles, no repeats. A method redefining a virtual one of a base without `override` is a warning.
+- **Bases** (optional): `bases: [IShape, Core.Base, Robot/Core.Sensor]`, paths of the modules it derives from, in order: of this project, or `Dependency/Module.Path` for a module of a dependency placed on the canvas (`dependencies[].modules`, whose methods are those overridden or implemented); no cycles, no repeats. A method redefining a virtual one of a base without `override` is a warning.
 - **Types** and **constants** (optional): see [Types and constants of modules](#types-and-constants-of-modules).
 - **Ports** and **submodules** (`modules`): see below.
 

@@ -267,9 +267,11 @@ const Module: z.ZodType<FileModule> = z
           'class (default): concrete; abstract: may have pure methods; interface: only pure methods, no attributes'
         ),
       bases: z
-        .array(QualifiedName)
+        .array(ModulePath)
         .optional()
-        .describe('paths of the modules of this project it derives from, in order'),
+        .describe(
+          'paths of the modules it derives from, in order: of this project, or `Dependency/Module.Path` for a module of a dependency placed on the canvas'
+        ),
       metadata: Metadata,
       color: z.string().optional().describe('accent color (CSS color)'),
       binary: Identifier.optional().describe(

@@ -32,6 +32,7 @@ A dependency's top-level module is placed on the canvas from the Explorer (doubl
 - Its header buttons, as a module's: → drags a link to a module or port of this project through one of its ports (it gets no new port: a menu picks one when several fit), the lock keeps its position and size (Ctrl+L; `editor.dependencies.<Dependency>.<Module>.locked`), ⤢ opens it in its own view (Alt+Enter): it with its content and the modules of this project linked to them (compact). That view keeps nothing of its own (it cannot be kept): what is moved or resized there is moved in the project view too, the outside modules stay in line.
 - It comes with all the modules inside it, drawn where its project puts them; move and resize them in it (it grows to hold them; kept on refresh), they are removed with it; their ports are linked to as well. A module placed alone by an earlier version is placed with its top-level module on the next refresh, its links kept.
 - Double-click a placed module to switch to its project's tab.
+- A module of this project may derive from a placed module (Inspector, _Bases_): its methods, as last read, are those overridden or implemented, its public types named by their own name in the derived module; removing the placed module removes it from the bases. Written `bases: [Robot/Core.Sensor]`.
 
 ### Indirect dependencies
 

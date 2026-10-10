@@ -5,6 +5,7 @@ import { mapTypeRef } from './typeExpr'
 import { binarySnapshot, settleBinaries } from './binaries'
 import {
   absolutePosition,
+  allImported,
   boundsOf,
   childModules,
   globalTypeNames,
@@ -310,8 +311,8 @@ export function pasteClip(d: Project, clip: Clip, options: PasteOptions): Id[] {
   // Ports whose interface does not exist here become untyped.
   const ifaceIds = new Set(d.interfaces.map((i) => i.id))
   const newModules = new Set(moduleIds.values())
-  // Bases follow copied modules, else stay when they exist here.
-  const existing = new Set(d.modules.map((m) => m.id))
+  // Bases follow copied modules, else stay when they exist here (placed modules of dependencies too).
+  const existing = new Set([...d.modules, ...allImported(d)].map((m) => m.id))
   for (const m of d.modules)
     if (newModules.has(m.id)) {
       for (const pt of m.ports) if (pt.interfaceId && !ifaceIds.has(pt.interfaceId)) pt.interfaceId = null
