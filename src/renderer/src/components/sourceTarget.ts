@@ -92,6 +92,14 @@ export function targetAt(p: Project, path: Path, names: (string | undefined)[]):
       }
       if (path[1] === 'layout' || path[1] === 'style') return moduleTarget(key(2))
       if (path[1] === 'links') return linkTarget(key(2))
+      // Placed modules of dependencies: dependencies.<Dependency>.<Module>.
+      if (path[1] === 'dependencies') {
+        const dep = p.dependencies.find((d) => d.name === key(2))
+        if (!dep) return null
+        return key(3) === undefined
+          ? { kind: 'dependency', id: dep.id }
+          : moduleTarget(`${dep.name}/${key(3)}`)
+      }
       if (path[1] !== 'views') return null
       const view = p.views[index(2) ?? -1]
       if (!view) return null

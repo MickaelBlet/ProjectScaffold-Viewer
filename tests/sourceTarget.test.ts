@@ -44,6 +44,23 @@ describe('caret target', () => {
     expect(at('  Core.Logger:')).toBe('module:Logger')
   })
 
+  it('finds placed modules of dependencies from their editor data', () => {
+    const station = loadText(readFileSync('examples/station.scaffold.yaml', 'utf8'), 'yaml')
+    const t = saveText(station, 'yaml', { editor: true })
+    const find = (marker: string) => {
+      const { path, names } = structureAt(t, t.indexOf(marker, t.indexOf('\neditor:')) + marker.length)
+      const target = targetAt(station, path, names)
+      const placed = station.dependencies.flatMap((d) => d.modules.map((m) => ({ id: m.id, name: m.path })))
+      const name = [...placed, ...station.dependencies].find(
+        (e) => target && 'id' in target && e.id === target.id
+      )?.name
+      return `${target?.kind}:${name}`
+    }
+    expect(find('    Core.Sensor:')).toBe('module:Core.Sensor')
+    expect(find('      Core:\n        x: 660')).toBe('module:Core')
+    expect(find('  dependencies:\n    Robot:')).toBe('dependency:Robot')
+  })
+
   it('finds links and modules from the editor data of the views', () => {
     const p = produce(project, (d) => {
       const core = d.modules.find((m) => m.name === 'Core')!
