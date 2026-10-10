@@ -20,6 +20,7 @@ scripts/build_desktop.sh             # Tauri + Electron in Docker (docker buildx
 scripts/build_all.sh [--check] [web|desktop]...   # all of the above (default: all)
 ```
 
+- `--check` runs lint, tests and build in parallel. ESLint (`--cache`) and `tsc` (`incremental`) cache in `node_modules/.cache/`; the ESLint cache does not see type changes in imported files, so delete it when type-aware results look stale.
 - `tests/serialize.test.ts` fails when `schema/scaffold.schema.json` is stale: run `npm run schema` after changing `model/schema.ts`.
 - Prettier: no semicolons, single quotes, width 110, no trailing commas.
 - `@/` aliases `src/renderer/src/`.

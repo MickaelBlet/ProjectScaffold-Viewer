@@ -39,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `sca-cpp98`: one executable per binary (`<ns>_<binary>`) serving its components in one process, bound in the naming service by their usage names, in place of one executable per component; `<ns>_app` serves the components of no binary. SPDs name the executable of their binary (`/bin/...`, installed in `dom/bin`). Templates see the `binary` of each module.
 - New links are bidirectional when their interface has a message returning a value or with `out` / `inout` parameters (IDL operations with results, for instance), in place of unidirectional (an error until changed).
 - Canvas: modules and links look up the project through indexes built once per edit, not a scan per module and link: edits of large projects redraw faster.
+- Build: Vite 8 (Rolldown) and `@vitejs/plugin-react` 6, `vite build` about ten times faster; `scripts/build_web.sh --check` runs lint, tests and build in parallel (`build_all.sh --check` through it); `npm run lint` caches its results and `tsc` checks incrementally, both in `node_modules/.cache/`.
 
 ### Removed
 

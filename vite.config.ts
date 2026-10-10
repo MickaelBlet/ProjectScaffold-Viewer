@@ -53,6 +53,6 @@ export default defineConfig({
     emptyOutDir: true,
     assetsInlineLimit: Number.MAX_SAFE_INTEGER,
     cssCodeSplit: false,
-    rollupOptions: { output: { inlineDynamicImports: true } }
+    rolldownOptions: { output: { codeSplitting: false } }
   }
 })

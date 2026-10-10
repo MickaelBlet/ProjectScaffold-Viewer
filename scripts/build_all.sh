@@ -24,10 +24,11 @@ if [ ! -f node_modules/.package-lock.json ] || [ package-lock.json -nt node_modu
   npm ci
 fi
 
-if $check; then
+if has web; then
+  # build_web.sh --check runs lint and tests in parallel with the build.
+  if $check; then scripts/build_web.sh --check; else scripts/build_web.sh; fi
+elif $check; then
   npm run lint
   npm test
 fi
-
-if has web; then scripts/build_web.sh; fi
 if has desktop; then scripts/build_desktop.sh; fi

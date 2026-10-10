@@ -16,10 +16,29 @@ if [ ! -f node_modules/.package-lock.json ] || [ package-lock.json -nt node_modu
   npm ci
 fi
 
-if $check; then
-  npm run lint
-  npm test
+if ! $check; then
+  npm run build # typecheck + vite build
+else
+  # Lint, tests and build in parallel; each output is printed once its step ends.
+  logs=$(mktemp -d)
+  trap 'rm -rf "$logs"' EXIT
+  declare -A pids
+  for step in lint test build; do
+    npm run "$step" >"$logs/$step" 2>&1 &
+    pids[$step]=$!
+  done
+  failed=()
+  for step in lint test build; do
+    status=0
+    wait "${pids[$step]}" || status=$?
+    echo "=== npm run $step (exit $status)"
+    cat "$logs/$step"
+    [ "$status" -eq 0 ] || failed+=("$step")
+  done
+  if [ ${#failed[@]} -gt 0 ]; then
+    echo "failed: ${failed[*]}" >&2
+    exit 1
+  fi
 fi
-npm run build # typecheck + vite build
 
 ls -lh dist-web/index.html
