@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Dialogs (depending on, refreshing or importing projects and IDL files…) mark warnings and errors with their icon in place of a bullet.
 - Access levels (`+ # -`) drawn as icons in the inspector's buttons, the attributes and methods of modules on the canvas and the module types and constants of the Explorer.
 - Explorer, _Modules_: the modules of dependencies placed on the canvas are nested under their parent (folding), each with its public types and constants, in place of a flat list of paths.
 - IDL dependencies: the types and constants of an IDL module belong to the module standing for it, named simply there (`Robot.Status` in place of `Robot_Status`); in files without components, every IDL module holding definitions is a module (files of types only too). The Explorer lists them under their module, in the dependency's _Modules_ too; _Refresh dependencies_ moves those used by name. `examples/idl/filling_cell.scaffold.yaml` refreshed.

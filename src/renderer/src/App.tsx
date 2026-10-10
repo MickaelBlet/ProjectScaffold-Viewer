@@ -60,7 +60,10 @@ function Dialog(): ReactNode {
         <h3 id={titleId}>{dialog.title}</h3>
         <ul>
           {dialog.lines.map((l, i) => (
-            <li key={i}>{l}</li>
+            <li key={i} className={l.level}>
+              {l.level && <Icon name={l.level} title={l.level} />}
+              {l.text}
+            </li>
           ))}
         </ul>
         <button type="button" autoFocus onClick={close}>

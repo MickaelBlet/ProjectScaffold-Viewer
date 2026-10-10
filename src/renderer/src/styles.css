@@ -2033,6 +2033,21 @@ ul.plain {
 .modal ul {
   padding-left: 18px;
 }
+/* Warnings and errors: the icon of their level in place of the bullet. */
+.modal li.warning,
+.modal li.error {
+  list-style: none;
+}
+.modal li > .ico {
+  margin: 0 4px 0 -18px;
+  vertical-align: -2px;
+}
+.modal li.warning > .ico {
+  color: var(--warning);
+}
+.modal li.error > .ico {
+  color: var(--danger);
+}
 
 /* Dropdown menu */
 .dropdown {

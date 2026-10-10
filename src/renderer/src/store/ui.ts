@@ -34,7 +34,8 @@ interface UiState {
   /** Recent project files, most recent first. */
   recent: string[]
   status: { kind: 'info' | 'error'; text: string } | null
-  dialog: { title: string; lines: string[] } | null
+  /** Lines marked `warning` or `error` show the icon of their level in place of a bullet. */
+  dialog: { title: string; lines: { text: string; level?: 'warning' | 'error' }[] } | null
   contextMenu: { x: number; y: number; items: MenuItem[] } | null
   /** Command palette: '>' prefix lists commands, otherwise entities; or a quick pick of `pick`. */
   palette: { query: string; pick?: { placeholder: string; entries: PickEntry[] } } | null
@@ -88,7 +89,18 @@ export function showDialog(title: string, lines: DialogLine[], level: OutputLeve
   for (const line of lines)
     if (typeof line === 'string') log(level, `  ${line}`)
     else log(line.level, `  ${line.text}`)
-  useUiStore.setState({ dialog: { title, lines: lines.map((l) => (typeof l === 'string' ? l : l.text)) } })
+  // Warnings are marked, and lines with a level of their own; lines of an error dialog are not.
+  const mark = (l: OutputLevel): 'warning' | 'error' | undefined => (l === 'info' ? undefined : l)
+  useUiStore.setState({
+    dialog: {
+      title,
+      lines: lines.map((l) =>
+        typeof l === 'string'
+          ? { text: l, level: level === 'warning' ? 'warning' : undefined }
+          : { text: l.text, level: mark(l.level) }
+      )
+    }
+  })
 }
 
 /** Let the user pick one of `entries` in the command palette. */
