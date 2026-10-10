@@ -9,6 +9,7 @@ import {
   isModuleRef,
   isModuleType,
   memberNames,
+  missingName,
   moduleTypes,
   parseDependencyModuleRef,
   refContext,
@@ -64,6 +65,12 @@ function duplicates(names: string[]): string[] {
   return [...dups]
 }
 
+/** What a reference to something the project lacks says: the name it keeps (see `missingRef`), if any. */
+function missingText(id: Id, kind: string, deleted: string, verb = 'references'): string {
+  const name = missingName(id)
+  return name === undefined ? `${verb} a deleted ${deleted}` : `${verb} unknown ${kind} '${name}'`
+}
+
 export function validate(p: Project): Problem[] {
   const problems: Problem[] = []
   // Entities of dependencies are checked in their own file: here only errors matter.
@@ -99,7 +106,7 @@ export function validate(p: Project): Problem[] {
   const checkTypeRef = (t: TypeRef, target: ProblemTarget, where: string): void => {
     walkTypeRef(t, (n) => {
       if (n.kind === 'ref' && !exists(n.id))
-        push('error', target, `${where}: references a deleted type or module`)
+        push('error', target, `${where}: ${missingText(n.id, 'type', 'type or module')}`)
       if (n.kind === 'ref' && types.get(n.id)?.kind === 'exception')
         push('error', target, `${where}: exception '${types.get(n.id)!.name}' can only be raised`)
       if (n.kind === 'primitive' && n.max !== undefined && n.name !== 'string' && n.name !== 'bytes')
@@ -291,7 +298,7 @@ export function validate(p: Project): Problem[] {
     if (m.returns) checkTypeRef(m.returns, target, `${where} returns`)
     for (const id of m.raises ?? []) {
       const e = types.get(id)
-      if (!e) push('error', target, `${where} raises a deleted type`)
+      if (!e) push('error', target, `${where} ${missingText(id, 'exception', 'type', 'raises')}`)
       else if (e.kind !== 'exception')
         push('error', target, `${where} raises '${e.name}', which is not an exception`)
     }
@@ -431,7 +438,7 @@ export function validate(p: Project): Problem[] {
     for (const pt of m.ports) {
       if (!pt.interfaceId) push('warning', target, `${path}:${pt.name} has no interface`)
       else if (!interfaces.has(pt.interfaceId))
-        push('error', target, `${path}:${pt.name} references a deleted interface`)
+        push('error', target, `${path}:${pt.name} ${missingText(pt.interfaceId, 'interface', 'interface')}`)
     }
   }
 

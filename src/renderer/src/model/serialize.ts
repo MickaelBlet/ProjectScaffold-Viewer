@@ -26,6 +26,8 @@ import {
   leafHeight,
   MODULE_WIDTH,
   modulePath,
+  missingName,
+  missingRef,
   modulePaths,
   moduleTypes,
   newId,
@@ -182,7 +184,7 @@ export function toFile(p: Project, options: { editor: boolean }): FileProject {
     direction: prm.direction === 'in' ? undefined : prm.direction
   })
   const raises = (m: Message) =>
-    m.raises?.length ? m.raises.map((id) => typeName.get(id) ?? '__deleted__') : undefined
+    m.raises?.length ? m.raises.map((id) => typeName.get(id) ?? missingName(id) ?? '__deleted__') : undefined
   const message = (m: Message) => ({
     name: m.name,
     description: opt(m.description),
@@ -310,7 +312,9 @@ export function toFile(p: Project, options: { editor: boolean }): FileProject {
         ports: m.ports.map((pt) => ({
           name: pt.name,
           role: pt.role,
-          interface: pt.interfaceId ? (typeName.get(pt.interfaceId) ?? null) : null,
+          interface: pt.interfaceId
+            ? (typeName.get(pt.interfaceId) ?? missingName(pt.interfaceId) ?? null)
+            : null,
           description: opt(pt.description)
         })),
         modules: children.length ? children : undefined
@@ -591,14 +595,14 @@ export function fromFile(data: unknown, prev?: Project): Project {
   })
 
   /** References naming no type: modules, resolved once modules are known. */
-  const moduleRefs: { ref: { id: Id }; name: string; where: string; at: DataPath }[] = []
+  const moduleRefs: { ref: { id: Id }; name: string }[] = []
   const ref = (t: FileTypeRef, where: string, at: DataPath): TypeRef =>
     mapTypeRef(t, (r) => {
       const id = typeIds.get(r.name)
       if (interfaceNames.has(r.name)) report(`${where}: unknown type '${r.name}'`, at)
       if (id) return { kind: 'ref', id }
       const out = { kind: 'ref' as const, id: newId() }
-      moduleRefs.push({ ref: out, name: r.name, where, at })
+      moduleRefs.push({ ref: out, name: r.name })
       return out
     })
   const field = (
@@ -645,10 +649,10 @@ export function fromFile(data: unknown, prev?: Project): Project {
         ...(m.raises?.length
           ? {
               raises: m.raises.map((name, k) => {
-                const id = typeIds.get(name)
-                if (!id || interfaceNames.has(name))
+                // Unknown ones are missing references, reported by validation.
+                if (interfaceNames.has(name))
                   report(`${where} raises: unknown exception '${name}'`, [...at, j, 'raises', k])
-                return id ?? newId()
+                return typeIds.get(name) ?? missingRef(name)
               })
             }
           : {})
@@ -824,7 +828,7 @@ export function fromFile(data: unknown, prev?: Project): Project {
           portNames.add(pt.name)
           let interfaceId: Id | null = null
           if (pt.interface) {
-            if (!interfaceNames.has(pt.interface))
+            if (typeIds.has(pt.interface) && !interfaceNames.has(pt.interface))
               report(`Port '${path}:${pt.name}': unknown interface '${pt.interface}'`, [
                 ...at,
                 i,
@@ -832,7 +836,7 @@ export function fromFile(data: unknown, prev?: Project): Project {
                 j,
                 'interface'
               ])
-            interfaceId = typeIds.get(pt.interface) ?? null
+            interfaceId = typeIds.get(pt.interface) ?? missingRef(pt.interface)
           }
           return {
             id: ports[j]?.id ?? newId(),
@@ -894,13 +898,13 @@ export function fromFile(data: unknown, prev?: Project): Project {
   })
   // Modules used as types: of this project by path, of a dependency `Dep/Core.Sensor`.
   const dependencyByName = new Map(fileDependencies.map((x, i) => [x.name, dependencyIds[i]!]))
-  for (const { ref, name, where, at } of moduleRefs) {
+  for (const { ref, name } of moduleRefs) {
     const slash = name.indexOf('/')
     const dependency = slash > 0 ? dependencyByName.get(name.slice(0, slash)) : undefined
     const id =
       moduleByPath.get(name)?.id ?? (dependency && dependencyModuleRef(dependency, name.slice(slash + 1)))
-    if (id) ref.id = id
-    else report(`${where}: unknown type '${name}'`, at)
+    // Unknown ones are missing references, reported by validation.
+    ref.id = id ?? missingRef(name)
   }
   // Placed modules of dependencies: on the right of the project's modules when they have no position.
   let importY = PAD

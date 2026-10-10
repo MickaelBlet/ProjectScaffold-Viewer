@@ -161,7 +161,7 @@ The diagram exports as PNG or SVG from the _File_ menu.
 
 ## Model panels
 
-- **Explorer**: types (struct / exception / enum / bitmask / union / alias / custom primitive), constants (edited in the project inspector) and interfaces (messages with typed `in` / `out` / `inout` parameters and optional return). Type fields accept expressions with completion (`map<string, vector<uint16>>`), or the structured editor (⋮). Inspectors list where a type or interface is used.
+- **Explorer**: types (struct / exception / enum / bitmask / union / alias / custom primitive), constants (edited in the project inspector) and interfaces (messages with typed `in` / `out` / `inout` parameters and optional return). Type fields accept expressions with completion (`map<string, vector<uint16>>`), or the structured editor (⋮). Inspectors list where a type or interface is used. A type in use is not deleted unless forced (_Delete anyway_, in its inspector or in the dialog listing its uses): the places using it keep its name, reported as errors in _Problems_ until changed or until a type of that name exists again.
 - **Problems**: validates live (filter by severity or text). Errors block export, warnings do not.
 - **Output** (Ctrl+Shift+U): logs every status message and dialog, with their time; filter by level or text.
 

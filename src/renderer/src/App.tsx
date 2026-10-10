@@ -66,9 +66,23 @@ function Dialog(): ReactNode {
             </li>
           ))}
         </ul>
-        <button type="button" autoFocus onClick={close}>
-          Close
-        </button>
+        <div className="modal-actions">
+          {dialog.action && (
+            <button
+              type="button"
+              className={dialog.action.danger ? 'danger' : undefined}
+              onClick={() => {
+                close()
+                dialog.action!.run()
+              }}
+            >
+              {dialog.action.label}
+            </button>
+          )}
+          <button type="button" autoFocus onClick={close}>
+            Close
+          </button>
+        </div>
       </div>
     </div>
   )

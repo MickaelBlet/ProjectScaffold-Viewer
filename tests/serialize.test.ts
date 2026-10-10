@@ -155,13 +155,12 @@ describe('serialize', () => {
       expect.unreachable()
     } catch (e) {
       expect((e as LoadError).problems).toEqual([
-        "Pose.position: unknown type 'Missing'",
         "Link 'sensor_to_controller' to: unknown module 'Core.Nope'"
       ])
     }
   })
 
-  it('round-trips the exceptions messages raise, reports unknown ones', () => {
+  it('round-trips the exceptions messages raise, keeps unknown ones as missing references', () => {
     const file = structuredClone(example) as FileProject
     file.types.push({
       kind: 'exception',
@@ -176,7 +175,15 @@ describe('serialize', () => {
     const back = toFile(p, { editor: true })
     expect(back.dependencies![0]!.interfaces[0]!.messages[0]!.raises).toEqual(['Busy'])
     message.raises = ['Nope']
-    expect(() => fromFile(file)).toThrow(/raises: unknown exception 'Nope'/)
+    const missing = fromFile(file)
+    expect(validate(missing).map((x) => x.message)).toContain(
+      "Telemetry.publish raises unknown exception 'Nope'"
+    )
+    expect(toFile(missing, { editor: true }).dependencies![0]!.interfaces[0]!.messages[0]!.raises).toEqual([
+      'Nope'
+    ])
+    message.raises = ['Telemetry']
+    expect(() => fromFile(file)).toThrow(/raises: unknown exception 'Telemetry'/)
   })
 
   it('rejects duplicate referenced names', () => {

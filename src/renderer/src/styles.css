@@ -2101,6 +2101,10 @@ ul.plain {
 .modal li.error > .ico {
   color: var(--danger);
 }
+.modal-actions {
+  display: flex;
+  gap: 6px;
+}
 
 /* Dropdown menu */
 .dropdown {

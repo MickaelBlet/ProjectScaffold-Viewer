@@ -14,14 +14,18 @@ import {
   findPort,
   findView,
   growAncestors,
+  hasMissingRefs,
   LAYOUT_PAD,
   linkOrigin,
   linkRoles,
   minSize,
   newId,
   nextModuleColor,
+  orphanRefs,
   pruneViews,
+  resolveMissingRefs,
   subtreeIds,
+  typeNames,
   typeUsages,
   uniqueName
 } from '@/model/project'
@@ -80,6 +84,8 @@ export function update(fn: (draft: Project) => void, viewId?: Id): void {
       followInterfaceRenames(base, d)
     })
     if (project === base) return { project: s.project }
+    // References left missing by a forced deletion follow what is named like them again.
+    if (hasMissingRefs(project)) project = produce(project, resolveMissingRefs)
     // Whatever an edit moves or resizes lands on the grid.
     const { snapToGrid, gridSize } = useSettings.getState()
     if (snapToGrid) project = snapChanges(base, project, gridSize)
@@ -394,12 +400,22 @@ export function renameDependency(id: Id, name: string): void {
   })
 }
 
-/** Stop depending on a project; returns what prevents it (then nothing changes). */
-export function removeDependencyById(id: Id): string[] {
+/**
+ * Stop depending on a project; returns what prevents it (then nothing changes). `force` removes it
+ * even when this project uses it (see `removeDependency`).
+ */
+export function removeDependencyById(id: Id, force = false): string[] {
   let blockers: string[] = []
-  produce(getProject(), (d) => void (blockers = removeDependency(d, id)))
-  if (!blockers.length) update((d) => void removeDependency(d, id))
+  produce(getProject(), (d) => void (blockers = removeDependency(d, id, force)))
+  if (!blockers.length) update((d) => void removeDependency(d, id, force))
   return blockers
+}
+
+/** Whether a dependency can be removed when forced: no other dependency uses it. */
+export function canForceRemoveDependency(id: Id): boolean {
+  let blockers: string[] = []
+  produce(getProject(), (d) => void (blockers = removeDependency(d, id, true)))
+  return !blockers.length
 }
 
 /** Make a dependency's types and interfaces this project's own; returns what prevents it. */
@@ -479,14 +495,19 @@ export function deleteConst(id: Id): void {
   update((d) => void (d.consts = d.consts.filter((c) => c.id !== id)))
 }
 
-/** Returns the usages that prevent deletion, or an empty list once deleted. */
-export function deleteType(id: Id): string[] {
+/**
+ * Returns the usages that prevent deletion, or an empty list once deleted. `force` deletes a type in
+ * use: its usages keep its name as a missing reference, reported until fixed.
+ */
+export function deleteType(id: Id, force = false): string[] {
   const dep = dependencyOf(getProject(), id)
   if (dep) return [`dependency ${dep.name}, which defines it`]
   const usages = typeUsages(getProject(), id)
-  if (usages.length) return usages
+  if (usages.length && !force) return usages
   update((d) => {
+    const name = typeNames(d).get(id)
     d.types = d.types.filter((t) => t.id !== id)
+    if (usages.length) orphanRefs(d, (x) => (x === id ? name : undefined))
   })
   return []
 }

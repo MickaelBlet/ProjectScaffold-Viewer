@@ -47,7 +47,7 @@ The dependencies of a dependency come with it (`indirect`). They are read from t
 
 - The Explorer shows a dependency's content in folding groups: _Constants_, _Types_, _Interfaces_, _Modules_. Modules are listed as a tree, each under its parent with its types (in _Types_ by path while the module is not listed), placed on the canvas, or dimmed when not (when its file can be read: open in a tab, next to the document in VS Code; in the browser, an IDL file picked in the session or open as text, e.g. by its _Open_ entry after a reload); double-click a top-level one to place it with its content.
 - Clicking the dependency shows it in the Inspector: where it comes from, the dependencies it uses and is used by, its types and interfaces with their members and uses, filtered.
-- Its right-click menu opens it, refreshes it, places a module on the canvas, removes it (when nothing here uses it) or _detaches_ it: its types and interfaces become this project's own.
+- Its right-click menu opens it, refreshes it, places a module on the canvas, removes it (when nothing here uses it; _Remove anyway_ removes it all the same unless another dependency uses it: its placed modules go with their links, the places using its types, interfaces or modules keep their names, reported as errors until fixed) or _detaches_ it: its types and interfaces become this project's own.
 
 ## Name clashes
 

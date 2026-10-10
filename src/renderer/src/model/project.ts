@@ -616,9 +616,78 @@ export function isModuleRef(p: Pick<Project, 'modules'>, id: Id): boolean {
   return !!parseDependencyModuleRef(id) || p.modules.some((m) => m.id === id)
 }
 
+// Missing references: to a type, module or interface deleted while in use (or never defined in
+// the file). They keep the name the file writes, and validation reports them until fixed.
+
+const MISSING_PREFIX = 'missing:'
+
+/** Id of a reference to a type, module or interface named `name` that the project does not have. */
+export const missingRef = (name: string): Id => `${MISSING_PREFIX}${name}`
+
+/** Name kept by an id made by `missingRef`. */
+export const missingName = (id: Id): string | undefined =>
+  id.startsWith(MISSING_PREFIX) ? id.slice(MISSING_PREFIX.length) : undefined
+
+/**
+ * Make the references to the types, modules and interfaces `nameOf` names (by id) missing ones:
+ * type references, raised exceptions and port interfaces.
+ */
+export function orphanRefs(d: Project, nameOf: (id: Id) => string | undefined): void {
+  const orphan = (id: Id): Id => {
+    const name = nameOf(id)
+    return name === undefined ? id : missingRef(name)
+  }
+  for (const { ref } of allTypeRefs(d))
+    walkTypeRef(ref, (n) => {
+      if (n.kind === 'ref') n.id = orphan(n.id)
+    })
+  const messages = [...d.interfaces.flatMap((i) => i.messages), ...d.modules.flatMap((m) => m.methods)]
+  for (const m of messages) if (m.raises) m.raises = m.raises.map(orphan)
+  for (const m of d.modules)
+    for (const pt of m.ports) if (pt.interfaceId) pt.interfaceId = orphan(pt.interfaceId)
+}
+
+/** Whether the project has missing references (see `missingRef`). */
+export function hasMissingRefs(p: Project): boolean {
+  const missing = (id: Id | null | undefined): boolean => !!id && missingName(id) !== undefined
+  if (p.modules.some((m) => m.ports.some((pt) => missing(pt.interfaceId)))) return true
+  const messages = [...p.interfaces.flatMap((i) => i.messages), ...p.modules.flatMap((m) => m.methods)]
+  if (messages.some((m) => m.raises?.some(missing))) return true
+  for (const { ref } of allTypeRefs(p)) {
+    let found = false
+    walkTypeRef(ref, (n) => {
+      if (n.kind === 'ref' && missing(n.id)) found = true
+    })
+    if (found) return true
+  }
+  return false
+}
+
+/** Point the missing references naming what the project has (again) at it: created or renamed since. */
+export function resolveMissingRefs(d: Project): void {
+  const resolve = refResolver(d)
+  const interfaces = new Map(d.interfaces.map((i) => [i.name, i.id]))
+  const found = (id: Id, lookup: (name: string) => Id | undefined): Id => {
+    const name = missingName(id)
+    return (name !== undefined && lookup(name)) || id
+  }
+  for (const { ref } of allTypeRefs(d))
+    walkTypeRef(ref, (n) => {
+      if (n.kind === 'ref') n.id = found(n.id, resolve)
+    })
+  for (const m of [...d.interfaces.flatMap((i) => i.messages), ...d.modules.flatMap((m) => m.methods)])
+    m.raises?.forEach((id, i) => {
+      m.raises![i] = found(id, resolve)
+    })
+  for (const m of d.modules)
+    for (const pt of m.ports)
+      if (pt.interfaceId) pt.interfaceId = found(pt.interfaceId, (n) => interfaces.get(n))
+}
+
 /**
  * Names type references write, by id: those of the types (see `typeNames`), the paths of the
- * modules, `Dep/Core.Sensor` for a module of a dependency. Undefined for a deleted one.
+ * modules, `Dep/Core.Sensor` for a module of a dependency, the name kept by a missing reference.
+ * Undefined for a deleted one.
  */
 export function refNamer(
   p: Pick<Project, 'types' | 'modules' | 'dependencies'>
@@ -631,7 +700,7 @@ export function refNamer(
     if (name !== undefined) return name
     const ref = parseDependencyModuleRef(id)
     const dep = ref && deps.get(ref.dependency)
-    return dep === undefined ? undefined : `${dep}/${ref!.path}`
+    return dep === undefined ? missingName(id) : `${dep}/${ref!.path}`
   }
 }
 

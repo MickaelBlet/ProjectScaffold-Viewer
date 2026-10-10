@@ -14,7 +14,9 @@ import {
   modulePath,
   modulePaths,
   newId,
+  orphanRefs,
   parseDependencyModuleRef,
+  refNamer,
   typeUsageTargets,
   uniqueName
 } from './project'
@@ -756,10 +758,14 @@ function dropPlacedRefs(d: Project, gone: Set<Id>): void {
     }
 }
 
+/** Dependencies using a dependency. */
+const dependents = (d: Project, dep: Dependency): string[] =>
+  d.dependencies.filter((x) => x.uses.includes(dep.name)).map((x) => `dependency ${x.name}`)
+
 /** What keeps a dependency: the dependencies using it and its modules placed here. */
 function holders(d: Project, dep: Dependency): string[] {
   return [
-    ...d.dependencies.filter((x) => x.uses.includes(dep.name)).map((x) => `dependency ${x.name}`),
+    ...dependents(d, dep),
     ...dep.modules.filter((m) => !importedParent(dep, m)).map((m) => `module ${m.path}, placed on the canvas`)
   ]
 }
@@ -767,18 +773,32 @@ function holders(d: Project, dep: Dependency): string[] {
 /**
  * Stop depending on a project. Returns why it cannot be removed (another dependency uses it, its
  * modules are placed here, or this project uses its types, interfaces or modules): then nothing changes.
+ * `force` removes it unless another dependency uses it: its placed modules go with their links, and
+ * the places using its types, interfaces or modules keep their names as missing references.
  */
-export function removeDependency(d: Project, dependencyId: Id): string[] {
+export function removeDependency(d: Project, dependencyId: Id, force = false): string[] {
   const dep = d.dependencies.find((x) => x.id === dependencyId)
   if (!dep) return []
-  const users = holders(d, dep)
   // Entities another dependency also defines stay, with that one.
   const own = dependencyEntities(d, dep.id).filter(
     (e) => scoped(e) || !d.dependencies.some((x) => x.shared.includes(e.name))
   )
-  const inside = new Set(dependencyEntities(d, dep.id).map((e) => e.id))
-  users.push(...own.filter((e) => usedOutside(d, e, inside)).map((e) => e.name), ...moduleRefUsers(d, dep))
-  if (users.length) return users
+  if (force) {
+    const users = dependents(d, dep)
+    if (users.length) return users
+    const refName = refNamer(d)
+    const names = new Map(own.map((e) => [e.id, refName(e.id) ?? e.name]))
+    orphanRefs(
+      d,
+      (id) => names.get(id) ?? (parseDependencyModuleRef(id)?.dependency === dep.id ? refName(id) : undefined)
+    )
+    removePlaced(d, new Set(dep.modules.map((m) => m.id)))
+  } else {
+    const users = holders(d, dep)
+    const inside = new Set(dependencyEntities(d, dep.id).map((e) => e.id))
+    users.push(...own.filter((e) => usedOutside(d, e, inside)).map((e) => e.name), ...moduleRefUsers(d, dep))
+    if (users.length) return users
+  }
   removeWithEntities(d, dep)
   prune(d)
   return []

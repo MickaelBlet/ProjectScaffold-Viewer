@@ -56,7 +56,7 @@ describe('types of modules', () => {
     const unknown = structuredClone(example) as FileProject
     const filter = unknown.modules[0]!.modules![0]!.attributes![2]!
     if (filter.type.kind === 'ref') filter.type.name = 'Core.Filter'
-    expect(() => fromFile(unknown)).toThrow(/unknown type 'Core.Filter'/)
+    expect(messages(fromFile(unknown))).toContain("Core.Sensor.filter: references unknown type 'Core.Filter'")
   })
 
   it('parses and prints qualified names in type expressions', () => {

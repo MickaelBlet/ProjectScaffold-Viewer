@@ -420,6 +420,19 @@ links: []
     expect(unused.types).toEqual([])
   })
 
+  it('removes a used dependency when forced, keeping the names it leaves missing', () => {
+    const { p } = withCommon()
+    let blockers: string[] = []
+    produce(p, (d) => void (blockers = removeDependency(d, d.dependencies[1]!.id, true)))
+    expect(blockers).toEqual(['dependency Common'])
+    const q = produce(p, (d) => void removeDependency(d, d.dependencies[0]!.id, true))
+    expect(q.dependencies).toEqual([])
+    expect(errors(q)).toEqual(["Monitor:telemetry references unknown interface 'Telemetry'"])
+    const file = toFile(q, { editor: false })
+    expect(file.modules[0]!.ports[0]!.interface).toBe('Telemetry')
+    expect(errors(fromFile(file))).toEqual(errors(q))
+  })
+
   it('checks that dependency entities only use their dependencies', () => {
     const { p } = withCommon()
     const q = produce(p, (d) => void (d.dependencies[0]!.uses = []))

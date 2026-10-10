@@ -1,7 +1,9 @@
 import { readFileSync } from 'node:fs'
 import YAML from 'yaml'
 import { describe, expect, it } from 'vitest'
-import { fromFile } from '@/model/serialize'
+import { produce } from 'immer'
+import { orphanRefs, resolveMissingRefs } from '@/model/project'
+import { fromFile, toFile } from '@/model/serialize'
 import { validate } from '@/model/validate'
 import { TEMPLATE_SETS } from '@/model/templateSets'
 import type { EnumDef, Project, StructDef, UnionDef } from '@/model/types'
@@ -153,7 +155,9 @@ describe('validate', () => {
       key: { kind: 'ref', id: vec3.id },
       value: { kind: 'primitive', name: 'bool' }
     }
-    expect(messages(p)).toEqual(['Pose.orientation: map key must be a primitive, an enum, a bitmask or a module'])
+    expect(messages(p)).toEqual([
+      'Pose.orientation: map key must be a primitive, an enum, a bitmask or a module'
+    ])
   })
 
   it('bounds strings, bytes and containers only', () => {
@@ -221,6 +225,23 @@ describe('validate', () => {
     const p = load()
     p.types = p.types.filter((t) => t.name !== 'Vec3')
     expect(messages(p)).toEqual(['Pose.position: references a deleted type or module'])
+  })
+
+  it('keeps the names of types deleted while used, until defined again', () => {
+    const p = produce(load(), (d) => {
+      const vec3 = type<StructDef>(d, 'Vec3')
+      d.types = d.types.filter((t) => t !== vec3)
+      orphanRefs(d, (id) => (id === vec3.id ? 'Vec3' : undefined))
+    })
+    expect(messages(p)).toEqual(["Pose.position: references unknown type 'Vec3'"])
+    const pose = toFile(p, { editor: false }).types.find((t) => t.name === 'Pose')
+    expect(pose?.kind === 'struct' && pose.fields[0]!.type).toEqual({ kind: 'ref', name: 'Vec3' })
+    const again = produce(p, (d) => {
+      d.types.push({ id: 'v', kind: 'struct', name: 'Vec3', description: '', fields: [] })
+      resolveMissingRefs(d)
+    })
+    expect(type<StructDef>(again, 'Pose').fields[0]!.type).toEqual({ kind: 'ref', id: 'v' })
+    expect(messages(again)).toEqual([])
   })
 
   it('requires bidirectional links for messages with return values', () => {

@@ -34,8 +34,15 @@ interface UiState {
   /** Recent project files, most recent first. */
   recent: string[]
   status: { kind: 'info' | 'error'; text: string } | null
-  /** Lines marked `warning` or `error` show the icon of their level in place of a bullet. */
-  dialog: { title: string; lines: { text: string; level?: 'warning' | 'error' }[] } | null
+  /**
+   * Lines marked `warning` or `error` show the icon of their level in place of a bullet. `action`:
+   * a button doing something more than closing (closing as well).
+   */
+  dialog: {
+    title: string
+    lines: { text: string; level?: 'warning' | 'error' }[]
+    action?: DialogAction
+  } | null
   contextMenu: { x: number; y: number; items: MenuItem[] } | null
   /** Command palette: '>' prefix lists commands, otherwise entities; or a quick pick of `pick`. */
   palette: { query: string; pick?: { placeholder: string; entries: PickEntry[] } } | null
@@ -77,6 +84,13 @@ export function setStatus(kind: 'info' | 'error', text: string): void {
   useUiStore.setState({ status: { kind, text } })
 }
 
+/** Button of a dialog beside Close, such as deleting anyway what is still used. */
+export interface DialogAction {
+  label: string
+  run: () => void
+  danger?: boolean
+}
+
 /** Line of a dialog: logged at the dialog's level, unless it has its own. */
 export type DialogLine = string | { level: OutputLevel; text: string }
 
@@ -84,7 +98,12 @@ export type DialogLine = string | { level: OutputLevel; text: string }
  * Shows a dialog, logged to the Output panel at `level`: `error` for what failed, `warning` for
  * what was approximated or left out by what succeeded.
  */
-export function showDialog(title: string, lines: DialogLine[], level: OutputLevel = 'error'): void {
+export function showDialog(
+  title: string,
+  lines: DialogLine[],
+  level: OutputLevel = 'error',
+  action?: DialogAction
+): void {
   log(level, title)
   for (const line of lines)
     if (typeof line === 'string') log(level, `  ${line}`)
@@ -98,7 +117,8 @@ export function showDialog(title: string, lines: DialogLine[], level: OutputLeve
         typeof l === 'string'
           ? { text: l, level: level === 'warning' ? 'warning' : undefined }
           : { text: l.text, level: mark(l.level) }
-      )
+      ),
+      action
     }
   })
 }

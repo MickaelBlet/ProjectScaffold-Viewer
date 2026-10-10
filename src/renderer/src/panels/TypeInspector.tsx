@@ -572,6 +572,20 @@ export function TypeInspector({ id }: { id: string }): ReactNode {
               <li key={u}>{u}</li>
             ))}
           </ul>
+          <div className="actions">
+            <button
+              type="button"
+              className="danger"
+              title="Delete it: its usages keep its name, reported in the Problems panel until fixed"
+              onClick={() => {
+                deleteType(id, true)
+                setBlocked([])
+                select(null)
+              }}
+            >
+              Delete anyway
+            </button>
+          </div>
         </div>
       )}
     </TypeScopeContext.Provider>

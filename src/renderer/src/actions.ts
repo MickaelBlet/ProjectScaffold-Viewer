@@ -5,6 +5,7 @@ import { copyItems, copyProject, parseClip, pasteClip, type Clip } from '@/model
 import {
   addDependencies,
   addDependencyOf,
+  dependencyOf,
   type DependencyResult,
   type DependencySource
 } from '@/model/dependencies'
@@ -61,6 +62,7 @@ import {
   addPort,
   addSubmodule,
   addView,
+  canForceRemoveDependency,
   deleteInterface,
   deleteItems,
   deleteLink,
@@ -392,6 +394,8 @@ export function deleteSelection(): void {
     return select(null)
   }
   const blocked: string[] = []
+  /** Types kept only by their usages: they can be deleted anyway. */
+  const used: Id[] = []
   const canvasIds = ids.filter(
     (id) => p.modules.some((m) => m.id === id) || p.notes.some((n) => n.id === id) || !!findImported(p, id)
   )
@@ -406,10 +410,26 @@ export function deleteSelection(): void {
     if (type) {
       const usages = deleteType(id)
       if (usages.length) blocked.push(`${type.name}: used by ${usages.join(', ')}`)
+      if (usages.length && !dependencyOf(p, id)) used.push(id)
     }
   }
-  if (blocked.length) showDialog('Some types and interfaces were not deleted', blocked)
+  if (blocked.length)
+    showDialog(
+      'Some types and interfaces were not deleted',
+      blocked,
+      'error',
+      used.length ? { label: 'Delete anyway', danger: true, run: () => forceDeleteTypes(used) } : undefined
+    )
   select(null)
+}
+
+/** Delete types still in use: their usages keep their names, reported as problems to fix. */
+function forceDeleteTypes(ids: Id[]): void {
+  for (const id of ids) deleteType(id, true)
+  setStatus(
+    'info',
+    `Deleted ${ids.length} type${ids.length === 1 ? '' : 's'} still in use: see the Problems panel`
+  )
 }
 
 // Creation
@@ -1006,11 +1026,31 @@ export function removeDependencyAction(id: Id): void {
   if (!dep) return
   const blockers = removeDependencyById(id)
   if (blockers.length)
-    showDialog(`Dependency ${dep.name} is still used`, [
-      ...blockers.map((b) => `Used by: ${b}`),
-      'Remove its modules from the canvas, or detach it to keep its types and interfaces here as your own.'
-    ])
+    showDialog(
+      `Dependency ${dep.name} is still used`,
+      [
+        ...blockers.map((b) => `Used by: ${b}`),
+        'Remove its modules from the canvas, or detach it to keep its types and interfaces here as your own.'
+      ],
+      'error',
+      canForceRemoveDependency(id)
+        ? { label: 'Remove anyway', danger: true, run: () => forceRemoveDependency(id) }
+        : undefined
+    )
   else setStatus('info', `No longer depending on ${dep.file}`)
+}
+
+/** Stop depending on a project still used: its placed modules go, the places using it are reported. */
+function forceRemoveDependency(id: Id): void {
+  const dep = getProject().dependencies.find((x) => x.id === id)
+  if (!dep) return
+  const blockers = removeDependencyById(id, true)
+  if (blockers.length)
+    showDialog(
+      `Dependency ${dep.name} is still used`,
+      blockers.map((b) => `Used by: ${b}`)
+    )
+  else setStatus('info', `No longer depending on ${dep.file}: see the Problems panel`)
 }
 
 /** Make a dependency's types and interfaces this project's own. */
@@ -1064,8 +1104,11 @@ function selectedCanvasItems(): { id: Id; locked?: boolean }[] {
 
 export function isLocked(id: Id): boolean {
   const p = getProject()
-  return !!(p.modules.find((m) => m.id === id) ?? p.notes.find((n) => n.id === id) ?? findImported(p, id)?.module)
-    ?.locked
+  return !!(
+    p.modules.find((m) => m.id === id) ??
+    p.notes.find((n) => n.id === id) ??
+    findImported(p, id)?.module
+  )?.locked
 }
 
 export function hasCanvasSelection(): boolean {

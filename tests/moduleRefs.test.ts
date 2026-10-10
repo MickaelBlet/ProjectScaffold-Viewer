@@ -71,7 +71,7 @@ describe('modules used as types', () => {
     })
   })
 
-  it('rejects unknown modules', () => {
+  it('keeps unknown modules as missing references, reported until defined', () => {
     const data = YAML.parse(`
 schemaVersion: 1
 project: { name: P }
@@ -80,7 +80,9 @@ interfaces: []
 modules: [{ name: Core, ports: [] }]
 links: []
 `)
-    expect(() => fromFile(data)).toThrow(/unknown type 'Core.Nope'/)
+    const p = fromFile(data)
+    expect(messages(p)).toEqual(["A: references unknown type 'Core.Nope'"])
+    expect(toFile(p, { editor: false }).types[0]).toMatchObject({ type: { kind: 'ref', name: 'Core.Nope' } })
   })
 
   it('flags references to deleted modules', () => {
@@ -231,6 +233,13 @@ links: []
     let users: string[] = []
     produce(p, (d) => void (users = removeDependency(d, d.dependencies[0]!.id)))
     expect(users).toEqual(['Monitor.imu'])
+  })
+
+  it('keeps the paths of the modules of a dependency removed while used', () => {
+    const p = produce(station(), (d) => void removeDependency(d, d.dependencies[0]!.id, true))
+    expect(p.dependencies).toEqual([])
+    expect(messages(p)).toEqual(["Monitor.imu: references unknown type 'Lib/Drivers.Imu'"])
+    expect(toFile(p, { editor: false }).modules[0]!.attributes![0]!.type).toEqual(ref('Lib/Drivers.Imu'))
   })
 
   it('flags references to modules of removed dependencies', () => {
