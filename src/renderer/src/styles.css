@@ -1203,6 +1203,24 @@ fieldset.readonly {
   display: flex;
   gap: 4px;
 }
+/* New type buttons of a module's Types section: wrapped and aligned right, as in the Explorer. */
+.section-actions:has(> .kind-add) {
+  min-width: 0;
+  margin-left: auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 2px;
+}
+.section h3:has(+ .section-actions > .kind-add) {
+  flex: none;
+  white-space: nowrap;
+}
+.section-actions button.icon.kind-add {
+  min-height: 0;
+  font-size: 11px;
+  padding: 0 4px;
+  color: var(--text);
+}
 .section > select {
   width: 100%;
 }
@@ -1390,8 +1408,9 @@ button.qualifier.on {
   background: var(--accent-soft);
   border-color: var(--accent);
 }
-/* In a field row: single-letter square toggles, centered on the row's inputs. */
-.field-row .qualifiers {
+/* In a field row or a module's type row: single-letter square toggles, centered on the inputs. */
+.field-row .qualifiers,
+.type-row .qualifiers {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1407,7 +1426,8 @@ button.qualifier.on {
 .field-row > .column .qualifiers.access + .qualifiers {
   margin-left: 2px;
 }
-.field-row button.qualifier {
+.field-row button.qualifier,
+.type-row button.qualifier {
   width: 20px;
   height: 20px;
   padding: 0;

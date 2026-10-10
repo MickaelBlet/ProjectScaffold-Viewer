@@ -213,7 +213,7 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
           <button
             key={k}
             type="button"
-            className="icon"
+            className="icon kind-add"
             title={`New ${k} of the module`}
             onClick={() => select({ kind: 'type', id: addType(k, id) })}
           >
@@ -224,8 +224,7 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
       >
         <ul className="plain">
           {types.map((t) => (
-            <li key={t.id} className="row-inline">
-              <AccessToggles value={t.access} onChange={(a) => withTypeOf(t.id, (x) => setAccess(x, a))} />
+            <li key={t.id} className="row-inline type-row">
               <span className={`kind-badge ${t.kind}`} title={t.kind}>
                 {TYPE_KIND_BADGE[t.kind]}
               </span>
@@ -236,6 +235,7 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
               >
                 {t.name}
               </button>
+              <AccessToggles value={t.access} onChange={(a) => withTypeOf(t.id, (x) => setAccess(x, a))} />
             </li>
           ))}
         </ul>
