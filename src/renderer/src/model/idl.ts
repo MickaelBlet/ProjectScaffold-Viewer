@@ -2540,7 +2540,7 @@ interface IdlServer {
   component: IdlComponent
 }
 
-/** Whether the file `file` defines components: then its IDL modules only hold them (see `interfaceServers`). */
+/** Whether the file `file` defines components: then its modules serve no interfaces (see `interfaceServers`). */
 const hasComponents = (idl: IdlFile, file: string, main: string): boolean =>
   idl.components.some((c) => (idl.origins[c.name] ?? main) === file)
 
@@ -2551,11 +2551,11 @@ const componentScope = (c: IdlComponent): string => {
 }
 
 /**
- * Modules standing for the IDL modules of the file `main`. With components: one per IDL module
- * enclosing them, holding them (see `nestServers`). Without (plain CORBA IDL, DDS types): one per
- * IDL module holding definitions, and per IDL module enclosing those (the file's own module at
- * file scope when it has interfaces there), providing each of its interfaces on an `in` port;
- * types and constants of IDL modules are theirs (see `idlProject`).
+ * Modules standing for the IDL modules of the file `main`: one per IDL module holding definitions
+ * or components (see `nestServers`), and per IDL module enclosing those; types and constants of
+ * IDL modules are theirs (see `idlProject`). In files without components (plain CORBA IDL, DDS
+ * types), each provides the interfaces of its IDL module on `in` ports, the file's own module
+ * those at file scope.
  */
 function interfaceServers(idl: IdlFile, main: string): IdlServer[] {
   const own = (name: string): boolean => (idl.origins[name] ?? main) === main
@@ -2566,18 +2566,17 @@ function interfaceServers(idl: IdlFile, main: string): IdlServer[] {
     if (!byScope.has(scope)) byScope.set(scope, [])
     return byScope.get(scope)!
   }
-  if (hasComponents(idl, main, main)) {
-    for (const c of idl.components) {
-      const scope = componentScope(c)
-      if (scope && own(c.name)) add(scope)
-    }
-  } else
-    for (const e of [...idl.types, ...idl.interfaces, ...idl.constants]) {
-      const scope = idl.scopes[e.name]
-      if (scope === undefined || !own(e.name)) continue
-      if ('messages' in e) add(scope).push(e)
-      else if (scope) add(scope)
-    }
+  const serves = !hasComponents(idl, main, main)
+  for (const e of [...idl.types, ...idl.interfaces, ...idl.constants]) {
+    const scope = idl.scopes[e.name]
+    if (scope === undefined || !own(e.name)) continue
+    if (serves && 'messages' in e) add(scope).push(e)
+    else if (scope) add(scope)
+  }
+  for (const c of idl.components) {
+    const scope = componentScope(c)
+    if (scope && own(c.name)) add(scope)
+  }
   const taken = idl.components.map((c) => c.name)
   return [...byScope].map(([scope, interfaces]) => {
     const name = uniqueName(scope ? scope.split('::').join('_') : dependencyName(stem(main)), taken)
@@ -2678,7 +2677,7 @@ function nestServers(
 /**
  * Make the types and constants of the IDL modules of `p` those of their modules (`modules`, of
  * the file `main`), or of the modules of the included file defining them (by path), named simply
- * there; those of files with components stay the project's. Returns the qualified IDL names of those named simply.
+ * there. Returns the qualified IDL names of those named simply.
  */
 function scopeDefinitions(
   p: Project,
@@ -2694,17 +2693,20 @@ function scopeDefinitions(
     if (!scope || !q) continue
     const file = idl.origins[e.name] ?? main
     const module = file === main ? modules.get(scope) : undefined
-    if (hasComponents(idl, file, main) || (file === main && !module)) continue
-    // Unique among the definitions of the module and its submodules.
+    if (file === main && !module) continue
+    // Unique among the definitions of the module, its submodules and its components.
     const key = `${file}|${scope}`
-    if (!taken.has(key))
+    if (!taken.has(key)) {
+      const components = idl.components.filter((c) => c.qualified && (idl.origins[c.name] ?? main) === file)
       taken.set(key, [
-        ...new Set(
-          Object.values(idl.scopes)
+        ...new Set([
+          ...[...Object.values(idl.scopes), ...components.map(componentScope)]
             .filter((s) => s.startsWith(`${scope}::`))
-            .map((s) => s.slice(scope.length + 2).split('::')[0]!)
-        )
+            .map((s) => s.slice(scope.length + 2).split('::')[0]!),
+          ...components.filter((c) => componentScope(c) === scope).map((c) => lastSegment(c.qualified!))
+        ])
       ])
+    }
     const names = taken.get(key)!
     const simple = lastSegment(q)
     if (!isReservedTypeName(simple)) e.name = uniqueName(simple, names)

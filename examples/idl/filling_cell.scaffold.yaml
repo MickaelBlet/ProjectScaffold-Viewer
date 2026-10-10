@@ -254,26 +254,7 @@ dependencies:
     file: tank_ccm.idl
     uses:
       - sensors_dds
-    types:
-      - kind: struct
-        name: LevelChanged
-        description: Level of a tank, as a share of its capacity.
-        fields:
-          - name: level
-            type:
-              kind: primitive
-              name: float64
-          - name: health
-            type:
-              kind: ref
-              name: sensors_dds/Sensors.Health
-      - kind: exception
-        name: Stuck
-        fields:
-          - name: position
-            type:
-              kind: primitive
-              name: float64
+    types: []
     interfaces:
       - name: Valve
         description: Valve opening, from 0 (closed) to 1 (open).
@@ -286,7 +267,7 @@ dependencies:
                   name: float64
             returns: null
             raises:
-              - Stuck
+              - tank_ccm/Plant.Stuck
           - name: get_position
             params: []
             returns:
@@ -305,8 +286,30 @@ dependencies:
               - name: event
                 type:
                   kind: ref
-                  name: LevelChanged
+                  name: tank_ccm/Plant.LevelChanged
             returns: null
+    moduleTypes:
+      - module: Plant
+        types:
+          - kind: struct
+            name: LevelChanged
+            description: Level of a tank, as a share of its capacity.
+            fields:
+              - name: level
+                type:
+                  kind: primitive
+                  name: float64
+              - name: health
+                type:
+                  kind: ref
+                  name: sensors_dds/Sensors.Health
+          - kind: exception
+            name: Stuck
+            fields:
+              - name: position
+                type:
+                  kind: primitive
+                  name: float64
     modules:
       - module: Plant
         ports: []

@@ -383,15 +383,16 @@ describe('IDL import', () => {
     expect(idlProject('idl/main.idl', files).project.modules.map((m) => m.name)).toEqual(['C'])
   })
 
-  it('nests the components of a file in their IDL modules, named simply there', () => {
+  it('nests the components of a file in their IDL modules, with their types and constants', () => {
     const files = new Map([
       [
         'idl/main.idl',
         [
           'interface I { void go(); };',
-          'component Top {};',
+          'struct Top { long t; };',
+          'component Main {};',
           'module A { component Tank { provides I i; }; module Deep { component Pump {}; }; };',
-          'module B { struct S { long x; }; component Tank {}; };',
+          'module B { const long MAX = 2; struct S { long x; }; component Tank { attribute S s; }; };',
           'module C { interface J { void j(); }; };'
         ].join('\n')
       ]
@@ -399,24 +400,27 @@ describe('IDL import', () => {
     const { project: p, warnings } = idlProject('idl/main.idl', files)
     // Renames the modules made needless.
     expect(warnings).toEqual([])
-    // Only IDL modules enclosing components, without ports.
+    // Every IDL module holding definitions or components, serving no interfaces.
     expect(p.modules.map((m) => [modulePath(p, m.id), m.ports.map((pt) => pt.name)])).toEqual([
-      ['Top', []],
+      ['Main', []],
       ['A.Tank', ['i']],
       ['A.Deep.Pump', []],
       ['B.Tank', []],
+      ['B', []],
+      ['C', []],
       ['A', []],
-      ['A.Deep', []],
-      ['B', []]
+      ['A.Deep', []]
     ])
     for (const m of p.modules.filter((x) => x.parentId)) {
       const parent = p.modules.find((x) => x.id === m.parentId)!
       expect(m.layout.x + m.layout.width).toBeLessThanOrEqual(parent.layout.width)
       expect(m.layout.y + m.layout.height).toBeLessThanOrEqual(parent.layout.height)
     }
-    // Their types stay the project's.
-    const s = p.types.find((t) => t.name === 'S')!
-    expect([s.module, s.modulePath]).toEqual([undefined, undefined])
+    // Types and constants of IDL modules are theirs; those at file scope and interfaces the project's.
+    const names = typeNames(p)
+    expect(p.types.map((t) => names.get(t.id))).toEqual(['Top', 'B.S'])
+    expect([...constNames(p).values()]).toEqual(['B.MAX'])
+    expect(p.interfaces.map((i) => i.name)).toEqual(['I', 'J'])
     expect(validate(p).filter((x) => x.severity === 'error')).toEqual([])
   })
 
