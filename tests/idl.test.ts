@@ -383,6 +383,43 @@ describe('IDL import', () => {
     expect(idlProject('idl/main.idl', files).project.modules.map((m) => m.name)).toEqual(['C'])
   })
 
+  it('nests the components of a file in their IDL modules, named simply there', () => {
+    const files = new Map([
+      [
+        'idl/main.idl',
+        [
+          'interface I { void go(); };',
+          'component Top {};',
+          'module A { component Tank { provides I i; }; module Deep { component Pump {}; }; };',
+          'module B { struct S { long x; }; component Tank {}; };',
+          'module C { interface J { void j(); }; };'
+        ].join('\n')
+      ]
+    ])
+    const { project: p, warnings } = idlProject('idl/main.idl', files)
+    // Renames the modules made needless.
+    expect(warnings).toEqual([])
+    // Only IDL modules enclosing components, without ports.
+    expect(p.modules.map((m) => [modulePath(p, m.id), m.ports.map((pt) => pt.name)])).toEqual([
+      ['Top', []],
+      ['A.Tank', ['i']],
+      ['A.Deep.Pump', []],
+      ['B.Tank', []],
+      ['A', []],
+      ['A.Deep', []],
+      ['B', []]
+    ])
+    for (const m of p.modules.filter((x) => x.parentId)) {
+      const parent = p.modules.find((x) => x.id === m.parentId)!
+      expect(m.layout.x + m.layout.width).toBeLessThanOrEqual(parent.layout.width)
+      expect(m.layout.y + m.layout.height).toBeLessThanOrEqual(parent.layout.height)
+    }
+    // Their types stay the project's.
+    const s = p.types.find((t) => t.name === 'S')!
+    expect([s.module, s.modulePath]).toEqual([undefined, undefined])
+    expect(validate(p).filter((x) => x.severity === 'error')).toEqual([])
+  })
+
   it('gives the types and constants of IDL modules to their modules, named simply there', () => {
     const files = new Map([
       [

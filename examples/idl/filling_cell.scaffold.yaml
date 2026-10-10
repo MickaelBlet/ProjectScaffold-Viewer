@@ -108,7 +108,7 @@ links:
   - name: tank_to_filler
     from:
       project: tank_ccm
-      module: Tank
+      module: Plant.Tank
       port: level
     to:
       module: Cell.Filler
@@ -128,7 +128,7 @@ links:
       port: inlet
     to:
       project: tank_ccm
-      module: Tank
+      module: Plant.Tank
       port: inlet
     constraints:
       direction: bidirectional
@@ -207,7 +207,7 @@ links:
       port: progress
     to:
       project: tank_ccm
-      module: Supervisor
+      module: Plant.Supervisor
       port: levels
     constraints:
       direction: unidirectional
@@ -220,7 +220,7 @@ links:
   - name: supervisor_to_pump
     from:
       project: tank_ccm
-      module: Supervisor
+      module: Plant.Supervisor
       port: pump_valve
     to:
       module: Pump
@@ -239,7 +239,7 @@ links:
       port: maintenance
     to:
       project: tank_ccm
-      module: Supervisor
+      module: Plant.Supervisor
       port: pump_maintenance
     constraints:
       direction: bidirectional
@@ -308,7 +308,11 @@ dependencies:
                   name: LevelChanged
             returns: null
     modules:
-      - module: Tank
+      - module: Plant
+        ports: []
+      - module: Plant.Equipment
+        ports: []
+      - module: Plant.Tank
         ports:
           - name: inlet
             role: in
@@ -327,7 +331,7 @@ dependencies:
           - name: pump_maintenance
             role: out
             interface: Maintenance
-      - module: Supervisor
+      - module: Plant.Supervisor
         ports:
           - name: levels
             role: in
@@ -738,9 +742,23 @@ editor:
       height: 72
   dependencies:
     tank_ccm:
-      Tank:
+      Plant:
         x: 996
         y: 29
-      Supervisor:
-        x: 996
-        y: 421
+        width: 750
+        height: 202
+      Plant.Equipment:
+        x: 10
+        y: 36
+        width: 200
+        height: 124
+      Plant.Tank:
+        x: 270
+        y: 36
+        width: 200
+        height: 146
+      Plant.Supervisor:
+        x: 530
+        y: 36
+        width: 200
+        height: 122

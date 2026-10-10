@@ -66,6 +66,8 @@ export interface IdlComponent {
   ports: IdlPort[]
   /** Types and interfaces it needs besides those its members reference. */
   needs: string[]
+  /** Qualified IDL name (`Plant::Tank`), for those written in the files. */
+  qualified?: string
 }
 
 export interface IdlFile {
@@ -2206,7 +2208,7 @@ class Parser {
       types: pick('type').map((e) => e.def),
       interfaces: pick('interface').map((e) => e.def),
       constants: this.constDefs.map((c) => c.def),
-      components: pick('component').map((e) => ({ ...e.def, needs: [...new Set(e.needs)] })),
+      components: pick('component').map((e) => ({ ...e.def, needs: [...new Set(e.needs)], qualified: e.q })),
       needs: Object.fromEntries(
         all
           .filter((e) => e.kind !== 'component' && e.needs.length)
@@ -2530,7 +2532,7 @@ export interface IdlProject {
   missing: string[]
 }
 
-/** Module standing for an IDL module of a file without components (see `interfaceServers`). */
+/** Module standing for an IDL module of the file (see `interfaceServers`). */
 interface IdlServer {
   /** Qualified IDL module, '' for the file scope. */
   scope: string
@@ -2538,19 +2540,25 @@ interface IdlServer {
   component: IdlComponent
 }
 
-/** Whether the file `file` defines components: then its IDL modules are not modules (see `interfaceServers`). */
+/** Whether the file `file` defines components: then its IDL modules only hold them (see `interfaceServers`). */
 const hasComponents = (idl: IdlFile, file: string, main: string): boolean =>
   idl.components.some((c) => (idl.origins[c.name] ?? main) === file)
 
+/** IDL module enclosing the component `c` ('' at file scope). */
+const componentScope = (c: IdlComponent): string => {
+  const q = c.qualified ?? ''
+  return q.includes('::') ? q.slice(0, q.lastIndexOf('::')) : ''
+}
+
 /**
- * Modules of a file `main` without components (plain CORBA IDL, DDS types): one per IDL module
- * holding definitions, and per IDL module enclosing those (the file's own module at file scope
- * when it has interfaces there), providing each of its interfaces on an `in` port. Types and
- * constants of IDL modules are theirs (see `idlProject`).
+ * Modules standing for the IDL modules of the file `main`. With components: one per IDL module
+ * enclosing them, holding them (see `nestServers`). Without (plain CORBA IDL, DDS types): one per
+ * IDL module holding definitions, and per IDL module enclosing those (the file's own module at
+ * file scope when it has interfaces there), providing each of its interfaces on an `in` port;
+ * types and constants of IDL modules are theirs (see `idlProject`).
  */
 function interfaceServers(idl: IdlFile, main: string): IdlServer[] {
   const own = (name: string): boolean => (idl.origins[name] ?? main) === main
-  if (hasComponents(idl, main, main)) return []
   const byScope = new Map<string, FileInterface[]>()
   const add = (scope: string): FileInterface[] => {
     const parent = scope.lastIndexOf('::')
@@ -2558,12 +2566,18 @@ function interfaceServers(idl: IdlFile, main: string): IdlServer[] {
     if (!byScope.has(scope)) byScope.set(scope, [])
     return byScope.get(scope)!
   }
-  for (const e of [...idl.types, ...idl.interfaces, ...idl.constants]) {
-    const scope = idl.scopes[e.name]
-    if (scope === undefined || !own(e.name)) continue
-    if ('messages' in e) add(scope).push(e)
-    else if (scope) add(scope)
-  }
+  if (hasComponents(idl, main, main)) {
+    for (const c of idl.components) {
+      const scope = componentScope(c)
+      if (scope && own(c.name)) add(scope)
+    }
+  } else
+    for (const e of [...idl.types, ...idl.interfaces, ...idl.constants]) {
+      const scope = idl.scopes[e.name]
+      if (scope === undefined || !own(e.name)) continue
+      if ('messages' in e) add(scope).push(e)
+      else if (scope) add(scope)
+    }
   const taken = idl.components.map((c) => c.name)
   return [...byScope].map(([scope, interfaces]) => {
     const name = uniqueName(scope ? scope.split('::').join('_') : dependencyName(stem(main)), taken)
@@ -2593,17 +2607,29 @@ function interfaceServers(idl: IdlFile, main: string): IdlServer[] {
 }
 
 /**
- * Nest the modules of `servers` in `p` like their IDL modules, named after them: the innermost
- * first, each laid out in a row in its parent, which grows to fit; the outermost in a row.
- * Returns the module of each IDL module.
+ * Nest the modules of `servers` in `p` like their IDL modules, with the modules of the
+ * `components` they enclose, named simply there: the innermost first, each laid out in a row in
+ * its parent, which grows to fit; the outermost in a row. Returns the module of each IDL module,
+ * and the qualified IDL names of the components named simply.
  */
-function nestServers(p: Project, servers: IdlServer[]): Map<string, Module> {
+function nestServers(
+  p: Project,
+  servers: IdlServer[],
+  components: IdlComponent[]
+): { modules: Map<string, Module>; simply: Set<string> } {
+  const root = (name: string): Module | undefined => p.modules.find((x) => x.name === name && !x.parentId)
   const modules = new Map(
     servers.flatMap((s) => {
-      const m = p.modules.find((x) => x.name === s.component.name && !x.parentId)
+      const m = root(s.component.name)
       return m ? [[s.scope, m] as const] : []
     })
   )
+  // Components of IDL modules, with their qualified name.
+  const held = components.flatMap((c) => {
+    const scope = componentScope(c)
+    const m = scope && modules.has(scope) ? root(c.name) : undefined
+    return m ? [{ m, scope, q: c.qualified! }] : []
+  })
   const parentOf = (scope: string): string | null =>
     scope.includes('::') ? scope.slice(0, scope.lastIndexOf('::')) : null
   const depth = (scope: string): number => (scope ? scope.split('::').length : 0)
@@ -2617,7 +2643,10 @@ function nestServers(p: Project, servers: IdlServer[]): Map<string, Module> {
   }
   for (const scope of [...modules.keys()].sort((a, b) => depth(b) - depth(a))) {
     const parent = modules.get(scope)!
-    const children = [...modules].filter(([s]) => parentOf(s) === scope).map(([, m]) => m)
+    const children = [
+      ...[...modules].filter(([s]) => parentOf(s) === scope).map(([, m]) => m),
+      ...held.filter((h) => h.scope === scope).map((h) => h.m)
+    ]
     row(children, contentTop(p.orientation, parent))
     for (const c of children) {
       c.layout.x += LAYOUT_PAD / 2
@@ -2626,25 +2655,30 @@ function nestServers(p: Project, servers: IdlServer[]): Map<string, Module> {
     }
   }
   const roots = p.modules.filter((m) => !m.parentId)
-  for (const [scope, m] of modules)
-    if (scope)
-      m.name = uniqueName(
-        lastSegment(`::${scope}`),
-        childModules(p, m.parentId)
-          .filter((x) => x !== m)
-          .map((x) => x.name)
-      )
+  const simply = new Set<string>()
+  const rename = (m: Module, q: string): boolean => {
+    const simple = lastSegment(`::${q}`)
+    m.name = uniqueName(
+      simple,
+      childModules(p, m.parentId)
+        .filter((x) => x !== m)
+        .map((x) => x.name)
+    )
+    return m.name === simple
+  }
+  for (const [scope, m] of modules) if (scope) rename(m, scope)
+  for (const { m, q } of held) if (rename(m, q)) simply.add(q)
   row(
     roots.filter((m) => [...modules.values()].includes(m)),
     0
   )
-  return modules
+  return { modules, simply }
 }
 
 /**
  * Make the types and constants of the IDL modules of `p` those of their modules (`modules`, of
- * the file `main`), or of the modules of the included file defining them (by path, when it has no
- * components), named simply there. Returns the qualified IDL names of those named simply.
+ * the file `main`), or of the modules of the included file defining them (by path), named simply
+ * there; those of files with components stay the project's. Returns the qualified IDL names of those named simply.
  */
 function scopeDefinitions(
   p: Project,
@@ -2660,7 +2694,7 @@ function scopeDefinitions(
     if (!scope || !q) continue
     const file = idl.origins[e.name] ?? main
     const module = file === main ? modules.get(scope) : undefined
-    if (file === main ? !module : hasComponents(idl, file, main)) continue
+    if (hasComponents(idl, file, main) || (file === main && !module)) continue
     // Unique among the definitions of the module and its submodules.
     const key = `${file}|${scope}`
     if (!taken.has(key))
@@ -2739,7 +2773,12 @@ export function idlProject(path: string, files: ReadonlyMap<string, string>): Id
     project.modules = project.modules.filter((m) => !theirs.has(m.id))
     for (const m of project.modules) if (m.bases) m.bases = m.bases.filter((b) => !theirs.has(b))
   }
-  const simply = scopeDefinitions(project, idl, main, nestServers(project, servers))
+  const nested = nestServers(
+    project,
+    servers,
+    parsed.components.filter((c) => (idl.origins[c.name] ?? main) === main)
+  )
+  const simply = new Set([...nested.simply, ...scopeDefinitions(project, parsed, main, nested.modules)])
   return {
     project,
     warnings: [
