@@ -16,7 +16,7 @@ A large architecture is split into project files depending on each other. A depe
 - [`examples/robot.scaffold.yaml`](../examples/robot.scaffold.yaml) uses it;
 - [`examples/station.scaffold.yaml`](../examples/station.scaffold.yaml) uses both and links to a module of the robot.
 
-A larger one, opened at once through a [workspace file](#workspace-files): [`examples/fleet/`](../examples/fleet).
+A larger one, opened at once through a [workspace file](#workspace-files): [`examples/fleet/`](../examples/fleet). Modules deriving from placed modules of a dependency: [`examples/plugins/`](../examples/plugins).
 
 ## In the editor
 

@@ -1,0 +1,593 @@
+schemaVersion: 1
+project:
+  name: Inspection
+  description: Optical inspection station built on imaging.idl - places its Imaging module (Grabber, Viewer components) and uses the types of that IDL module
+types:
+  - kind: enum
+    name: Verdict
+    underlying: uint8
+    values:
+      - name: Pass
+        value: 0
+      - name: Fail
+        value: 1
+      - name: Unsure
+        value: 2
+  - kind: struct
+    name: Defect
+    fields:
+      - name: where
+        type:
+          kind: ref
+          name: imaging/Imaging.Roi
+      - name: kind
+        type:
+          kind: primitive
+          name: string
+          max: 24
+      - name: score
+        type:
+          kind: primitive
+          name: float32
+interfaces:
+  - name: Results
+    messages:
+      - name: inspected
+        params:
+          - name: part
+            type:
+              kind: primitive
+              name: uint64
+          - name: verdict
+            type:
+              kind: ref
+              name: Verdict
+          - name: defects
+            type:
+              kind: vector
+              of:
+                kind: ref
+                name: Defect
+              max: 16
+        returns: null
+modules:
+  - name: Inspector
+    description: Finds defects in the frames
+    color: "#2e9e8f"
+    attributes:
+      - name: format
+        type:
+          kind: ref
+          name: imaging/Imaging.PixelFormat
+        default: MONO8
+      - name: roi
+        type:
+          kind: ref
+          name: imaging/Imaging.Roi
+        default:
+          x: 200
+          y: 100
+          width: 1280
+          height: 720
+      - name: threshold
+        type:
+          kind: primitive
+          name: float32
+        default: 0.8
+    ports:
+      - name: camera
+        role: out
+        interface: Camera
+      - name: frames
+        role: in
+        interface: FrameListener
+      - name: results
+        role: out
+        interface: Results
+      - name: preview
+        role: out
+        interface: FrameListener
+  - name: Reject
+    description: Pushes failed parts off the conveyor
+    color: "#d1733b"
+    ports:
+      - name: results
+        role: in
+        interface: Results
+links:
+  - name: configure_camera
+    from:
+      module: Inspector
+      port: camera
+    to:
+      project: imaging
+      module: Imaging.Grabber
+      port: camera
+    constraints:
+      direction: bidirectional
+      ack:
+        required: false
+      performance:
+        class: normal
+      remote:
+        enabled: false
+  - name: frames_in
+    from:
+      project: imaging
+      module: Imaging.Grabber
+      port: listeners
+    to:
+      module: Inspector
+      port: frames
+    constraints:
+      direction: unidirectional
+      ack:
+        required: false
+      performance:
+        class: realtime
+        maxLatencyMs: 30
+        rateHz: 30
+      remote:
+        enabled: false
+  - name: preview
+    description: Frames with the defects drawn
+    from:
+      module: Inspector
+      port: preview
+    to:
+      project: imaging
+      module: Imaging.Viewer
+      port: frames
+    constraints:
+      direction: unidirectional
+      ack:
+        required: false
+      performance:
+        class: low
+        rateHz: 10
+      remote:
+        enabled: false
+  - name: verdicts
+    from:
+      module: Inspector
+      port: results
+    to:
+      module: Reject
+      port: results
+    constraints:
+      direction: unidirectional
+      ack:
+        required: false
+      performance:
+        class: realtime
+        maxLatencyMs: 50
+      remote:
+        enabled: false
+dependencies:
+  - name: imaging
+    file: imaging.idl
+    uses:
+      - sensors_dds
+    types:
+      - kind: primitive
+        name: BufferHandle
+        description: Handle the platform gives to frame buffers.
+    interfaces:
+      - name: Camera
+        messages:
+          - name: get_settings
+            params: []
+            returns:
+              kind: ref
+              name: imaging/Imaging.Register
+          - name: configure
+            params:
+              - name: format
+                type:
+                  kind: ref
+                  name: imaging/Imaging.PixelFormat
+              - name: roi
+                type:
+                  kind: ref
+                  name: imaging/Imaging.Roi
+            returns: null
+          - name: grab
+            params: []
+            returns:
+              kind: ref
+              name: imaging/Imaging.Frame
+            raises:
+              - imaging/Imaging.NotStreaming
+          - name: health
+            params: []
+            returns:
+              kind: ref
+              name: sensors_dds/Sensors.Health
+      - name: FrameListener
+        messages:
+          - name: onFrame
+            params:
+              - name: frame
+                type:
+                  kind: ref
+                  name: imaging/Imaging.Frame
+            returns: null
+      - name: Annotated
+        description: What a processing step reports.
+        messages:
+          - name: caption
+            params: []
+            returns:
+              kind: ref
+              name: imaging/Imaging.Label
+    moduleTypes:
+      - module: Imaging
+        types:
+          - kind: struct
+            name: Roi
+            description: Region of interest.
+            fields:
+              - name: x
+                type:
+                  kind: primitive
+                  name: uint16
+              - name: y
+                type:
+                  kind: primitive
+                  name: uint16
+              - name: width
+                type:
+                  kind: primitive
+                  name: uint16
+                default: 1920
+              - name: height
+                type:
+                  kind: primitive
+                  name: uint16
+                default: 1080
+          - kind: enum
+            name: PixelFormat
+            underlying: int32
+            values:
+              - name: MONO8
+                value: 0
+              - name: RGB24
+                value: 1
+              - name: BAYER_RG8
+                value: 2
+              - name: YUV422
+                value: 3
+          - kind: struct
+            name: Register
+            description: Packed sensor register.
+            fields:
+              - name: gain
+                type:
+                  kind: primitive
+                  name: uint8
+                description: 4 bits.
+              - name: binning
+                type:
+                  kind: primitive
+                  name: uint8
+                description: 3 bits.
+              - name: enabled
+                type:
+                  kind: primitive
+                  name: bool
+                description: 1 bits.
+          - kind: struct
+            name: Frame
+            description: Frame shared by value.
+            fields:
+              - name: format
+                type:
+                  kind: ref
+                  name: imaging/Imaging.PixelFormat
+              - name: roi
+                type:
+                  kind: ref
+                  name: imaging/Imaging.Roi
+              - name: pixels
+                type:
+                  kind: primitive
+                  name: bytes
+              - name: buffer
+                type:
+                  kind: ref
+                  name: BufferHandle
+          - kind: alias
+            name: Label
+            description: "Text maybe absent: a boxed value."
+            type:
+              kind: optional
+              of:
+                kind: primitive
+                name: string
+          - kind: exception
+            name: NotStreaming
+            fields: []
+      - module: Imaging.Exposures
+        types:
+          - kind: struct
+            name: Ring
+            fields:
+              - name: items
+                type:
+                  kind: array
+                  of:
+                    kind: primitive
+                    name: float64
+                  size: 16
+              - name: head
+                type:
+                  kind: primitive
+                  name: uint32
+    moduleConstants:
+      - module: Imaging
+        constants:
+          - name: WIDTH
+            type:
+              kind: primitive
+              name: uint16
+            value: 1920
+          - name: HEIGHT
+            type:
+              kind: primitive
+              name: uint16
+            value: 1080
+          - name: PIXELS
+            type:
+              kind: primitive
+              name: uint32
+            value: 2073600
+          - name: GAMMA
+            type:
+              kind: primitive
+              name: float64
+            value: 2.2
+          - name: VENDOR
+            type:
+              kind: primitive
+              name: string
+            value: Example Optics
+    modules:
+      - module: Imaging
+        ports: []
+      - module: Imaging.Grabber
+        attributes:
+          - name: fps
+            type:
+              kind: primitive
+              name: uint16
+        ports:
+          - name: camera
+            role: in
+            interface: Camera
+          - name: listeners
+            role: out
+            interface: FrameListener
+            description: Multiple connections.
+      - module: Imaging.Viewer
+        ports:
+          - name: frames
+            role: in
+            interface: FrameListener
+      - module: Imaging.SharedFrames
+        ports:
+          - name: sink
+            role: in
+            interface: FrameListener
+          - name: source
+            role: out
+            interface: FrameListener
+      - module: Imaging.Exposures
+        ports: []
+  - name: sensors_dds
+    file: sensors_dds.idl
+    indirect: true
+    types: []
+    interfaces: []
+    moduleTypes:
+      - module: Sensors
+        types:
+          - kind: enum
+            name: Health
+            underlying: int32
+            values:
+              - name: OK
+                value: 0
+              - name: DEGRADED
+                value: 10
+              - name: FAILED
+                value: 20
+          - kind: bitmask
+            name: Capabilities
+            underlying: uint8
+            flags:
+              - name: RANGE
+                bit: 0
+              - name: INTENSITY
+                bit: 1
+              - name: VELOCITY
+                bit: 4
+          - kind: struct
+            name: Point
+            description: Point of a scan, in the sensor frame (meters).
+            fields:
+              - name: x
+                type:
+                  kind: primitive
+                  name: float32
+              - name: y
+                type:
+                  kind: primitive
+                  name: float32
+              - name: z
+                type:
+                  kind: primitive
+                  name: float32
+              - name: intensity
+                type:
+                  kind: optional
+                  of:
+                    kind: primitive
+                    name: float32
+          - kind: struct
+            name: Header
+            description: Header of every sample.
+            fields:
+              - name: sensorId
+                type:
+                  kind: primitive
+                  name: string
+                  max: 16
+              - name: stampNs
+                type:
+                  kind: primitive
+                  name: uint64
+                description: since the epoch
+              - name: counter
+                type:
+                  kind: primitive
+                  name: uint32
+          - kind: struct
+            name: Scan
+            fields:
+              - name: sensorId
+                type:
+                  kind: primitive
+                  name: string
+                  max: 16
+              - name: stampNs
+                type:
+                  kind: primitive
+                  name: uint64
+                description: since the epoch
+              - name: counter
+                type:
+                  kind: primitive
+                  name: uint32
+              - name: points
+                type:
+                  kind: vector
+                  of:
+                    kind: ref
+                    name: sensors_dds/Sensors.Point
+                  max: 1024
+              - name: capabilities
+                type:
+                  kind: ref
+                  name: sensors_dds/Sensors.Capabilities
+          - kind: struct
+            name: Status
+            fields:
+              - name: sensorId
+                type:
+                  kind: primitive
+                  name: string
+                  max: 16
+              - name: stampNs
+                type:
+                  kind: primitive
+                  name: uint64
+                description: since the epoch
+              - name: counter
+                type:
+                  kind: primitive
+                  name: uint32
+              - name: health
+                type:
+                  kind: ref
+                  name: sensors_dds/Sensors.Health
+              - name: temperatures
+                type:
+                  kind: map
+                  key:
+                    kind: primitive
+                    name: string
+                  value:
+                    kind: primitive
+                    name: float64
+                description: by probe name
+              - name: diagnostics
+                type:
+                  kind: primitive
+                  name: bytes
+                description: vendor blob
+          - kind: union
+            name: Reading
+            description: "Raw reading: a struct of its discriminator and one optional field per case."
+            discriminator:
+              kind: primitive
+              name: int32
+            cases:
+              - name: range
+                type:
+                  kind: primitive
+                  name: float32
+                labels:
+                  - 0
+              - name: point
+                type:
+                  kind: ref
+                  name: sensors_dds/Sensors.Point
+                labels:
+                  - 1
+              - name: text
+                type:
+                  kind: primitive
+                  name: string
+                default: true
+    moduleConstants:
+      - module: Sensors
+        constants:
+          - name: MAX_POINTS
+            type:
+              kind: primitive
+              name: int32
+            value: 1024
+          - name: MAX_ID
+            type:
+              kind: primitive
+              name: int32
+            value: 16
+editor:
+  layout:
+    Inspector:
+      x: 900
+      y: 60
+      width: 200
+      height: 182
+    Reject:
+      x: 1220
+      y: 60
+      width: 200
+      height: 72
+  dependencies:
+    imaging:
+      Imaging:
+        x: 20
+        y: 20
+        width: 780
+        height: 330
+      Imaging.Grabber:
+        x: 540
+        y: 60
+        width: 200
+        height: 98
+      Imaging.Viewer:
+        x: 540
+        y: 220
+        width: 200
+        height: 72
+      Imaging.SharedFrames:
+        x: 20
+        y: 200
+        width: 200
+        height: 98
+      Imaging.Exposures:
+        x: 20
+        y: 60
+        width: 200
+        height: 72

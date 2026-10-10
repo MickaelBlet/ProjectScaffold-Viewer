@@ -18,8 +18,9 @@ In [`examples/idl/`](../examples/idl):
 | `sensors_dds.idl`   | DDS types only: annotations, bitmask, union, bounded sequences, maps                                                    |
 | `tank_ccm.idl`      | CCM components, porttypes and events; includes `sensors_dds.idl`                                                        |
 | `navigation.idl`    | uses `Pose` and `Vec3` without defining them: import it into `examples/robot.scaffold.yaml` to see them matched by name |
+| `imaging.idl`       | `import`, template modules, constant expressions, value types (concrete, abstract, boxed), bitsets, natives, connectors |
 
-[`filling_cell.scaffold.yaml`](../examples/idl/filling_cell.scaffold.yaml) depends on `tank_ccm.idl` (with `sensors_dds.idl`, indirect) and `robot_control.idl`: it places the `Plant` module of `tank_ccm.idl` (the `Equipment`, `Tank` and `Supervisor` components), links its own modules to them, and uses the IDL interfaces (`Arm`, `Gripper`, `Valve`…) and types (`Scan`, `Health`, `JointAngles`…) as its own.
+[`filling_cell.scaffold.yaml`](../examples/idl/filling_cell.scaffold.yaml) depends on `tank_ccm.idl` (with `sensors_dds.idl`, indirect) and `robot_control.idl`: it places the `Plant` module of `tank_ccm.idl` (the `Equipment`, `Tank` and `Supervisor` components), links its own modules to them, and uses the IDL interfaces (`Arm`, `Gripper`, `Valve`…) and types (`Scan`, `Health`, `JointAngles`…) as its own. [`inspection.scaffold.yaml`](../examples/idl/inspection.scaffold.yaml) depends on `imaging.idl`: it places its `Imaging` module, links to the `Grabber` and `Viewer` components and uses the types of that IDL module by path (`imaging/Imaging.Roi`).
 
 ## Preprocessor
 

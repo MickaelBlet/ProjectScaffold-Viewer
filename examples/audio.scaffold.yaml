@@ -1,0 +1,609 @@
+schemaVersion: 1
+project:
+  name: Audio
+  description: Audio effect chain built on a class hierarchy - interface and abstract modules, multiple inheritance, virtual, pure and override methods; generated in C++20
+generation:
+  templates: cpp20
+types:
+  - kind: alias
+    name: Sample
+    type:
+      kind: primitive
+      name: float32
+  - kind: struct
+    name: Buffer
+    description: Interleaved block of samples
+    fields:
+      - name: channels
+        type:
+          kind: primitive
+          name: uint8
+        default: 2
+      - name: rate
+        type:
+          kind: primitive
+          name: uint32
+        default: 48000
+      - name: samples
+        type:
+          kind: vector
+          of:
+            kind: ref
+            name: Sample
+  - kind: exception
+    name: FormatError
+    description: The buffer has a channel count or rate the effect cannot handle
+    fields:
+      - name: channels
+        type:
+          kind: primitive
+          name: uint8
+      - name: rate
+        type:
+          kind: primitive
+          name: uint32
+interfaces:
+  - name: AudioSink
+    messages:
+      - name: push
+        params:
+          - name: buffer
+            type:
+              kind: ref
+              name: Buffer
+        returns: null
+  - name: LevelSink
+    messages:
+      - name: level
+        params:
+          - name: db
+            type:
+              kind: primitive
+              name: float32
+        returns: null
+constants:
+  - name: SilenceDb
+    type:
+      kind: primitive
+      name: float32
+    value: -96
+modules:
+  - name: Processor
+    description: Anything processing audio in place
+    kind: interface
+    color: "#6b7f8e"
+    methods:
+      - name: process
+        virtual: true
+        pure: true
+        params:
+          - name: buffer
+            type:
+              kind: ref
+              name: Buffer
+            direction: inout
+        returns: null
+        raises:
+          - FormatError
+      - name: reset
+        virtual: true
+        pure: true
+        params: []
+        returns: null
+      - name: latency
+        description: Delay added, in samples
+        const: true
+        virtual: true
+        pure: true
+        params: []
+        returns:
+          kind: primitive
+          name: uint32
+    ports: []
+  - name: Meter
+    description: Exposes a level
+    kind: interface
+    color: "#6b7f8e"
+    methods:
+      - name: level
+        const: true
+        virtual: true
+        pure: true
+        params: []
+        returns:
+          kind: primitive
+          name: float32
+    ports: []
+  - name: Effect
+    description: Processor that can be bypassed; derived effects only implement apply
+    kind: abstract
+    bases:
+      - Processor
+    color: "#8a4fd1"
+    attributes:
+      - name: bypass
+        type:
+          kind: primitive
+          name: bool
+        default: false
+      - name: rate
+        access: protected
+        type:
+          kind: primitive
+          name: uint32
+        default: 48000
+      - name: count
+        access: private
+        static: true
+        type:
+          kind: primitive
+          name: uint32
+        default: 0
+    methods:
+      - name: process
+        description: Checks the format, then applies the effect unless bypassed
+        virtual: true
+        override: true
+        params:
+          - name: buffer
+            type:
+              kind: ref
+              name: Buffer
+            direction: inout
+        returns: null
+        raises:
+          - FormatError
+      - name: reset
+        virtual: true
+        override: true
+        params: []
+        returns: null
+      - name: latency
+        const: true
+        virtual: true
+        override: true
+        params: []
+        returns:
+          kind: primitive
+          name: uint32
+      - name: apply
+        access: protected
+        virtual: true
+        pure: true
+        params:
+          - name: samples
+            type:
+              kind: vector
+              of:
+                kind: ref
+                name: Sample
+            direction: inout
+        returns: null
+      - name: instances
+        description: Effects alive
+        static: true
+        params: []
+        returns:
+          kind: primitive
+          name: uint32
+    ports: []
+  - name: Source
+    description: Reads the input device
+    color: "#3b8fd1"
+    attributes:
+      - name: device
+        type:
+          kind: primitive
+          name: string
+        default: default
+      - name: blockSize
+        type:
+          kind: primitive
+          name: uint16
+        default: 256
+    ports:
+      - name: out
+        role: out
+        interface: AudioSink
+  - name: Equalizer
+    bases:
+      - Effect
+    color: "#2e9e8f"
+    types:
+      - kind: enum
+        name: Shape
+        underlying: uint8
+        values:
+          - name: Peak
+            value: 0
+          - name: LowShelf
+            value: 1
+          - name: HighShelf
+            value: 2
+          - name: LowCut
+            value: 3
+          - name: HighCut
+            value: 4
+      - kind: struct
+        name: Band
+        fields:
+          - name: shape
+            type:
+              kind: ref
+              name: Equalizer.Shape
+            default: Peak
+          - name: frequency
+            type:
+              kind: primitive
+              name: float32
+            default: 1000
+          - name: gainDb
+            type:
+              kind: primitive
+              name: float32
+            default: 0
+          - name: q
+            type:
+              kind: primitive
+              name: float32
+            default: 0.707
+      - kind: struct
+        name: Coefficients
+        access: private
+        fields:
+          - name: b
+            type:
+              kind: array
+              of:
+                kind: primitive
+                name: float64
+              size: 3
+          - name: a
+            type:
+              kind: array
+              of:
+                kind: primitive
+                name: float64
+              size: 2
+    constants:
+      - name: MAX_BANDS
+        type:
+          kind: primitive
+          name: uint8
+        value: 8
+    attributes:
+      - name: bands
+        type:
+          kind: vector
+          of:
+            kind: ref
+            name: Equalizer.Band
+          max: 8
+        default:
+          - shape: LowCut
+            frequency: 40
+          - frequency: 3000
+            gainDb: 2
+      - name: filters
+        access: private
+        type:
+          kind: vector
+          of:
+            kind: ref
+            name: Equalizer.Coefficients
+    methods:
+      - name: apply
+        access: protected
+        virtual: true
+        override: true
+        params:
+          - name: samples
+            type:
+              kind: vector
+              of:
+                kind: ref
+                name: Sample
+            direction: inout
+        returns: null
+      - name: design
+        access: private
+        static: true
+        params:
+          - name: band
+            type:
+              kind: ref
+              name: Equalizer.Band
+            const: true
+          - name: rate
+            type:
+              kind: primitive
+              name: uint32
+        returns:
+          kind: ref
+          name: Equalizer.Coefficients
+    ports:
+      - name: in
+        role: in
+        interface: AudioSink
+      - name: out
+        role: out
+        interface: AudioSink
+  - name: Compressor
+    bases:
+      - Effect
+      - Meter
+    color: "#d14f9e"
+    attributes:
+      - name: thresholdDb
+        type:
+          kind: primitive
+          name: float32
+        default: -18
+      - name: ratio
+        type:
+          kind: primitive
+          name: float32
+        default: 4
+      - name: attackMs
+        type:
+          kind: primitive
+          name: float32
+        default: 10
+      - name: releaseMs
+        type:
+          kind: primitive
+          name: float32
+        default: 120
+      - name: envelope
+        access: protected
+        type:
+          kind: primitive
+          name: float32
+        default: 0
+    methods:
+      - name: apply
+        access: protected
+        virtual: true
+        override: true
+        params:
+          - name: samples
+            type:
+              kind: vector
+              of:
+                kind: ref
+                name: Sample
+            direction: inout
+        returns: null
+      - name: level
+        description: Gain reduction
+        const: true
+        virtual: true
+        override: true
+        params: []
+        returns:
+          kind: primitive
+          name: float32
+    ports:
+      - name: in
+        role: in
+        interface: AudioSink
+      - name: out
+        role: out
+        interface: AudioSink
+      - name: reduction
+        role: out
+        interface: LevelSink
+  - name: Limiter
+    description: Compressor with an infinite ratio and look-ahead
+    bases:
+      - Compressor
+    color: "#d1733b"
+    attributes:
+      - name: ceilingDb
+        type:
+          kind: primitive
+          name: float32
+        default: -0.3
+      - name: lookAhead
+        type:
+          kind: primitive
+          name: uint16
+        description: Samples
+        default: 64
+    methods:
+      - name: apply
+        access: protected
+        virtual: true
+        override: true
+        params:
+          - name: samples
+            type:
+              kind: vector
+              of:
+                kind: ref
+                name: Sample
+            direction: inout
+        returns: null
+      - name: latency
+        const: true
+        virtual: true
+        override: true
+        params: []
+        returns:
+          kind: primitive
+          name: uint32
+    ports:
+      - name: in
+        role: in
+        interface: AudioSink
+      - name: out
+        role: out
+        interface: AudioSink
+      - name: reduction
+        role: out
+        interface: LevelSink
+  - name: Sink
+    description: Writes the output device
+    color: "#3b8fd1"
+    ports:
+      - name: in
+        role: in
+        interface: AudioSink
+  - name: Display
+    description: Shows the gain reduction
+    color: "#d6c21f"
+    ports:
+      - name: compressor
+        role: in
+        interface: LevelSink
+      - name: limiter
+        role: in
+        interface: LevelSink
+links:
+  - name: source_to_eq
+    from:
+      module: Source
+      port: out
+    to:
+      module: Equalizer
+      port: in
+    constraints:
+      direction: unidirectional
+      ack:
+        required: false
+      performance:
+        class: realtime
+        maxLatencyMs: 2
+        rateHz: 187.5
+      remote:
+        enabled: false
+  - name: eq_to_compressor
+    from:
+      module: Equalizer
+      port: out
+    to:
+      module: Compressor
+      port: in
+    constraints:
+      direction: unidirectional
+      ack:
+        required: false
+      performance:
+        class: realtime
+        maxLatencyMs: 2
+        rateHz: 187.5
+      remote:
+        enabled: false
+  - name: compressor_to_limiter
+    from:
+      module: Compressor
+      port: out
+    to:
+      module: Limiter
+      port: in
+    constraints:
+      direction: unidirectional
+      ack:
+        required: false
+      performance:
+        class: realtime
+        maxLatencyMs: 2
+        rateHz: 187.5
+      remote:
+        enabled: false
+  - name: limiter_to_sink
+    from:
+      module: Limiter
+      port: out
+    to:
+      module: Sink
+      port: in
+    constraints:
+      direction: unidirectional
+      ack:
+        required: false
+      performance:
+        class: realtime
+        maxLatencyMs: 2
+        rateHz: 187.5
+      remote:
+        enabled: false
+  - name: compressor_meter
+    from:
+      module: Compressor
+      port: reduction
+    to:
+      module: Display
+      port: compressor
+    constraints:
+      direction: unidirectional
+      ack:
+        required: false
+      performance:
+        class: low
+        rateHz: 30
+      remote:
+        enabled: false
+  - name: limiter_meter
+    from:
+      module: Limiter
+      port: reduction
+    to:
+      module: Display
+      port: limiter
+    constraints:
+      direction: unidirectional
+      ack:
+        required: false
+      performance:
+        class: low
+        rateHz: 30
+      remote:
+        enabled: false
+editor:
+  layout:
+    Processor:
+      x: 21
+      y: 20
+      width: 200
+      height: 134
+    Meter:
+      x: 21
+      y: 712
+      width: 200
+      height: 98
+    Effect:
+      x: 21
+      y: 224
+      width: 200
+      height: 232
+    Source:
+      x: 20
+      y: 526
+      width: 200
+      height: 116
+    Equalizer:
+      x: 336
+      y: 335
+      width: 200
+      height: 160
+    Compressor:
+      x: 652
+      y: 296
+      width: 200
+      height: 238
+    Limiter:
+      x: 968
+      y: 323
+      width: 200
+      height: 184
+    Sink:
+      x: 1284
+      y: 296
+      width: 200
+      height: 72
+    Display:
+      x: 1284
+      y: 438
+      width: 200
+      height: 96

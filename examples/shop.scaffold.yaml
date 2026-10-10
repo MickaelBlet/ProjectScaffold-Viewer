@@ -1,0 +1,590 @@
+schemaVersion: 1
+project:
+  name: Shop
+  description: Online shop services, laid out with the editor's tools - notes and frames, views of a module with hidden modules, placed outside modules and hand-set links, locked modules, port label sides
+  metadata:
+    version: 2.0.0
+    owner: commerce-team
+remoteDefaults:
+  client:
+    host: api.shop.example
+  basePort: 9000
+binaries:
+  - name: Frontend
+    description: Single-page app in the browser
+    color: "#d6c21f"
+  - name: Api
+    description: Backend services
+    color: "#2e9e8f"
+  - name: Jobs
+    description: Background workers
+    color: "#8a4fd1"
+  - name: Provider
+    description: Payment provider
+    color: "#6b7f8e"
+types:
+  - kind: alias
+    name: Sku
+    type:
+      kind: primitive
+      name: string
+      max: 24
+  - kind: struct
+    name: Product
+    fields:
+      - name: sku
+        type:
+          kind: ref
+          name: Sku
+      - name: title
+        type:
+          kind: primitive
+          name: string
+      - name: priceCents
+        type:
+          kind: primitive
+          name: uint32
+  - kind: struct
+    name: Line
+    fields:
+      - name: sku
+        type:
+          kind: ref
+          name: Sku
+      - name: quantity
+        type:
+          kind: primitive
+          name: uint16
+        default: 1
+  - kind: enum
+    name: OrderStatus
+    underlying: uint8
+    values:
+      - name: Pending
+        value: 0
+      - name: Paid
+        value: 1
+      - name: Shipped
+        value: 2
+      - name: Cancelled
+        value: 3
+  - kind: struct
+    name: Order
+    fields:
+      - name: id
+        type:
+          kind: primitive
+          name: uint64
+      - name: lines
+        type:
+          kind: vector
+          of:
+            kind: ref
+            name: Line
+      - name: status
+        type:
+          kind: ref
+          name: OrderStatus
+        default: Pending
+  - kind: exception
+    name: OutOfStock
+    fields:
+      - name: sku
+        type:
+          kind: ref
+          name: Sku
+  - kind: exception
+    name: PaymentDeclined
+    fields:
+      - name: reason
+        type:
+          kind: primitive
+          name: string
+interfaces:
+  - name: Storefront
+    messages:
+      - name: search
+        params:
+          - name: query
+            type:
+              kind: primitive
+              name: string
+        returns:
+          kind: vector
+          of:
+            kind: ref
+            name: Product
+      - name: checkout
+        params:
+          - name: lines
+            type:
+              kind: vector
+              of:
+                kind: ref
+                name: Line
+        returns:
+          kind: ref
+          name: Order
+        raises:
+          - OutOfStock
+          - PaymentDeclined
+  - name: Catalog
+    messages:
+      - name: search
+        params:
+          - name: query
+            type:
+              kind: primitive
+              name: string
+        returns:
+          kind: vector
+          of:
+            kind: ref
+            name: Product
+      - name: price
+        params:
+          - name: sku
+            type:
+              kind: ref
+              name: Sku
+        returns:
+          kind: primitive
+          name: uint32
+  - name: Ordering
+    messages:
+      - name: place
+        params:
+          - name: lines
+            type:
+              kind: vector
+              of:
+                kind: ref
+                name: Line
+        returns:
+          kind: ref
+          name: Order
+        raises:
+          - OutOfStock
+          - PaymentDeclined
+  - name: Stock
+    messages:
+      - name: reserve
+        params:
+          - name: lines
+            type:
+              kind: vector
+              of:
+                kind: ref
+                name: Line
+        returns: null
+        raises:
+          - OutOfStock
+      - name: release
+        params:
+          - name: order
+            type:
+              kind: primitive
+              name: uint64
+        returns: null
+  - name: Payment
+    messages:
+      - name: charge
+        params:
+          - name: order
+            type:
+              kind: primitive
+              name: uint64
+          - name: cents
+            type:
+              kind: primitive
+              name: uint32
+        returns:
+          kind: primitive
+          name: string
+        raises:
+          - PaymentDeclined
+  - name: OrderEvents
+    messages:
+      - name: changed
+        params:
+          - name: order
+            type:
+              kind: ref
+              name: Order
+        returns: null
+modules:
+  - name: Web
+    color: "#d6c21f"
+    binary: Frontend
+    ports:
+      - name: api
+        role: out
+        interface: Storefront
+  - name: Gateway
+    description: Authenticates and routes the requests
+    color: "#3b8fd1"
+    binary: Api
+    ports:
+      - name: api
+        role: in
+        interface: Storefront
+      - name: catalog
+        role: out
+        interface: Catalog
+      - name: orders
+        role: out
+        interface: Ordering
+  - name: Backend
+    color: "#2e9e8f"
+    binary: Api
+    ports:
+      - name: catalog
+        role: in
+        interface: Catalog
+      - name: orders
+        role: in
+        interface: Ordering
+      - name: payment
+        role: out
+        interface: Payment
+      - name: events
+        role: out
+        interface: OrderEvents
+    modules:
+      - name: Products
+        ports:
+          - name: catalog
+            role: in
+            interface: Catalog
+      - name: Orders
+        attributes:
+          - name: holdMinutes
+            type:
+              kind: primitive
+              name: uint16
+            default: 15
+        ports:
+          - name: orders
+            role: in
+            interface: Ordering
+          - name: prices
+            role: out
+            interface: Catalog
+          - name: stock
+            role: out
+            interface: Stock
+          - name: payment
+            role: out
+            interface: Payment
+          - name: events
+            role: out
+            interface: OrderEvents
+      - name: Inventory
+        ports:
+          - name: stock
+            role: in
+            interface: Stock
+  - name: Notifier
+    description: Mails the customers when their orders change
+    color: "#8a4fd1"
+    binary: Jobs
+    ports:
+      - name: events
+        role: in
+        interface: OrderEvents
+  - name: Psp
+    description: Payment service provider
+    color: "#6b7f8e"
+    binary: Provider
+    ports:
+      - name: payment
+        role: in
+        interface: Payment
+links:
+  - name: web_api
+    from:
+      module: Web
+      port: api
+    to:
+      module: Gateway
+      port: api
+    constraints:
+      direction: bidirectional
+      ack:
+        required: false
+      performance:
+        class: normal
+        maxLatencyMs: 300
+      remote:
+        enabled: true
+        transport: http
+        settings:
+          path: /api
+  - name: gateway_catalog
+    from:
+      module: Gateway
+      port: catalog
+    to:
+      module: Backend
+      port: catalog
+    constraints:
+      direction: bidirectional
+      ack:
+        required: false
+      performance:
+        class: normal
+      remote:
+        enabled: false
+  - name: gateway_orders
+    from:
+      module: Gateway
+      port: orders
+    to:
+      module: Backend
+      port: orders
+    constraints:
+      direction: bidirectional
+      ack:
+        required: false
+      performance:
+        class: normal
+      remote:
+        enabled: false
+  - name: catalog_in
+    from:
+      module: Backend
+      port: catalog
+    to:
+      module: Backend.Products
+      port: catalog
+    constraints:
+      direction: bidirectional
+      ack:
+        required: false
+      performance:
+        class: normal
+      remote:
+        enabled: false
+  - name: orders_in
+    from:
+      module: Backend
+      port: orders
+    to:
+      module: Backend.Orders
+      port: orders
+    constraints:
+      direction: bidirectional
+      ack:
+        required: false
+      performance:
+        class: normal
+      remote:
+        enabled: false
+  - name: order_prices
+    from:
+      module: Backend.Orders
+      port: prices
+    to:
+      module: Backend.Products
+      port: catalog
+    constraints:
+      direction: bidirectional
+      ack:
+        required: false
+      performance:
+        class: normal
+      remote:
+        enabled: false
+  - name: order_stock
+    from:
+      module: Backend.Orders
+      port: stock
+    to:
+      module: Backend.Inventory
+      port: stock
+    constraints:
+      direction: bidirectional
+      ack:
+        required: false
+      performance:
+        class: normal
+      remote:
+        enabled: false
+  - name: payment_out
+    from:
+      module: Backend.Orders
+      port: payment
+    to:
+      module: Backend
+      port: payment
+    constraints:
+      direction: bidirectional
+      ack:
+        required: false
+      performance:
+        class: normal
+      remote:
+        enabled: false
+  - name: events_out
+    from:
+      module: Backend.Orders
+      port: events
+    to:
+      module: Backend
+      port: events
+    constraints:
+      direction: unidirectional
+      ack:
+        required: false
+      performance:
+        class: low
+      remote:
+        enabled: false
+  - name: charge
+    from:
+      module: Backend
+      port: payment
+    to:
+      module: Psp
+      port: payment
+    constraints:
+      direction: bidirectional
+      ack:
+        required: true
+        timeoutMs: 10000
+      performance:
+        class: normal
+      remote:
+        enabled: true
+        transport: grpc
+        settings:
+          client:
+            host: psp.example
+            port: 443
+  - name: order_events
+    from:
+      module: Backend
+      port: events
+    to:
+      module: Notifier
+      port: events
+    constraints:
+      direction: unidirectional
+      ack:
+        required: false
+      performance:
+        class: low
+      remote:
+        enabled: true
+        transport: mqtt
+        settings:
+          broker:
+            host: mq.shop.internal
+          topic: shop/orders
+editor:
+  layout:
+    Web:
+      x: 20
+      y: 155
+      width: 200
+      height: 72
+    Gateway:
+      x: 336
+      y: 143
+      width: 200
+      height: 96
+    Backend:
+      x: 652
+      y: 20
+      width: 785
+      height: 341
+    Backend.Products:
+      x: 443
+      y: 77
+      width: 200
+      height: 72
+    Backend.Orders:
+      x: 127
+      y: 99
+      width: 200
+      height: 170
+    Backend.Inventory:
+      x: 443
+      y: 219
+      width: 200
+      height: 72
+    Notifier:
+      x: 1553
+      y: 226
+      width: 200
+      height: 72
+    Psp:
+      x: 1553
+      y: 84
+      width: 200
+      height: 72
+  views:
+    - name: Checkout
+      root: Backend
+      hidden:
+        - Backend.Products
+      outside:
+        Gateway:
+          x: -320
+          y: 120
+          width: 200
+          height: 96
+        Notifier:
+          x: 1000
+          y: 260
+        Psp:
+          x: 1000
+          y: 40
+      notes:
+        - kind: note
+          text: "Products is hidden in this view: Orders asks it for prices."
+          x: 440
+          y: 60
+          width: 240
+          height: 80
+          color: "#fff3b0"
+    - name: Without jobs
+      hidden:
+        - Notifier
+  style:
+    Gateway:
+      locked: true
+    Backend.Orders:
+      labels:
+        events: bottom
+  links:
+    charge:
+      from:
+        side: right
+        at: 0.3
+      to:
+        side: left
+        at: 0.5
+      label: 0.4
+    order_events:
+      points:
+        - x: 1495
+          y: 300
+        - x: 1495
+          y: 262
+  notes:
+    - kind: frame
+      text: Api binary
+      x: 316
+      y: -20
+      width: 1141
+      height: 401
+      color: "#2e9e8f"
+      locked: true
+    - kind: note
+      text: "Views: Checkout shows Backend alone (Products hidden), Without jobs hides Notifier. Gateway is locked in place."
+      x: 20
+      y: -20
+      width: 260
+      height: 120
+      color: "#fff3b0"

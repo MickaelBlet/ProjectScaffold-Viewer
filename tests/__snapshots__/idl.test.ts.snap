@@ -1,5 +1,33 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`IDL import > imports examples/idl/imaging.idl 1`] = `
+{
+  "interfaces": [
+    "Annotated",
+    "Camera",
+    "FrameListener",
+  ],
+  "modules": [
+    "Grabber: in camera, out listeners",
+    "Viewer: in frames",
+    "SharedFrames: in sink, out source",
+  ],
+  "types": [
+    "enum Health",
+    "primitive BufferHandle",
+    "struct Register",
+    "enum PixelFormat",
+    "struct Roi",
+    "struct Frame",
+    "alias Label",
+    "exception NotStreaming",
+  ],
+  "warnings": [
+    "Line 25: bitset Imaging::Register imported as a struct of its bitfields",
+  ],
+}
+`;
+
 exports[`IDL import > imports examples/idl/navigation.idl 1`] = `
 {
   "interfaces": [

@@ -1,0 +1,412 @@
+schemaVersion: 1
+project:
+  name: Radio
+  description: Software-defined FM radio waveform - components with uses (out) and provides (in) ports and properties; generated as SCA components in C++98
+generation:
+  templates: sca-cpp98
+types:
+  - kind: struct
+    name: IqSample
+    fields:
+      - name: i
+        type:
+          kind: primitive
+          name: int16
+      - name: q
+        type:
+          kind: primitive
+          name: int16
+  - kind: struct
+    name: PacketHeader
+    fields:
+      - name: sampleRate
+        type:
+          kind: primitive
+          name: float64
+      - name: centerHz
+        type:
+          kind: primitive
+          name: float64
+      - name: endOfStream
+        type:
+          kind: primitive
+          name: bool
+        default: false
+      - name: streamId
+        type:
+          kind: primitive
+          name: string
+          max: 32
+  - kind: enum
+    name: Deemphasis
+    underlying: uint8
+    values:
+      - name: None
+        value: 0
+      - name: Us50
+        value: 50
+      - name: Us75
+        value: 75
+  - kind: struct
+    name: RdsGroup
+    description: Radio Data System block group
+    fields:
+      - name: blocks
+        type:
+          kind: array
+          of:
+            kind: primitive
+            name: uint16
+          size: 4
+  - kind: exception
+    name: InvalidFrequency
+    fields:
+      - name: hz
+        type:
+          kind: primitive
+          name: float64
+interfaces:
+  - name: IqStream
+    messages:
+      - name: pushPacket
+        params:
+          - name: header
+            type:
+              kind: ref
+              name: PacketHeader
+          - name: data
+            type:
+              kind: vector
+              of:
+                kind: ref
+                name: IqSample
+        returns: null
+  - name: AudioStream
+    messages:
+      - name: pushPacket
+        params:
+          - name: header
+            type:
+              kind: ref
+              name: PacketHeader
+          - name: left
+            type:
+              kind: vector
+              of:
+                kind: primitive
+                name: float32
+          - name: right
+            type:
+              kind: vector
+              of:
+                kind: primitive
+                name: float32
+        returns: null
+  - name: RdsStream
+    messages:
+      - name: group
+        params:
+          - name: group
+            type:
+              kind: ref
+              name: RdsGroup
+        returns: null
+  - name: Tuner
+    messages:
+      - name: tune
+        params:
+          - name: hz
+            type:
+              kind: primitive
+              name: float64
+        returns: null
+        raises:
+          - InvalidFrequency
+      - name: signalStrength
+        params: []
+        returns:
+          kind: primitive
+          name: float32
+  - name: StationInfo
+    messages:
+      - name: name
+        params: []
+        returns:
+          kind: primitive
+          name: string
+          max: 8
+      - name: text
+        params: []
+        returns:
+          kind: primitive
+          name: string
+          max: 64
+constants:
+  - name: FmLowHz
+    type:
+      kind: primitive
+      name: float64
+    value: 87500000
+  - name: FmHighHz
+    type:
+      kind: primitive
+      name: float64
+    value: 108000000
+modules:
+  - name: RfFrontEnd
+    description: Device - tuner and analog-to-digital converter
+    color: "#d1733b"
+    attributes:
+      - name: sampleRate
+        type:
+          kind: primitive
+          name: float64
+        default: 2400000
+      - name: gainDb
+        type:
+          kind: primitive
+          name: float32
+        default: 30
+      - name: agc
+        type:
+          kind: primitive
+          name: bool
+        default: true
+    ports:
+      - name: tuner
+        role: in
+        interface: Tuner
+      - name: dataIq
+        role: out
+        interface: IqStream
+  - name: Channelizer
+    description: Moves the station to baseband and decimates to 240 kHz
+    color: "#8a4fd1"
+    attributes:
+      - name: decimation
+        type:
+          kind: primitive
+          name: uint16
+        default: 10
+      - name: taps
+        type:
+          kind: vector
+          of:
+            kind: primitive
+            name: float32
+        default: []
+    ports:
+      - name: dataIqIn
+        role: in
+        interface: IqStream
+      - name: dataIqOut
+        role: out
+        interface: IqStream
+  - name: FmDemod
+    description: Stereo FM demodulator with RDS decoder
+    color: "#2e9e8f"
+    attributes:
+      - name: deemphasis
+        type:
+          kind: ref
+          name: Deemphasis
+        default: Us50
+      - name: stereo
+        type:
+          kind: primitive
+          name: bool
+        default: true
+      - name: audioRate
+        type:
+          kind: primitive
+          name: uint32
+        default: 48000
+    ports:
+      - name: dataIqIn
+        role: in
+        interface: IqStream
+      - name: audioOut
+        role: out
+        interface: AudioStream
+      - name: rdsOut
+        role: out
+        interface: RdsStream
+  - name: RdsDecoder
+    color: "#d14f9e"
+    ports:
+      - name: groups
+        role: in
+        interface: RdsStream
+      - name: info
+        role: in
+        interface: StationInfo
+  - name: AudioSink
+    description: Device - sound card
+    color: "#3b8fd1"
+    attributes:
+      - name: volume
+        type:
+          kind: primitive
+          name: float32
+        default: 0.8
+      - name: device
+        type:
+          kind: primitive
+          name: string
+        default: hw:0
+    ports:
+      - name: audioIn
+        role: in
+        interface: AudioStream
+  - name: Controller
+    description: Assembly controller - tunes and reads the station name
+    color: "#d6c21f"
+    attributes:
+      - name: presets
+        type:
+          kind: vector
+          of:
+            kind: primitive
+            name: float64
+          max: 10
+        default:
+          - 91300000
+          - 95800000
+          - 104100000
+    ports:
+      - name: tuner
+        role: out
+        interface: Tuner
+      - name: info
+        role: out
+        interface: StationInfo
+links:
+  - name: rf_to_channelizer
+    from:
+      module: RfFrontEnd
+      port: dataIq
+    to:
+      module: Channelizer
+      port: dataIqIn
+    constraints:
+      direction: unidirectional
+      ack:
+        required: false
+      performance:
+        class: realtime
+        maxLatencyMs: 10
+        rateHz: 100
+      remote:
+        enabled: false
+  - name: channelizer_to_demod
+    from:
+      module: Channelizer
+      port: dataIqOut
+    to:
+      module: FmDemod
+      port: dataIqIn
+    constraints:
+      direction: unidirectional
+      ack:
+        required: false
+      performance:
+        class: realtime
+        maxLatencyMs: 10
+        rateHz: 100
+      remote:
+        enabled: false
+  - name: demod_to_audio
+    from:
+      module: FmDemod
+      port: audioOut
+    to:
+      module: AudioSink
+      port: audioIn
+    constraints:
+      direction: unidirectional
+      ack:
+        required: false
+      performance:
+        class: realtime
+        maxLatencyMs: 10
+        rateHz: 100
+      remote:
+        enabled: false
+  - name: demod_to_rds
+    from:
+      module: FmDemod
+      port: rdsOut
+    to:
+      module: RdsDecoder
+      port: groups
+    constraints:
+      direction: unidirectional
+      ack:
+        required: false
+      performance:
+        class: low
+        rateHz: 11.4
+      remote:
+        enabled: false
+  - name: control_tuner
+    from:
+      module: Controller
+      port: tuner
+    to:
+      module: RfFrontEnd
+      port: tuner
+    constraints:
+      direction: bidirectional
+      ack:
+        required: false
+      performance:
+        class: normal
+      remote:
+        enabled: false
+  - name: control_info
+    from:
+      module: Controller
+      port: info
+    to:
+      module: RdsDecoder
+      port: info
+    constraints:
+      direction: bidirectional
+      ack:
+        required: false
+      performance:
+        class: low
+      remote:
+        enabled: false
+editor:
+  layout:
+    RfFrontEnd:
+      x: 336
+      y: 94
+      width: 200
+      height: 134
+    Channelizer:
+      x: 652
+      y: 103
+      width: 200
+      height: 116
+    FmDemod:
+      x: 968
+      y: 82
+      width: 200
+      height: 158
+    RdsDecoder:
+      x: 1284
+      y: 206
+      width: 200
+      height: 96
+    AudioSink:
+      x: 1284
+      y: 20
+      width: 200
+      height: 116
+    Controller:
+      x: 20
+      y: 100
+      width: 200
+      height: 122

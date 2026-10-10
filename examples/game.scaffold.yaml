@@ -1,0 +1,783 @@
+schemaVersion: 1
+project:
+  name: Game
+  description: Game engine three modules deep - types and constants of modules with their access levels, used by path from other modules, bases between nested modules, static members; generated in C++14
+generation:
+  templates: cpp14
+types:
+  - kind: alias
+    name: Entity
+    type:
+      kind: primitive
+      name: uint32
+  - kind: struct
+    name: Vec2
+    fields:
+      - name: x
+        type:
+          kind: primitive
+          name: float32
+        default: 0
+      - name: y
+        type:
+          kind: primitive
+          name: float32
+        default: 0
+  - kind: struct
+    name: Input
+    fields:
+      - name: axis
+        type:
+          kind: ref
+          name: Vec2
+      - name: buttons
+        type:
+          kind: primitive
+          name: uint32
+        default: 0
+interfaces:
+  - name: Tick
+    messages:
+      - name: update
+        params:
+          - name: dt
+            type:
+              kind: primitive
+              name: float32
+        returns: null
+  - name: Controls
+    messages:
+      - name: input
+        params:
+          - name: input
+            type:
+              kind: ref
+              name: Input
+        returns: null
+  - name: DrawList
+    messages:
+      - name: submit
+        params:
+          - name: sprites
+            type:
+              kind: vector
+              of:
+                kind: ref
+                name: Engine.Render.Sprite
+        returns: null
+  - name: Sound
+    messages:
+      - name: play
+        params:
+          - name: clip
+            type:
+              kind: ref
+              name: Engine.Audio.ClipId
+          - name: at
+            type:
+              kind: ref
+              name: Vec2
+        returns: null
+constants:
+  - name: TargetFps
+    type:
+      kind: primitive
+      name: uint16
+    value: 60
+modules:
+  - name: Platform
+    description: Window, input devices and clock
+    color: "#6b7f8e"
+    attributes:
+      - name: title
+        type:
+          kind: primitive
+          name: string
+        default: Space Rocks
+      - name: size
+        type:
+          kind: ref
+          name: Vec2
+        default:
+          x: 1280
+          y: 720
+    ports:
+      - name: tick
+        role: out
+        interface: Tick
+      - name: controls
+        role: out
+        interface: Controls
+      - name: draw
+        role: in
+        interface: DrawList
+      - name: sound
+        role: in
+        interface: Sound
+  - name: Engine
+    color: "#2e9e8f"
+    ports:
+      - name: tick
+        role: in
+        interface: Tick
+      - name: controls
+        role: in
+        interface: Controls
+      - name: draw
+        role: out
+        interface: DrawList
+      - name: sound
+        role: out
+        interface: Sound
+    modules:
+      - name: System
+        description: Base of the systems, run once per frame in order
+        kind: abstract
+        types:
+          - kind: enum
+            name: Phase
+            underlying: uint8
+            values:
+              - name: Input
+                value: 0
+              - name: Simulate
+                value: 1
+              - name: Present
+                value: 2
+        attributes:
+          - name: enabled
+            type:
+              kind: primitive
+              name: bool
+            default: true
+          - name: phase
+            access: protected
+            const: true
+            type:
+              kind: ref
+              name: Engine.System.Phase
+            default: Simulate
+        methods:
+          - name: update
+            virtual: true
+            pure: true
+            params:
+              - name: dt
+                type:
+                  kind: primitive
+                  name: float32
+            returns: null
+          - name: name
+            const: true
+            virtual: true
+            params: []
+            returns:
+              kind: primitive
+              name: string
+        ports: []
+      - name: World
+        description: Entities and their components
+        types:
+          - kind: struct
+            name: Transform
+            fields:
+              - name: position
+                type:
+                  kind: ref
+                  name: Vec2
+              - name: rotation
+                type:
+                  kind: primitive
+                  name: float32
+                default: 0
+              - name: scale
+                type:
+                  kind: ref
+                  name: Vec2
+                default:
+                  x: 1
+                  y: 1
+          - kind: struct
+            name: Slot
+            access: private
+            description: Storage of one entity
+            fields:
+              - name: generation
+                type:
+                  kind: primitive
+                  name: uint16
+              - name: alive
+                type:
+                  kind: primitive
+                  name: bool
+        constants:
+          - name: MAX_ENTITIES
+            type:
+              kind: primitive
+              name: uint32
+            value: 4096
+          - name: NONE
+            type:
+              kind: ref
+              name: Entity
+            value: 4294967295
+        attributes:
+          - name: slots
+            access: private
+            type:
+              kind: vector
+              of:
+                kind: ref
+                name: Engine.World.Slot
+          - name: transforms
+            type:
+              kind: map
+              key:
+                kind: ref
+                name: Entity
+              value:
+                kind: ref
+                name: Engine.World.Transform
+        methods:
+          - name: spawn
+            params:
+              - name: at
+                type:
+                  kind: ref
+                  name: Engine.World.Transform
+                const: true
+            returns:
+              kind: ref
+              name: Entity
+          - name: despawn
+            params:
+              - name: entity
+                type:
+                  kind: ref
+                  name: Entity
+            returns: null
+          - name: count
+            const: true
+            params: []
+            returns:
+              kind: primitive
+              name: uint32
+          - name: identity
+            description: Transform at the origin
+            static: true
+            params: []
+            returns:
+              kind: ref
+              name: Engine.World.Transform
+        ports: []
+      - name: Systems
+        description: The systems, in run order
+        ports:
+          - name: tick
+            role: in
+            interface: Tick
+          - name: controls
+            role: in
+            interface: Controls
+          - name: draw
+            role: out
+            interface: DrawList
+          - name: sound
+            role: out
+            interface: Sound
+        modules:
+          - name: Player
+            bases:
+              - Engine.System
+            attributes:
+              - name: speed
+                type:
+                  kind: primitive
+                  name: float32
+                default: 220
+              - name: ship
+                type:
+                  kind: ref
+                  name: Entity
+                default: 0
+            methods:
+              - name: update
+                virtual: true
+                override: true
+                params:
+                  - name: dt
+                    type:
+                      kind: primitive
+                      name: float32
+                returns: null
+            ports:
+              - name: tick
+                role: in
+                interface: Tick
+              - name: controls
+                role: in
+                interface: Controls
+          - name: Physics
+            bases:
+              - Engine.System
+            types:
+              - kind: struct
+                name: Body
+                fields:
+                  - name: velocity
+                    type:
+                      kind: ref
+                      name: Vec2
+                  - name: mass
+                    type:
+                      kind: primitive
+                      name: float32
+                    default: 1
+                  - name: radius
+                    type:
+                      kind: primitive
+                      name: float32
+                    default: 8
+              - kind: struct
+                name: Contact
+                access: protected
+                fields:
+                  - name: a
+                    type:
+                      kind: ref
+                      name: Entity
+                  - name: b
+                    type:
+                      kind: ref
+                      name: Entity
+            constants:
+              - name: GRAVITY
+                type:
+                  kind: ref
+                  name: Vec2
+                value:
+                  x: 0
+                  y: 0
+              - name: SUBSTEPS
+                access: private
+                type:
+                  kind: primitive
+                  name: uint8
+                value: 4
+            attributes:
+              - name: bodies
+                type:
+                  kind: map
+                  key:
+                    kind: ref
+                    name: Entity
+                  value:
+                    kind: ref
+                    name: Engine.Systems.Physics.Body
+              - name: contacts
+                access: protected
+                type:
+                  kind: vector
+                  of:
+                    kind: ref
+                    name: Engine.Systems.Physics.Contact
+            methods:
+              - name: update
+                virtual: true
+                override: true
+                params:
+                  - name: dt
+                    type:
+                      kind: primitive
+                      name: float32
+                returns: null
+              - name: collide
+                access: protected
+                virtual: true
+                params:
+                  - name: a
+                    type:
+                      kind: ref
+                      name: Engine.Systems.Physics.Body
+                    const: true
+                  - name: b
+                    type:
+                      kind: ref
+                      name: Engine.Systems.Physics.Body
+                    const: true
+                returns:
+                  kind: primitive
+                  name: bool
+            ports:
+              - name: tick
+                role: in
+                interface: Tick
+              - name: sound
+                role: out
+                interface: Sound
+          - name: Sprites
+            bases:
+              - Engine.System
+            attributes:
+              - name: layers
+                type:
+                  kind: primitive
+                  name: uint8
+                default: 4
+            methods:
+              - name: update
+                virtual: true
+                override: true
+                params:
+                  - name: dt
+                    type:
+                      kind: primitive
+                      name: float32
+                returns: null
+              - name: name
+                const: true
+                virtual: true
+                override: true
+                params: []
+                returns:
+                  kind: primitive
+                  name: string
+            ports:
+              - name: tick
+                role: in
+                interface: Tick
+              - name: draw
+                role: out
+                interface: DrawList
+      - name: Render
+        description: Sprite batches
+        types:
+          - kind: struct
+            name: Sprite
+            fields:
+              - name: texture
+                type:
+                  kind: primitive
+                  name: uint16
+              - name: transform
+                type:
+                  kind: ref
+                  name: Engine.World.Transform
+              - name: tint
+                type:
+                  kind: array
+                  of:
+                    kind: primitive
+                    name: uint8
+                  size: 4
+                default:
+                  - 255
+                  - 255
+                  - 255
+                  - 255
+        ports: []
+      - name: Audio
+        types:
+          - kind: alias
+            name: ClipId
+            type:
+              kind: primitive
+              name: uint16
+        constants:
+          - name: CHANNELS
+            type:
+              kind: primitive
+              name: uint8
+            value: 32
+        ports: []
+links:
+  - name: platform_tick
+    from:
+      module: Platform
+      port: tick
+    to:
+      module: Engine
+      port: tick
+    constraints:
+      direction: unidirectional
+      ack:
+        required: false
+      performance:
+        class: realtime
+        maxLatencyMs: 16
+        rateHz: 60
+      remote:
+        enabled: false
+  - name: platform_controls
+    from:
+      module: Platform
+      port: controls
+    to:
+      module: Engine
+      port: controls
+    constraints:
+      direction: unidirectional
+      ack:
+        required: false
+      performance:
+        class: realtime
+        maxLatencyMs: 16
+        rateHz: 60
+      remote:
+        enabled: false
+  - name: engine_draw
+    from:
+      module: Engine
+      port: draw
+    to:
+      module: Platform
+      port: draw
+    constraints:
+      direction: unidirectional
+      ack:
+        required: false
+      performance:
+        class: realtime
+        maxLatencyMs: 16
+        rateHz: 60
+      remote:
+        enabled: false
+  - name: engine_sound
+    from:
+      module: Engine
+      port: sound
+    to:
+      module: Platform
+      port: sound
+    constraints:
+      direction: unidirectional
+      ack:
+        required: false
+      performance:
+        class: realtime
+        maxLatencyMs: 16
+        rateHz: 60
+      remote:
+        enabled: false
+  - name: tick_in
+    from:
+      module: Engine
+      port: tick
+    to:
+      module: Engine.Systems
+      port: tick
+    constraints:
+      direction: unidirectional
+      ack:
+        required: false
+      performance:
+        class: realtime
+        maxLatencyMs: 16
+        rateHz: 60
+      remote:
+        enabled: false
+  - name: controls_in
+    from:
+      module: Engine
+      port: controls
+    to:
+      module: Engine.Systems
+      port: controls
+    constraints:
+      direction: unidirectional
+      ack:
+        required: false
+      performance:
+        class: realtime
+        maxLatencyMs: 16
+        rateHz: 60
+      remote:
+        enabled: false
+  - name: draw_out
+    from:
+      module: Engine.Systems
+      port: draw
+    to:
+      module: Engine
+      port: draw
+    constraints:
+      direction: unidirectional
+      ack:
+        required: false
+      performance:
+        class: realtime
+        maxLatencyMs: 16
+        rateHz: 60
+      remote:
+        enabled: false
+  - name: sound_out
+    from:
+      module: Engine.Systems
+      port: sound
+    to:
+      module: Engine
+      port: sound
+    constraints:
+      direction: unidirectional
+      ack:
+        required: false
+      performance:
+        class: realtime
+        maxLatencyMs: 16
+        rateHz: 60
+      remote:
+        enabled: false
+  - name: player_tick
+    from:
+      module: Engine.Systems
+      port: tick
+    to:
+      module: Engine.Systems.Player
+      port: tick
+    constraints:
+      direction: unidirectional
+      ack:
+        required: false
+      performance:
+        class: realtime
+        maxLatencyMs: 16
+        rateHz: 60
+      remote:
+        enabled: false
+  - name: physics_tick
+    from:
+      module: Engine.Systems
+      port: tick
+    to:
+      module: Engine.Systems.Physics
+      port: tick
+    constraints:
+      direction: unidirectional
+      ack:
+        required: false
+      performance:
+        class: realtime
+        maxLatencyMs: 16
+        rateHz: 60
+      remote:
+        enabled: false
+  - name: sprites_tick
+    from:
+      module: Engine.Systems
+      port: tick
+    to:
+      module: Engine.Systems.Sprites
+      port: tick
+    constraints:
+      direction: unidirectional
+      ack:
+        required: false
+      performance:
+        class: realtime
+        maxLatencyMs: 16
+        rateHz: 60
+      remote:
+        enabled: false
+  - name: player_controls
+    from:
+      module: Engine.Systems
+      port: controls
+    to:
+      module: Engine.Systems.Player
+      port: controls
+    constraints:
+      direction: unidirectional
+      ack:
+        required: false
+      performance:
+        class: realtime
+        maxLatencyMs: 16
+        rateHz: 60
+      remote:
+        enabled: false
+  - name: sprites_draw
+    from:
+      module: Engine.Systems.Sprites
+      port: draw
+    to:
+      module: Engine.Systems
+      port: draw
+    constraints:
+      direction: unidirectional
+      ack:
+        required: false
+      performance:
+        class: realtime
+        maxLatencyMs: 16
+        rateHz: 60
+      remote:
+        enabled: false
+  - name: physics_sound
+    from:
+      module: Engine.Systems.Physics
+      port: sound
+    to:
+      module: Engine.Systems
+      port: sound
+    constraints:
+      direction: unidirectional
+      ack:
+        required: false
+      performance:
+        class: realtime
+        maxLatencyMs: 16
+        rateHz: 60
+      remote:
+        enabled: false
+editor:
+  layout:
+    Platform:
+      x: 887
+      y: 710
+      width: 200
+      height: 140
+    Engine:
+      x: 20
+      y: 20
+      width: 751
+      height: 1520
+    Engine.System:
+      x: 289
+      y: 1340
+      width: 200
+      height: 160
+    Engine.World:
+      x: 289
+      y: 188
+      width: 200
+      height: 196
+    Engine.Systems:
+      x: 140
+      y: 596
+      width: 499
+      height: 674
+    Engine.Systems.Player:
+      x: 187
+      y: 488
+      width: 200
+      height: 166
+    Engine.Systems.Physics:
+      x: 187
+      y: 258
+      width: 200
+      height: 160
+    Engine.Systems.Sprites:
+      x: 187
+      y: 46
+      width: 200
+      height: 142
+    Engine.Render:
+      x: 289
+      y: 454
+      width: 200
+      height: 72
+    Engine.Audio:
+      x: 289
+      y: 46
+      width: 200
+      height: 72

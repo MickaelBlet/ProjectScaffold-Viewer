@@ -1,0 +1,631 @@
+schemaVersion: 1
+project:
+  name: Ledger
+  description: Accounting service touring every kind of type, type reference, default value and constant; generated in Python
+  metadata:
+    version: 1.2.0
+    owner: finance-team
+generation:
+  templates: python
+types:
+  - kind: primitive
+    name: Decimal
+    description: Exact decimal number, mapped by generators to a native type (decimal.Decimal)
+  - kind: primitive
+    name: Instant
+    description: UTC time point (datetime.datetime)
+  - kind: alias
+    name: AccountId
+    description: IBAN-like identifier, at most 34 characters
+    type:
+      kind: primitive
+      name: string
+      max: 34
+  - kind: enum
+    name: Currency
+    description: ISO 4217
+    underlying: uint16
+    values:
+      - name: EUR
+        value: 978
+      - name: USD
+        value: 840
+      - name: GBP
+        value: 826
+      - name: JPY
+        value: 392
+      - name: CHF
+        value: 756
+  - kind: enum
+    name: Side
+    underlying: int8
+    values:
+      - name: Debit
+        value: -1
+      - name: Credit
+        value: 1
+  - kind: bitmask
+    name: AccountFlags
+    underlying: uint16
+    flags:
+      - name: Frozen
+        bit: 0
+      - name: Overdraft
+        bit: 1
+      - name: Joint
+        bit: 2
+      - name: Business
+        bit: 3
+      - name: Closed
+        bit: 15
+  - kind: struct
+    name: Money
+    fields:
+      - name: amount
+        type:
+          kind: ref
+          name: Decimal
+        default: "0.00"
+      - name: currency
+        type:
+          kind: ref
+          name: Currency
+        default: EUR
+  - kind: struct
+    name: Card
+    fields:
+      - name: last4
+        type:
+          kind: array
+          of:
+            kind: primitive
+            name: char
+          size: 4
+      - name: expiry
+        type:
+          kind: primitive
+          name: string
+          max: 5
+        description: MM/YY
+  - kind: struct
+    name: BankTransfer
+    fields:
+      - name: iban
+        type:
+          kind: ref
+          name: AccountId
+      - name: bic
+        type:
+          kind: optional
+          of:
+            kind: primitive
+            name: string
+            max: 11
+        default: null
+  - kind: union
+    name: PaymentMethod
+    description: How a transaction was paid
+    discriminator:
+      kind: primitive
+      name: char
+    cases:
+      - name: card
+        type:
+          kind: ref
+          name: Card
+        labels:
+          - c
+      - name: transfer
+        type:
+          kind: ref
+          name: BankTransfer
+        labels:
+          - t
+      - name: voucher
+        type:
+          kind: primitive
+          name: string
+          max: 16
+        labels:
+          - v
+          - g
+      - name: other
+        type:
+          kind: primitive
+          name: string
+        description: Free text for any other method
+        default: true
+  - kind: struct
+    name: Entry
+    description: One line of a transaction
+    fields:
+      - name: account
+        type:
+          kind: ref
+          name: AccountId
+      - name: side
+        type:
+          kind: ref
+          name: Side
+      - name: amount
+        type:
+          kind: ref
+          name: Money
+  - kind: struct
+    name: Transaction
+    fields:
+      - name: id
+        type:
+          kind: primitive
+          name: uint64
+      - name: at
+        type:
+          kind: ref
+          name: Instant
+      - name: entries
+        type:
+          kind: vector
+          of:
+            kind: ref
+            name: Entry
+          max: 32
+        description: Balanced debits and credits
+      - name: method
+        type:
+          kind: ref
+          name: PaymentMethod
+        default:
+          other: unknown
+      - name: tags
+        type:
+          kind: set
+          of:
+            kind: primitive
+            name: string
+            max: 24
+          max: 8
+        default: []
+      - name: memo
+        type:
+          kind: optional
+          of:
+            kind: primitive
+            name: string
+            max: 140
+        default: null
+      - name: attachment
+        type:
+          kind: primitive
+          name: bytes
+          max: 65536
+        default: ""
+  - kind: struct
+    name: Account
+    fields:
+      - name: id
+        type:
+          kind: ref
+          name: AccountId
+      - name: owner
+        type:
+          kind: primitive
+          name: string
+      - name: flags
+        type:
+          kind: ref
+          name: AccountFlags
+        default: []
+      - name: balances
+        type:
+          kind: map
+          key:
+            kind: ref
+            name: Currency
+          value:
+            kind: ref
+            name: Decimal
+          max: 8
+        default:
+          EUR: "0.00"
+      - name: history
+        type:
+          kind: list
+          of:
+            kind: primitive
+            name: uint64
+        description: Transaction ids
+        default: []
+  - kind: struct
+    name: Statement
+    fields:
+      - name: account
+        type:
+          kind: ref
+          name: AccountId
+      - name: lines
+        type:
+          kind: vector
+          of:
+            kind: ref
+            name: Transaction
+      - name: monthly
+        type:
+          kind: array
+          of:
+            kind: ref
+            name: Money
+          size: 12
+        description: Closing balance of each month
+  - kind: exception
+    name: InsufficientFunds
+    fields:
+      - name: account
+        type:
+          kind: ref
+          name: AccountId
+      - name: missing
+        type:
+          kind: ref
+          name: Money
+  - kind: exception
+    name: AccountFrozen
+    fields:
+      - name: account
+        type:
+          kind: ref
+          name: AccountId
+      - name: since
+        type:
+          kind: ref
+          name: Instant
+  - kind: exception
+    name: Unbalanced
+    description: Debits and credits differ
+    fields:
+      - name: difference
+        type:
+          kind: ref
+          name: Money
+interfaces:
+  - name: Accounts
+    messages:
+      - name: open
+        params:
+          - name: owner
+            type:
+              kind: primitive
+              name: string
+          - name: flags
+            type:
+              kind: ref
+              name: AccountFlags
+        returns:
+          kind: ref
+          name: AccountId
+      - name: get
+        params:
+          - name: id
+            type:
+              kind: ref
+              name: AccountId
+        returns:
+          kind: optional
+          of:
+            kind: ref
+            name: Account
+      - name: freeze
+        params:
+          - name: id
+            type:
+              kind: ref
+              name: AccountId
+          - name: frozen
+            type:
+              kind: primitive
+              name: bool
+        returns: null
+  - name: Postings
+    description: Records balanced transactions
+    messages:
+      - name: post
+        params:
+          - name: transaction
+            type:
+              kind: ref
+              name: Transaction
+            description: Gets its id and time
+            direction: inout
+        returns: null
+        raises:
+          - InsufficientFunds
+          - AccountFrozen
+          - Unbalanced
+      - name: balance
+        params:
+          - name: id
+            type:
+              kind: ref
+              name: AccountId
+          - name: currency
+            type:
+              kind: ref
+              name: Currency
+          - name: pending
+            type:
+              kind: ref
+              name: Money
+            description: Amount of the transactions not settled yet
+            direction: out
+        returns:
+          kind: ref
+          name: Money
+  - name: Reports
+    messages:
+      - name: statement
+        params:
+          - name: id
+            type:
+              kind: ref
+              name: AccountId
+          - name: year
+            type:
+              kind: primitive
+              name: uint16
+        returns:
+          kind: ref
+          name: Statement
+  - name: Audit
+    messages:
+      - name: posted
+        params:
+          - name: transaction
+            type:
+              kind: ref
+              name: Transaction
+        returns: null
+constants:
+  - name: MaxEntries
+    type:
+      kind: primitive
+      name: uint8
+    value: 32
+  - name: Bank
+    type:
+      kind: primitive
+      name: string
+    value: Example Bank
+  - name: BaseCurrency
+    type:
+      kind: ref
+      name: Currency
+    value: EUR
+  - name: Zero
+    type:
+      kind: ref
+      name: Money
+    value:
+      amount: "0.00"
+      currency: EUR
+  - name: NewAccount
+    description: Flags of an account just opened
+    type:
+      kind: ref
+      name: AccountFlags
+    value:
+      - Overdraft
+  - name: Quarters
+    type:
+      kind: array
+      of:
+        kind: primitive
+        name: uint8
+      size: 4
+    value:
+      - 3
+      - 6
+      - 9
+      - 12
+  - name: FeeRates
+    description: Percent per method
+    type:
+      kind: map
+      key:
+        kind: primitive
+        name: string
+      value:
+        kind: primitive
+        name: float64
+    value:
+      card: 1.5
+      transfer: 0
+      voucher: 2.25
+  - name: DefaultMethod
+    type:
+      kind: ref
+      name: PaymentMethod
+    value:
+      transfer:
+        iban: FR7630006000011234567890189
+modules:
+  - name: Api
+    description: REST front end
+    color: "#3b8fd1"
+    attributes:
+      - name: port
+        type:
+          kind: primitive
+          name: uint16
+        default: 8080
+      - name: origins
+        type:
+          kind: vector
+          of:
+            kind: primitive
+            name: string
+        default:
+          - https://bank.example
+    ports:
+      - name: accounts
+        role: out
+        interface: Accounts
+      - name: postings
+        role: out
+        interface: Postings
+      - name: reports
+        role: out
+        interface: Reports
+  - name: Book
+    description: Keeps accounts and balances
+    color: "#2e9e8f"
+    attributes:
+      - name: currencies
+        type:
+          kind: set
+          of:
+            kind: ref
+            name: Currency
+        default:
+          - EUR
+          - USD
+          - GBP
+      - name: limits
+        type:
+          kind: map
+          key:
+            kind: ref
+            name: AccountFlags
+          value:
+            kind: ref
+            name: Money
+        default: {}
+    methods:
+      - name: check
+        description: Raises when the transaction cannot be posted
+        access: protected
+        const: true
+        params:
+          - name: transaction
+            type:
+              kind: ref
+              name: Transaction
+            const: true
+        returns: null
+        raises:
+          - InsufficientFunds
+          - AccountFrozen
+          - Unbalanced
+    ports:
+      - name: accounts
+        role: in
+        interface: Accounts
+      - name: postings
+        role: in
+        interface: Postings
+      - name: audit
+        role: out
+        interface: Audit
+  - name: Reporting
+    color: "#d6c21f"
+    ports:
+      - name: reports
+        role: in
+        interface: Reports
+  - name: Auditor
+    description: Append-only trail of the postings
+    color: "#6b7f8e"
+    attributes:
+      - name: retentionYears
+        type:
+          kind: primitive
+          name: uint8
+        default: 10
+    ports:
+      - name: audit
+        role: in
+        interface: Audit
+links:
+  - name: api_accounts
+    from:
+      module: Api
+      port: accounts
+    to:
+      module: Book
+      port: accounts
+    constraints:
+      direction: bidirectional
+      ack:
+        required: false
+      performance:
+        class: normal
+      remote:
+        enabled: false
+  - name: api_postings
+    from:
+      module: Api
+      port: postings
+    to:
+      module: Book
+      port: postings
+    constraints:
+      direction: bidirectional
+      ack:
+        required: true
+        timeoutMs: 2000
+      performance:
+        class: normal
+        maxLatencyMs: 200
+      remote:
+        enabled: false
+  - name: api_reports
+    from:
+      module: Api
+      port: reports
+    to:
+      module: Reporting
+      port: reports
+    constraints:
+      direction: bidirectional
+      ack:
+        required: false
+      performance:
+        class: bulk
+      remote:
+        enabled: false
+  - name: book_audit
+    from:
+      module: Book
+      port: audit
+    to:
+      module: Auditor
+      port: audit
+    constraints:
+      direction: bidirectional
+      ack:
+        required: true
+        timeoutMs: 1000
+      performance:
+        class: low
+      remote:
+        enabled: false
+editor:
+  layout:
+    Api:
+      x: 20
+      y: 92
+      width: 200
+      height: 164
+    Book:
+      x: 336
+      y: 20
+      width: 200
+      height: 166
+    Reporting:
+      x: 336
+      y: 256
+      width: 200
+      height: 72
+    Auditor:
+      x: 652
+      y: 125
+      width: 200
+      height: 98

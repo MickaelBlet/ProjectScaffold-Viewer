@@ -1,0 +1,584 @@
+schemaVersion: 1
+project:
+  name: Vehicle
+  description: Electric car split into ECUs on a CAN bus; modules nested in the ECUs, their ports forwarded through the container's; generated in C++11
+  metadata:
+    version: 0.3.0
+    safety: ASIL-B
+generation:
+  templates: cpp11
+binaries:
+  - name: Powertrain
+    description: Motor and battery ECU
+    color: "#d1733b"
+  - name: Chassis
+    description: Brakes and steering ECU
+    color: "#2e9e8f"
+  - name: Cockpit
+    description: Dashboard and infotainment
+    color: "#3b8fd1"
+  - name: Diagnostics
+    description: Workshop tester on the OBD port
+    color: "#6b7f8e"
+types:
+  - kind: enum
+    name: Gear
+    underlying: uint8
+    values:
+      - name: Park
+        value: 0
+      - name: Reverse
+        value: 1
+      - name: Neutral
+        value: 2
+      - name: Drive
+        value: 3
+  - kind: bitmask
+    name: Faults
+    underlying: uint32
+    flags:
+      - name: OverTemp
+        bit: 0
+      - name: UnderVoltage
+        bit: 1
+      - name: OverCurrent
+        bit: 2
+      - name: SensorLost
+        bit: 3
+      - name: BusOff
+        bit: 4
+  - kind: struct
+    name: Torque
+    fields:
+      - name: requestedNm
+        type:
+          kind: primitive
+          name: int16
+      - name: gear
+        type:
+          kind: ref
+          name: Gear
+        default: Park
+  - kind: struct
+    name: BatteryState
+    fields:
+      - name: socPercent
+        type:
+          kind: primitive
+          name: uint8
+      - name: voltage
+        type:
+          kind: primitive
+          name: float32
+      - name: current
+        type:
+          kind: primitive
+          name: float32
+      - name: cellTemps
+        type:
+          kind: array
+          of:
+            kind: primitive
+            name: int8
+          size: 8
+  - kind: struct
+    name: WheelSpeeds
+    fields:
+      - name: rpm
+        type:
+          kind: array
+          of:
+            kind: primitive
+            name: int16
+          size: 4
+        description: FL
+  - kind: struct
+    name: Dtc
+    description: Diagnostic trouble code
+    fields:
+      - name: code
+        type:
+          kind: primitive
+          name: uint32
+      - name: faults
+        type:
+          kind: ref
+          name: Faults
+      - name: occurrences
+        type:
+          kind: primitive
+          name: uint16
+        default: 1
+interfaces:
+  - name: TorqueCommand
+    messages:
+      - name: request
+        params:
+          - name: torque
+            type:
+              kind: ref
+              name: Torque
+        returns: null
+  - name: BatteryStatus
+    messages:
+      - name: state
+        params:
+          - name: state
+            type:
+              kind: ref
+              name: BatteryState
+        returns: null
+  - name: WheelStatus
+    messages:
+      - name: speeds
+        params:
+          - name: speeds
+            type:
+              kind: ref
+              name: WheelSpeeds
+        returns: null
+  - name: Brake
+    messages:
+      - name: pressure
+        params:
+          - name: bar
+            type:
+              kind: primitive
+              name: float32
+        returns: null
+  - name: Diagnosis
+    messages:
+      - name: readDtcs
+        params: []
+        returns:
+          kind: vector
+          of:
+            kind: ref
+            name: Dtc
+          max: 32
+      - name: clearDtcs
+        params: []
+        returns:
+          kind: primitive
+          name: bool
+constants:
+  - name: MaxTorqueNm
+    type:
+      kind: primitive
+      name: int16
+    value: 310
+  - name: CanBitrate
+    type:
+      kind: primitive
+      name: uint32
+    value: 500000
+modules:
+  - name: Vcu
+    description: Vehicle control unit
+    color: "#d1733b"
+    binary: Powertrain
+    ports:
+      - name: wheels
+        role: in
+        interface: WheelStatus
+      - name: brake
+        role: out
+        interface: Brake
+      - name: battery
+        role: out
+        interface: BatteryStatus
+      - name: diagnosis
+        role: in
+        interface: Diagnosis
+    modules:
+      - name: Pedals
+        description: Reads the accelerator, asks for torque
+        attributes:
+          - name: deadZone
+            type:
+              kind: primitive
+              name: uint8
+            default: 3
+        ports:
+          - name: torque
+            role: out
+            interface: TorqueCommand
+      - name: TractionControl
+        description: Limits torque when the wheels slip
+        attributes:
+          - name: slipLimit
+            type:
+              kind: primitive
+              name: float32
+            default: 0.12
+        ports:
+          - name: wheels
+            role: in
+            interface: WheelStatus
+          - name: torqueIn
+            role: in
+            interface: TorqueCommand
+          - name: torqueOut
+            role: out
+            interface: TorqueCommand
+          - name: brake
+            role: out
+            interface: Brake
+      - name: Inverter
+        attributes:
+          - name: switchingKHz
+            type:
+              kind: primitive
+              name: uint16
+            default: 10
+        ports:
+          - name: torque
+            role: in
+            interface: TorqueCommand
+      - name: Bms
+        description: Battery management
+        constants:
+          - name: CELLS
+            type:
+              kind: primitive
+              name: uint8
+            value: 96
+        attributes:
+          - name: maxCellTemp
+            type:
+              kind: primitive
+              name: int8
+            default: 55
+          - name: faults
+            type:
+              kind: ref
+              name: Faults
+            default: []
+        ports:
+          - name: state
+            role: out
+            interface: BatteryStatus
+      - name: Dem
+        description: Diagnostic event manager
+        ports:
+          - name: diagnosis
+            role: in
+            interface: Diagnosis
+  - name: Esc
+    description: Electronic stability control
+    color: "#2e9e8f"
+    binary: Chassis
+    ports:
+      - name: wheels
+        role: out
+        interface: WheelStatus
+      - name: brake
+        role: in
+        interface: Brake
+    modules:
+      - name: WheelSensors
+        attributes:
+          - name: teeth
+            type:
+              kind: primitive
+              name: uint8
+            default: 48
+        ports:
+          - name: speeds
+            role: out
+            interface: WheelStatus
+      - name: Hydraulics
+        ports:
+          - name: pressure
+            role: in
+            interface: Brake
+  - name: Dashboard
+    color: "#3b8fd1"
+    binary: Cockpit
+    ports:
+      - name: battery
+        role: in
+        interface: BatteryStatus
+  - name: Tester
+    color: "#6b7f8e"
+    binary: Diagnostics
+    ports:
+      - name: diagnosis
+        role: out
+        interface: Diagnosis
+links:
+  - name: pedals_to_traction
+    from:
+      module: Vcu.Pedals
+      port: torque
+    to:
+      module: Vcu.TractionControl
+      port: torqueIn
+    constraints:
+      direction: unidirectional
+      ack:
+        required: false
+      performance:
+        class: realtime
+        maxLatencyMs: 1
+        rateHz: 1000
+      remote:
+        enabled: false
+  - name: traction_to_inverter
+    from:
+      module: Vcu.TractionControl
+      port: torqueOut
+    to:
+      module: Vcu.Inverter
+      port: torque
+    constraints:
+      direction: unidirectional
+      ack:
+        required: false
+      performance:
+        class: realtime
+        maxLatencyMs: 1
+        rateHz: 1000
+      remote:
+        enabled: false
+  - name: wheels_in
+    from:
+      module: Vcu
+      port: wheels
+    to:
+      module: Vcu.TractionControl
+      port: wheels
+    constraints:
+      direction: unidirectional
+      ack:
+        required: false
+      performance:
+        class: realtime
+        maxLatencyMs: 1
+        rateHz: 1000
+      remote:
+        enabled: false
+  - name: brake_out
+    from:
+      module: Vcu.TractionControl
+      port: brake
+    to:
+      module: Vcu
+      port: brake
+    constraints:
+      direction: unidirectional
+      ack:
+        required: false
+      performance:
+        class: realtime
+        maxLatencyMs: 1
+        rateHz: 1000
+      remote:
+        enabled: false
+  - name: battery_out
+    from:
+      module: Vcu.Bms
+      port: state
+    to:
+      module: Vcu
+      port: battery
+    constraints:
+      direction: unidirectional
+      ack:
+        required: false
+      performance:
+        class: low
+        rateHz: 10
+      remote:
+        enabled: false
+  - name: diagnosis_in
+    from:
+      module: Vcu
+      port: diagnosis
+    to:
+      module: Vcu.Dem
+      port: diagnosis
+    constraints:
+      direction: bidirectional
+      ack:
+        required: false
+      performance:
+        class: low
+      remote:
+        enabled: false
+  - name: speeds_out
+    from:
+      module: Esc.WheelSensors
+      port: speeds
+    to:
+      module: Esc
+      port: wheels
+    constraints:
+      direction: unidirectional
+      ack:
+        required: false
+      performance:
+        class: realtime
+        maxLatencyMs: 1
+        rateHz: 1000
+      remote:
+        enabled: false
+  - name: pressure_in
+    from:
+      module: Esc
+      port: brake
+    to:
+      module: Esc.Hydraulics
+      port: pressure
+    constraints:
+      direction: unidirectional
+      ack:
+        required: false
+      performance:
+        class: realtime
+        maxLatencyMs: 1
+        rateHz: 1000
+      remote:
+        enabled: false
+  - name: wheel_speeds
+    from:
+      module: Esc
+      port: wheels
+    to:
+      module: Vcu
+      port: wheels
+    constraints:
+      direction: unidirectional
+      ack:
+        required: false
+      performance:
+        class: realtime
+        maxLatencyMs: 5
+        rateHz: 100
+      remote:
+        enabled: true
+        transport: can
+        settings:
+          interface: can0
+          id: 416
+  - name: brake_request
+    from:
+      module: Vcu
+      port: brake
+    to:
+      module: Esc
+      port: brake
+    constraints:
+      direction: unidirectional
+      ack:
+        required: false
+      performance:
+        class: realtime
+        maxLatencyMs: 5
+        rateHz: 100
+      remote:
+        enabled: true
+        transport: can
+        settings:
+          interface: can0
+          id: 432
+  - name: battery_display
+    from:
+      module: Vcu
+      port: battery
+    to:
+      module: Dashboard
+      port: battery
+    constraints:
+      direction: unidirectional
+      ack:
+        required: false
+      performance:
+        class: low
+        rateHz: 10
+      remote:
+        enabled: true
+        transport: can
+        settings:
+          interface: can1
+          id: 960
+  - name: obd
+    from:
+      module: Tester
+      port: diagnosis
+    to:
+      module: Vcu
+      port: diagnosis
+    constraints:
+      direction: bidirectional
+      ack:
+        required: true
+        timeoutMs: 2000
+      performance:
+        class: low
+      remote:
+        enabled: true
+        transport: can
+        settings:
+          interface: can1
+          id: 2016
+          options:
+            protocol: UDS
+            response: "0x7E8"
+editor:
+  layout:
+    Vcu:
+      x: 579
+      y: 20
+      width: 1144
+      height: 546
+    Vcu.Pedals:
+      x: 151
+      y: 166
+      width: 200
+      height: 98
+    Vcu.TractionControl:
+      x: 467
+      y: 225
+      width: 200
+      height: 122
+    Vcu.Inverter:
+      x: 783
+      y: 330
+      width: 200
+      height: 98
+    Vcu.Bms:
+      x: 781
+      y: 144
+      width: 200
+      height: 116
+    Vcu.Dem:
+      x: 153
+      y: 334
+      width: 200
+      height: 72
+    Esc:
+      x: 20
+      y: 34
+      width: 443
+      height: 306
+    Esc.WheelSensors:
+      x: 99
+      y: 188
+      width: 200
+      height: 98
+    Esc.Hydraulics:
+      x: 101
+      y: 46
+      width: 200
+      height: 72
+    Dashboard:
+      x: 1839
+      y: 257
+      width: 200
+      height: 72
+    Tester:
+      x: 142
+      y: 481
+      width: 200
+      height: 72

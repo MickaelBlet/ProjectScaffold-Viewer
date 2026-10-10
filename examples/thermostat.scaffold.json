@@ -1,0 +1,357 @@
+{
+  "schemaVersion": 1,
+  "project": {
+    "name": "Thermostat",
+    "description": "Room thermostat on a small microcontroller, written in JSON rather than YAML; generated in C++98"
+  },
+  "generation": {
+    "templates": "cpp98"
+  },
+  "types": [
+    {
+      "kind": "enum",
+      "name": "HeatMode",
+      "underlying": "uint8",
+      "values": [
+        {
+          "name": "Off",
+          "value": 0
+        },
+        {
+          "name": "Eco",
+          "value": 1
+        },
+        {
+          "name": "Comfort",
+          "value": 2
+        },
+        {
+          "name": "Boost",
+          "value": 3
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "Schedule",
+      "description": "Mode of each hour of the day",
+      "fields": [
+        {
+          "name": "hours",
+          "type": {
+            "kind": "array",
+            "of": {
+              "kind": "ref",
+              "name": "HeatMode"
+            },
+            "size": 24
+          }
+        }
+      ]
+    }
+  ],
+  "interfaces": [
+    {
+      "name": "Temperature",
+      "messages": [
+        {
+          "name": "measured",
+          "params": [
+            {
+              "name": "celsius",
+              "type": {
+                "kind": "primitive",
+                "name": "float32"
+              }
+            }
+          ],
+          "returns": null
+        }
+      ]
+    },
+    {
+      "name": "Heater",
+      "messages": [
+        {
+          "name": "power",
+          "params": [
+            {
+              "name": "percent",
+              "type": {
+                "kind": "primitive",
+                "name": "uint8"
+              }
+            }
+          ],
+          "returns": null
+        }
+      ]
+    },
+    {
+      "name": "Panel",
+      "messages": [
+        {
+          "name": "show",
+          "params": [
+            {
+              "name": "celsius",
+              "type": {
+                "kind": "primitive",
+                "name": "float32"
+              }
+            },
+            {
+              "name": "mode",
+              "type": {
+                "kind": "ref",
+                "name": "HeatMode"
+              }
+            }
+          ],
+          "returns": null
+        },
+        {
+          "name": "setpoint",
+          "params": [],
+          "returns": {
+            "kind": "primitive",
+            "name": "float32"
+          }
+        }
+      ]
+    }
+  ],
+  "constants": [
+    {
+      "name": "EcoCelsius",
+      "type": {
+        "kind": "primitive",
+        "name": "float32"
+      },
+      "value": 17
+    },
+    {
+      "name": "ComfortCelsius",
+      "type": {
+        "kind": "primitive",
+        "name": "float32"
+      },
+      "value": 20.5
+    }
+  ],
+  "modules": [
+    {
+      "name": "Probe",
+      "description": "Thermistor on the ADC",
+      "color": "#3b8fd1",
+      "attributes": [
+        {
+          "name": "periodMs",
+          "type": {
+            "kind": "primitive",
+            "name": "uint16"
+          },
+          "default": 1000
+        }
+      ],
+      "ports": [
+        {
+          "name": "temperature",
+          "role": "out",
+          "interface": "Temperature"
+        }
+      ]
+    },
+    {
+      "name": "Regulator",
+      "description": "PI controller following the schedule",
+      "color": "#2e9e8f",
+      "attributes": [
+        {
+          "name": "kp",
+          "type": {
+            "kind": "primitive",
+            "name": "float32"
+          },
+          "default": 8
+        },
+        {
+          "name": "ki",
+          "type": {
+            "kind": "primitive",
+            "name": "float32"
+          },
+          "default": 0.05
+        },
+        {
+          "name": "mode",
+          "type": {
+            "kind": "ref",
+            "name": "HeatMode"
+          },
+          "default": "Eco"
+        }
+      ],
+      "methods": [
+        {
+          "name": "step",
+          "access": "private",
+          "params": [
+            {
+              "name": "error",
+              "type": {
+                "kind": "primitive",
+                "name": "float32"
+              }
+            }
+          ],
+          "returns": {
+            "kind": "primitive",
+            "name": "uint8"
+          }
+        }
+      ],
+      "ports": [
+        {
+          "name": "temperature",
+          "role": "in",
+          "interface": "Temperature"
+        },
+        {
+          "name": "heater",
+          "role": "out",
+          "interface": "Heater"
+        },
+        {
+          "name": "panel",
+          "role": "out",
+          "interface": "Panel"
+        }
+      ]
+    },
+    {
+      "name": "Relay",
+      "description": "Drives the heater with slow PWM",
+      "color": "#d1733b",
+      "ports": [
+        {
+          "name": "heater",
+          "role": "in",
+          "interface": "Heater"
+        }
+      ]
+    },
+    {
+      "name": "Display",
+      "description": "LCD and buttons",
+      "color": "#d6c21f",
+      "ports": [
+        {
+          "name": "panel",
+          "role": "in",
+          "interface": "Panel"
+        }
+      ]
+    }
+  ],
+  "links": [
+    {
+      "name": "probe_to_regulator",
+      "from": {
+        "module": "Probe",
+        "port": "temperature"
+      },
+      "to": {
+        "module": "Regulator",
+        "port": "temperature"
+      },
+      "constraints": {
+        "direction": "unidirectional",
+        "ack": {
+          "required": false
+        },
+        "performance": {
+          "class": "low",
+          "rateHz": 1
+        },
+        "remote": {
+          "enabled": false
+        }
+      }
+    },
+    {
+      "name": "regulator_to_relay",
+      "from": {
+        "module": "Regulator",
+        "port": "heater"
+      },
+      "to": {
+        "module": "Relay",
+        "port": "heater"
+      },
+      "constraints": {
+        "direction": "unidirectional",
+        "ack": {
+          "required": false
+        },
+        "performance": {
+          "class": "low"
+        },
+        "remote": {
+          "enabled": false
+        }
+      }
+    },
+    {
+      "name": "regulator_to_display",
+      "from": {
+        "module": "Regulator",
+        "port": "panel"
+      },
+      "to": {
+        "module": "Display",
+        "port": "panel"
+      },
+      "constraints": {
+        "direction": "bidirectional",
+        "ack": {
+          "required": false
+        },
+        "performance": {
+          "class": "normal"
+        },
+        "remote": {
+          "enabled": false
+        }
+      }
+    }
+  ],
+  "editor": {
+    "layout": {
+      "Probe": {
+        "x": 20,
+        "y": 78,
+        "width": 200,
+        "height": 98
+      },
+      "Regulator": {
+        "x": 336,
+        "y": 35,
+        "width": 200,
+        "height": 184
+      },
+      "Relay": {
+        "x": 652,
+        "y": 20,
+        "width": 200,
+        "height": 72
+      },
+      "Display": {
+        "x": 652,
+        "y": 162,
+        "width": 200,
+        "height": 72
+      }
+    }
+  }
+}

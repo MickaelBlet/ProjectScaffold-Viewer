@@ -1,0 +1,84 @@
+// IDL features the other examples leave out: imports, template modules, constant expressions,
+// value types (concrete, abstract, boxed), bitsets, natives, connectors and fixed-size arrays.
+import "sensors_dds.idl";
+
+/** Handle the platform gives to frame buffers. */
+native BufferHandle;
+
+module Imaging {
+  const unsigned short WIDTH = 1920;
+  const unsigned short HEIGHT = WIDTH * 9 / 16;
+  const unsigned long PIXELS = WIDTH * HEIGHT;
+  const double GAMMA = 2.2;
+  const string VENDOR = "Example Optics";
+
+  /** Ring of `SIZE` items of `T`. */
+  module Rings<typename T, long SIZE> {
+    struct Ring {
+      T items[SIZE];
+      unsigned long head;
+    };
+  };
+  module Rings<double, 16> Exposures;
+
+  /** Packed sensor register. */
+  bitset Register {
+    bitfield<4> gain;
+    bitfield<3> binning;
+    bitfield<1> enabled;
+  };
+
+  enum PixelFormat { MONO8, RGB24, BAYER_RG8, YUV422 };
+
+  /** Region of interest. */
+  struct Roi {
+    unsigned short x, y;
+    @default(1920) unsigned short width;
+    @default(1080) unsigned short height;
+  };
+
+  /** Frame shared by value. */
+  valuetype Frame {
+    public PixelFormat format;
+    public Roi roi;
+    public sequence<octet> pixels;
+    private BufferHandle buffer;
+  };
+
+  /** Text maybe absent: a boxed value. */
+  valuetype Label string;
+
+  /** What a processing step reports. */
+  abstract valuetype Annotated {
+    Label caption();
+  };
+
+  interface Camera {
+    exception NotStreaming {};
+    readonly attribute Register settings;
+    void configure(in PixelFormat format, in Roi roi);
+    Frame grab() raises (NotStreaming);
+    Sensors::Health health();
+  };
+
+  interface FrameListener {
+    oneway void onFrame(in Frame frame);
+  };
+
+  /** Camera publishing its frames to listeners. */
+  component Grabber {
+    attribute unsigned short fps;
+    provides Camera camera;
+    uses multiple FrameListener listeners;
+  };
+
+  component Viewer {
+    provides FrameListener frames;
+  };
+
+  /** Copies frames between processes. */
+  connector SharedFrames {
+    provides FrameListener sink;
+    uses FrameListener source;
+  };
+};

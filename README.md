@@ -22,7 +22,7 @@ npm install
 npm run dev     # open the editor, then File › Open… examples/robot.scaffold.yaml
 ```
 
-[`examples/`](examples) holds sample projects; [`examples/fleet/fleet.scaffold-workspace.yaml`](examples/fleet/fleet.scaffold-workspace.yaml) opens a multi-project one.
+[`examples/`](examples) holds sample projects, listed with what each shows in [`examples/README.md`](examples/README.md): start with [`hello.scaffold.yaml`](examples/hello.scaffold.yaml); [`examples/fleet/fleet.scaffold-workspace.yaml`](examples/fleet/fleet.scaffold-workspace.yaml) opens a multi-project one.
 
 ## Documentation
 

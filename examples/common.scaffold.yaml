@@ -103,3 +103,5 @@ interfaces:
         returns: null
 modules: []
 links: []
+editor:
+  layout: {}
