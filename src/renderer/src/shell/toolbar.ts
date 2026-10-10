@@ -32,7 +32,6 @@ const COMMAND_ICONS: Partial<Record<string, IconName>> = {
   'insert.frame': 'frame',
   'insert.projectContent': 'file-import',
   'insert.dependency': 'package',
-  'insert.imported': 'link',
   'insert.refreshDependencies': 'refresh',
   'view.palette': 'command',
   'view.goto': 'target',

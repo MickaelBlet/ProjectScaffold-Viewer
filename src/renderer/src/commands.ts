@@ -20,7 +20,6 @@ import {
   hideSelection,
   importProjectContent,
   keepView,
-  linkOtherProject,
   newView,
   nudgeSelection,
   openModuleView,
@@ -354,12 +353,6 @@ const allCommands: Command[] = [
   },
   { id: 'insert.note', title: 'Add note', category: 'Insert', run: () => addNoteAt('note') },
   { id: 'insert.frame', title: 'Add frame', category: 'Insert', run: () => addNoteAt('frame') },
-  {
-    id: 'insert.imported',
-    title: 'Link to another project…',
-    category: 'Insert',
-    run: () => linkOtherProject()
-  },
   {
     id: 'insert.projectContent',
     title: 'Import projects or IDL files…',

@@ -56,7 +56,6 @@ import {
   addNoteAt,
   importProjectContent,
   keepView,
-  linkOtherProject,
   navigate,
   openImportSource,
   openModuleView,
@@ -485,7 +484,7 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
 
   const isValidConnection = useCallback((c: Connection | Edge): boolean => {
     if (!c.sourceHandle || !c.targetHandle || c.source === c.target) return false
-    // A link to another project needs one end here.
+    // A link to a dependency's module needs one end here.
     if (isImportedId(c.source) && isImportedId(c.target)) return false
     return !!linkEnds(getProject(), c)
   }, [])
@@ -781,7 +780,6 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
       { label: 'Add note here', run: () => addNoteAt('note', at) },
       { label: 'Add frame here', run: () => addNoteAt('frame', at) },
       'separator',
-      { label: 'Link to another project…', run: () => linkOtherProject(at) },
       { label: 'Import projects or IDL files here…', run: () => importProjectContent(parent, at) },
       'separator',
       { label: 'Paste here', keys: keyLabel('Ctrl+V'), run: () => void paste(undefined, { at, parent }) },

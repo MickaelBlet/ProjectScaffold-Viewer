@@ -3003,7 +3003,7 @@ mark {
   color: var(--muted);
   font-size: 10px;
 }
-/* Module of another project (Insert › Link to another project). */
+/* Module of a dependency placed on the canvas. */
 .module.imported {
   border-style: dashed;
   border-color: var(--muted);

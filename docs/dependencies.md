@@ -24,13 +24,12 @@ A larger one, opened at once through a [workspace file](#workspace-files): [`exa
 
 _Insert › Add dependency…_ (or + in the Explorer's _Dependencies_) picks an open document, or several project files and IDL files at once (_Open files…_). Their types and interfaces are then used read-only, like this project's own ones.
 
-### Linking to another project's modules
+### Linking to a dependency's modules
 
-_Insert › Link to another project…_ (or the canvas menu) picks a dependency or another project, then one of its top-level modules.
+A dependency's top-level module is placed on the canvas from the Explorer (double-click it in the dependency's _Modules_) or the dependency's right-click menu (_Place a module on the canvas…_). Add the project as a dependency first (_Insert › Add dependency…_).
 
 - The module is drawn in the project view (dashed, `↗ Project`, resizable), with its attributes and methods (read-only, also in its inspector) and ports linked to like any other.
 - It comes with all the modules inside it, drawn where its project puts them; move and resize them in it (it grows to hold them; kept on refresh), they are removed with it; their ports are linked to as well. A module placed alone by an earlier version is placed with its top-level module on the next refresh, its links kept.
-- The project becomes a dependency if it was not one, so the interfaces of its ports are used here, not copied.
 - Double-click a placed module to switch to its project's tab.
 
 ### Indirect dependencies

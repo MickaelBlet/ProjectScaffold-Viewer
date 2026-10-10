@@ -456,7 +456,7 @@ export function addNoteAt(kind: 'note' | 'frame', pos?: { x: number; y: number }
 
 // Dependencies: other projects
 
-/** Another project to depend on or link to: an open document, or a file read without opening it. */
+/** Another project to depend on or import: an open document, or a file read without opening it. */
 interface OtherProject {
   project: Project
   file: string
@@ -624,50 +624,6 @@ function pickModuleOf(others: OtherProject[], at: { x: number; y: number }, line
     return setStatus('error', `${namesOf(others)} has no modules`)
   }
   quickPick(`Module of ${namesOf(others)} to link to`, entries)
-}
-
-/** The dependencies of this project, read from their files, as projects to pick from. */
-function dependencyProjects(): { label: string; detail: string; get: () => Promise<OtherProject | null> }[] {
-  return getProject().dependencies.map((x) => ({
-    label: x.name,
-    detail: `dependency · ${x.file}`,
-    get: async (): Promise<OtherProject | null> => {
-      const project = await importSource(x.file)
-      if (project) return { project, file: x.file }
-      showDialog(`Cannot read ${x.file}`, [cannotRead(x.name, x.file)])
-      return null
-    }
-  }))
-}
-
-/**
- * Pick a project (this one's dependencies first), then one of its modules: it is placed on the
- * canvas (global view) and its ports can be linked to. The project becomes a dependency: its
- * interfaces and types are used here, not copied.
- */
-export function linkOtherProject(pos?: { x: number; y: number }): void {
-  const at = pos ?? activeCanvas()?.center() ?? { x: 80, y: 80 }
-  const deps = getProject().dependencies
-  const others = openProjects().filter((o) => !deps.some((x) => sameFile(x.file, o.label)))
-  quickPick('Project to link to', [
-    ...[...dependencyProjects(), ...others].map((o, i) => ({
-      key: String(i),
-      label: o.label,
-      detail: o.detail,
-      kind: 'P',
-      run: () =>
-        void o.get().then((other) => {
-          if (other) pickModuleOf([other], at)
-        })
-    })),
-    filesEntry(
-      (files) =>
-        void readPicked(files).then(({ projects, lines }) => {
-          if (projects.length) pickModuleOf(projects, at, lines)
-          else showDialog(`Cannot read ${files.length === 1 ? fileName(files[0]!.path) : 'the files'}`, lines)
-        })
-    )
-  ])
 }
 
 /** Pick a module of a dependency and place it on the canvas. */
