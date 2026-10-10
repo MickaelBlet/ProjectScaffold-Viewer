@@ -593,6 +593,89 @@ export function typeQualifiedName(p: Project, t: TypeDef): string {
   return qualifiedTypeName(t, modulePaths(p), new Map(p.dependencies.map((x) => [x.id, x.name])))
 }
 
+// Modules used as types: a reference to an instance of the module (a pointer or a reference for
+// generators), with no value. A module of this project is referenced by its id, a module of a
+// dependency by an id made of the dependency's and the module's path (`dependencyModuleRef`),
+// placed here or not. The file writes their path: `Core.Sensor`, `Dep/Core.Sensor`.
+
+const DEPENDENCY_MODULE_PREFIX = 'depmodule:'
+
+/** Id standing for the module at `path` of dependency `dependency` in type references. */
+export const dependencyModuleRef = (dependency: Id, path: string): Id =>
+  `${DEPENDENCY_MODULE_PREFIX}${dependency}|${path}`
+
+/** Dependency and module path of an id made by `dependencyModuleRef`. */
+export function parseDependencyModuleRef(id: Id): { dependency: Id; path: string } | undefined {
+  if (!id.startsWith(DEPENDENCY_MODULE_PREFIX)) return undefined
+  const bar = id.lastIndexOf('|')
+  return { dependency: id.slice(DEPENDENCY_MODULE_PREFIX.length, bar), path: id.slice(bar + 1) }
+}
+
+/** Whether a type reference names a module (of this project or of a dependency) rather than a type. */
+export function isModuleRef(p: Pick<Project, 'modules'>, id: Id): boolean {
+  return !!parseDependencyModuleRef(id) || p.modules.some((m) => m.id === id)
+}
+
+/**
+ * Names type references write, by id: those of the types (see `typeNames`), the paths of the
+ * modules, `Dep/Core.Sensor` for a module of a dependency. Undefined for a deleted one.
+ */
+export function refNamer(
+  p: Pick<Project, 'types' | 'modules' | 'dependencies'>
+): (id: Id) => string | undefined {
+  const types = typeNames(p)
+  const paths = modulePaths({ modules: p.modules, dependencies: [] })
+  const deps = new Map(p.dependencies.map((x) => [x.id, x.name]))
+  return (id) => {
+    const name = types.get(id) ?? paths.get(id)
+    if (name !== undefined) return name
+    const ref = parseDependencyModuleRef(id)
+    const dep = ref && deps.get(ref.dependency)
+    return dep === undefined ? undefined : `${dep}/${ref!.path}`
+  }
+}
+
+/**
+ * Id a name of a type reference stands for (`refNamer` reversed): a type first, else a module of
+ * this project, else a module of an existing dependency (`Dep/Core.Sensor`, known here or not).
+ */
+export function refResolver(
+  p: Pick<Project, 'types' | 'modules' | 'dependencies'>
+): (name: string) => Id | undefined {
+  const types = new Map([...typeNames(p)].map(([id, n]) => [n, id]))
+  const modules = new Map(
+    [...modulePaths({ modules: p.modules, dependencies: [] })].map(([id, n]) => [n, id])
+  )
+  const deps = new Map(p.dependencies.map((x) => [x.name, x.id]))
+  return (name) => {
+    const id = types.get(name) ?? modules.get(name)
+    if (id !== undefined) return id
+    const slash = name.indexOf('/')
+    const dep = slash > 0 ? deps.get(name.slice(0, slash)) : undefined
+    return dep === undefined ? undefined : dependencyModuleRef(dep, name.slice(slash + 1))
+  }
+}
+
+/**
+ * Modules of dependencies known here, as type references name them: those placed on the canvas,
+ * those owning types and those already referenced.
+ */
+export function dependencyModuleRefs(p: Project): { id: Id; name: string }[] {
+  const ids = new Set<Id>()
+  for (const dep of p.dependencies) for (const m of dep.modules) ids.add(dependencyModuleRef(dep.id, m.path))
+  for (const t of p.types)
+    if (t.dependency && t.modulePath) ids.add(dependencyModuleRef(t.dependency, t.modulePath))
+  for (const { ref } of allTypeRefs(p))
+    walkTypeRef(ref, (n) => {
+      if (n.kind === 'ref' && parseDependencyModuleRef(n.id)) ids.add(n.id)
+    })
+  const nameOf = refNamer(p)
+  return [...ids].flatMap((id) => {
+    const name = nameOf(id)
+    return name === undefined ? [] : [{ id, name }]
+  })
+}
+
 /**
  * Whether modules (`contextModuleId`; null: a type, interface or constant of the project) may use
  * a type: the project's, dependencies' and public ones of modules anywhere, the others of modules
@@ -620,15 +703,25 @@ export interface TypeScope {
   idOf: (name: string) => Id | undefined
   /** Types this scope may use, with the name to write. */
   usable: { type: TypeDef; name: string }[]
+  /** Modules usable as types (this project's, and those of dependencies known here), by path. */
+  modules: { id: Id; name: string }[]
 }
 
 /**
  * Names of the types in a module (C++-like lookup: its own types, then those of its bases it may
  * use, then the project's and dependencies'; others by qualified name), or outside modules (null).
+ * Modules are named by their path.
  */
 export function typeScope(p: Project, contextModuleId: Id | null): TypeScope {
   const qualified = typeNames(p)
   const byQualified = new Map([...qualified].map(([id, n]) => [n, id]))
+  const ownModules = [...modulePaths({ modules: p.modules, dependencies: [] })].map(([id, name]) => ({
+    id,
+    name
+  }))
+  const modules = [...ownModules, ...dependencyModuleRefs(p)].filter((m) => !byQualified.has(m.name))
+  const moduleByName = new Map(modules.map((m) => [m.name, m.id]))
+  const moduleName = new Map(modules.map((m) => [m.id, m.name]))
   const byId = new Map(p.types.map((t) => [t.id, t]))
   const local = new Map<string, Id>()
   if (contextModuleId)
@@ -643,15 +736,16 @@ export function typeScope(p: Project, contextModuleId: Id | null): TypeScope {
   for (const t of p.types) if (!isModuleType(t) && !local.has(t.name)) local.set(t.name, t.id)
   const nameOf = (id: Id): string | undefined => {
     const t = byId.get(id)
-    if (!t) return undefined
+    if (!t) return moduleName.get(id)
     return local.get(t.name) === id ? t.name : qualified.get(id)
   }
   return {
     nameOf,
-    idOf: (name) => local.get(name) ?? byQualified.get(name),
+    idOf: (name) => local.get(name) ?? byQualified.get(name) ?? moduleByName.get(name),
     usable: p.types
       .filter((t) => canUseType(p, contextModuleId, t))
-      .map((t) => ({ type: t, name: nameOf(t.id)! }))
+      .map((t) => ({ type: t, name: nameOf(t.id)! })),
+    modules
   }
 }
 
@@ -679,10 +773,14 @@ export function nameError(p: Project, target: NameTarget, name: string): string 
         return moduleTypeNameError(p, target.module, name, target.id)
       if (globalTypeNames(p, target.id).includes(name))
         return `A type, interface or constant named '${name}' already exists`
+      // Type references name top-level modules as types.
+      if (childModules(p, null).some((m) => m.name === name)) return `A module named '${name}' already exists`
       return null
     case 'module':
       if (childModules(p, target.parentId).some((m) => m.id !== target.id && m.name === name))
         return `A sibling module named '${name}' already exists`
+      if (!target.parentId && globalTypeNames(p).includes(name))
+        return `A type, interface or constant named '${name}' already exists`
       return null
     case 'port': {
       const mod = p.modules.find((m) => m.id === target.moduleId)
@@ -829,7 +927,13 @@ export function findView(p: Pick<Project, 'views' | 'modules' | 'dependencies'>,
   if (m) return { id: viewId, name: m.name, rootModuleId: m.id, hidden: NO_HIDDEN, temporary: true }
   const im = moduleId ? findImported(p, moduleId)?.module : undefined
   if (im)
-    return { id: viewId, name: im.path.split('.').pop()!, rootModuleId: im.id, hidden: NO_HIDDEN, temporary: true }
+    return {
+      id: viewId,
+      name: im.path.split('.').pop()!,
+      rootModuleId: im.id,
+      hidden: NO_HIDDEN,
+      temporary: true
+    }
   return globalView()
 }
 

@@ -70,29 +70,46 @@ function primitiveError(v: Value, name: Primitive): string | null {
   }
 }
 
-/** Follows aliases; null for a deleted type or a cyclic alias. */
+/** Whether a type reference names a module (see `isModuleRef`): no value, null when given. */
+export type IsModule = (id: Id) => boolean
+
+const noModules: IsModule = () => false
+
+/** Follows aliases; the reference itself for a module, null for a deleted type or a cyclic alias. */
 function resolve(
   t: TypeRef,
   types: ReadonlyMap<Id, TypeDef>,
+  isModule: IsModule = noModules,
   seen = new Set<Id>()
 ): TypeRef | TypeDef | null {
   if (t.kind !== 'ref') return t
   const def = types.get(t.id)
-  if (!def || seen.has(def.id)) return null
+  if (!def) return isModule(t.id) ? t : null
+  if (seen.has(def.id)) return null
   if (def.kind !== 'alias') return def
-  return resolve(def.type, types, seen.add(def.id))
+  return resolve(def.type, types, isModule, seen.add(def.id))
 }
 
 /**
- * Whether a struct field of type `t` may be left out of a value: `optional` (null) or a struct
- * whose fields may all be left out.
+ * Whether a struct field of type `t` may be left out of a value: `optional` (null), a module
+ * (no value) or a struct whose fields may all be left out.
  */
-function implicit(t: TypeRef, types: ReadonlyMap<Id, TypeDef>, seen = new Set<Id>()): boolean {
-  const r = resolve(t, types)
-  if (r?.kind === 'optional') return true
+function implicit(
+  t: TypeRef,
+  types: ReadonlyMap<Id, TypeDef>,
+  isModule: IsModule,
+  seen = new Set<Id>()
+): boolean {
+  const r = resolve(t, types, isModule)
+  if (r?.kind === 'optional' || r?.kind === 'ref') return true
   if (r?.kind !== 'struct' || seen.has(r.id)) return false
   seen.add(r.id)
-  return r.fields.every((f) => f.default !== undefined || implicit(f.type, types, seen))
+  return r.fields.every((f) => f.default !== undefined || implicit(f.type, types, isModule, seen))
+}
+
+/** Whether values of `t` are module references: no value. */
+export function isModuleValue(t: TypeRef, types: readonly TypeDef[], isModule: IsModule): boolean {
+  return resolve(t, new Map(types.map((d) => [d.id, d])), isModule)?.kind === 'ref'
 }
 
 /** Values offered as a choice (bool, enum, and null for optional), or null for a free literal. */
@@ -168,16 +185,21 @@ export function valueExample(t: TypeRef, types: readonly TypeDef[]): Value {
 
 /**
  * Problems of `v` as a value of type `t`, each prefixed with where it is in the value. Values of
- * custom primitives are opaque: passed as is to generators.
+ * custom primitives are opaque: passed as is to generators. Modules have no value: null only.
  */
-export function valueErrors(v: Value, t: TypeRef, types: readonly TypeDef[]): string[] {
+export function valueErrors(
+  v: Value,
+  t: TypeRef,
+  types: readonly TypeDef[],
+  isModule: IsModule = noModules
+): string[] {
   const byId = new Map(types.map((d) => [d.id, d]))
   const errors: string[] = []
   const at = (path: string, message: string): void => void errors.push(path ? `${path}: ${message}` : message)
 
   /** Map keys are text in YAML: read them as the key type. */
   const key = (k: string, t: TypeRef): Value => {
-    const r = resolve(t, byId)
+    const r = resolve(t, byId, isModule)
     if (r?.kind !== 'primitive') return k
     if (r.name === 'bool') return k === 'true' ? true : k === 'false' ? false : k
     if ((r.name === 'float32' || r.name === 'float64') && FLOAT_RE.test(k)) return Number(k)
@@ -226,6 +248,10 @@ export function valueErrors(v: Value, t: TypeRef, types: readonly TypeDef[]): st
         return
       case 'ref': {
         const def = byId.get(t.id)
+        if (!def && isModule(t.id)) {
+          if (v !== null) at(path, `Expected null (a module reference has no value), got ${describe(v)}`)
+          return
+        }
         // Deleted types are reported on their own.
         if (!def || def.kind === 'primitive') return
         if (def.kind === 'alias') {
@@ -266,7 +292,7 @@ export function valueErrors(v: Value, t: TypeRef, types: readonly TypeDef[]): st
         for (const f of def.fields) {
           const e = Object.hasOwn(v, f.name) ? v[f.name] : undefined
           if (e !== undefined) check(e, f.type, path ? `${path}.${f.name}` : f.name, seen)
-          else if (f.default === undefined && !implicit(f.type, byId))
+          else if (f.default === undefined && !implicit(f.type, byId, isModule))
             at(path, `Missing field '${f.name}' of ${def.name}`)
         }
       }

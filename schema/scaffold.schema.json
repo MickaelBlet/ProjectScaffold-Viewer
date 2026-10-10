@@ -1716,12 +1716,12 @@
             "kind": {
               "type": "string",
               "const": "ref",
-              "description": "a type defined in the project, a module or a dependency"
+              "description": "a type defined in the project, a module or a dependency, or a module"
             },
             "name": {
               "type": "string",
               "pattern": "^([A-Za-z_][A-Za-z0-9_]*\\/)?[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$",
-              "description": "type name; a type of a module: Module.Path.Name (Dependency/Module.Path.Name for a module of a dependency)"
+              "description": "type name; a type of a module: Module.Path.Name (Dependency/Module.Path.Name for a module of a dependency); a module (a reference to an instance of it): Module.Path (Dependency/Module.Path)"
             }
           },
           "required": [

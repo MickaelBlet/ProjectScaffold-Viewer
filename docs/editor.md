@@ -120,6 +120,10 @@ A module has types of its own, like types nested in a C++ class (its constants a
 - `+ # -` sets who uses them: anyone (`public`), the module and the modules deriving from it (`protected`), the module only (`private`).
 - In a module, type expressions name its own types and those of its bases by name, the others by their path: `Core.Sensor.Filter` (`Robot/Core.Sensor.Filter` for those of a dependency's modules). Outside modules, only public ones are offered, by path.
 
+### Modules as types
+
+Any type expression may name a module by its path, `Core.Sensor` (`Robot/Drivers.Imu` for a module of a dependency): a reference to an instance of the module, in containers too (`vector<Core.Sensor>`). Completion and the structured editor (_Modules_) offer this project's modules and the modules of dependencies known here (placed on the canvas, owning types, or already used). The → button goes to the module. A module has no value: the default of an attribute or field of a module is left empty. A dependency whose modules are used as types cannot be removed or detached.
+
 ### Classes and inheritance
 
 Modules work as C++-like classes:

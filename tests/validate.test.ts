@@ -153,7 +153,7 @@ describe('validate', () => {
       key: { kind: 'ref', id: vec3.id },
       value: { kind: 'primitive', name: 'bool' }
     }
-    expect(messages(p)).toEqual(['Pose.orientation: map key must be a primitive, an enum or a bitmask'])
+    expect(messages(p)).toEqual(['Pose.orientation: map key must be a primitive, an enum, a bitmask or a module'])
   })
 
   it('bounds strings, bytes and containers only', () => {
@@ -220,7 +220,7 @@ describe('validate', () => {
   it('flags deleted type references', () => {
     const p = load()
     p.types = p.types.filter((t) => t.name !== 'Vec3')
-    expect(messages(p)).toEqual(['Pose.position: references a deleted type'])
+    expect(messages(p)).toEqual(['Pose.position: references a deleted type or module'])
   })
 
   it('requires bidirectional links for messages with return values', () => {
@@ -365,7 +365,7 @@ describe('validate module attributes', () => {
     controller.attributes.push({ ...controller.attributes[0]!, id: 'dup' })
     expect(messages(p)).toContain("Core.Controller: duplicate attribute 'mode'")
     controller.attributes = [{ id: 'a', name: 'x', type: { kind: 'ref', id: 'gone' }, description: '' }]
-    expect(messages(p)).toContain('Core.Controller.x: references a deleted type')
+    expect(messages(p)).toContain('Core.Controller.x: references a deleted type or module')
   })
 
   it('checks defaults of attributes and struct fields against their type', () => {
@@ -400,7 +400,7 @@ describe('validate module methods', () => {
     expect(messages(p)).toEqual([
       "Core.Controller: 'mode' is both an attribute and a method",
       "Core.Controller.mode: duplicate parameter 'mode'",
-      'Core.Controller.mode returns: references a deleted type'
+      'Core.Controller.mode returns: references a deleted type or module'
     ])
   })
 

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { ACCESS_MARKS, findImported, IDENTIFIER_RE, importedParent, typeNames } from '@/model/project'
+import { ACCESS_MARKS, findImported, IDENTIFIER_RE, importedParent, refNamer } from '@/model/project'
 import { printTypeRef } from '@/model/typeExpr'
 import { deleteItems, renameDependency, useProjectStore } from '@/store/project'
 import { select } from '@/store/ui'
@@ -15,8 +15,8 @@ export function ImportedInspector({ id }: { id: string }): ReactNode {
   // Content of a placed module: placed and removed with it.
   const parent = importedParent(dep, module)
   const links = project.links.filter((l) => l.from.moduleId === id || l.to.moduleId === id)
-  const names = typeNames(project)
-  const type = (t: Parameters<typeof printTypeRef>[0]): string => printTypeRef(t, (x) => names.get(x))
+  const nameOf = refNamer(project)
+  const type = (t: Parameters<typeof printTypeRef>[0]): string => printTypeRef(t, nameOf)
   const attributes = module.attributes ?? []
   const methods = module.methods ?? []
 

@@ -78,9 +78,11 @@ export const FileTypeRefSchema: z.ZodType<FileTypeRef> = z
         max: Max.describe('most entries')
       }),
       z.object({
-        kind: z.literal('ref').describe('a type defined in the project, a module or a dependency'),
+        kind: z
+          .literal('ref')
+          .describe('a type defined in the project, a module or a dependency, or a module'),
         name: TypeName.describe(
-          'type name; a type of a module: Module.Path.Name (Dependency/Module.Path.Name for a module of a dependency)'
+          'type name; a type of a module: Module.Path.Name (Dependency/Module.Path.Name for a module of a dependency); a module (a reference to an instance of it): Module.Path (Dependency/Module.Path)'
         )
       })
     ])

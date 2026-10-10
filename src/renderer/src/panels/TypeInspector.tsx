@@ -1,6 +1,7 @@
 import { Fragment, useState, type ReactNode } from 'react'
 import {
   IDENTIFIER_RE,
+  isModuleRef,
   modulePaths,
   nameError,
   newId,
@@ -37,6 +38,7 @@ import {
 } from '@/model/types'
 import {
   formatValue,
+  isModuleValue,
   parseValue,
   valueChoices,
   valueErrors,
@@ -73,7 +75,21 @@ export function DefaultInput(props: {
   onChange: (value: Value | undefined) => void
 }): ReactNode {
   const { field, types, onChange } = props
+  const modules = useProjectStore((s) => s.project.modules)
+  const isModule = (id: string): boolean => isModuleRef({ modules }, id)
   const text = field.default === undefined ? '' : formatValue(field.default)
+  // A module reference has no value.
+  if (field.default === undefined && isModuleValue(field.type, types, isModule))
+    return (
+      <span className="field">
+        <input
+          value=""
+          placeholder="— no value (module) —"
+          title="A module reference has no value"
+          disabled
+        />
+      </span>
+    )
   const flags = valueFlags(field.type, types)
   if (flags) {
     const set = Array.isArray(field.default) ? field.default : []
@@ -125,7 +141,7 @@ export function DefaultInput(props: {
     if (!v.trim()) return { error: null }
     try {
       const value = parseValue(v)
-      return { value, error: valueErrors(value, field.type, types).join('; ') || null }
+      return { value, error: valueErrors(value, field.type, types, isModule).join('; ') || null }
     } catch (e) {
       return { error: e instanceof Error ? e.message.split('\n')[0]! : String(e) }
     }

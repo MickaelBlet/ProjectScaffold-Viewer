@@ -6,10 +6,13 @@ import {
   baseModule,
   canUseType,
   globalTypeNames,
+  isModuleRef,
   isModuleType,
   memberNames,
   moduleTypes,
+  parseDependencyModuleRef,
   refContext,
+  refNamer,
   typeNames,
   findImported,
   findPort,
@@ -73,11 +76,20 @@ export function validate(p: Project): Problem[] {
   }
   const types = new Map(p.types.map((t) => [t.id, t]))
   const interfaces = new Map(p.interfaces.map((i) => [i.id, i]))
+  const isModule = (id: Id): boolean => isModuleRef(p, id)
+  const dependencyIds = new Set(p.dependencies.map((x) => x.id))
+  /** Whether a type reference names an existing type or module (of a dependency: an existing one). */
+  const exists = (id: Id): boolean => {
+    if (types.has(id)) return true
+    const ref = parseDependencyModuleRef(id)
+    return ref ? dependencyIds.has(ref.dependency) : isModule(id)
+  }
 
-  /** Follow aliases to the underlying type; null for dangling or cyclic aliases. */
+  /** Follow aliases to the underlying type; the reference itself for a module, null for dangling or cyclic aliases. */
   const resolve = (t: TypeRef, seen = new Set<Id>()): TypeRef | TypeDef | null => {
     if (t.kind !== 'ref') return t
     const def = types.get(t.id)
+    if (!def && exists(t.id)) return t
     if (!def || seen.has(t.id)) return null
     if (def.kind !== 'alias') return def
     seen.add(t.id)
@@ -86,7 +98,8 @@ export function validate(p: Project): Problem[] {
 
   const checkTypeRef = (t: TypeRef, target: ProblemTarget, where: string): void => {
     walkTypeRef(t, (n) => {
-      if (n.kind === 'ref' && !types.has(n.id)) push('error', target, `${where}: references a deleted type`)
+      if (n.kind === 'ref' && !exists(n.id))
+        push('error', target, `${where}: references a deleted type or module`)
       if (n.kind === 'ref' && types.get(n.id)?.kind === 'exception')
         push('error', target, `${where}: exception '${types.get(n.id)!.name}' can only be raised`)
       if (n.kind === 'primitive' && n.max !== undefined && n.name !== 'string' && n.name !== 'bytes')
@@ -95,8 +108,9 @@ export function validate(p: Project): Problem[] {
       if (!keyOf) return
       const k = resolve(keyOf)
       if (!k) return
-      const ok = k.kind === 'primitive' || k.kind === 'enum' || k.kind === 'bitmask'
-      if (!ok) push('error', target, `${where}: ${n.kind} key must be a primitive, an enum or a bitmask`)
+      const ok = k.kind === 'primitive' || k.kind === 'enum' || k.kind === 'bitmask' || k.kind === 'ref'
+      if (!ok)
+        push('error', target, `${where}: ${n.kind} key must be a primitive, an enum, a bitmask or a module`)
       else if (k.kind === 'primitive' && (k.name === 'float32' || k.name === 'float64'))
         push('warning', target, `${where}: floating-point ${n.kind} key`)
     })
@@ -104,7 +118,8 @@ export function validate(p: Project): Problem[] {
 
   const checkDefault = (f: ValueField, target: ProblemTarget, where: string): void => {
     if (f.default === undefined) return
-    for (const e of valueErrors(f.default, f.type, p.types)) push('error', target, `${where} default: ${e}`)
+    for (const e of valueErrors(f.default, f.type, p.types, isModule))
+      push('error', target, `${where} default: ${e}`)
   }
 
   // Project
@@ -124,7 +139,8 @@ export function validate(p: Project): Problem[] {
     const target = { kind: 'const', id: c.id } as const
     if (isReservedTypeName(c.name)) push('error', target, `'${c.name}' is a reserved type name`)
     checkTypeRef(c.type, target, c.name)
-    for (const e of valueErrors(c.value, c.type, p.types)) push('error', target, `Constant '${c.name}': ${e}`)
+    for (const e of valueErrors(c.value, c.type, p.types, isModule))
+      push('error', target, `Constant '${c.name}': ${e}`)
   }
 
   for (const t of p.types) {
@@ -303,6 +319,15 @@ export function validate(p: Project): Problem[] {
         parentId ? { kind: 'module', id: parentId } : { kind: 'project' },
         `Duplicate module name '${n}'`
       )
+  // Type references name top-level modules as types: a type of the same name hides the module.
+  const globalNames = new Set(globalTypeNames(p))
+  for (const m of p.modules)
+    if (!m.parentId && globalNames.has(m.name))
+      push(
+        'warning',
+        { kind: 'module', id: m.id },
+        `Module '${m.name}' has the name of a type, interface or constant: '${m.name}' in a type names that one`
+      )
   // Binaries
   for (const n of duplicates(p.binaries.map((b) => b.name)))
     push('error', { kind: 'project' }, `Duplicate binary name '${n}'`)
@@ -386,7 +411,11 @@ export function validate(p: Project): Problem[] {
     const bases = m.bases ?? []
     for (const b of bases)
       if (!baseModule(p, b))
-        push('error', target, `${path} derives from a deleted module${isImportedId(b) ? ' of a dependency' : ''}`)
+        push(
+          'error',
+          target,
+          `${path} derives from a deleted module${isImportedId(b) ? ' of a dependency' : ''}`
+        )
     if (bases.includes(m.id)) push('error', target, `${path} derives from itself`)
     else if (bases.some((b) => ancestorModules(p, b).some((a) => a.id === m.id)))
       push('error', target, `${path} derives from itself through its bases`)
@@ -463,6 +492,7 @@ export function validate(p: Project): Problem[] {
   }
 
   const owners = new Map([...p.types, ...p.interfaces, ...p.consts].map((e) => [e.id, e.dependency]))
+  const refName = refNamer(p)
   for (const { ref, where, owner } of allTypeRefs(p)) {
     const dependency = owner.kind === 'module' ? undefined : owners.get(owner.id)
     if (!dependency) continue
@@ -470,6 +500,16 @@ export function validate(p: Project): Problem[] {
     // Entities held by another dependency count as those of the ones sharing them.
     const shared = new Set(p.dependencies.filter((x) => allowed.has(x.id)).flatMap((x) => x.shared))
     walkTypeRef(ref, (n) => {
+      if (n.kind === 'ref' && isModule(n.id)) {
+        const of = parseDependencyModuleRef(n.id)
+        if (!of || !allowed.has(of.dependency))
+          push(
+            'error',
+            { kind: owner.kind, id: owner.id },
+            `${where}: module '${refName(n.id) ?? '?'}' is not in its dependency or the dependencies it uses`
+          )
+        return
+      }
       const used = n.kind === 'ref' && types.get(n.id)
       if (used && (!used.dependency || !allowed.has(used.dependency)) && !shared.has(used.name))
         push(

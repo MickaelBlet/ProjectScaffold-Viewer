@@ -4,7 +4,9 @@
 // `indirect`), each with its file relative to this project. Some of their modules may be placed on
 // the canvas, with a copy of their ports as last read, so that links reach them.
 import {
+  allTypeRefs,
   childModules,
+  dependencyModuleRef,
   IDENTIFIER_RE,
   IMPORTED_PREFIX,
   importedParent,
@@ -12,12 +14,13 @@ import {
   modulePath,
   modulePaths,
   newId,
+  parseDependencyModuleRef,
   typeUsageTargets,
   uniqueName
 } from './project'
 import { pair } from './reuse'
 import { normalizeFile, resolveRelative, sameFile, type Renames } from './sync'
-import { mapTypeRef } from './typeExpr'
+import { mapTypeRef, walkTypeRef } from './typeExpr'
 import type {
   Attribute,
   ConstDef,
@@ -159,17 +162,37 @@ function placedTree(
   return out
 }
 
-/** Content of an entity without ids, references by name: equal for the same definition in two projects. */
-function shaper(p: Project): (e: Entity) => string {
+/**
+ * Keys of the modules used as types (see `isModuleRef`), the same in every project: the file of
+ * their project (`file`: that of `p`, relative to the project changed) and their path.
+ */
+function moduleKeyer(p: Project, file: string): (id: Id) => string | undefined {
+  const paths = modulePaths({ modules: p.modules, dependencies: [] })
+  const files = new Map(p.dependencies.map((x) => [x.id, normalizeFile(resolveRelative(file, x.file))]))
+  return (id) => {
+    const own = paths.get(id)
+    if (own !== undefined) return `${normalizeFile(file)}|module:${own}`
+    const ref = parseDependencyModuleRef(id)
+    const dep = ref && files.get(ref.dependency)
+    return dep === undefined ? undefined : `${dep}|module:${ref!.path}`
+  }
+}
+
+/**
+ * Content of an entity without ids, references by name: equal for the same definition in two
+ * projects (`file`: that of `p`, see `moduleKeyer`).
+ */
+function shaper(p: Project, file: string): (e: Entity) => string {
   const key = keyer(p)
   const names = new Map(entities(p).map((e) => [e.id, key(e)]))
+  const moduleKey = moduleKeyer(p, file)
   return (e) =>
     JSON.stringify(e, (key, value: unknown) => {
       if (key === 'id' || key === 'dependency' || key === 'module' || key === 'modulePath') return undefined
       if (key === 'raises' && Array.isArray(value)) return value.map((id) => names.get(id as Id) ?? '')
       const ref = value as { kind?: unknown; id?: unknown } | null
       if (ref && typeof ref === 'object' && ref.kind === 'ref' && typeof ref.id === 'string')
-        return { kind: 'ref', name: names.get(ref.id) ?? '' }
+        return { kind: 'ref', name: names.get(ref.id) ?? moduleKey(ref.id) ?? '' }
       return value
     })
 }
@@ -205,26 +228,30 @@ function rebind(e: Entity, idOf: (id: Id) => Id): void {
 
 /**
  * Names binding the references of the entities of `source` (saved as `file`) once copied: their
- * names, a type of a module by the file of its project and its `Path.Name`.
+ * names, a type of a module by the file of its project and its `Path.Name`, a module used as a
+ * type by its key (see `moduleKeyer`).
  */
-function refNames(source: Project, file: string): Map<Id, string> {
+function refNames(source: Project, file: string): (id: Id) => string | undefined {
   const paths = modulePaths(source)
   const files = new Map(source.dependencies.map((x) => [x.id, normalizeFile(resolveRelative(file, x.file))]))
-  return new Map(
+  const names = new Map(
     entities(source).map((e) => {
       if (!scoped(e)) return [e.id, e.name]
       if (e.module) return [e.id, `${normalizeFile(file)}|${paths.get(e.module)}.${e.name}`]
       return [e.id, `${files.get(e.dependency!)}|${e.modulePath}.${e.name}`]
     })
   )
+  const moduleKey = moduleKeyer(source, file)
+  return (id) => names.get(id) ?? moduleKey(id)
 }
 
 /**
- * Binding of the references of entities copied into `d`: the id here of each entity named in
- * `names` (see `refNames`), a new one (dangling) for those not here.
+ * Binding of the references of entities copied into `d`: the id here of each entity named by
+ * `names` (see `refNames`), the module of a dependency here, a new one (dangling) for those not here.
  */
-function binder(d: Project): (names: ReadonlyMap<Id, string>) => (id: Id) => Id {
+function binder(d: Project): (names: (id: Id) => string | undefined) => (id: Id) => Id {
   const files = new Map(d.dependencies.map((x) => [x.id, normalizeFile(x.file)]))
+  const byFile = new Map([...files].map(([id, file]) => [file, id]))
   const ids = new Map(
     entities(d).flatMap((e) =>
       !scoped(e)
@@ -234,7 +261,14 @@ function binder(d: Project): (names: ReadonlyMap<Id, string>) => (id: Id) => Id 
           : []
     )
   )
-  return (names) => (id) => ids.get(names.get(id) ?? '') ?? newId()
+  return (names) => (id) => {
+    const name = names(id) ?? ''
+    const known = ids.get(name)
+    if (known) return known
+    const at = name.indexOf('|module:')
+    const dep = at < 0 ? undefined : byFile.get(name.slice(0, at))
+    return dep ? dependencyModuleRef(dep, name.slice(at + '|module:'.length)) : newId()
+  }
 }
 
 /** Whether something outside `inside` (ids) uses a type or interface (nothing refers to constants). */
@@ -284,7 +318,7 @@ const signature = (ports: { name: string; role: string }[]): string =>
 class Sync {
   readonly result: DependencyResult = { conflicts: [], detached: [], renamed: [], missing: [] }
   /** Copied entities, with the names of the entities of the project they come from. */
-  private readonly copied: { entity: Entity; names: Map<Id, string> }[] = []
+  private readonly copied: { entity: Entity; names: (id: Id) => string | undefined }[] = []
   /** Entities left by their dependency, removed at the end unless still used. */
   private readonly removed: Entity[] = []
   /** Dependencies brought up to date: snapshots do not overwrite them. */
@@ -328,11 +362,11 @@ class Sync {
   entities(dep: Dependency, source: Project, owner: Id | undefined, file: string): void {
     const names = refNames(source, file)
     const sourceKey = keyer(source)
-    const sourceShape = shaper(source)
+    const sourceShape = shaper(source, file)
     const paths = modulePaths(source)
     const shared: string[] = []
     for (const kind of KINDS) {
-      const here = shaper(this.d)
+      const here = shaper(this.d, '')
       const hereKey = keyer(this.d)
       const list = this.d[kind] as Entity[]
       const current = list.filter((e) => e.dependency === dep.id)
@@ -449,6 +483,7 @@ class Sync {
       })
     )
     const taken = new Set(dep.modules.map((m) => m.path))
+    const moved = new Map<string, string>()
     const find = (path: string, ports: ImportedPort[]): string | null => {
       const free = [...byPath].filter(([p]) => !taken.has(p))
       const moved = free.filter(([p]) => leaf(p) === leaf(path))
@@ -465,8 +500,10 @@ class Sync {
       }
       this.result.renamed.push(`module ${im.path} → ${found}`)
       taken.add(found)
+      moved.set(im.path, found)
       im.path = found
     }
+    followModuleRenames(this.d, dep.id, moved)
     // Placed modules come with their content: a module placed alone (before modules were placed
     // whole) is placed with its top-level module, at its place.
     const previous = new Map(dep.modules.map((m) => [m.path, m]))
@@ -534,9 +571,24 @@ class Sync {
   }
 }
 
-/** Whether this project uses a dependency itself: its types or interfaces, or its placed modules. */
+/** Places using a module of dependency `dep` as a type, outside its entities unless `all`. */
+function moduleRefUsers(d: Project, dep: Dependency, all = false): string[] {
+  const owners = new Map([...d.types, ...d.interfaces, ...d.consts].map((e) => [e.id, e.dependency]))
+  const out: string[] = []
+  for (const { ref, where, owner } of allTypeRefs(d)) {
+    if (!all && owner.kind !== 'module' && owners.get(owner.id) === dep.id) continue
+    let used = false
+    walkTypeRef(ref, (n) => {
+      if (n.kind === 'ref' && parseDependencyModuleRef(n.id)?.dependency === dep.id) used = true
+    })
+    if (used) out.push(where)
+  }
+  return out
+}
+
+/** Whether this project uses a dependency itself: its types, interfaces or modules, or its placed modules. */
 function usedHere(d: Project, dep: Dependency): boolean {
-  if (dep.modules.length) return true
+  if (dep.modules.length || moduleRefUsers(d, dep).length) return true
   const own = dependencyEntities(d, dep.id)
   const inside = new Set(own.map((e) => e.id))
   return own.some((e) => usedOutside(d, e, inside))
@@ -714,7 +766,7 @@ function holders(d: Project, dep: Dependency): string[] {
 
 /**
  * Stop depending on a project. Returns why it cannot be removed (another dependency uses it, its
- * modules are placed here, or this project uses its types or interfaces): then nothing changes.
+ * modules are placed here, or this project uses its types, interfaces or modules): then nothing changes.
  */
 export function removeDependency(d: Project, dependencyId: Id): string[] {
   const dep = d.dependencies.find((x) => x.id === dependencyId)
@@ -725,7 +777,7 @@ export function removeDependency(d: Project, dependencyId: Id): string[] {
     (e) => scoped(e) || !d.dependencies.some((x) => x.shared.includes(e.name))
   )
   const inside = new Set(dependencyEntities(d, dep.id).map((e) => e.id))
-  users.push(...own.filter((e) => usedOutside(d, e, inside)).map((e) => e.name))
+  users.push(...own.filter((e) => usedOutside(d, e, inside)).map((e) => e.name), ...moduleRefUsers(d, dep))
   if (users.length) return users
   removeWithEntities(d, dep)
   prune(d)
@@ -734,12 +786,14 @@ export function removeDependency(d: Project, dependencyId: Id): string[] {
 
 /**
  * Make the types and interfaces of a dependency this project's own, and stop depending on it.
- * Returns what keeps it (dependencies using it, modules placed here): then nothing changes.
+ * Returns what keeps it (dependencies using it, modules placed here, places using its modules as
+ * types): then nothing changes.
  */
 export function detachDependency(d: Project, dependencyId: Id): string[] {
   const dep = d.dependencies.find((x) => x.id === dependencyId)
   if (!dep) return []
-  const users = holders(d, dep)
+  // Modules used as types stay in the dependency.
+  const users = [...holders(d, dep), ...moduleRefUsers(d, dep, true)]
   if (users.length) return users
   for (const e of handOver(d, dep)) delete e.dependency
   d.dependencies = d.dependencies.filter((x) => x.id !== dep.id)
@@ -782,8 +836,20 @@ export function applyDependencyRenames(d: Project, file: string, r: Renames): vo
     rename('types', r.types)
     rename('interfaces', r.interfaces)
     rename('consts', r.consts)
+    followModuleRenames(d, dep.id, r.modules)
   }
   followPortInterfaces(d, r.interfaces)
+}
+
+/** Make the type references to modules of dependency `dep` follow their renames (old path → new one). */
+function followModuleRenames(d: Project, dep: Id, renames: ReadonlyMap<string, string>): void {
+  if (!renames.size) return
+  for (const { ref } of allTypeRefs(d))
+    walkTypeRef(ref, (n) => {
+      const of = n.kind === 'ref' ? parseDependencyModuleRef(n.id) : undefined
+      const to = of?.dependency === dep ? renames.get(of.path) : undefined
+      if (to !== undefined && n.kind === 'ref') n.id = dependencyModuleRef(dep, to)
+    })
 }
 
 /** Make placed ports follow interface renames: they reference interfaces by name. */

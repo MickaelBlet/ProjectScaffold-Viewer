@@ -3,7 +3,8 @@ import { useProjectStore } from '@/store/project'
 import { openContextMenu } from '@/store/ui'
 import { navigate } from '@/actions'
 import { parseTypeRef, printTypeRef, TypeExprError } from '@/model/typeExpr'
-import { isModuleType, typeScope } from '@/model/project'
+import { isModuleType, parseDependencyModuleRef, typeScope } from '@/model/project'
+import type { ProblemTarget } from '@/model/validate'
 import {
   BOUNDED_PRIMITIVES,
   CONTAINERS,
@@ -39,12 +40,35 @@ function useTypeNames(): {
   idOf: (n: string) => string | undefined
   names: string[]
 } {
-  const { nameOf, idOf, usable } = useTypeScope()
+  const { nameOf, idOf, usable, modules } = useTypeScope()
   return useMemo(
     // Exceptions are only raised: not offered as types.
-    () => ({ nameOf, idOf, names: usable.filter((u) => u.type.kind !== 'exception').map((u) => u.name) }),
-    [nameOf, idOf, usable]
+    () => ({
+      nameOf,
+      idOf,
+      names: [
+        ...usable.filter((u) => u.type.kind !== 'exception').map((u) => u.name),
+        ...modules.map((m) => m.name)
+      ]
+    }),
+    [nameOf, idOf, usable, modules]
   )
+}
+
+/**
+ * Where a type reference leads: its type, its module, the placed module of a dependency (none
+ * when not placed here).
+ */
+function useRefTarget(): (id: Id) => ProblemTarget | null {
+  const { types, modules, dependencies } = useProjectStore((s) => s.project)
+  return (id) => {
+    if (types.some((t) => t.id === id)) return { kind: 'type', id }
+    if (modules.some((m) => m.id === id)) return { kind: 'module', id }
+    const of = parseDependencyModuleRef(id)
+    const placed =
+      of && dependencies.find((x) => x.id === of.dependency)?.modules.find((m) => m.path === of.path)
+    return placed ? { kind: 'module', id: placed.id } : null
+  }
 }
 
 /** Ids of the user types referenced by `t`, in order of appearance, without duplicates. */
@@ -78,7 +102,11 @@ export function TypeEditor(props: {
   const tree = props.onToggleTree ? !!props.tree : ownTree
   const [suggest, setSuggest] = useState<{ items: string[]; index: number } | null>(null)
   const input = useRef<HTMLInputElement>(null)
-  const refs = refIds(props.value).filter((id) => nameOf(id) !== undefined)
+  const targetOf = useRefTarget()
+  const refs = refIds(props.value).flatMap((id) => {
+    const target = nameOf(id) === undefined ? null : targetOf(id)
+    return target ? [{ id, target }] : []
+  })
   const candidates = useMemo(() => [...PRIMITIVES, ...names, ...CONTAINERS.map((c) => `${c}<`)], [names])
 
   const check = (s: string): TypeRef | null => {
@@ -123,11 +151,11 @@ export function TypeEditor(props: {
 
   // Several types: a menu below the button.
   const goTo = (e: { currentTarget: Element }): void => {
-    if (refs.length === 1) return navigate({ kind: 'type', id: refs[0]! })
+    if (refs.length === 1) return navigate(refs[0]!.target)
     const r = e.currentTarget.getBoundingClientRect()
     openContextMenu(
       { clientX: r.left, clientY: r.bottom },
-      refs.map((id) => ({ label: nameOf(id)!, run: () => navigate({ kind: 'type', id }) }))
+      refs.map(({ id, target }) => ({ label: nameOf(id)!, run: () => navigate(target) }))
     )
   }
 
@@ -191,7 +219,7 @@ export function TypeEditor(props: {
             role="button"
             tabIndex={0}
             className="nav-button"
-            title={refs.length === 1 ? `Go to ${nameOf(refs[0]!)}` : 'Go to type'}
+            title={refs.length === 1 ? `Go to ${nameOf(refs[0]!.id)}` : 'Go to type'}
             aria-label="Go to type"
             onClick={goTo}
             onKeyDown={(e) => {
@@ -223,7 +251,7 @@ export function TypeTree(props: {
   onChange: (t: TypeRef) => void
   label?: string
 }): ReactNode {
-  const { nameOf, usable } = useTypeScope()
+  const { nameOf, usable, modules } = useTypeScope()
   const types = useProjectStore((s) => s.project.types)
   const t = props.value
   const selected = t.kind === 'primitive' ? t.name : t.kind === 'ref' ? `ref:${t.id}` : t.kind
@@ -315,6 +343,25 @@ export function TypeTree(props: {
               )
             )
           })}
+          {(() => {
+            // The current module stays listed even when hidden by a type of the same name.
+            const list = [...modules]
+            if (t.kind === 'ref' && !types.some((ut) => ut.id === t.id) && !list.some((m) => m.id === t.id)) {
+              const name = nameOf(t.id)
+              if (name !== undefined) list.push({ id: t.id, name })
+            }
+            return (
+              list.length > 0 && (
+                <optgroup label="Modules">
+                  {list.map((m) => (
+                    <option key={m.id} value={`ref:${m.id}`}>
+                      {m.name}
+                    </option>
+                  ))}
+                </optgroup>
+              )
+            )
+          })()}
           <optgroup label="Containers">
             {CONTAINERS.map((c) => (
               <option key={c} value={c}>
@@ -322,7 +369,7 @@ export function TypeTree(props: {
               </option>
             ))}
           </optgroup>
-          {t.kind === 'ref' && !types.some((ut) => ut.id === t.id) && (
+          {t.kind === 'ref' && nameOf(t.id) === undefined && (
             <option value={selected}>&lt;deleted&gt;</option>
           )}
         </select>

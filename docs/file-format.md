@@ -37,7 +37,7 @@ The `editor` section holds layout and view data only; it is stripped on export.
 
 - All names are identifiers: `[A-Za-z_][A-Za-z0-9_]*`.
 - Types, interfaces and constants share one namespace (with those of the [dependencies](dependencies.md)).
-- Module path = dot-separated names (`Core.Sensor`); names are unique among siblings.
+- Module path = dot-separated names (`Core.Sensor`); names are unique among siblings. A top-level module is named apart from the types, interfaces and constants (a type of the same name hides it in type references: a warning).
 
 ## Types
 
@@ -52,13 +52,28 @@ A type reference is always structured, never a string:
 | `vector` `list` `set` | `of`, `max`           | `max`: most items                                                                                                                     |
 | `optional`            | `of`                  |                                                                                                                                       |
 | `map`                 | `key`, `value`, `max` | key: primitive or enum; `max`: most entries                                                                                           |
-| `ref`                 | `name`                | user type (struct, enum or alias)                                                                                                     |
+| `ref`                 | `name`                | user type (struct, enum or alias), or module (see [Modules as types](#modules-as-types))                                              |
 
 ```yaml
 type: { kind: map, key: { kind: primitive, name: string }, value: { kind: ref, name: Reading }, max: 8 }
 ```
 
 Bounds (`max`, optional) are written `string<16>`, `bytes<4>`, `vector<T, 8>`, `map<K, V, 8>` in the editor's type expressions; default values are checked against them.
+
+### Modules as types
+
+A `ref` may name a module by its path: a reference to an instance of the module (a pointer or a reference for generators), anywhere a type is used (struct fields, union cases, aliases, constants, interface messages, attributes, method parameters and returns), in containers too (`vector<Core.Sensor>`, a map key).
+
+```yaml
+attributes:
+  - { name: log, type: { kind: ref, name: Logger } }
+  - { name: sensors, type: { kind: vector, of: { kind: ref, name: Core.Sensor } } }
+  - { name: imu, type: { kind: ref, name: Robot/Drivers.Imu } } # a module of dependency Robot
+```
+
+- A type's name comes first: `Sensor` names the type when a type and a top-level module share it (a warning).
+- `Dependency/Module.Path` names a module of a dependency, placed on the canvas or not; the dependency's own types and interfaces name its modules that way too.
+- A module has no value: a `default` or constant value of a module is `null` (an empty `optional`), and a struct value leaves its module fields out. A union discriminator cannot be a module.
 
 ### User types
 
@@ -157,8 +172,9 @@ modules:
 | struct                  | a mapping naming its fields                          |
 | `optional`              | `null` when empty                                    |
 | custom primitive        | opaque, passed as is to generators                   |
+| module                  | none (`null`)                                        |
 
-In a struct value, unknown and missing fields are errors, except fields with their own default, `optional` fields and structs whose fields all have one. In the editor, write values as one-line flow literals: `{ position: { x: 1, y: 2 }, samples: [ 1, 2, 3 ] }`.
+In a struct value, unknown and missing fields are errors, except fields with their own default, `optional` fields, modules and structs whose fields all have one. In the editor, write values as one-line flow literals: `{ position: { x: 1, y: 2 }, samples: [ 1, 2, 3 ] }`.
 
 ## Ports and links
 

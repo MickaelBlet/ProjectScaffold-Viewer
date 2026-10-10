@@ -8,13 +8,18 @@ import {
   allImported,
   boundsOf,
   childModules,
+  dependencyModuleRefs,
   globalTypeNames,
   growAncestors,
   isModuleType,
+  isModuleRef,
   linkOrigin,
   memberNames,
+  modulePaths,
   moduleTypes,
   newId,
+  parseDependencyModuleRef,
+  refResolver,
   subtreeIds,
   typeNames,
   uniqueName
@@ -52,7 +57,10 @@ export interface Clip {
   interfaces: Interface[]
   /** Absent in clips of older versions. */
   consts?: ConstDef[]
-  /** Names of the source project's types (qualified) and interfaces, to rebind references elsewhere. */
+  /**
+   * Names of the source project's types (qualified), interfaces and modules used as types (paths),
+   * to rebind references elsewhere.
+   */
   names: Record<Id, string>
   /** Types selected themselves, not only copied with their module (absent in older clips: all). */
   selectedTypes?: Id[]
@@ -98,7 +106,12 @@ export function copyItems(p: Project, ids: Id[]): Clip | null {
     selectedTypes: p.types.filter((t) => selected.has(t.id)).map((t) => t.id),
     interfaces: p.interfaces.filter((i) => selected.has(i.id)),
     consts: p.consts.filter((c) => selected.has(c.id)),
-    names: Object.fromEntries([...typeNames(p), ...p.interfaces.map((i) => [i.id, i.name] as const)])
+    names: Object.fromEntries([
+      ...typeNames(p),
+      ...p.interfaces.map((i) => [i.id, i.name] as const),
+      ...modulePaths({ modules: p.modules, dependencies: [] }),
+      ...dependencyModuleRefs(p).map((m) => [m.id, m.name] as const)
+    ])
   }
   const empty =
     !clip.modules.length &&
@@ -160,15 +173,18 @@ export function pasteClip(d: Project, clip: Clip, options: PasteOptions): Id[] {
   const moduleIds = new Map<Id, Id>()
   for (const m of clip.modules) moduleIds.set(m.id, newId())
   let names: Map<string, Id> | undefined
+  let resolve: ((name: string) => Id | undefined) | undefined
   const rebind = (id: Id): Id => {
-    const copied = typeIds.get(id)
+    const copied = typeIds.get(id) ?? moduleIds.get(id)
     if (copied) return copied
     if ([...d.types, ...d.interfaces].some((e) => e.id === id)) return id
-    names ??= new Map([
-      ...[...typeNames(d)].map(([k, v]) => [v, k] as const),
-      ...d.interfaces.map((i) => [i.name, i.id] as const)
-    ])
-    return names.get(clip.names[id] ?? '') ?? id
+    // Modules used as types: here, else by path (`Dep/Core.Sensor` in a dependency of the same name).
+    const dependency = parseDependencyModuleRef(id)?.dependency
+    if (dependency ? d.dependencies.some((x) => x.id === dependency) : isModuleRef(d, id)) return id
+    names ??= new Map(d.interfaces.map((i) => [i.name, i.id] as const))
+    resolve ??= refResolver(d)
+    const name = clip.names[id] ?? ''
+    return names.get(name) ?? resolve(name) ?? id
   }
   const ref = (t: TypeRef): TypeRef => mapTypeRef(t, (r) => ({ kind: 'ref', id: rebind(r.id) }))
   const field = <F extends Field>(f: F): F => ({ ...f, id: newId(), type: ref(f.type) })

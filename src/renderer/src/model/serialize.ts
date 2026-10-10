@@ -19,6 +19,7 @@ import { pair } from './reuse'
 import {
   childModules,
   compartmentsHeight,
+  dependencyModuleRef,
   findImported,
   isModuleType,
   IMPORTED_PREFIX,
@@ -29,6 +30,7 @@ import {
   moduleTypes,
   newId,
   portRows,
+  refNamer,
   subtreeIds,
   typeNames,
   viewNotes
@@ -167,8 +169,9 @@ function clean<T>(v: T): T {
 
 export function toFile(p: Project, options: { editor: boolean }): FileProject {
   const typeName = new Map<Id, string>([...typeNames(p), ...p.interfaces.map((i) => [i.id, i.name] as const)])
+  const refName = refNamer(p)
   const ref = (t: TypeRef): FileTypeRef =>
-    mapTypeRef(t, (r) => ({ kind: 'ref', name: typeName.get(r.id) ?? '__deleted__' }))
+    mapTypeRef(t, (r) => ({ kind: 'ref', name: refName(r.id) ?? '__deleted__' }))
   const field = (f: Field) => ({ name: f.name, type: ref(f.type), description: opt(f.description) })
   const valueField = (f: ValueField) => ({
     ...field(f),
@@ -587,11 +590,16 @@ export function fromFile(data: unknown, prev?: Project): Project {
     return idOf(prevConsts[i], () => `const:${x.e.name}`)
   })
 
+  /** References naming no type: modules, resolved once modules are known. */
+  const moduleRefs: { ref: { id: Id }; name: string; where: string; at: DataPath }[] = []
   const ref = (t: FileTypeRef, where: string, at: DataPath): TypeRef =>
     mapTypeRef(t, (r) => {
       const id = typeIds.get(r.name)
-      if (!id || interfaceNames.has(r.name)) report(`${where}: unknown type '${r.name}'`, at)
-      return { kind: 'ref', id: id ?? newId() }
+      if (interfaceNames.has(r.name)) report(`${where}: unknown type '${r.name}'`, at)
+      if (id) return { kind: 'ref', id }
+      const out = { kind: 'ref' as const, id: newId() }
+      moduleRefs.push({ ref: out, name: r.name, where, at })
+      return out
     })
   const field = (
     fl: { name: string; type: FileTypeRef; description?: string },
@@ -884,6 +892,16 @@ export function fromFile(data: unknown, prev?: Project): Project {
     const mod = x.module === undefined ? undefined : moduleByPath.get(x.module)
     if (mod) types[i]!.module = mod.id
   })
+  // Modules used as types: of this project by path, of a dependency `Dep/Core.Sensor`.
+  const dependencyByName = new Map(fileDependencies.map((x, i) => [x.name, dependencyIds[i]!]))
+  for (const { ref, name, where, at } of moduleRefs) {
+    const slash = name.indexOf('/')
+    const dependency = slash > 0 ? dependencyByName.get(name.slice(0, slash)) : undefined
+    const id =
+      moduleByPath.get(name)?.id ?? (dependency && dependencyModuleRef(dependency, name.slice(slash + 1)))
+    if (id) ref.id = id
+    else report(`${where}: unknown type '${name}'`, at)
+  }
   // Placed modules of dependencies: on the right of the project's modules when they have no position.
   let importY = PAD
   const importX =

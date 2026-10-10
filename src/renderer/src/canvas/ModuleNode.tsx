@@ -1,6 +1,15 @@
-import { memo, type CSSProperties, type ReactNode } from 'react'
+import { memo, useMemo, type CSSProperties, type ReactNode } from 'react'
 import { Handle, NodeResizer, Position, type Node, type NodeProps } from '@xyflow/react'
-import { ACCESS_MARKS, findImported, indexById, minSize, modulePath, nameError, parentIds } from '@/model/project'
+import {
+  ACCESS_MARKS,
+  findImported,
+  indexById,
+  minSize,
+  modulePath,
+  nameError,
+  parentIds,
+  parseDependencyModuleRef
+} from '@/model/project'
 import { getProject, setLocked, setModuleLayout, update, useProjectStore } from '@/store/project'
 import { useUiStore } from '@/store/ui'
 import { openModuleView } from '@/actions'
@@ -76,6 +85,33 @@ function hasDeletedRef(t: TypeRef, nameOf: (id: string) => string | undefined): 
   return deleted
 }
 
+/**
+ * Short names of the types and modules `refs` use, as the canvas shows them: their own name, the
+ * last part of the path of a module of a dependency.
+ */
+function useShortNames(types: TypeDef[], refs: TypeRef[]): (id: string) => string | undefined {
+  // Stable string: re-renders only when a module used as a type is added, removed or renamed.
+  const modules = useProjectStore((s) => {
+    const out: string[] = []
+    for (const t of refs)
+      walkTypeRef(t, (n) => {
+        if (n.kind !== 'ref') return
+        const of = parseDependencyModuleRef(n.id)
+        const name = of
+          ? s.project.dependencies.some((x) => x.id === of.dependency)
+            ? of.path.split('.').pop()
+            : undefined
+          : indexById(s.project.modules).get(n.id)?.name
+        if (name !== undefined) out.push(`${n.id}\t${name}`)
+      })
+    return out.join('\n')
+  })
+  return useMemo(() => {
+    const names = new Map(modules ? modules.split('\n').map((e) => e.split('\t') as [string, string]) : [])
+    return (id) => types.find((t) => t.id === id)?.name ?? names.get(id)
+  }, [types, modules])
+}
+
 /** Qualifiers set on an attribute, method or parameter, each followed by a space. */
 const qualifierText = (q: { static?: boolean; const?: boolean }): string =>
   QUALIFIERS.filter((k) => q[k])
@@ -83,7 +119,10 @@ const qualifierText = (q: { static?: boolean; const?: boolean }): string =>
     .join('')
 
 export function Attributes({ attributes, types }: { attributes: Attribute[]; types: TypeDef[] }): ReactNode {
-  const nameOf = (id: string): string | undefined => types.find((t) => t.id === id)?.name
+  const nameOf = useShortNames(
+    types,
+    attributes.map((a) => a.type)
+  )
   return (
     <ul className="module-attrs">
       {attributes.map((a) => {
@@ -111,7 +150,10 @@ export function Attributes({ attributes, types }: { attributes: Attribute[]; typ
 
 /** Method compartment below the attributes: `virtual name(a: T, out b: U): R const = 0`. */
 export function Methods({ methods, types }: { methods: Method[]; types: TypeDef[] }): ReactNode {
-  const nameOf = (id: string): string | undefined => types.find((t) => t.id === id)?.name
+  const nameOf = useShortNames(
+    types,
+    methods.flatMap((m) => [...m.params.map((prm) => prm.type), ...(m.returns ? [m.returns] : [])])
+  )
   return (
     <ul className="module-attrs module-methods">
       {methods.map((m) => {
@@ -177,7 +219,9 @@ export const ModuleNode = memo(function ModuleNode({
       .map((b) => {
         // A placed module of a dependency: with its dependency's name.
         const placed = findImported(s.project, b)
-        return placed ? `${placed.dep.name}/${placed.module.path.split('.').pop()!}` : (modules.get(b)?.name ?? '?')
+        return placed
+          ? `${placed.dep.name}/${placed.module.path.split('.').pop()!}`
+          : (modules.get(b)?.name ?? '?')
       })
       .join(', ')
   })

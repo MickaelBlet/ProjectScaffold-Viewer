@@ -298,6 +298,11 @@ modules:
                   kind: primitive
                   name: float32
                 default: 220
+              - name: world
+                type:
+                  kind: ref
+                  name: Engine.World
+                description: The world the player moves in (a module used as a type)
               - name: ship
                 type:
                   kind: ref

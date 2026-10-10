@@ -3,7 +3,7 @@
 // Click selects (the Inspector shows it), double-click opens an editor tab, Right / Left expand and
 // collapse.
 import { useMemo, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
-import { typeUsageTargets } from '@/model/project'
+import { refNamer, typeUsageTargets } from '@/model/project'
 import { dependencyEntities } from '@/model/dependencies'
 import { printTypeRef } from '@/model/typeExpr'
 import { formatValue } from '@/model/defaults'
@@ -231,8 +231,9 @@ export function DependencyDetail({ lib }: { lib: Dependency }): ReactNode {
   const consts = owned.filter((e) => 'value' in e && (!f || e.name.toLowerCase().includes(f)))
   const print = useMemo(() => {
     const names = new Map([...project.types, ...project.interfaces].map((e) => [e.id, e.name]))
-    return (t: TypeRef): string => printTypeRef(t, (id) => names.get(id))
-  }, [project.types, project.interfaces])
+    const refName = refNamer(project)
+    return (t: TypeRef): string => printTypeRef(t, (id) => names.get(id) ?? refName(id))
+  }, [project])
   const usages = useMemo(() => {
     const inside = new Set(all.map((e) => e.id))
     return new Map(all.map((e) => [e.id, usageCount(project, e, inside)]))
