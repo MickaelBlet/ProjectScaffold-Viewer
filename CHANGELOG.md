@@ -45,6 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Text editor completion: types of modules are offered by their qualified name as the file writes them (`Core.Sensor.Filter`, `Robot/Core.Sensor.Filter` for the public types of a dependency's modules), not by their bare name; a link end's `module` offers the placed modules of the dependency its `project` names (not `Robot/Core.Sensor`), and `project` the dependencies.
 - Text editor, _Sync selection_: the cursor in the editor data of a placed module of a dependency (`editor.dependencies.<Dependency>.<Module>`) selects that module and shows it on the canvas (the dependency itself on the dependency's line).
 - Inspector: the _Go to type_ button (↗) of type expressions works in read-only types and interfaces of dependencies.
 - Browser: IDL dependencies are read again after a page reload, their modules listed in the Explorer with their types and constants under them, in place of flat _Constants_ and _Types_ groups: the IDL files picked are kept (as last read, and read again when access is still granted). A dependency whose file cannot be read lists the modules this project keeps of it.

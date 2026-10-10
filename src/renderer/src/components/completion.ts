@@ -22,7 +22,11 @@ export interface JsonSchema {
 /** Names of the project, for values that reference them. */
 export interface ProjectNames {
   interfaces: string[]
+  /** Paths of the project's modules. */
   modules: string[]
+  /** Paths of the placed modules of each dependency, by dependency name. */
+  placed: Record<string, string[]>
+  /** Qualified type names (`Core.Sensor.Filter`, `Dependency/Core.Sensor.Filter`). */
   types: string[]
 }
 
@@ -219,7 +223,12 @@ function keyItems(root: JsonSchema, schemas: JsonSchema[], present: Set<string>,
     .map(({ label, insert, detail }) => ({ label, insert, ...(detail ? { detail } : {}) }))
 }
 
-function valueItems(schemas: JsonSchema[], path: Path, names: ProjectNames): Completion[] {
+function valueItems(
+  schemas: JsonSchema[],
+  path: Path,
+  siblings: Map<string, string> | undefined,
+  names: ProjectNames
+): Completion[] {
   const key = path.at(-1)
   const parent = path.at(-2)
   const values = new Set<unknown>()
@@ -231,8 +240,13 @@ function valueItems(schemas: JsonSchema[], path: Path, names: ProjectNames): Com
   const add = (list: string[], detail: string): void => {
     for (const n of list) if (!values.has(n)) out.push({ label: n, insert: scalar(n), detail })
   }
+  const endpoint = parent === 'from' || parent === 'to'
   if (key === 'interface') add(names.interfaces, 'interface')
-  else if (key === 'module' && (parent === 'from' || parent === 'to')) add(names.modules, 'module')
+  else if (key === 'module' && endpoint) {
+    // A module of a dependency is named in it, its dependency by `project`.
+    const project = siblings?.get('project')
+    add(project === undefined ? names.modules : (names.placed[project] ?? []), 'module')
+  } else if (key === 'project' && endpoint) add(Object.keys(names.placed), 'dependency')
   else if (key === 'root') add(names.modules, 'module')
   return out
 }
@@ -308,7 +322,7 @@ export function complete(
     schema,
     parents.flatMap((s) => (s.properties?.[key] ? [s.properties[key]] : []))
   )
-  const items = [...valueItems(schemas, path, names), ...refNames(siblings, key, names)]
+  const items = [...valueItems(schemas, path, siblings, names), ...refNames(siblings, key, names)]
   return { from: pos - prefix.length, to: pos + wordAfter.length, prefix, value: true, items }
 }
 

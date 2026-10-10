@@ -8,7 +8,7 @@ import { getChunks, unifiedMergeView } from '@codemirror/merge'
 import { Prec, type EditorState, type Extension } from '@codemirror/state'
 import { EditorView, keymap } from '@codemirror/view'
 import { FileProjectSchema } from '@/model/schema'
-import { modulePaths, notePath } from '@/model/project'
+import { modulePaths, notePath, typeNames } from '@/model/project'
 import { locateValidation, targetPath } from '@/model/locate'
 import {
   LoadError,
@@ -52,10 +52,13 @@ function fileSchema(): JsonSchema {
 
 function projectNames(p: Project): ProjectNames {
   const paths = modulePaths(p)
+  const qualified = typeNames(p)
   return {
     interfaces: p.interfaces.map((i) => i.name),
     modules: p.modules.map((m) => paths.get(m.id)!),
-    types: p.types.map((t) => t.name)
+    placed: Object.fromEntries(p.dependencies.map((d) => [d.name, d.modules.map((m) => m.path)])),
+    // The types of the modules of dependencies this project can use: their public ones.
+    types: p.types.filter((t) => !(t.dependency && t.modulePath && t.access)).map((t) => qualified.get(t.id)!)
   }
 }
 

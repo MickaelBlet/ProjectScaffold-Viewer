@@ -6,7 +6,8 @@ const schema = JSON.parse(readFileSync('schema/scaffold.schema.json', 'utf8')) a
 const names = {
   interfaces: ['Telemetry', 'Control'],
   modules: ['Core', 'Core.Sensor'],
-  types: ['Vec3', 'Pose']
+  placed: { Robot: ['Core', 'Core.Logger'] },
+  types: ['Vec3', 'Pose', 'Core.Sensor.Filter', 'Robot/Core.Sensor.Sample']
 }
 
 /** Completion labels at the `|` of the text. */
@@ -54,7 +55,20 @@ describe('schema completion', () => {
   it('completes project names', () => {
     expect(at('modules:\n  - name: A\n    ports:\n      - interface: Te|')).toEqual(['Telemetry'])
     expect(at('links:\n  - from:\n      module: Core.|')).toEqual(['Core.Sensor'])
-    expect(at('types:\n  - kind: alias\n    type:\n      kind: ref\n      name: |')).toEqual(['Vec3', 'Pose'])
+    expect(at('types:\n  - kind: alias\n    type:\n      kind: ref\n      name: |')).toEqual([
+      'Vec3',
+      'Pose',
+      'Core.Sensor.Filter',
+      'Robot/Core.Sensor.Sample'
+    ])
+  })
+
+  it('completes types and modules of dependencies', () => {
+    expect(at('types:\n  - kind: alias\n    type:\n      kind: ref\n      name: Rob|')).toEqual([
+      'Robot/Core.Sensor.Sample'
+    ])
+    expect(at('links:\n  - from:\n      project: |')).toEqual(['Robot'])
+    expect(at('links:\n  - from:\n      project: Robot\n      module: Core.|')).toEqual(['Core.Logger'])
   })
 
   it('opens nested objects and lists on the next line', () => {
