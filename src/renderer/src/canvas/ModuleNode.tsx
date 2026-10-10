@@ -16,7 +16,7 @@ import {
   type TypeDef,
   type TypeRef
 } from '@/model/types'
-import { Icon } from '@/components/Icon'
+import { AccessIcon, Icon } from '@/components/Icon'
 import { MODULE_HANDLE } from './constants'
 import type { PortNodeData } from './flowGraph'
 import { anchorStyle, inward, PortPoint } from './PortPoint'
@@ -95,7 +95,9 @@ export function Attributes({ attributes, types }: { attributes: Attribute[]; typ
         const sig = `${mark} ${qualifiers}${a.name}: ${type}${value}`
         return (
           <li key={a.id} title={a.description ? `${sig}\n${a.description}` : sig}>
-            <span className="attr-access">{mark}</span>
+            <span className="attr-access">
+              <AccessIcon access={a.access} />
+            </span>
             {qualifiers && <span className="attr-qualifier">{qualifiers}</span>}
             <span className="attr-name">{a.name}</span>
             <span className={`attr-type ${deleted ? 'deleted' : ''}`}>: {type}</span>
@@ -132,7 +134,9 @@ export function Methods({ methods, types }: { methods: Method[]; types: TypeDef[
         const sig = `${mark} ${before}${m.name}(${params})${returns}${after}${raises}`
         return (
           <li key={m.id} title={m.description ? `${sig}\n${m.description}` : sig}>
-            <span className="attr-access">{mark}</span>
+            <span className="attr-access">
+              <AccessIcon access={m.access} />
+            </span>
             {before && <span className="attr-qualifier">{before}</span>}
             <span className={`attr-name ${m.pure ? 'pure' : ''}`}>{m.name}</span>
             <span className={`attr-type ${deleted ? 'deleted' : ''}`}>

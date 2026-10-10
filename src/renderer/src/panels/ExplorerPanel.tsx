@@ -14,15 +14,7 @@ import {
   type MouseEvent,
   type ReactNode
 } from 'react'
-import {
-  ACCESS_MARKS,
-  endpointLabel,
-  findView,
-  importedParent,
-  modulePaths,
-  newId,
-  uniqueName
-} from '@/model/project'
+import { endpointLabel, findView, importedParent, modulePaths, newId, uniqueName } from '@/model/project'
 import { removeBinary } from '@/model/binaries'
 import { formatValue } from '@/model/defaults'
 import {
@@ -67,7 +59,7 @@ import { dependencyMenu } from './DependencyDetail'
 import { useDependencyModules, type DependencyModule } from './dependencyModules'
 import { childrenByParent, dropModule, matching, MODULE_DRAG, toggleHidden } from './moduleTree'
 import { openEditor, openView, revealInspector } from '@/shell/controllers'
-import { Icon } from '@/components/Icon'
+import { AccessIcon, Icon } from '@/components/Icon'
 import { TYPE_KIND_BADGE, TYPE_KINDS } from '@/components/fields'
 import { FoldSection, placed, sectionOrder, StackedSections } from '@/components/FoldSection'
 import { onListKeyDown, tabStop } from '@/components/listKeys'
@@ -1185,7 +1177,7 @@ export function ExplorerPanel(): ReactNode {
                   <span className="kind-badge const">C</span>
                   <span className="tree-name">{c.name}</span>
                   <small>
-                    {ACCESS_MARKS[c.access ?? 'public']} {formatValue(c.value)}
+                    <AccessIcon access={c.access} /> {formatValue(c.value)}
                   </small>
                 </Item>
               )
@@ -1209,7 +1201,9 @@ export function ExplorerPanel(): ReactNode {
                     {KIND_BADGE[t.kind]}
                   </span>
                   <span className="tree-name">{t.name}</span>
-                  <small>{ACCESS_MARKS[t.access ?? 'public']}</small>
+                  <small>
+                    <AccessIcon access={t.access} />
+                  </small>
                 </Item>
               )
             }

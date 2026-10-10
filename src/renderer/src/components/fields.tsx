@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
-import { ACCESS_MARKS, PALETTE } from '@/model/project'
+import { PALETTE } from '@/model/project'
 import { ACCESS_LEVELS, type Access, type Qualifier } from '@/model/types'
-import { Icon, type IconName } from './Icon'
+import { AccessIcon, Icon, type IconName } from './Icon'
 import { useDraft } from './useDraft'
 
 /** Text input that keeps a local draft and commits on blur / Enter, rejecting invalid values. */
@@ -172,7 +172,7 @@ export function AccessToggles(props: {
           title={a}
           onClick={() => props.onChange(a)}
         >
-          {ACCESS_MARKS[a]}
+          <AccessIcon access={a} />
         </button>
       ))}
     </span>

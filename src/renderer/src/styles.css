@@ -1588,7 +1588,7 @@ ul.plain {
 .module-attrs {
   flex-shrink: 0;
   margin: 0;
-  padding: 4px 14px 3px;
+  padding: 4px 4px 3px;
   list-style: none;
   font-family: ui-monospace, 'SF Mono', Consolas, monospace;
   font-size: 11px;
@@ -1621,9 +1621,18 @@ ul.plain {
 /* UML access mark: + public, # protected, - private. */
 .attr-access {
   display: inline-block;
-  width: 1.2ch;
-  margin-right: 0.4ch;
+  width: 1em;
+  margin-right: 0.6ch;
   color: var(--muted);
+}
+/* Access icons follow the text size (canvas compartments, Explorer). */
+.attr-access .ico,
+.entity-list li small .ico-plus,
+.entity-list li small .ico-hash,
+.entity-list li small .ico-minus {
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.15em;
 }
 .attr-name.pure {
   font-style: italic;

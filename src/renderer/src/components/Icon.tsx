@@ -1,8 +1,11 @@
 import type { ReactNode } from 'react'
+import type { Access } from '@/model/types'
 
 /** Stroked outlines on a 16×16 grid, sized by `--icon-size` (styles.css). */
 const PATHS = {
   plus: 'M8 3v10M3 8h10',
+  minus: 'M3 8h10',
+  hash: 'M6.5 2.5l-1 11M10.5 2.5l-1 11M3 6h10.5M2.5 10H13',
   x: 'M4 4l8 8M12 4l-8 8',
   check: 'M3 8.5l3 3 7-7',
   dot: 'M8 5a3 3 0 1 0 0 6 3 3 0 1 0 0-6z',
@@ -130,4 +133,12 @@ export function Icon({ name, title }: { name: IconName; title?: string }): React
       <path d={PATHS[name]} />
     </svg>
   )
+}
+
+/** Icons of the UML access marks (`+ # -`). */
+export const ACCESS_ICONS: Record<Access, IconName> = { public: 'plus', protected: 'hash', private: 'minus' }
+
+/** UML access mark of a type, constant, attribute or method, as an icon. */
+export function AccessIcon({ access }: { access: Access | undefined }): ReactNode {
+  return <Icon name={ACCESS_ICONS[access ?? 'public']} />
 }
