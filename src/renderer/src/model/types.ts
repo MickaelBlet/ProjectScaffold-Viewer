@@ -493,6 +493,8 @@ export interface ImportedModule {
   position: { x: number; y: number }
   /** Editor-only size set by hand; else from its ports. */
   size?: { width: number; height: number }
+  /** Editor-only: its position and size cannot be changed on the canvas. */
+  locked?: boolean
 }
 
 /** Named constant: a value of a type. */

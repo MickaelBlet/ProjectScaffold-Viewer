@@ -3,16 +3,19 @@
 // between two handles.
 import { MarkerType, type Connection, type Edge, type Node } from '@xyflow/react'
 import {
+  absolutePosition,
   compartmentsHeight,
+  findImported,
   findPort,
   importedParent,
   importedSize,
+  isImportedId,
   orderLinkEnds,
   viewNotes
 } from '@/model/project'
 import { ceilToGrid } from '@/model/grid'
 import { outsideOf, shownModuleIds } from '@/model/viewLayout'
-import type { Id, LinkAnchor, PortRole, Project, View } from '@/model/types'
+import type { Id, ImportedPort, LinkAnchor, PortRole, Project, View } from '@/model/types'
 import { inheritEdges } from './inheritEdges'
 import { MODULE_HANDLE, PERF_COLORS, Z } from './constants'
 import {
@@ -32,7 +35,10 @@ export type PortNodeData = {
   sides?: Record<Id, PortPlacement>
   /** Ports at a hand-set link attachment (see portAnchors), out of their edge's rows. */
   anchors: Record<Id, LinkAnchor>
-  /** Root of a drill-down view: moved and resized in it, never into another module. */
+  /**
+   * Root of a drill-down view: moved and resized in it, never into another module (a placed module
+   * of a dependency: drawn where it is in the project, not moved).
+   */
   frame?: true
   /** Module outside a drill-down view: drawn compact, without its content. */
   outside?: true
@@ -55,6 +61,8 @@ export function toNodes(
   const fit = (v: number): number => (grid ? ceilToGrid(v, grid) : v)
   const visible = shownModuleIds(p, view)
   const outside = outsideOf(p)
+  // The view of a placed module of a dependency keeps no places of its own: its stand-ins stay.
+  const placedView = !!view.rootModuleId && isImportedId(view.rootModuleId)
   const nodes: Node[] = []
   for (const n of viewNotes(p, view))
     nodes.push({
@@ -101,7 +109,7 @@ export function toNodes(
         : m.layout.height,
       // The root of a drill-down view and the modules outside it are drawn at the top level.
       parentId: m.parentId ?? undefined,
-      draggable: !m.locked && movable(m.id),
+      draggable: !m.locked && movable(m.id) && !(placedView && outside.has(m.id)),
       selected: selected.has(m.id),
       zIndex: containers.has(m.id) ? Z.container : Z.module,
       data: {
@@ -116,7 +124,8 @@ export function toNodes(
   for (const dep of p.dependencies)
     for (const m of [...dep.modules].sort((a, b) => depth(a.path) - depth(b.path))) {
       if (!visible.has(m.id)) continue
-      const parent = outside.has(m.id) ? undefined : importedParent(dep, m)
+      const isRoot = m.id === view.rootModuleId
+      const parent = outside.has(m.id) || isRoot ? undefined : importedParent(dep, m)
       if (parent && (!visible.has(parent.id) || outside.has(parent.id))) continue
       const placements = sides?.get(m.id)
       const size = importedSize(m, p.orientation)
@@ -124,7 +133,7 @@ export function toNodes(
       nodes.push({
         id: m.id,
         type: 'imported',
-        position: { ...m.position },
+        position: isRoot ? absolutePosition(p, m.id) : { ...m.position },
         parentId: parent?.id,
         width: fit(size.width),
         height: fit(
@@ -133,9 +142,13 @@ export function toNodes(
             : size.height
         ),
         selected: selected.has(m.id),
-        draggable: movable(m.id),
+        draggable: !isRoot && !m.locked && movable(m.id),
         zIndex: holds ? Z.container : Z.module,
-        data: { ...portData(m.ports, placements), ...(outside.has(m.id) && { outside: true as const }) }
+        data: {
+          ...portData(m.ports, placements),
+          ...(isRoot && { frame: true as const }),
+          ...(outside.has(m.id) && { outside: true as const })
+        }
       })
     }
   return nodes
@@ -177,6 +190,23 @@ export interface ConnectEnd {
 export function endOf(p: Project, moduleId: Id, handle: string): ConnectEnd {
   if (handle === MODULE_HANDLE) return { moduleId, portId: null, role: null }
   return { moduleId, portId: handle, role: findPort(p, moduleId, handle)?.role ?? null }
+}
+
+/**
+ * Ends linking `other` to a port of the placed module `moduleId` of a dependency (it gets no new
+ * port), in link order: one for each of its ports whose role and interface fit.
+ */
+export function placedPortEnds(
+  p: Project,
+  moduleId: Id,
+  other: ConnectEnd
+): { port: ImportedPort; ends: [ConnectEnd, ConnectEnd] }[] {
+  const iface = other.portId ? findPort(p, other.moduleId, other.portId)?.interfaceId : null
+  return (findImported(p, moduleId)?.module.ports ?? []).flatMap((port) => {
+    const ends = orderLinkEnds(p, { moduleId, portId: port.id, role: port.role }, other)
+    const own = findPort(p, moduleId, port.id)?.interfaceId
+    return ends && !(iface && own && iface !== own) ? [{ port, ends }] : []
+  })
 }
 
 /**

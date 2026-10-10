@@ -509,6 +509,7 @@ const Editor = z
             y: z.number(),
             width: z.number().optional(),
             height: z.number().optional(),
+            locked: z.boolean().optional(),
             labels: PortLabels
           })
         )

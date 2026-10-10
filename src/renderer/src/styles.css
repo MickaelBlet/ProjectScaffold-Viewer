@@ -378,6 +378,20 @@ button.icon.danger:hover {
 button.icon.active {
   background: var(--accent-soft);
 }
+/* An icon button that is not a <button>, so a disabled fieldset leaves it enabled (navigation). */
+.nav-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+  min-width: 24px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.nav-button:hover {
+  border-color: var(--border);
+}
 button.link-button {
   background: none;
   border: none;
@@ -3003,11 +3017,11 @@ mark {
   color: var(--muted);
   font-size: 10px;
 }
-/* Module of a dependency placed on the canvas. */
+/* Module of a dependency placed on the canvas: see-through, apart from the project's own. */
 .module.imported {
   border-style: dashed;
   border-color: var(--muted);
-  background: var(--panel-2);
+  background: color-mix(in srgb, var(--panel-2) 60%, transparent);
 }
 .module.imported.selected {
   border-color: var(--accent);

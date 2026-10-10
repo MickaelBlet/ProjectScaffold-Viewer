@@ -121,6 +121,16 @@ export function TypeEditor(props: {
     })
   }
 
+  // Several types: a menu below the button.
+  const goTo = (e: { currentTarget: Element }): void => {
+    if (refs.length === 1) return navigate({ kind: 'type', id: refs[0]! })
+    const r = e.currentTarget.getBoundingClientRect()
+    openContextMenu(
+      { clientX: r.left, clientY: r.bottom },
+      refs.map((id) => ({ label: nameOf(id)!, run: () => navigate({ kind: 'type', id }) }))
+    )
+  }
+
   return (
     <div className="type-editor">
       <div className="type-editor-line">
@@ -176,22 +186,22 @@ export function TypeEditor(props: {
           {error && <span className="field-error">{error}</span>}
         </span>
         {refs.length > 0 && (
-          <button
-            type="button"
-            className="icon"
+          // Not a <button>: navigation stays available in read-only content (a disabled fieldset).
+          <span
+            role="button"
+            tabIndex={0}
+            className="nav-button"
             title={refs.length === 1 ? `Go to ${nameOf(refs[0]!)}` : 'Go to type'}
             aria-label="Go to type"
-            onClick={(e) =>
-              refs.length === 1
-                ? navigate({ kind: 'type', id: refs[0]! })
-                : openContextMenu(
-                    e,
-                    refs.map((id) => ({ label: nameOf(id)!, run: () => navigate({ kind: 'type', id }) }))
-                  )
-            }
+            onClick={goTo}
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter' && e.key !== ' ') return
+              e.preventDefault()
+              goTo(e)
+            }}
           >
             <Icon name="arrow-up-right" />
-          </button>
+          </span>
         )}
         <button
           type="button"

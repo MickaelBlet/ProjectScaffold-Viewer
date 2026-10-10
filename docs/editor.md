@@ -28,7 +28,7 @@ Explorer, Inspector, Problems, Output, Search and Settings are dockable panels.
 
 Each document has a _Project_ view plus any number of stored views, opened as tabs and splittable side by side.
 
-- _Open module in its own view_ (Alt+Enter, or ⤢ on a container) shows one module's content, with the outside modules it is linked to (drawn compact: their path and the ports linked to the content, dashed, see-through but for their header) and a breadcrumb back to the parents.
+- _Open module in its own view_ (Alt+Enter, or ⤢ on a container; a placed module of a dependency too, see [Dependencies](dependencies.md#linking-to-a-dependencys-modules)) shows one module's content, with the outside modules it is linked to (drawn compact: their path and the ports linked to the content, dashed, see-through but for their header) and a breadcrumb back to the parents.
 - It opens in a temporary tab (italic title, not saved in the file). _Keep view_ (double-click the tab, its right-click menu, the breadcrumb or _View › Keep view_) stores it with the document; closing the tab discards it.
 - Modules can be hidden per view: H, or _Hide in view_ in the right-click menu of a module in the Explorer; Shift+H shows them again.
 - A module's own view has its own layout: moving or resizing modules there (the module itself included, moved with its content, never into another module; the outside modules not placed by hand stay lined up along it), arranging or aligning them leaves the _Project_ view as it is, and keeps a temporary view. New modules, and modules moved to another parent, take their place in the view in the _Project_ view too.

@@ -1,9 +1,18 @@
 import { memo, type ReactNode } from 'react'
-import { NodeResizer, type Node, type NodeProps } from '@xyflow/react'
-import { contentBottom, importedParent, importedSize, LAYOUT_PAD, minSize } from '@/model/project'
+import { Handle, NodeResizer, Position, type Node, type NodeProps } from '@xyflow/react'
+import {
+  absolutePosition,
+  contentBottom,
+  importedParent,
+  importedSize,
+  LAYOUT_PAD,
+  minSize
+} from '@/model/project'
 import type { ImportedPort, LinkAnchor, Side } from '@/model/types'
-import { setModuleLayout, useProjectStore } from '@/store/project'
+import { setLocked, setModuleLayout, useProjectStore } from '@/store/project'
+import { openModuleView } from '@/actions'
 import { Icon } from '@/components/Icon'
+import { MODULE_HANDLE } from './constants'
 import type { PortNodeData } from './flowGraph'
 import { Attributes, Methods } from './ModuleNode'
 import { anchorStyle, inward, PortPoint } from './PortPoint'
@@ -12,7 +21,7 @@ import { useDrawn } from './viewContext'
 
 /**
  * Module of another project, with its content (placed with it, in place): its ports floating (see portSides.ts) or on the orientation's default
- * edges, linkable; resizable.
+ * edges, linkable; resizable. The root of its own view is drawn at the top level, where it is.
  */
 export const ImportedNode = memo(function ImportedNode({
   id,
@@ -25,6 +34,9 @@ export const ImportedNode = memo(function ImportedNode({
   const types = useProjectStore((s) => s.project.types)
   const orientation = useProjectStore((s) => s.project.orientation)
   const module = dep?.modules.find((m) => m.id === id)
+  // Root of its own view: from where it is drawn to its parent-relative position.
+  const shiftX = useDrawn((p) => (data.frame ? absolutePosition(p, id).x - (module?.position.x ?? 0) : 0))
+  const shiftY = useDrawn((p) => (data.frame ? absolutePosition(p, id).y - (module?.position.y ?? 0) : 0))
   const { floating, anchors, top, bottom, left, right } = usePortLayout(
     id,
     module?.ports ?? [],
@@ -34,7 +46,7 @@ export const ImportedNode = memo(function ImportedNode({
   if (!dep || !module) return null
   const vertical = orientation === 'vertical'
   // Content of a placed module: drawn in it, at its place there.
-  const parent = !data.outside && importedParent(dep, module)
+  const parent = !data.outside && !data.frame && importedParent(dep, module)
   const content = data.outside ? [] : dep.modules.filter((x) => importedParent(dep, x) === module)
   const own = minSize(module, orientation)
   const min = content.reduce((m, c) => {
@@ -79,10 +91,12 @@ export const ImportedNode = memo(function ImportedNode({
       title={`${module.path} in ${dep.file}`}
     >
       <NodeResizer
-        isVisible={selected}
+        isVisible={selected && !module.locked}
         minWidth={min.width}
         minHeight={min.height}
-        onResizeEnd={(_, r) => setModuleLayout(id, { x: r.x, y: r.y, width: r.width, height: r.height })}
+        onResizeEnd={(_, r) =>
+          setModuleLayout(id, { x: r.x - shiftX, y: r.y - shiftY, width: r.width, height: r.height })
+        }
       />
       {(top.length > 0 || (!floating && vertical)) && band(top, 'top')}
       <div className="module-header">
@@ -98,6 +112,37 @@ export const ImportedNode = memo(function ImportedNode({
             </>
           )}
         </span>
+        <Handle
+          type="source"
+          position={vertical ? Position.Bottom : Position.Right}
+          id={MODULE_HANDLE}
+          className="module-connect"
+          title="Drag to a module or port of this project to link them through one of its ports"
+        >
+          <Icon name="arrow-right" />
+        </Handle>
+        <button
+          type="button"
+          className={`module-open module-lock nodrag ${module.locked ? 'locked' : ''}`}
+          title={module.locked ? 'Unlock position and size (Ctrl+L)' : 'Lock position and size (Ctrl+L)'}
+          onClick={(e) => {
+            e.stopPropagation()
+            setLocked([id], !module.locked)
+          }}
+        >
+          <Icon name={module.locked ? 'lock' : 'unlock'} />
+        </button>
+        <button
+          type="button"
+          className="module-open nodrag"
+          title="Open in its own view (Alt+Enter)"
+          onClick={(e) => {
+            e.stopPropagation()
+            openModuleView(id)
+          }}
+        >
+          <Icon name="expand" />
+        </button>
       </div>
       {!!module.attributes?.length && <Attributes attributes={module.attributes} types={types} />}
       {!!module.methods?.length && <Methods methods={module.methods} types={types} />}

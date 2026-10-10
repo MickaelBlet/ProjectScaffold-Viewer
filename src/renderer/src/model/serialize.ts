@@ -427,7 +427,10 @@ export function toFile(p: Project, options: { editor: boolean }): FileProject {
           .map((x) => [
             x.name,
             Object.fromEntries(
-              x.modules.map((m) => [m.path, { ...m.position, ...m.size, labels: portLabels(m.ports) }])
+              x.modules.map((m) => [
+                m.path,
+                { ...m.position, ...m.size, locked: m.locked || undefined, labels: portLabels(m.ports) }
+              ])
             )
           ])
       )
@@ -995,6 +998,7 @@ export function fromFile(data: unknown, prev?: Project): Project {
           path: m.module,
           position,
           ...(size && { size }),
+          ...((saved ? saved.locked : was?.locked) && { locked: true }),
           ...(attributes.length && { attributes }),
           ...(methods.length && { methods }),
           ports: m.ports.map((pt, k) => {

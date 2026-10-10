@@ -35,7 +35,10 @@ export interface WebviewInit {
   storage: Record<string, string>
 }
 
-/** A view: stored by name, temporary by the path of its module (`Core.Sensor`), null: global. */
+/**
+ * A view: stored by name, temporary by the path of its module (`Core.Sensor`, `Dependency/Core.Sensor`
+ * for a placed module of a dependency), null: global.
+ */
 export type ViewRef = string | { module: string } | null
 
 /** Done by a diagram for a side panel. Entities by data path of the file, views by reference. */

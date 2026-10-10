@@ -22,6 +22,8 @@ import {
 import { useShallow } from 'zustand/react/shallow'
 import { toSvg } from 'html-to-image'
 import {
+  allImported,
+  canKeepView,
   findImported,
   findView,
   importedParent,
@@ -34,7 +36,7 @@ import { NOTE_MIN, snapRect, snapValue } from '@/model/grid'
 import { hasOwnLayout, inView, outsideOf, shownModuleIds } from '@/model/viewLayout'
 import { ViewContext } from './viewContext'
 import { assignBinary } from '@/model/binaries'
-import { GLOBAL_VIEW, type Id, type Project, type View } from '@/model/types'
+import { GLOBAL_VIEW, type Id, type ImportedModule, type Project, type View } from '@/model/types'
 import {
   connect,
   deleteLink,
@@ -69,7 +71,7 @@ import { commandItem as item, commands, keyLabel, runCommand } from '@/commands'
 import { Icon } from '@/components/Icon'
 import { fileName } from '@/fileOps'
 import { openView, registerCanvas, revealInspector } from '@/shell/controllers'
-import { endOf, linkEnds, toEdges, toNodes } from './flowGraph'
+import { endOf, linkEnds, placedPortEnds, toEdges, toNodes, type ConnectEnd } from './flowGraph'
 import { INHERIT } from './inheritEdges'
 import { reuseUnchanged } from './reuseUnchanged'
 import { floatingPortSides } from './portSides'
@@ -141,6 +143,12 @@ function Breadcrumbs({ view }: { view: View }): ReactNode {
     const parentId = cur.parentId
     cur = parentId ? project.modules.find((m) => m.id === parentId) : undefined
   }
+  // A placed module of a dependency: its placed ancestors, the topmost with its dependency.
+  const placed = view.rootModuleId ? findImported(project, view.rootModuleId) : undefined
+  for (let m: ImportedModule | undefined = placed?.module; placed && m; m = importedParent(placed.dep, m)) {
+    const top = !importedParent(placed.dep, m)
+    chain.unshift({ id: m.id, name: top ? `${placed.dep.name}/${m.path}` : m.path.split('.').pop()! })
+  }
   if (!chain.length && !view.hidden.length) return null
   return (
     <nav className="breadcrumbs">
@@ -163,7 +171,7 @@ function Breadcrumbs({ view }: { view: View }): ReactNode {
           ))}
         </>
       )}
-      {view.temporary && (
+      {canKeepView(view) && (
         <button
           type="button"
           className="link-button keep-view"
@@ -489,21 +497,66 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
     return !!linkEnds(getProject(), c)
   }, [])
 
+  // A connection to a placed module of a dependency (no port): linked where it ends (onConnectEnd).
+  const pendingLink = useRef<[ConnectEnd, ConnectEnd] | null>(null)
+
   const onConnect = useCallback((c: Connection): void => {
     const ends = linkEnds(getProject(), c)
     if (!ends) return
+    if (ends.some((e) => !e.portId && isImportedId(e.moduleId))) {
+      pendingLink.current = ends
+      return
+    }
     const [from, to] = ends
     const id = connect(from, to)
     if (id) select({ kind: 'link', id })
   }, [])
 
-  /** Deepest visible module under a flow point (excluding `exclude`'s subtree). */
+  /**
+   * Link two ends. A placed module of a dependency gets no new port: it is linked through one of
+   * its ports that fit, picked in a menu at `at` when there are several.
+   */
+  const linkThrough = useCallback(
+    (a: ConnectEnd, b: ConnectEnd, at: { clientX: number; clientY: number }): void => {
+      const p = getProject()
+      const done = (from: ConnectEnd, to: ConnectEnd): void => {
+        const id = connect(from, to)
+        if (id) select({ kind: 'link', id })
+      }
+      const open = [a, b].find((e) => !e.portId && isImportedId(e.moduleId))
+      if (!open) {
+        const ends = orderLinkEnds(p, a, b)
+        if (ends) done(...ends)
+        return
+      }
+      const choices = placedPortEnds(p, open.moduleId, open === a ? b : a)
+      if (choices.length === 1) return done(...choices[0]!.ends)
+      if (!choices.length) {
+        const path = findImported(p, open.moduleId)?.module.path ?? 'This module'
+        return setStatus('error', `${path} has no port to link there`)
+      }
+      openContextMenu(
+        at,
+        choices.map(({ port, ends }) => ({
+          label: `${port.role} ${port.name}`,
+          keys: port.interface ?? 'no interface',
+          run: () => done(...ends)
+        }))
+      )
+    },
+    []
+  )
+
+  /**
+   * Deepest visible module under a flow point (excluding `exclude`'s subtree); with `placed`, a
+   * placed module of a dependency too.
+   */
   const moduleAt = useCallback(
-    (point: { x: number; y: number }, exclude?: Set<Id>): Id | null => {
+    (point: { x: number; y: number }, exclude?: Set<Id>, placed = false): Id | null => {
       const p = getProject()
       let best: { id: Id; depth: number } | null = null
       for (const n of flow.getNodes()) {
-        if (n.type !== 'module' || exclude?.has(n.id)) continue
+        if (!(n.type === 'module' || (placed && n.type === 'imported')) || exclude?.has(n.id)) continue
         const a = absolute(n.id)
         const w = n.measured?.width ?? 0
         const h = n.measured?.height ?? 0
@@ -513,6 +566,12 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
           const parentId: Id = m.parentId
           m = p.modules.find((x) => x.id === parentId)
         }
+        // Placed modules are drawn over the project's: deeper than any.
+        const found = n.type === 'imported' ? findImported(p, n.id) : undefined
+        if (found) {
+          depth = p.modules.length
+          for (let m = importedParent(found.dep, found.module); m; m = importedParent(found.dep, m)) depth++
+        }
         if (!best || depth > best.depth) best = { id: n.id, depth }
       }
       return best?.id ?? null
@@ -520,24 +579,29 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
     [flow, absolute]
   )
 
-  // Dropped on a module rather than a port: link to a new port there.
+  // Dropped on a module rather than a port: link to a new port there (or one of a placed module's).
   const onConnectEnd: OnConnectEnd = useCallback(
     (e, state) => {
       const origin = state.fromHandle
-      if (state.isValid || !origin?.id) return
       const { clientX, clientY } = 'changedTouches' in e ? e.changedTouches[0]! : e
-      const target = moduleAt(flow.screenToFlowPosition({ x: clientX, y: clientY }))
+      if (state.isValid) {
+        const ends = pendingLink.current
+        pendingLink.current = null
+        if (ends) linkThrough(ends[0], ends[1], { clientX, clientY })
+        return
+      }
+      if (!origin?.id) return
+      const target = moduleAt(flow.screenToFlowPosition({ x: clientX, y: clientY }), undefined, true)
       if (!target || target === origin.nodeId) return
-      const ends = orderLinkEnds(getProject(), endOf(getProject(), origin.nodeId, origin.id), {
-        moduleId: target,
-        portId: null,
-        role: null
-      })
-      if (!ends) return
-      const id = connect(ends[0], ends[1])
-      if (id) select({ kind: 'link', id })
+      // A link to a dependency's module needs one end here.
+      if (isImportedId(target) && isImportedId(origin.nodeId)) return
+      linkThrough(
+        endOf(getProject(), origin.nodeId, origin.id),
+        { moduleId: target, portId: null, role: null },
+        { clientX, clientY }
+      )
     },
-    [flow, moduleAt]
+    [flow, moduleAt, linkThrough]
   )
 
   // A dragged frame carries the top-level nodes lying fully inside it.
@@ -555,7 +619,7 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
       const nodes = new Map<string, Point>()
       for (const n of flow.getNodes()) {
         // Unselected nodes are not draggable with `selectToMove`, yet still carried: only locked ones stay.
-        const locked = [...p.modules, ...notes].find((x) => x.id === n.id)?.locked
+        const locked = [...p.modules, ...notes, ...allImported(p)].find((x) => x.id === n.id)?.locked
         if (moving.has(n.id) || n.parentId || locked) continue
         const r = nodeRect(n.id)
         if (r && frames.some((f) => within(r, f))) nodes.set(n.id, { ...n.position })
@@ -629,7 +693,7 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
           label: 'Show in project view',
           run: () => (openView(GLOBAL_VIEW), navigate({ kind: 'module', id }))
         },
-        ...(node.type === 'module' ? [item('view.openModule')] : []),
+        item('view.openModule'),
         ...(view.standIns?.[id]
           ? [{ label: 'Line up along the view', run: () => lineUpOutside(viewId, [id]) }]
           : []),
@@ -646,6 +710,9 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
       // Content of a placed module goes with it.
       const content = !!found && !!importedParent(found.dep, found.module)
       return openContextMenu(e, [
+        item('view.openModule'),
+        item('arrange.lock', 'Locked'),
+        'separator',
         ...(dep
           ? [
               { label: 'Refresh from its project', run: () => void refreshDependencies([dep.id]) },
@@ -773,6 +840,15 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
 
   const paneMenu = (e: React.MouseEvent | MouseEvent): void => {
     e.preventDefault()
+    // The view of a placed module of a dependency: nothing to add there.
+    if (view.rootModuleId && isImportedId(view.rootModuleId))
+      return openContextMenu(e, [
+        item('view.fitAll'),
+        item('edit.selectAll'),
+        'separator',
+        item('file.exportPng'),
+        item('file.exportSvg')
+      ])
     const at = screenToFlowPosition({ x: e.clientX, y: e.clientY })
     const parent = moduleAt(at) ?? view.rootModuleId
     openContextMenu(e, [

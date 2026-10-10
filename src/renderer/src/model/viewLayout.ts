@@ -2,11 +2,13 @@
 // modules outside them): drawing a view, and folding a layout edit made in it back.
 import { produce } from 'immer'
 import {
+  absolutePosition,
   absoluteRect,
   defaultSize,
   findImported,
   growAncestors,
   indexById,
+  isImportedId,
   isolatedModuleId,
   importedSize,
   minSize,
@@ -216,10 +218,14 @@ export function inView(p: Project, view: View): Project {
       })
   }
   const sizes = outside.map((o) => ({ o, size: defaultSize(compact.get(o.id)!, p.orientation) }))
-  const root = drawn.modules.find((m) => m.id === rootId)!
+  // A placed module of a dependency is drawn at the top level, where it is in the project.
+  const placedRoot = findImported(drawn, rootId)?.module
+  const rootRect = placedRoot
+    ? { ...absolutePosition(drawn, rootId), ...importedSize(placedRoot, p.orientation) }
+    : drawn.modules.find((m) => m.id === rootId)!.layout
   const places = outsidePlaces(
     drawn,
-    root.layout,
+    rootRect,
     sizes.filter(({ o }) => !view.standIns?.[o.id])
   )
   for (const { o } of sizes) {
@@ -245,6 +251,33 @@ export function inView(p: Project, view: View): Project {
   outsideRegistry.set(drawn, new Set(outside.map((o) => o.id)))
   byView.set(view.id, { view, drawn })
   return drawn
+}
+
+/**
+ * Fold an edit of the view of a placed module of a dependency (see foldLayouts), which keeps no
+ * layout of its own: the placed modules take their new places, the stand-ins of the modules
+ * outside and the link shapes stay as they are in the project.
+ */
+function foldPlaced(prev: Project, base: Project, next: Project): Project {
+  const outside = outsideOf(base)
+  const was = indexById(prev.modules)
+  const drawn = indexById(base.modules)
+  const modules = next.modules.map((m) => {
+    const before = was.get(m.id)
+    return before && (drawn.get(m.id) === m || outside.has(m.id)) ? before : m
+  })
+  const prevLinks = indexById(prev.links)
+  const links = next.links.map((l) => {
+    const before = prevLinks.get(l.id)
+    if (!before) return l
+    return sameBut('route', before, l) ? before : withRoute(l, before.route)
+  })
+  const same = <T>(a: T[], b: T[]): boolean => a.length === b.length && a.every((x, i) => x === b[i])
+  return {
+    ...next,
+    modules: same(modules, prev.modules) ? prev.modules : modules,
+    links: same(links, prev.links) ? prev.links : links
+  }
 }
 
 /** Whether a view has a layout of its own to reset: module rects, link shapes, port name sides or stand-in places. */
@@ -278,6 +311,7 @@ const orUndefined = <T>(o: Record<Id, T>): Record<Id, T> | undefined =>
 export function foldLayouts(prev: Project, base: Project, next: Project, viewId: Id): Project {
   const stored = next.views.find((v) => v.id === viewId)
   const rootId = stored ? stored.rootModuleId : isolatedModuleId(viewId)
+  if (rootId && isImportedId(rootId)) return foldPlaced(prev, base, next)
   if (!rootId || !next.modules.some((m) => m.id === rootId)) return next
   const was = indexById(prev.modules)
   const drawn = indexById(base.modules)

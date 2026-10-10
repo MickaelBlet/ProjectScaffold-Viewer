@@ -3,7 +3,16 @@ import YAML from 'yaml'
 import { produce } from 'immer'
 import { describe, expect, it } from 'vitest'
 import { fromFile, toFile } from '@/model/serialize'
-import { findView, growAncestors, isolatedViewId, modulePath, newId, pruneViews } from '@/model/project'
+import {
+  canKeepView,
+  findView,
+  growAncestors,
+  isolatedViewId,
+  modulePath,
+  newId,
+  pruneViews,
+  visibleModuleIds
+} from '@/model/project'
 import { foldLayouts, inView, outsideOf } from '@/model/viewLayout'
 import type { Project } from '@/model/types'
 
@@ -228,6 +237,35 @@ describe('view layouts', () => {
     expect(back.views.find((v) => v.id === id)?.standIns?.[radio]).toMatchObject({
       x: -400,
       y: 30
+    })
+  })
+
+  it('draws a placed module of a dependency in a view of its own, which keeps nothing of its own', () => {
+    const ground = fromFile(YAML.parse(readFileSync('examples/fleet/ground.scaffold.yaml', 'utf8')))
+    const datalink = idOf(ground, 'Datalink')
+    const radio = ground.dependencies.flatMap((x) => x.modules).find((m) => m.path === 'Radio')!
+    const id = isolatedViewId(radio.id)
+    const view = findView(ground, id)
+    expect(view).toMatchObject({ name: 'Radio', rootModuleId: radio.id, temporary: true })
+    expect(canKeepView(view)).toBe(false)
+    expect([...visibleModuleIds(ground, view)]).toEqual([radio.id])
+    const base = inView(ground, view)
+    expect(outsideOf(base).has(datalink)).toBe(true)
+    const next = foldLayouts(
+      ground,
+      base,
+      produce(base, (d) => {
+        mod(d, datalink).layout.x -= 500
+        d.dependencies.flatMap((x) => x.modules).find((m) => m.id === radio.id)!.size = { width: 400, height: 300 }
+      }),
+      id
+    )
+    // The stand-in stays where the project has it; the placed module takes its new size.
+    expect(next.modules).toBe(ground.modules)
+    expect(next.views).toBe(ground.views)
+    expect(next.dependencies.flatMap((x) => x.modules).find((m) => m.id === radio.id)?.size).toEqual({
+      width: 400,
+      height: 300
     })
   })
 

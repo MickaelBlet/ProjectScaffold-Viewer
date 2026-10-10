@@ -15,6 +15,7 @@ import {
   absoluteRect,
   belowContent,
   boundsOf,
+  canKeepView,
   childModules,
   defaultSize,
   findImported,
@@ -29,7 +30,8 @@ import {
   newId,
   subtreeIds,
   uniqueName,
-  viewNotes
+  viewNotes,
+  viewScopeIds
 } from '@/model/project'
 import { hasOwnLayout, inView, outsideOf, shownModuleIds } from '@/model/viewLayout'
 import { targetAt, type SourceTarget } from '@/components/sourceTarget'
@@ -144,6 +146,7 @@ export function selectAll(): void {
   const view = findView(p, activeDoc().activeViewId)
   const scope = view.rootModuleId
   // Top-level entities of the view: selecting them moves their content along.
+  if (scope && isImportedId(scope)) return selectMany([scope])
   selectMany([...childModules(p, scope).map((m) => m.id), ...viewNotes(p, view).map((n) => n.id)])
 }
 
@@ -189,7 +192,7 @@ export function navigate(
   // Show the module (a link: at least one end) in a view that draws it (outside a drill-down view too).
   const root = view.rootModuleId
   const outside = outsideOf(inView(p, view))
-  if (root && !ids.some((id) => subtreeIds(p, root).has(id) || outside.has(id))) {
+  if (root && !ids.some((id) => viewScopeIds(p, root).has(id) || outside.has(id))) {
     openView(GLOBAL_VIEW)
     view = findView(p, GLOBAL_VIEW)
   }
@@ -417,7 +420,8 @@ export function deleteSelection(): void {
 
 /** Where new modules go in the focused view: its root module, or the top level. */
 function viewParent(): Id | null {
-  return findView(getProject(), activeDoc().activeViewId).rootModuleId
+  const root = findView(getProject(), activeDoc().activeViewId).rootModuleId
+  return root && !isImportedId(root) ? root : null
 }
 
 /** The focused view when it is a drill-down view (with notes of its own). */
@@ -1050,17 +1054,22 @@ export function startRename(): void {
 
 // Locking
 
-/** Selected modules and notes. */
-function selectedCanvasItems(): (Project['modules'][number] | Project['notes'][number])[] {
+/** Selected modules, notes and placed modules of dependencies. */
+function selectedCanvasItems(): { id: Id; locked?: boolean }[] {
   const p = getProject()
   return selectedIds().flatMap(
-    (id) => p.modules.find((m) => m.id === id) ?? p.notes.find((n) => n.id === id) ?? []
+    (id) =>
+      p.modules.find((m) => m.id === id) ??
+      p.notes.find((n) => n.id === id) ??
+      findImported(p, id)?.module ??
+      []
   )
 }
 
 export function isLocked(id: Id): boolean {
   const p = getProject()
-  return !!(p.modules.find((m) => m.id === id) ?? p.notes.find((n) => n.id === id))?.locked
+  return !!(p.modules.find((m) => m.id === id) ?? p.notes.find((n) => n.id === id) ?? findImported(p, id)?.module)
+    ?.locked
 }
 
 export function hasCanvasSelection(): boolean {
@@ -1135,7 +1144,7 @@ export function nudgeSelection(dx: number, dy: number): void {
     const e = p.modules.find((m) => m.id === id) ?? p.notes.find((n) => n.id === id)
     if (e && !e.locked) layouts.set(id, { x: e.layout.x + dx, y: e.layout.y + dy })
     const im = findImported(p, id)?.module
-    if (im) layouts.set(id, { x: im.position.x + dx, y: im.position.y + dy })
+    if (im && !im.locked) layouts.set(id, { x: im.position.x + dx, y: im.position.y + dy })
   }
   if (layouts.size) setLayouts(layouts)
 }
@@ -1225,7 +1234,7 @@ export async function arrangeLayout(
       }
       for (const m of d.dependencies.flatMap((x) => x.modules)) {
         const pos = findImported(arranged, m.id)?.module.position
-        if (pos) m.position = { ...pos }
+        if (pos && !m.locked) m.position = { ...pos }
       }
       // Hand-set bends do not fit the new layout; attachments and badges do not fit a new orientation.
       const moved = scopeId ? subtreeIds(p, scopeId) : null
@@ -1256,8 +1265,8 @@ export async function arrangeLayout(
 export function openModuleView(moduleId?: Id, split = false): void {
   const p = getProject()
   const sel = activeDoc().selection
-  const id = moduleId ?? (sel?.kind === 'module' ? sel.id : null)
-  if (!id || !p.modules.some((m) => m.id === id)) return
+  const id = moduleId ?? (sel?.kind === 'module' || sel?.kind === 'imported' ? sel.id : null)
+  if (!id || !(p.modules.some((m) => m.id === id) || findImported(p, id))) return
   const existing = p.views.find((v) => v.rootModuleId === id && !v.hidden.length)
   openView(existing?.id ?? isolatedViewId(id), { split })
 }
@@ -1266,14 +1275,15 @@ export function newView(): void {
   openView(addView('View', null))
 }
 
+/** Whether the focused view is temporary and can be kept (see canKeepView). */
 export function activeViewTemporary(): boolean {
-  return !!findView(getProject(), activeDoc().activeViewId).temporary
+  return canKeepView(findView(getProject(), activeDoc().activeViewId))
 }
 
 /** Store a temporary view in the project, in place of its tab; gives the id of the stored view. */
 export function keepView(viewId: Id = activeDoc().activeViewId): Id {
   const view = findView(getProject(), viewId)
-  if (!view.temporary) return viewId
+  if (!canKeepView(view)) return viewId
   const id = addView(view.name, view.rootModuleId)
   replaceView(viewId, id)
   return id

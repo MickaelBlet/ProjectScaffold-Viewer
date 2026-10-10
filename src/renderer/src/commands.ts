@@ -96,6 +96,8 @@ export function isEditable(el: Element | null): boolean {
 const hasSelection = (): boolean => selectedIds().length > 0
 const multi = (n: number) => (): boolean => selectedIds().length >= n
 const moduleSelected = (): boolean => activeDoc().selection?.kind === 'module'
+/** A module or a placed module of a dependency: both open in a view of their own. */
+const viewableSelected = (): boolean => moduleSelected() || activeDoc().selection?.kind === 'imported'
 /** Arrow keys move by a grid cell (five when far) on the grid, else by 2px (20px). */
 function nudgeStep(far: boolean): number {
   const { snapToGrid, gridSize } = useSettings.getState()
@@ -451,14 +453,14 @@ const allCommands: Command[] = [
     title: 'Open module in its own view',
     category: 'View',
     keys: ['Alt+Enter'],
-    enabled: moduleSelected,
+    enabled: viewableSelected,
     run: () => openModuleView()
   },
   {
     id: 'view.openModuleSplit',
     title: 'Open module view to the side',
     category: 'View',
-    enabled: moduleSelected,
+    enabled: viewableSelected,
     run: () => openModuleView(undefined, true)
   },
   {

@@ -453,7 +453,7 @@ export function ExplorerPanel(): ReactNode {
   const [filter, setFilter] = useState('')
   /** Module a dragged module would go into (null: top level). */
   const [dropTarget, setDropTarget] = useState<Id | null | undefined>(undefined)
-  const hiddenIds = findView({ views, modules }, activeViewId).hidden
+  const hiddenIds = findView({ views, modules, dependencies }, activeViewId).hidden
   const savedOrder = useSettings((s) => s.explorerOrder)
   const savedHidden = useSettings((s) => s.explorerHidden)
   const order = useMemo(() => sectionOrder(savedOrder, SECTIONS), [savedOrder])

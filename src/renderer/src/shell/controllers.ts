@@ -6,7 +6,7 @@ import {
   type IDockviewGroupPanel,
   type SerializedDockview
 } from 'dockview-react'
-import { findView, isolatedModuleId, isolatedViewId, modulePath } from '@/model/project'
+import { findImported, findView, isolatedModuleId, isolatedViewId, modulePath } from '@/model/project'
 import { GLOBAL_VIEW, type Id, type Project, type Rect } from '@/model/types'
 import { activeDoc, patchDoc } from '@/store/documents'
 import { getProject } from '@/store/project'
@@ -397,7 +397,11 @@ export function viewPanelId(viewId: Id): string {
 /** A view for another page of the document, where ids differ (see ViewRef). */
 export function viewRef(p: Project, viewId: Id): ViewRef {
   const moduleId = isolatedModuleId(viewId)
-  if (moduleId) return p.modules.some((m) => m.id === moduleId) ? { module: modulePath(p, moduleId) } : null
+  if (moduleId) {
+    if (p.modules.some((m) => m.id === moduleId)) return { module: modulePath(p, moduleId) }
+    const placed = findImported(p, moduleId)
+    return placed ? { module: `${placed.dep.name}/${placed.module.path}` } : null
+  }
   return p.views.find((v) => v.id === viewId)?.name ?? null
 }
 
@@ -405,6 +409,11 @@ export function viewRef(p: Project, viewId: Id): ViewRef {
 export function viewOfRef(p: Project, ref: ViewRef): Id | undefined {
   if (ref === null) return GLOBAL_VIEW
   if (typeof ref === 'string') return p.views.find((v) => v.name === ref)?.id
+  const [depName, path] = ref.module.split('/')
+  if (path !== undefined) {
+    const placed = p.dependencies.find((x) => x.name === depName)?.modules.find((m) => m.path === path)
+    return placed && isolatedViewId(placed.id)
+  }
   const m = p.modules.find((m) => modulePath(p, m.id) === ref.module)
   return m && isolatedViewId(m.id)
 }

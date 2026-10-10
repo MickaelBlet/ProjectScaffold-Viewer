@@ -86,6 +86,16 @@ describe('serialize', () => {
     expect(again.notes.at(-1)?.locked).toBe(true)
   })
 
+  it('round-trips locked placed modules of dependencies', () => {
+    const ground = fromFile(YAML.parse(readFileSync('examples/fleet/ground.scaffold.yaml', 'utf8')))
+    const radio = ground.dependencies.flatMap((x) => x.modules).find((m) => m.path === 'Radio')!
+    radio.locked = true
+    const file = toFile(ground, { editor: true })
+    expect(file.editor?.dependencies?.Drone?.Radio?.locked).toBe(true)
+    const again = fromFile(JSON.parse(JSON.stringify(file)))
+    expect(again.dependencies.flatMap((x) => x.modules).find((m) => m.path === 'Radio')?.locked).toBe(true)
+  })
+
   it('round-trips hand-set link shapes, left out of exports', () => {
     const p = fromFile(example)
     p.links[0]!.route = { points: [{ x: 10, y: 20 }], from: { side: 'bottom', at: 0.5 } }

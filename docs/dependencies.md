@@ -28,7 +28,8 @@ _Insert › Add dependency…_ (or + in the Explorer's _Dependencies_) picks an 
 
 A dependency's top-level module is placed on the canvas from the Explorer (double-click it in the dependency's _Modules_) or the dependency's right-click menu (_Place a module on the canvas…_). Add the project as a dependency first (_Insert › Add dependency…_).
 
-- The module is drawn in the project view (dashed, `↗ Project`, resizable), with its attributes and methods (read-only, also in its inspector) and ports linked to like any other.
+- The module is drawn in the project view (dashed, see-through, `↗ Project`, resizable), with its attributes and methods (read-only, also in its inspector) and ports linked to like any other.
+- Its header buttons, as a module's: → drags a link to a module or port of this project through one of its ports (it gets no new port: a menu picks one when several fit), the lock keeps its position and size (Ctrl+L; `editor.dependencies.<Dependency>.<Module>.locked`), ⤢ opens it in its own view (Alt+Enter): it with its content and the modules of this project linked to them (compact). That view keeps nothing of its own (it cannot be kept): what is moved or resized there is moved in the project view too, the outside modules stay in line.
 - It comes with all the modules inside it, drawn where its project puts them; move and resize them in it (it grows to hold them; kept on refresh), they are removed with it; their ports are linked to as well. A module placed alone by an earlier version is placed with its top-level module on the next refresh, its links kept.
 - Double-click a placed module to switch to its project's tab.
 

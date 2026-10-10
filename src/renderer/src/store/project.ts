@@ -1,6 +1,7 @@
 import { produce } from 'immer'
 import { useStore } from 'zustand'
 import {
+  allImported,
   belowContent,
   childModules,
   defaultConstraints,
@@ -629,7 +630,7 @@ export function updateNote(id: Id, fn: (n: Project['notes'][number]) => void): v
 /** Lock or unlock the position and size of modules and notes. */
 export function setLocked(ids: Id[], locked: boolean): void {
   update((d) => {
-    for (const e of [...d.modules, ...d.notes])
+    for (const e of [...d.modules, ...d.notes, ...allImported(d)])
       if (ids.includes(e.id)) {
         if (locked) e.locked = true
         else delete e.locked

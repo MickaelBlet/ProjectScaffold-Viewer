@@ -826,18 +826,28 @@ export function isolatedModuleId(viewId: Id): Id | null {
   return viewId.startsWith(ISOLATED) ? viewId.slice(ISOLATED.length) : null
 }
 
-/** The view with this id (a temporary view resolved from its module); the global view for an unknown id. */
-export function findView(p: Pick<Project, 'views' | 'modules'>, viewId: Id): View {
+/**
+ * The view with this id (a temporary view resolved from its module, or placed module of a
+ * dependency); the global view for an unknown id.
+ */
+export function findView(p: Pick<Project, 'views' | 'modules' | 'dependencies'>, viewId: Id): View {
   const stored = p.views.find((v) => v.id === viewId)
   if (stored) return stored
   const moduleId = isolatedModuleId(viewId)
   const m = moduleId ? p.modules.find((m) => m.id === moduleId) : undefined
   if (m) return { id: viewId, name: m.name, rootModuleId: m.id, hidden: NO_HIDDEN, temporary: true }
+  const im = moduleId ? findImported(p, moduleId)?.module : undefined
+  if (im)
+    return { id: viewId, name: im.path.split('.').pop()!, rootModuleId: im.id, hidden: NO_HIDDEN, temporary: true }
   return globalView()
 }
 
+/** Whether a temporary view can be stored in the project: not the view of a placed module of a dependency. */
+export const canKeepView = (view: View): boolean =>
+  !!view.temporary && !(view.rootModuleId && isImportedId(view.rootModuleId))
+
 /** Whether the view can be shown: the global view, a stored view, or a temporary view of a module. */
-export function viewExists(p: Pick<Project, 'views' | 'modules'>, viewId: Id): boolean {
+export function viewExists(p: Pick<Project, 'views' | 'modules' | 'dependencies'>, viewId: Id): boolean {
   return viewId === GLOBAL_VIEW || findView(p, viewId).id === viewId
 }
 
@@ -866,11 +876,24 @@ export function noteAtPath(p: Project, path: readonly (string | number)[]): Note
   return view && p.notes.filter((n) => n.viewId === view.id)[b]
 }
 
+/** Ids of a placed module of a dependency and of the placed modules inside it. */
+export function importedSubtreeIds(p: Pick<Project, 'dependencies'>, id: Id): Set<Id> {
+  const found = findImported(p, id)
+  if (!found) return new Set()
+  const prefix = `${found.module.path}.`
+  return new Set([id, ...found.dep.modules.filter((m) => m.path.startsWith(prefix)).map((m) => m.id)])
+}
+
+/** Ids of the modules a view rooted at `rootId` is about: the module (local or placed) and its content. */
+export function viewScopeIds(p: Project, rootId: Id): Set<Id> {
+  return isImportedId(rootId) ? importedSubtreeIds(p, rootId) : subtreeIds(p, rootId)
+}
+
 /** Ids of the modules drawn in a view: the root's subtree (or everything) minus hidden subtrees. */
 export function visibleModuleIds(p: Project, view: View): Set<Id> {
-  // Imported modules are drawn in the global view only.
+  // Placed modules of dependencies are drawn in the global view and in their own.
   const scope = view.rootModuleId
-    ? subtreeIds(p, view.rootModuleId)
+    ? viewScopeIds(p, view.rootModuleId)
     : new Set([...p.modules, ...allImported(p)].map((m) => m.id))
   for (const h of view.hidden)
     if (h !== view.rootModuleId) for (const id of subtreeIds(p, h)) scope.delete(id)

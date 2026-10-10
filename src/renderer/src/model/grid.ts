@@ -103,7 +103,7 @@ export function snapChanges(prev: Project, next: Project, grid: number): Project
     }
     for (const m of d.dependencies.flatMap((x) => x.modules)) {
       const before = imported.get(m.id)?.position
-      if (before && before.x === m.position.x && before.y === m.position.y) continue
+      if (m.locked || (before && before.x === m.position.x && before.y === m.position.y)) continue
       m.position = { x: snapValue(m.position.x, grid), y: snapValue(m.position.y, grid) }
     }
   })

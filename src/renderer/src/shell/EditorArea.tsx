@@ -19,7 +19,7 @@ import {
 } from 'dockview-react'
 import { ReactFlowProvider } from '@xyflow/react'
 import { Canvas } from '@/canvas/Canvas'
-import { findView, viewExists } from '@/model/project'
+import { canKeepView, findView, viewExists } from '@/model/project'
 import { GLOBAL_VIEW, type Id, type Project } from '@/model/types'
 import { formatFromPath } from '@/model/serialize'
 import { findDoc, patchDoc, useDoc, useDocs } from '@/store/documents'
@@ -110,6 +110,7 @@ function ViewTab(props: IDockviewPanelHeaderProps<{ viewId: Id }>): ReactNode {
   const { viewId } = props.params
   const drill = useProjectStore((s) => !!findView(s.project, viewId).rootModuleId)
   const temporary = useProjectStore((s) => !!findView(s.project, viewId).temporary)
+  const keepable = useProjectStore((s) => canKeepView(findView(s.project, viewId)))
   const stored = viewId !== GLOBAL_VIEW && !temporary
   const rename = (): void => {
     if (!stored) return
@@ -123,12 +124,12 @@ function ViewTab(props: IDockviewPanelHeaderProps<{ viewId: Id }>): ReactNode {
       data-tab={drill ? 'drill' : 'view'}
       data-temporary={temporary || undefined}
       // A temporary view is kept by a double click, as VS Code's preview tabs.
-      onDoubleClick={temporary ? () => keepView(viewId) : rename}
+      onDoubleClick={keepable ? () => keepView(viewId) : rename}
       onContextMenu={(e) => {
         e.preventDefault()
         openContextMenu(e, [
           { label: 'Open to the side', run: () => (closeView(viewId), openView(viewId, { split: true })) },
-          { label: 'Keep view', disabled: !temporary, run: () => keepView(viewId) },
+          { label: 'Keep view', disabled: !keepable, run: () => keepView(viewId) },
           { label: 'Rename…', disabled: !stored, run: rename },
           { label: 'Close', run: () => props.api.close() },
           'separator',
