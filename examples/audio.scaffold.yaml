@@ -2,8 +2,6 @@ schemaVersion: 1
 project:
   name: Audio
   description: Audio effect chain built on a class hierarchy - interface and abstract modules, multiple inheritance, virtual, pure and override methods; generated in C++20
-generation:
-  templates: cpp20
 types:
   - kind: alias
     name: Sample

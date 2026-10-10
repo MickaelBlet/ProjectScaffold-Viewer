@@ -19,7 +19,6 @@ Dependencies on other project files and workspace files: [Dependencies](dependen
 ```yaml
 schemaVersion: 1
 project: { name, description?, metadata? }
-generation: { templates? } # built-in template set generating the code (optional, default cpp17)
 binaries: [...] # executables the top-level modules are split into (optional)
 remoteDefaults: { ... } # addresses of the links between binaries without settings (optional)
 types: [...] # struct | exception | enum | bitmask | union | alias | primitive

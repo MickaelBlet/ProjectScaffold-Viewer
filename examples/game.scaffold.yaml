@@ -2,8 +2,6 @@ schemaVersion: 1
 project:
   name: Game
   description: Game engine three modules deep - types and constants of modules with their access levels, used by path from other modules, bases between nested modules, static members; generated in C++14
-generation:
-  templates: cpp14
 types:
   - kind: alias
     name: Entity

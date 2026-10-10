@@ -4,7 +4,6 @@ import { removeBinary } from '@/model/binaries'
 import { DEFAULT_BASE_PORT, DEFAULT_HOST } from '@/model/transports'
 import { TRANSPORTS, type ConstDef, type RemoteDefaults } from '@/model/types'
 import { valueExample } from '@/model/defaults'
-import { DEFAULT_TEMPLATE_SET, TEMPLATE_SETS } from '@/model/templateSets'
 import { DefaultInput, FieldList } from './TypeInspector'
 import { update, useProjectStore } from '@/store/project'
 import {
@@ -40,14 +39,6 @@ function withRemoteDefaults(fn: (r: RemoteDefaults) => void): void {
   })
 }
 
-/** Built-in template set generating the project's code; the default one leaves the file without it. */
-function setTemplateSet(name: string): void {
-  update((d) => {
-    if (name === DEFAULT_TEMPLATE_SET) delete d.templates
-    else d.templates = name
-  })
-}
-
 export function ProjectInspector(): ReactNode {
   const p = useProjectStore((s) => s.project)
   const own = p.consts.filter((c) => !c.dependency)
@@ -60,25 +51,6 @@ export function ProjectInspector(): ReactNode {
       <TextArea value={p.description} onChange={(v) => update((d) => void (d.description = v))} />
       <Section title="Metadata">
         <MetadataEditor value={p.metadata} onChange={(fn) => update((d) => fn(d.metadata))} />
-      </Section>
-      <Section title="Code generation">
-        <Row label="Templates">
-          <select
-            value={p.templates ?? DEFAULT_TEMPLATE_SET}
-            onChange={(e) => setTemplateSet(e.target.value)}
-            aria-label="Built-in template set generating the code"
-          >
-            {[...new Set([...TEMPLATE_SETS, p.templates ?? DEFAULT_TEMPLATE_SET])].map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
-        </Row>
-        <p className="muted">
-          Built-in template set of the code generator (ProjectScaffold-Generator), unless it is given other
-          templates.
-        </p>
       </Section>
       <Section title={`Constants (${own.length})`}>
         <FieldList<ConstDef>

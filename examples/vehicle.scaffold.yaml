@@ -5,8 +5,6 @@ project:
   metadata:
     version: 0.3.0
     safety: ASIL-B
-generation:
-  templates: cpp11
 binaries:
   - name: Powertrain
     description: Motor and battery ECU

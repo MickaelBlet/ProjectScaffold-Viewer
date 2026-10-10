@@ -2,8 +2,6 @@ schemaVersion: 1
 project:
   name: Radio
   description: Software-defined FM radio waveform - components with uses (out) and provides (in) ports and properties; generated as SCA components in C++98
-generation:
-  templates: sca-cpp98
 types:
   - kind: struct
     name: IqSample

@@ -4,9 +4,6 @@
     "name": "Thermostat",
     "description": "Room thermostat on a small microcontroller, written in JSON rather than YAML; generated in C++98"
   },
-  "generation": {
-    "templates": "cpp98"
-  },
   "types": [
     {
       "kind": "enum",

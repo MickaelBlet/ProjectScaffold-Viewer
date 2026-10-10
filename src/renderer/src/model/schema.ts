@@ -630,18 +630,6 @@ export const FileProjectSchema = z
         metadata: Metadata
       })
       .describe('name and documentation of the project'),
-    generation: z
-      .object({
-        templates: z
-          .string()
-          .min(1)
-          .optional()
-          .describe(
-            'built-in template set generating the code (cpp17 by default): cpp98, cpp11, cpp14, cpp17, cpp20, python, sca-cpp98'
-          )
-      })
-      .optional()
-      .describe('code generation settings'),
     transports: z
       .array(z.string().min(1))
       .optional()

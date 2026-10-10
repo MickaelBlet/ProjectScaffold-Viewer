@@ -5,8 +5,6 @@ project:
   metadata:
     version: 1.2.0
     owner: finance-team
-generation:
-  templates: python
 types:
   - kind: primitive
     name: Decimal
