@@ -31,7 +31,6 @@ export const ImportedNode = memo(function ImportedNode({
   // As the canvas's view draws it (outside a drill-down view: its ports linked to the view).
   const dep = useDrawn((p) => p.dependencies.find((x) => x.modules.some((m) => m.id === id)))
   const interfaces = useProjectStore((s) => s.project.interfaces)
-  const types = useProjectStore((s) => s.project.types)
   const orientation = useProjectStore((s) => s.project.orientation)
   const module = dep?.modules.find((m) => m.id === id)
   // Root of its own view: from where it is drawn to its parent-relative position.
@@ -144,8 +143,8 @@ export const ImportedNode = memo(function ImportedNode({
           <Icon name="expand" />
         </button>
       </div>
-      {!!module.attributes?.length && <Attributes attributes={module.attributes} types={types} />}
-      {!!module.methods?.length && <Methods methods={module.methods} types={types} />}
+      {!!module.attributes?.length && <Attributes attributes={module.attributes} moduleId={id} />}
+      {!!module.methods?.length && <Methods methods={module.methods} moduleId={id} />}
       {rows > 0 && (
         // A container's side ports are centered on its frame, over its content.
         <div className={`module-ports ${content.length ? 'framed' : ''}`}>

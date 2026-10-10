@@ -118,7 +118,7 @@ A module has types of its own, like types nested in a C++ class (its constants a
 
 - Add them from the _Types_ section of the module's inspector (one button per kind) or _New type of the module_ in its right-click menu in the Explorer, which lists them under their module with their access mark. The type's inspector moves a type to a module or back to the project (_Module_) and sets its access.
 - `+ # -` sets who uses them: anyone (`public`), the module and the modules deriving from it (`protected`), the module only (`private`).
-- In a module, type expressions name its own types and those of its bases by name, the others by their path: `Core.Sensor.Filter` (`Robot/Core.Sensor.Filter` for those of a dependency's modules). Outside modules, only public ones are offered, by path.
+- In a module, type expressions name its own types and those of its bases by name, the others by their path: `Core.Sensor.Filter` (`Robot/Core.Sensor.Filter` for those of a dependency's modules); the canvas shows them that way too. Outside modules, only public ones are offered, by path.
 
 ### Modules as types
 

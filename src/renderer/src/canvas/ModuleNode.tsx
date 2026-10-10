@@ -4,11 +4,14 @@ import {
   ACCESS_MARKS,
   findImported,
   indexById,
+  isModuleType,
   minSize,
   modulePath,
   nameError,
   parentIds,
-  parseDependencyModuleRef
+  parseDependencyModuleRef,
+  typeScope,
+  type TypeScope
 } from '@/model/project'
 import { getProject, setLocked, setModuleLayout, update, useProjectStore } from '@/store/project'
 import { useUiStore } from '@/store/ui'
@@ -18,11 +21,11 @@ import { formatValue } from '@/model/defaults'
 import {
   QUALIFIERS,
   type Attribute,
+  type Id,
   type LinkAnchor,
   type Method,
   type Port,
   type Side,
-  type TypeDef,
   type TypeRef
 } from '@/model/types'
 import { AccessIcon, Icon } from '@/components/Icon'
@@ -86,30 +89,39 @@ function hasDeletedRef(t: TypeRef, nameOf: (id: string) => string | undefined): 
 }
 
 /**
- * Short names of the types and modules `refs` use, as the canvas shows them: their own name, the
- * last part of the path of a module of a dependency.
+ * Names of the types and modules `refs` use, as the canvas shows them in module `moduleId`: types
+ * as its type expressions name them (its own and its bases' by name, the others by path), modules
+ * by their name, the last part of the path of a module of a dependency.
  */
-function useShortNames(types: TypeDef[], refs: TypeRef[]): (id: string) => string | undefined {
-  // Stable string: re-renders only when a module used as a type is added, removed or renamed.
-  const modules = useProjectStore((s) => {
+function useShortNames(moduleId: Id, refs: TypeRef[]): (id: string) => string | undefined {
+  // Stable string: re-renders only when a type or module used is added, removed or renamed.
+  const entries = useProjectStore((s) => {
+    const types = indexById(s.project.types)
+    // Only for types of other modules: the others are named by their own name.
+    let scope: TypeScope | undefined
     const out: string[] = []
     for (const t of refs)
       walkTypeRef(t, (n) => {
         if (n.kind !== 'ref') return
+        const type = types.get(n.id)
         const of = parseDependencyModuleRef(n.id)
-        const name = of
-          ? s.project.dependencies.some((x) => x.id === of.dependency)
-            ? of.path.split('.').pop()
-            : undefined
-          : indexById(s.project.modules).get(n.id)?.name
+        const name = type
+          ? isModuleType(type) && type.module !== moduleId
+            ? (scope ??= typeScope(s.project, moduleId)).nameOf(type.id)
+            : type.name
+          : of
+            ? s.project.dependencies.some((x) => x.id === of.dependency)
+              ? of.path.split('.').pop()
+              : undefined
+            : indexById(s.project.modules).get(n.id)?.name
         if (name !== undefined) out.push(`${n.id}\t${name}`)
       })
     return out.join('\n')
   })
   return useMemo(() => {
-    const names = new Map(modules ? modules.split('\n').map((e) => e.split('\t') as [string, string]) : [])
-    return (id) => types.find((t) => t.id === id)?.name ?? names.get(id)
-  }, [types, modules])
+    const names = new Map(entries ? entries.split('\n').map((e) => e.split('\t') as [string, string]) : [])
+    return (id) => names.get(id)
+  }, [entries])
 }
 
 /** Qualifiers set on an attribute, method or parameter, each followed by a space. */
@@ -118,9 +130,9 @@ const qualifierText = (q: { static?: boolean; const?: boolean }): string =>
     .map((k) => `${k} `)
     .join('')
 
-export function Attributes({ attributes, types }: { attributes: Attribute[]; types: TypeDef[] }): ReactNode {
+export function Attributes({ attributes, moduleId }: { attributes: Attribute[]; moduleId: Id }): ReactNode {
   const nameOf = useShortNames(
-    types,
+    moduleId,
     attributes.map((a) => a.type)
   )
   return (
@@ -149,9 +161,9 @@ export function Attributes({ attributes, types }: { attributes: Attribute[]; typ
 }
 
 /** Method compartment below the attributes: `virtual name(a: T, out b: U): R const = 0`. */
-export function Methods({ methods, types }: { methods: Method[]; types: TypeDef[] }): ReactNode {
+export function Methods({ methods, moduleId }: { methods: Method[]; moduleId: Id }): ReactNode {
   const nameOf = useShortNames(
-    types,
+    moduleId,
     methods.flatMap((m) => [...m.params.map((prm) => prm.type), ...(m.returns ? [m.returns] : [])])
   )
   return (
@@ -201,7 +213,6 @@ export const ModuleNode = memo(function ModuleNode({
   // Port name sides of the canvas's view.
   const mod = useDrawn((p) => indexById(p.modules).get(id))
   const interfaces = useProjectStore((s) => s.project.interfaces)
-  const types = useProjectStore((s) => s.project.types)
   // A module outside a drill-down view is drawn compact: its path, its ports linked to the view.
   const outside = !!data.outside
   const path = useProjectStore((s) => (outside ? modulePath(s.project, id) : null))
@@ -333,8 +344,8 @@ export const ModuleNode = memo(function ModuleNode({
           <Icon name="expand" />
         </button>
       </div>
-      {mod.attributes.length > 0 && <Attributes attributes={mod.attributes} types={types} />}
-      {mod.methods.length > 0 && <Methods methods={mod.methods} types={types} />}
+      {mod.attributes.length > 0 && <Attributes attributes={mod.attributes} moduleId={id} />}
+      {mod.methods.length > 0 && <Methods methods={mod.methods} moduleId={id} />}
       {rows > 0 && (
         // A container's side ports are centered on its frame, over its content.
         <div className={`module-ports ${hasChildren ? 'framed' : ''}`}>
