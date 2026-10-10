@@ -33,34 +33,52 @@ const TypeName = z
     /^([A-Za-z_][A-Za-z0-9_]*\/)?[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$/,
     'must be a type name, with its module path for a type of a module (and its dependency name and a slash for a module of a dependency)'
   )
-const Description = z.string().optional()
-const Metadata = z.record(z.string(), z.string()).optional()
+const Description = z.string().optional().describe('free text documenting it')
+const Metadata = z
+  .record(z.string(), z.string().describe('value of this metadata entry'))
+  .optional()
+  .describe('free key: value pairs, passed to generators')
 
 const Max = z.int().positive().optional()
+
+/**
+ * A described reference to the type below: wrapped, so that the type keeps its name in the JSON
+ * Schema (a described copy of it would share its content, extracted under another name).
+ */
+const typeRef = (description: string) => z.lazy(() => FileTypeRefSchema).describe(description)
 
 export const FileTypeRefSchema: z.ZodType<FileTypeRef> = z
   .lazy(() =>
     z.union([
       z.object({
-        kind: z.literal('primitive'),
-        name: z.enum(PRIMITIVES),
+        kind: z.literal('primitive').describe('a built-in type'),
+        name: z.enum(PRIMITIVES).describe('the built-in type'),
         max: Max.describe('string, bytes: most UTF-8 bytes')
       }),
-      z.object({ kind: z.literal('array'), of: FileTypeRefSchema, size: z.int().positive() }),
       z.object({
-        kind: z.enum(['vector', 'list', 'set']),
-        of: FileTypeRefSchema,
+        kind: z.literal('array').describe('a fixed number of items'),
+        of: typeRef('type of the items'),
+        size: z.int().positive().describe('number of items')
+      }),
+      z.object({
+        kind: z
+          .enum(['vector', 'list', 'set'])
+          .describe('vector, list: items in order, any number; set: distinct items'),
+        of: typeRef('type of the items'),
         max: Max.describe('most items')
       }),
-      z.object({ kind: z.literal('optional'), of: FileTypeRefSchema }),
       z.object({
-        kind: z.literal('map'),
-        key: FileTypeRefSchema,
-        value: FileTypeRefSchema,
+        kind: z.literal('optional').describe('a value or none (null)'),
+        of: typeRef('type of the value')
+      }),
+      z.object({
+        kind: z.literal('map').describe('entries from keys to values'),
+        key: typeRef('type of the keys'),
+        value: typeRef('type of the values'),
         max: Max.describe('most entries')
       }),
       z.object({
-        kind: z.literal('ref'),
+        kind: z.literal('ref').describe('a type defined in the project, a module or a dependency'),
         name: TypeName.describe(
           'type name; a type of a module: Module.Path.Name (Dependency/Module.Path.Name for a module of a dependency)'
         )
@@ -70,8 +88,8 @@ export const FileTypeRefSchema: z.ZodType<FileTypeRef> = z
   .meta({ id: 'TypeRef' })
 
 const Field = z.object({
-  name: Identifier,
-  type: FileTypeRefSchema,
+  name: Identifier.describe('name of the field'),
+  type: typeRef('type of the field'),
   description: Description
 })
 
@@ -88,71 +106,87 @@ const ValueField = Field.extend({
 const typeDefs = <E extends z.ZodRawShape>(extra: E) =>
   z.discriminatedUnion('kind', [
     z.object({
-      kind: z.literal('struct'),
+      kind: z.literal('struct').describe('struct: named fields'),
       ...extra,
-      name: Identifier,
+      name: Identifier.describe('name of the type'),
       description: Description,
-      fields: z.array(ValueField)
+      fields: z.array(ValueField).describe('fields of the struct, in order')
     }),
     z.object({
-      kind: z.literal('enum'),
+      kind: z.literal('enum').describe('enum: named integer values'),
       ...extra,
-      name: Identifier,
+      name: Identifier.describe('name of the type'),
       description: Description,
-      underlying: z.enum(INT_PRIMITIVES),
-      values: z.array(z.object({ name: Identifier, value: z.int() }))
+      underlying: z.enum(INT_PRIMITIVES).describe('integer type holding the values'),
+      values: z
+        .array(
+          z.object({
+            name: Identifier.describe('name of the value'),
+            value: z.int().describe('integer value')
+          })
+        )
+        .describe('values of the enum')
     }),
     z
       .object({
-        kind: z.literal('exception'),
+        kind: z.literal('exception').describe('exception: named fields, raised by messages and methods'),
         ...extra,
-        name: Identifier,
+        name: Identifier.describe('name of the type'),
         description: Description,
-        fields: z.array(ValueField)
+        fields: z.array(ValueField).describe('fields of the exception, in order')
       })
       .describe('raised by messages and methods (their `raises`), never used as a type'),
     z
       .object({
-        kind: z.literal('bitmask'),
+        kind: z.literal('bitmask').describe('bitmask: named flags, combined with |'),
         ...extra,
-        name: Identifier,
+        name: Identifier.describe('name of the type'),
         description: Description,
-        underlying: z.enum(UNSIGNED_PRIMITIVES),
-        flags: z.array(z.object({ name: Identifier, bit: z.int().nonnegative().describe('value: 1 << bit') }))
+        underlying: z.enum(UNSIGNED_PRIMITIVES).describe('unsigned integer type holding the flags'),
+        flags: z
+          .array(
+            z.object({
+              name: Identifier.describe('name of the flag'),
+              bit: z.int().nonnegative().describe('value: 1 << bit')
+            })
+          )
+          .describe('flags of the bitmask')
       })
       .describe('set of flags, combined with |'),
     z
       .object({
-        kind: z.literal('union'),
+        kind: z.literal('union').describe('union: one of its cases, selected by the discriminator'),
         ...extra,
-        name: Identifier,
+        name: Identifier.describe('name of the type'),
         description: Description,
-        discriminator: FileTypeRefSchema.describe('integer primitive, bool, char or enum'),
-        cases: z.array(
-          Field.extend({
-            labels: z
-              .array(z.union([z.int(), z.string(), z.boolean()]))
-              .optional()
-              .describe(
-                'discriminator values selecting the case: integers, characters, booleans, enum value names'
-              ),
-            default: z.boolean().optional().describe('held for the discriminator values no case lists')
-          })
-        )
+        discriminator: typeRef('integer primitive, bool, char or enum'),
+        cases: z
+          .array(
+            Field.extend({
+              labels: z
+                .array(z.union([z.int(), z.string(), z.boolean()]))
+                .optional()
+                .describe(
+                  'discriminator values selecting the case: integers, characters, booleans, enum value names'
+                ),
+              default: z.boolean().optional().describe('held for the discriminator values no case lists')
+            })
+          )
+          .describe('cases of the union, each holding a value of its type')
       })
       .describe('discriminated union: one of its cases, selected by the discriminator'),
     z.object({
-      kind: z.literal('alias'),
+      kind: z.literal('alias').describe('alias: another name for a type'),
       ...extra,
-      name: Identifier,
+      name: Identifier.describe('name of the type'),
       description: Description,
-      type: FileTypeRefSchema
+      type: typeRef('the type it names')
     }),
     z
       .object({
-        kind: z.literal('primitive'),
+        kind: z.literal('primitive').describe('custom primitive: an opaque type mapped to a native type'),
         ...extra,
-        name: Identifier,
+        name: Identifier.describe('name of the type'),
         description: Description
       })
       .describe('custom primitive: an opaque type that generators map to a native type')
@@ -171,9 +205,9 @@ const ModuleTypeDef = typeDefs({ access: ModuleAccess }).meta({ id: 'ModuleTypeD
 
 const Constant = z
   .object({
-    name: Identifier,
+    name: Identifier.describe('name of the constant'),
     description: Description,
-    type: FileTypeRefSchema,
+    type: typeRef('type of the value'),
     value: z.json().describe('checked against the type, as default values are')
   })
   .meta({ id: 'Constant' })
@@ -181,6 +215,8 @@ const Constant = z
 const ModuleConstant = Constant.extend({ access: ModuleAccess }).meta({ id: 'ModuleConstant' })
 
 const Param = Field.extend({
+  name: Identifier.describe('name of the parameter'),
+  type: typeRef('type of the parameter'),
   direction: z
     .enum(PARAM_DIRECTIONS)
     .optional()
@@ -188,16 +224,21 @@ const Param = Field.extend({
 })
 
 const Message = z.object({
-  name: Identifier,
+  name: Identifier.describe('name of the message'),
   description: Description,
-  params: z.array(Param),
-  returns: FileTypeRefSchema.nullable(),
+  params: z.array(Param).describe('parameters, in order'),
+  returns: z
+    .lazy(() => FileTypeRefSchema)
+    .nullable()
+    .describe('type of the returned value; null: none'),
   raises: z.array(TypeName).optional().describe('exceptions it may raise (names of exception types)')
 })
 
 const Access = z.enum(ACCESS_LEVELS).optional()
 
 const Attribute = ValueField.extend({
+  name: Identifier.describe('name of the attribute'),
+  type: typeRef('type of the attribute'),
   access: Access.describe(
     'public (default): public accessors; protected: accessors for derived modules; private: no accessors'
   ),
@@ -210,10 +251,11 @@ const MethodParam = Param.extend({
 })
 
 const Method = Message.extend({
+  name: Identifier.describe('name of the method'),
   access: Access.describe(
     'public (default): called by anyone; protected: by the module and derived modules; private: by the module'
   ),
-  params: z.array(MethodParam),
+  params: z.array(MethodParam).describe('parameters, in order'),
   static: z.boolean().optional().describe('called without a module instance'),
   const: z.boolean().optional().describe("leaves the module's state unchanged"),
   virtual: z.boolean().optional().describe('can be overridden by derived modules'),
@@ -226,16 +268,16 @@ const Method = Message.extend({
 
 const Interface = z
   .object({
-    name: Identifier,
+    name: Identifier.describe('name of the interface'),
     description: Description,
-    messages: z.array(Message)
+    messages: z.array(Message).describe('messages exchanged through the ports of this interface')
   })
   .meta({ id: 'Interface' })
 
 const Port = z.object({
-  name: Identifier,
+  name: Identifier.describe('name of the port, unique in its module'),
   role: z.enum(['out', 'in']).describe('out: initiates / sends; in: receives / serves'),
-  interface: Identifier.nullable(),
+  interface: Identifier.nullable().describe('name of the interface it carries; null: none yet'),
   description: Description
 })
 
@@ -258,7 +300,7 @@ export interface FileModule {
 const Module: z.ZodType<FileModule> = z
   .lazy(() =>
     z.object({
-      name: Identifier,
+      name: Identifier.describe('name of the module, unique among its siblings'),
       description: Description,
       kind: z
         .enum(MODULE_KINDS)
@@ -289,15 +331,15 @@ const Module: z.ZodType<FileModule> = z
         .describe('constants of the module, like constants nested in a class, named Module.Path.Name'),
       attributes: z.array(Attribute).optional().describe('typed properties of the module'),
       methods: z.array(Method).optional().describe('method prototypes of the module'),
-      ports: z.array(Port),
-      modules: z.array(Module).optional()
+      ports: z.array(Port).describe('ports of the module, which links connect'),
+      modules: z.array(Module).optional().describe('modules inside this one')
     })
   )
   .meta({ id: 'Module' })
 
 const Binary = z
   .object({
-    name: Identifier,
+    name: Identifier.describe('name of the binary'),
     description: Description,
     color: z.string().optional().describe('accent color (CSS color)')
   })
@@ -305,8 +347,8 @@ const Binary = z
 
 const Endpoint = z.object({
   project: Identifier.optional().describe('name of a dependency: the module belongs to that other project'),
-  module: QualifiedName,
-  port: Identifier
+  module: QualifiedName.describe('path of the module (in the dependency `project` when set)'),
+  port: Identifier.describe('name of the port')
 })
 
 const Dependency = z
@@ -328,22 +370,32 @@ const Dependency = z
     interfaces: z.array(Interface).describe('its own interfaces, as last read from it'),
     constants: z.array(Constant).optional().describe('its own constants, as last read from it'),
     moduleTypes: z
-      .array(z.object({ module: QualifiedName, types: z.array(ModuleTypeDef) }))
+      .array(
+        z.object({
+          module: QualifiedName.describe('path of the module in the dependency'),
+          types: z.array(ModuleTypeDef).describe('types of the module')
+        })
+      )
       .optional()
       .describe(
         'types of its modules, as last read from it, by module path: its public ones are used by this project as Dependency/Module.Path.Name'
       ),
     moduleConstants: z
-      .array(z.object({ module: QualifiedName, constants: z.array(ModuleConstant) }))
+      .array(
+        z.object({
+          module: QualifiedName.describe('path of the module in the dependency'),
+          constants: z.array(ModuleConstant).describe('constants of the module')
+        })
+      )
       .optional()
       .describe('constants of its modules, as last read from it, by module path'),
     modules: z
       .array(
         z.object({
-          module: QualifiedName,
-          attributes: z.array(Attribute).optional(),
-          methods: z.array(Method).optional(),
-          ports: z.array(Port)
+          module: QualifiedName.describe('path of the module in the dependency'),
+          attributes: z.array(Attribute).optional().describe('attributes of the module'),
+          methods: z.array(Method).optional().describe('methods of the module'),
+          ports: z.array(Port).describe('ports of the module')
         })
       )
       .optional()
@@ -355,8 +407,8 @@ const Dependency = z
     "Another project this one uses: its types and interfaces share the namespace of the project's own ones, which reference them by name, and links may reach its modules"
   )
 
-const Host = z.string().min(1)
-const NetPort = z.int().min(1).max(65535)
+const Host = z.string().min(1).describe('host name or IP address')
+const NetPort = z.int().min(1).max(65535).describe('port number')
 const HostPort = z.object({ host: Host.optional(), port: NetPort.optional() })
 
 const TransportSettings = z
@@ -373,7 +425,10 @@ const TransportSettings = z
     id: z.int().nonnegative().optional().describe('frame id (can)'),
     device: z.string().min(1).optional().describe('device path (serial)'),
     baud: z.int().positive().optional().describe('baud rate (serial)'),
-    options: z.record(z.string(), z.string()).optional().describe('free settings, for any transport')
+    options: z
+      .record(z.string(), z.string().describe('value of this setting'))
+      .optional()
+      .describe('free settings, for any transport')
   })
   .meta({ id: 'TransportSettings' })
 
@@ -388,24 +443,42 @@ const RemoteDefaults = z
   .describe('defaults of the addresses of the remote links (default host 127.0.0.1)')
 
 const LinkConstraints = z.object({
-  direction: z.enum(['unidirectional', 'bidirectional']),
-  ack: z.object({ required: z.boolean(), timeoutMs: z.number().positive().optional() }),
-  performance: z.object({
-    class: z.enum(PERFORMANCE_CLASSES),
-    maxLatencyMs: z.number().positive().optional(),
-    rateHz: z.number().positive().optional()
-  }),
-  remote: z.object({
-    enabled: z.boolean(),
-    transport: z.string().optional(),
-    settings: TransportSettings.optional().describe(
-      'settings of the transport; the fields that apply depend on it'
-    )
-  })
+  direction: z
+    .enum(['unidirectional', 'bidirectional'])
+    .describe(
+      'unidirectional: requests only; bidirectional: replies too (messages returning a value need it)'
+    ),
+  ack: z
+    .object({
+      required: z.boolean().describe('the receiver acknowledges each message'),
+      timeoutMs: z.number().positive().optional().describe('how long to wait for the acknowledgement (ms)')
+    })
+    .describe('acknowledgement of the messages'),
+  performance: z
+    .object({
+      class: z.enum(PERFORMANCE_CLASSES).describe('realtime, low (latency), normal or bulk traffic'),
+      maxLatencyMs: z.number().positive().optional().describe('highest acceptable latency (ms)'),
+      rateHz: z.number().positive().optional().describe('expected message rate (Hz)')
+    })
+    .describe('expected performance of the link'),
+  remote: z
+    .object({
+      enabled: z.boolean().describe('the link crosses processes or machines through a transport'),
+      transport: z
+        .string()
+        .optional()
+        .describe(
+          'transport carrying it: ipc, shm, tcp, udp, http, websocket, grpc, mqtt, can, serial, or one of `transports`'
+        ),
+      settings: TransportSettings.optional().describe(
+        'settings of the transport; the fields that apply depend on it'
+      )
+    })
+    .describe('remote link: between binaries, through a transport')
 })
 
 const Link = z.object({
-  name: Identifier,
+  name: Identifier.describe('name of the link, unique in the project'),
   description: Description,
   from: Endpoint.describe(
     "initiator side (an `out` port; a container's `in` port into its content, an inner `out` port out of it)"
@@ -413,37 +486,44 @@ const Link = z.object({
   to: Endpoint.describe(
     "receiver side (an `in` port; an inner `in` port from its container, the container's `out` port from its content)"
   ),
-  constraints: LinkConstraints
+  constraints: LinkConstraints.describe('how messages travel along the link')
 })
 
-const Rect = z.object({ x: z.number(), y: z.number(), width: z.number(), height: z.number() })
+const X = z.number().describe('left edge')
+const Y = z.number().describe('top edge')
+const Width = z.number().describe('width')
+const Height = z.number().describe('height')
+const Rect = z.object({ x: X, y: Y, width: Width, height: Height })
+const Locked = z.boolean().optional().describe('not moved or resized on the canvas')
 
 const EditorNote = z.object({
-  kind: z.enum(['note', 'frame']),
-  text: z.string(),
-  x: z.number(),
-  y: z.number(),
-  width: z.number(),
-  height: z.number(),
-  color: z.string().optional(),
-  locked: z.boolean().optional()
+  kind: z
+    .enum(['note', 'frame'])
+    .describe('note: sticky note; frame: titled area, moving what lies inside it'),
+  text: z.string().describe('text of the note, title of the frame'),
+  x: X,
+  y: Y,
+  width: Width,
+  height: Height,
+  color: z.string().optional().describe('color (CSS color)'),
+  locked: Locked
 })
 
 const Side = z.enum(['left', 'right', 'top', 'bottom'])
 
 const Anchor = z.object({
-  side: Side,
+  side: Side.describe('side of the module'),
   at: z.number().min(0).max(1).describe('position along the side: 0 left / top, 1 right / bottom')
 })
 
 const PortLabels = z
-  .record(Identifier, Side)
+  .record(Identifier, Side.describe("direction from the port's handle where its name is drawn"))
   .optional()
   .describe("direction from each port's handle where its name is drawn, by port name")
 
 const EditorLink = z.object({
   points: z
-    .array(z.object({ x: z.number(), y: z.number() }))
+    .array(z.object({ x: z.number().describe('x'), y: z.number().describe('y') }))
     .optional()
     .describe('bend points, relative to the innermost module holding both ends (absolute at the top level)'),
   from: Anchor.optional().describe('attachment of the source end on its module'),
@@ -456,20 +536,33 @@ const EditorLink = z.object({
     .describe('where the badges sit along the link: 0 source, 1 target (default: the middle)')
 })
 
+const ModuleRect = Rect.describe('position and size of the module')
+const LinkShape = EditorLink.describe('shape of the link')
+
 const EditorView = z.object({
-  name: z.string(),
+  name: z.string().describe('name of the view'),
   root: QualifiedName.optional().describe('module shown with its content; the whole project when absent'),
-  hidden: z.array(ModulePath).optional(),
+  hidden: z
+    .array(ModulePath)
+    .optional()
+    .describe(
+      'modules hidden in this view, with their content, by path (Dependency/Module for modules of dependencies)'
+    ),
   layout: z
-    .record(QualifiedName, Rect)
+    .record(QualifiedName, ModuleRect)
     .optional()
     .describe('rects of modules in this view (parent-relative), in place of their `layout` entries'),
   links: z
-    .record(Identifier, EditorLink)
+    .record(Identifier, LinkShape)
     .optional()
     .describe('link shapes in this view (with a root), by link name; others are drawn automatically'),
   labels: z
-    .record(ModulePath, z.record(Identifier, Side))
+    .record(
+      ModulePath,
+      z
+        .record(Identifier, Side.describe("direction from the port's handle where its name is drawn"))
+        .describe('directions of the port names of the module, by port name')
+    )
     .optional()
     .describe(
       'direction where port names are drawn in this view (with a root), by module path (Dependency/Module for modules of dependencies) and port name'
@@ -478,7 +571,9 @@ const EditorView = z.object({
   outside: z
     .record(
       ModulePath,
-      z.object({ x: z.number(), y: z.number(), width: z.number().optional(), height: z.number().optional() })
+      z
+        .object({ x: X, y: Y, width: Width.optional(), height: Height.optional() })
+        .describe('place (and size) of the stand-in of the module')
     )
     .optional()
     .describe(
@@ -488,33 +583,44 @@ const EditorView = z.object({
 
 const Editor = z
   .object({
-    layout: z.record(QualifiedName, Rect),
-    views: z.array(EditorView).optional(),
+    layout: z
+      .record(QualifiedName, ModuleRect)
+      .describe(
+        'canvas position and size of the modules, by module path (nested ones: relative to their parent)'
+      ),
+    views: z.array(EditorView).optional().describe('views of the canvas besides the Project view'),
     style: z
       .record(
         QualifiedName,
-        z.object({
-          color: z.string().optional().describe('deprecated: use the module `color`'),
-          locked: z.boolean().optional(),
-          labels: PortLabels
-        })
+        z
+          .object({
+            color: z.string().optional().describe('deprecated: use the module `color`'),
+            locked: Locked,
+            labels: PortLabels
+          })
+          .describe('look of the module on the canvas')
       )
-      .optional(),
-    notes: z.array(EditorNote).optional(),
+      .optional()
+      .describe('look of the modules on the canvas, by module path'),
+    notes: z.array(EditorNote).optional().describe('notes and frames of the Project view'),
     dependencies: z
       .record(
         Identifier,
-        z.record(
-          QualifiedName,
-          z.object({
-            x: z.number(),
-            y: z.number(),
-            width: z.number().optional(),
-            height: z.number().optional(),
-            locked: z.boolean().optional(),
-            labels: PortLabels
-          })
-        )
+        z
+          .record(
+            QualifiedName,
+            z
+              .object({
+                x: X,
+                y: Y,
+                width: Width.optional(),
+                height: Height.optional(),
+                locked: Locked,
+                labels: PortLabels
+              })
+              .describe('position and size of the placed module')
+          )
+          .describe('placed modules of the dependency, by module path')
       )
       .optional()
       .describe(
@@ -524,14 +630,20 @@ const Editor = z
       .enum(['horizontal', 'vertical'])
       .optional()
       .describe('port placement: in left / out right (default), or in top / out bottom'),
-    links: z.record(Identifier, EditorLink).optional().describe('hand-set link shapes, by link name')
+    links: z.record(Identifier, LinkShape).optional().describe('hand-set link shapes, by link name')
   })
   .describe('Editor-only data, ignored by generators')
 
 export const FileProjectSchema = z
   .object({
-    schemaVersion: z.literal(SCHEMA_VERSION),
-    project: z.object({ name: z.string(), description: Description, metadata: Metadata }),
+    schemaVersion: z.literal(SCHEMA_VERSION).describe('version of the file format'),
+    project: z
+      .object({
+        name: z.string().describe('name of the project'),
+        description: Description,
+        metadata: Metadata
+      })
+      .describe('name and documentation of the project'),
     generation: z
       .object({
         templates: z
@@ -555,15 +667,20 @@ export const FileProjectSchema = z
       .describe(
         'executables the top-level modules are split into (each names its own); links between two of them must be remote'
       ),
-    types: z.array(TypeDef),
-    interfaces: z.array(Interface),
+    types: z
+      .array(TypeDef)
+      .describe('types of the project: struct, enum, exception, bitmask, union, alias, custom primitive'),
+    interfaces: z.array(Interface).describe('message sets the ports carry'),
     constants: z
       .array(Constant)
       .optional()
       .describe('named values; their names share the namespace of the types and interfaces'),
-    modules: z.array(Module),
-    links: z.array(Link),
-    dependencies: z.array(Dependency).optional(),
+    modules: z.array(Module).describe('top-level modules of the architecture'),
+    links: z.array(Link).describe('connections between ports of modules'),
+    dependencies: z
+      .array(Dependency)
+      .optional()
+      .describe('other projects (project or IDL files) whose types, interfaces and modules this one uses'),
     editor: Editor.optional()
   })
   .meta({ id: 'ScaffoldProject', title: 'ProjectScaffold architecture file' })

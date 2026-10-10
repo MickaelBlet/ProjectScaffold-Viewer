@@ -95,6 +95,7 @@ const theme = EditorView.theme({
     color: 'var(--text)',
     backgroundColor: 'var(--accent-soft)'
   },
+  '.cm-keyDescription': { padding: '4px 8px', maxWidth: '480px', fontFamily: 'system-ui, sans-serif' },
   '.cm-completionDetail': { color: 'var(--muted)', fontStyle: 'normal', fontFamily: 'system-ui, sans-serif' },
   '.cm-completionMatchedText': { textDecoration: 'none', fontWeight: '600' },
   '.cm-panels': { color: 'var(--text)', backgroundColor: 'var(--panel-2)' },

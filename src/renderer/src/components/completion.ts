@@ -326,6 +326,43 @@ export function complete(
   return { from: pos - prefix.length, to: pos + wordAfter.length, prefix, value: true, items }
 }
 
+/** Description the schema gives a key, and the key's range in the text. */
+export interface KeyDescription {
+  from: number
+  to: number
+  text: string
+}
+
+/** Description of the key under `pos` in YAML `text`; null off a key or for a key without one. */
+export function describeKey(text: string, pos: number, schema: JsonSchema): KeyDescription | null {
+  const lineStart = text.lastIndexOf('\n', pos - 1) + 1
+  const lineEnd = text.indexOf('\n', pos)
+  const line = text.slice(lineStart, lineEnd < 0 ? text.length : lineEnd)
+  const col = /^ *(?:-(?: +|$))*/.exec(line)![0].length
+  const key = KEY_LINE.exec(line.slice(col))
+  if (!key) return null
+  const from = lineStart + col
+  const to = from + key[1]!.length
+  if (pos < from || pos > to) return null
+  const name = unquote(key[1]!)
+  const stack = frames(text.slice(0, lineStart + line.length).split('\n'))
+  const top = stack.at(-1)
+  // Not a key where the line sits in a block scalar.
+  if (top?.kind !== 'map' || top.col !== col || top.key !== name) return null
+  const parents = matching(resolve(schema, pathOf(stack).slice(0, -1)).filter(isObject), top.values)
+  const texts = new Set<string>()
+  for (const s of parents) {
+    // A key of a record (a module path, a link name...): the description of its values.
+    const prop =
+      s.properties?.[name] ??
+      (typeof s.additionalProperties === 'object' ? s.additionalProperties : undefined)
+    if (!prop) continue
+    const description = prop.description ?? expand(schema, [prop]).find((d) => d.description)?.description
+    if (description) texts.add(description)
+  }
+  return texts.size ? { from, to, text: [...texts].join('\n') } : null
+}
+
 /** Items starting with the typed prefix, then those containing it. */
 export function filterItems(result: CompletionResult): Completion[] {
   const p = result.prefix.toLowerCase()

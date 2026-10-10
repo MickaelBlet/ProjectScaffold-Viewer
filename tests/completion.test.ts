@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { complete, filterItems, type JsonSchema } from '@/components/completion'
+import { complete, describeKey, filterItems, type JsonSchema } from '@/components/completion'
 
 const schema = JSON.parse(readFileSync('schema/scaffold.schema.json', 'utf8')) as JsonSchema
 const names = {
@@ -77,5 +77,40 @@ describe('schema completion', () => {
     expect(r.items.find((i) => i.label === 'constraints')!.insert).toBe('constraints:\n      ')
     const m = end('modules:\n  - name: A\n    por')
     expect(m.items.find((i) => i.label === 'ports')!.insert).toBe('ports:\n      - ')
+  })
+})
+
+describe('key descriptions', () => {
+  /** Description of the key at the `|` of the text. */
+  const hover = (text: string): string | undefined =>
+    describeKey(text.replace('|', ''), text.indexOf('|'), schema)?.text
+
+  it('describes the key under the pointer', () => {
+    expect(hover('modules:\n  - name: A\n    me|thods: []')).toBe('method prototypes of the module')
+    expect(hover('modules:\n  - name: A\n    ports:\n      - ro|le: in')).toBe(
+      'out: initiates / sends; in: receives / serves'
+    )
+  })
+
+  it('reaches keys through list items and alternatives', () => {
+    expect(hover('types:\n  - ki|nd: exception\n    name: E\n')).toBe(
+      'exception: named fields, raised by messages and methods'
+    )
+    expect(hover('remote|Defaults:\n  basePort: 1')).toBe(
+      'defaults of the addresses of the remote links (default host 127.0.0.1)'
+    )
+  })
+
+  it('describes nested keys and the keys of records', () => {
+    expect(
+      hover('types:\n  - kind: struct\n    fields:\n      - name: a\n        type:\n          ki|nd: vector')
+    ).toBe('vector, list: items in order, any number; set: distinct items')
+    expect(hover('editor:\n  layout:\n    Core.Sen|sor:\n      x: 1')).toBe('position and size of the module')
+    expect(hover('editor:\n  dependencies:\n    Robot:\n      Core:\n        wid|th: 1')).toBe('width')
+  })
+
+  it('gives nothing off a key', () => {
+    expect(hover('modules:\n  - name: A\n    methods: [|]')).toBeUndefined()
+    expect(hover('project:\n  description: |\n    color: x\n    co|lor: y')).toBeUndefined()
   })
 })

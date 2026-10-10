@@ -7,30 +7,36 @@
       "properties": {
         "schemaVersion": {
           "type": "number",
-          "const": 1
+          "const": 1,
+          "description": "version of the file format"
         },
         "project": {
           "type": "object",
           "properties": {
             "name": {
-              "type": "string"
+              "type": "string",
+              "description": "name of the project"
             },
             "description": {
+              "description": "free text documenting it",
               "type": "string"
             },
             "metadata": {
+              "description": "free key: value pairs, passed to generators",
               "type": "object",
               "propertyNames": {
                 "type": "string"
               },
               "additionalProperties": {
-                "type": "string"
+                "type": "string",
+                "description": "value of this metadata entry"
               }
             }
           },
           "required": [
             "name"
-          ]
+          ],
+          "description": "name and documentation of the project"
         },
         "generation": {
           "description": "code generation settings",
@@ -60,7 +66,8 @@
               "properties": {
                 "host": {
                   "type": "string",
-                  "minLength": 1
+                  "minLength": 1,
+                  "description": "host name or IP address"
                 }
               }
             },
@@ -70,7 +77,8 @@
               "properties": {
                 "host": {
                   "type": "string",
-                  "minLength": 1
+                  "minLength": 1,
+                  "description": "host name or IP address"
                 }
               }
             },
@@ -91,9 +99,11 @@
             "properties": {
               "name": {
                 "type": "string",
-                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                "description": "name of the binary"
               },
               "description": {
+                "description": "free text documenting it",
                 "type": "string"
               },
               "color": {
@@ -111,13 +121,15 @@
           "type": "array",
           "items": {
             "$ref": "#/$defs/TypeDef"
-          }
+          },
+          "description": "types of the project: struct, enum, exception, bitmask, union, alias, custom primitive"
         },
         "interfaces": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/Interface"
-          }
+          },
+          "description": "message sets the ports carry"
         },
         "constants": {
           "description": "named values; their names share the namespace of the types and interfaces",
@@ -130,7 +142,8 @@
           "type": "array",
           "items": {
             "$ref": "#/$defs/Module"
-          }
+          },
+          "description": "top-level modules of the architecture"
         },
         "links": {
           "type": "array",
@@ -139,9 +152,11 @@
             "properties": {
               "name": {
                 "type": "string",
-                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                "description": "name of the link, unique in the project"
               },
               "description": {
+                "description": "free text documenting it",
                 "type": "string"
               },
               "from": {
@@ -154,11 +169,13 @@
                   },
                   "module": {
                     "type": "string",
-                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$"
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$",
+                    "description": "path of the module (in the dependency `project` when set)"
                   },
                   "port": {
                     "type": "string",
-                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                    "description": "name of the port"
                   }
                 },
                 "required": [
@@ -177,11 +194,13 @@
                   },
                   "module": {
                     "type": "string",
-                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$"
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$",
+                    "description": "path of the module (in the dependency `project` when set)"
                   },
                   "port": {
                     "type": "string",
-                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                    "description": "name of the port"
                   }
                 },
                 "required": [
@@ -198,22 +217,26 @@
                     "enum": [
                       "unidirectional",
                       "bidirectional"
-                    ]
+                    ],
+                    "description": "unidirectional: requests only; bidirectional: replies too (messages returning a value need it)"
                   },
                   "ack": {
                     "type": "object",
                     "properties": {
                       "required": {
-                        "type": "boolean"
+                        "type": "boolean",
+                        "description": "the receiver acknowledges each message"
                       },
                       "timeoutMs": {
+                        "description": "how long to wait for the acknowledgement (ms)",
                         "type": "number",
                         "exclusiveMinimum": 0
                       }
                     },
                     "required": [
                       "required"
-                    ]
+                    ],
+                    "description": "acknowledgement of the messages"
                   },
                   "performance": {
                     "type": "object",
@@ -225,28 +248,34 @@
                           "low",
                           "normal",
                           "bulk"
-                        ]
+                        ],
+                        "description": "realtime, low (latency), normal or bulk traffic"
                       },
                       "maxLatencyMs": {
+                        "description": "highest acceptable latency (ms)",
                         "type": "number",
                         "exclusiveMinimum": 0
                       },
                       "rateHz": {
+                        "description": "expected message rate (Hz)",
                         "type": "number",
                         "exclusiveMinimum": 0
                       }
                     },
                     "required": [
                       "class"
-                    ]
+                    ],
+                    "description": "expected performance of the link"
                   },
                   "remote": {
                     "type": "object",
                     "properties": {
                       "enabled": {
-                        "type": "boolean"
+                        "type": "boolean",
+                        "description": "the link crosses processes or machines through a transport"
                       },
                       "transport": {
+                        "description": "transport carrying it: ipc, shm, tcp, udp, http, websocket, grpc, mqtt, can, serial, or one of `transports`",
                         "type": "string"
                       },
                       "settings": {
@@ -256,7 +285,8 @@
                     },
                     "required": [
                       "enabled"
-                    ]
+                    ],
+                    "description": "remote link: between binaries, through a transport"
                   }
                 },
                 "required": [
@@ -264,7 +294,8 @@
                   "ack",
                   "performance",
                   "remote"
-                ]
+                ],
+                "description": "how messages travel along the link"
               }
             },
             "required": [
@@ -273,9 +304,11 @@
               "to",
               "constraints"
             ]
-          }
+          },
+          "description": "connections between ports of modules"
         },
         "dependencies": {
+          "description": "other projects (project or IDL files) whose types, interfaces and modules this one uses",
           "type": "array",
           "items": {
             "type": "object",
@@ -338,13 +371,15 @@
                   "properties": {
                     "module": {
                       "type": "string",
-                      "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$"
+                      "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$",
+                      "description": "path of the module in the dependency"
                     },
                     "types": {
                       "type": "array",
                       "items": {
                         "$ref": "#/$defs/ModuleTypeDef"
-                      }
+                      },
+                      "description": "types of the module"
                     }
                   },
                   "required": [
@@ -361,13 +396,15 @@
                   "properties": {
                     "module": {
                       "type": "string",
-                      "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$"
+                      "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$",
+                      "description": "path of the module in the dependency"
                     },
                     "constants": {
                       "type": "array",
                       "items": {
                         "$ref": "#/$defs/ModuleConstant"
-                      }
+                      },
+                      "description": "constants of the module"
                     }
                   },
                   "required": [
@@ -384,21 +421,26 @@
                   "properties": {
                     "module": {
                       "type": "string",
-                      "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$"
+                      "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$",
+                      "description": "path of the module in the dependency"
                     },
                     "attributes": {
+                      "description": "attributes of the module",
                       "type": "array",
                       "items": {
                         "type": "object",
                         "properties": {
                           "name": {
                             "type": "string",
-                            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                            "description": "name of the attribute"
                           },
                           "type": {
+                            "description": "type of the attribute",
                             "$ref": "#/$defs/TypeRef"
                           },
                           "description": {
+                            "description": "free text documenting it",
                             "type": "string"
                           },
                           "default": {
@@ -430,15 +472,18 @@
                       }
                     },
                     "methods": {
+                      "description": "methods of the module",
                       "type": "array",
                       "items": {
                         "type": "object",
                         "properties": {
                           "name": {
                             "type": "string",
-                            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                            "description": "name of the method"
                           },
                           "description": {
+                            "description": "free text documenting it",
                             "type": "string"
                           },
                           "params": {
@@ -448,12 +493,15 @@
                               "properties": {
                                 "name": {
                                   "type": "string",
-                                  "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                                  "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                                  "description": "name of the parameter"
                                 },
                                 "type": {
+                                  "description": "type of the parameter",
                                   "$ref": "#/$defs/TypeRef"
                                 },
                                 "description": {
+                                  "description": "free text documenting it",
                                   "type": "string"
                                 },
                                 "direction": {
@@ -474,7 +522,8 @@
                                 "name",
                                 "type"
                               ]
-                            }
+                            },
+                            "description": "parameters, in order"
                           },
                           "returns": {
                             "anyOf": [
@@ -484,7 +533,8 @@
                               {
                                 "type": "null"
                               }
-                            ]
+                            ],
+                            "description": "type of the returned value; null: none"
                           },
                           "raises": {
                             "description": "exceptions it may raise (names of exception types)",
@@ -538,7 +588,8 @@
                         "properties": {
                           "name": {
                             "type": "string",
-                            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                            "description": "name of the port, unique in its module"
                           },
                           "role": {
                             "type": "string",
@@ -557,9 +608,11 @@
                               {
                                 "type": "null"
                               }
-                            ]
+                            ],
+                            "description": "name of the interface it carries; null: none yet"
                           },
                           "description": {
+                            "description": "free text documenting it",
                             "type": "string"
                           }
                         },
@@ -568,7 +621,8 @@
                           "role",
                           "interface"
                         ]
-                      }
+                      },
+                      "description": "ports of the module"
                     }
                   },
                   "required": [
@@ -600,16 +654,20 @@
                 "type": "object",
                 "properties": {
                   "x": {
-                    "type": "number"
+                    "type": "number",
+                    "description": "left edge"
                   },
                   "y": {
-                    "type": "number"
+                    "type": "number",
+                    "description": "top edge"
                   },
                   "width": {
-                    "type": "number"
+                    "type": "number",
+                    "description": "width"
                   },
                   "height": {
-                    "type": "number"
+                    "type": "number",
+                    "description": "height"
                   }
                 },
                 "required": [
@@ -617,16 +675,20 @@
                   "y",
                   "width",
                   "height"
-                ]
-              }
+                ],
+                "description": "position and size of the module"
+              },
+              "description": "canvas position and size of the modules, by module path (nested ones: relative to their parent)"
             },
             "views": {
+              "description": "views of the canvas besides the Project view",
               "type": "array",
               "items": {
                 "type": "object",
                 "properties": {
                   "name": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "name of the view"
                   },
                   "root": {
                     "description": "module shown with its content; the whole project when absent",
@@ -634,6 +696,7 @@
                     "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$"
                   },
                   "hidden": {
+                    "description": "modules hidden in this view, with their content, by path (Dependency/Module for modules of dependencies)",
                     "type": "array",
                     "items": {
                       "type": "string",
@@ -651,16 +714,20 @@
                       "type": "object",
                       "properties": {
                         "x": {
-                          "type": "number"
+                          "type": "number",
+                          "description": "left edge"
                         },
                         "y": {
-                          "type": "number"
+                          "type": "number",
+                          "description": "top edge"
                         },
                         "width": {
-                          "type": "number"
+                          "type": "number",
+                          "description": "width"
                         },
                         "height": {
-                          "type": "number"
+                          "type": "number",
+                          "description": "height"
                         }
                       },
                       "required": [
@@ -668,7 +735,8 @@
                         "y",
                         "width",
                         "height"
-                      ]
+                      ],
+                      "description": "position and size of the module"
                     }
                   },
                   "links": {
@@ -688,10 +756,12 @@
                             "type": "object",
                             "properties": {
                               "x": {
-                                "type": "number"
+                                "type": "number",
+                                "description": "x"
                               },
                               "y": {
-                                "type": "number"
+                                "type": "number",
+                                "description": "y"
                               }
                             },
                             "required": [
@@ -711,7 +781,8 @@
                                 "right",
                                 "top",
                                 "bottom"
-                              ]
+                              ],
+                              "description": "side of the module"
                             },
                             "at": {
                               "type": "number",
@@ -736,7 +807,8 @@
                                 "right",
                                 "top",
                                 "bottom"
-                              ]
+                              ],
+                              "description": "side of the module"
                             },
                             "at": {
                               "type": "number",
@@ -756,7 +828,8 @@
                           "minimum": 0,
                           "maximum": 1
                         }
-                      }
+                      },
+                      "description": "shape of the link"
                     }
                   },
                   "labels": {
@@ -779,8 +852,10 @@
                           "right",
                           "top",
                           "bottom"
-                        ]
-                      }
+                        ],
+                        "description": "direction from the port's handle where its name is drawn"
+                      },
+                      "description": "directions of the port names of the module, by port name"
                     }
                   },
                   "notes": {
@@ -794,27 +869,35 @@
                           "enum": [
                             "note",
                             "frame"
-                          ]
+                          ],
+                          "description": "note: sticky note; frame: titled area, moving what lies inside it"
                         },
                         "text": {
-                          "type": "string"
+                          "type": "string",
+                          "description": "text of the note, title of the frame"
                         },
                         "x": {
-                          "type": "number"
+                          "type": "number",
+                          "description": "left edge"
                         },
                         "y": {
-                          "type": "number"
+                          "type": "number",
+                          "description": "top edge"
                         },
                         "width": {
-                          "type": "number"
+                          "type": "number",
+                          "description": "width"
                         },
                         "height": {
-                          "type": "number"
+                          "type": "number",
+                          "description": "height"
                         },
                         "color": {
+                          "description": "color (CSS color)",
                           "type": "string"
                         },
                         "locked": {
+                          "description": "not moved or resized on the canvas",
                           "type": "boolean"
                         }
                       },
@@ -839,22 +922,27 @@
                       "type": "object",
                       "properties": {
                         "x": {
-                          "type": "number"
+                          "type": "number",
+                          "description": "left edge"
                         },
                         "y": {
-                          "type": "number"
+                          "type": "number",
+                          "description": "top edge"
                         },
                         "width": {
-                          "type": "number"
+                          "type": "number",
+                          "description": "width"
                         },
                         "height": {
-                          "type": "number"
+                          "type": "number",
+                          "description": "height"
                         }
                       },
                       "required": [
                         "x",
                         "y"
-                      ]
+                      ],
+                      "description": "place (and size) of the stand-in of the module"
                     }
                   }
                 },
@@ -864,6 +952,7 @@
               }
             },
             "style": {
+              "description": "look of the modules on the canvas, by module path",
               "type": "object",
               "propertyNames": {
                 "type": "string",
@@ -877,6 +966,7 @@
                     "type": "string"
                   },
                   "locked": {
+                    "description": "not moved or resized on the canvas",
                     "type": "boolean"
                   },
                   "labels": {
@@ -893,13 +983,16 @@
                         "right",
                         "top",
                         "bottom"
-                      ]
+                      ],
+                      "description": "direction from the port's handle where its name is drawn"
                     }
                   }
-                }
+                },
+                "description": "look of the module on the canvas"
               }
             },
             "notes": {
+              "description": "notes and frames of the Project view",
               "type": "array",
               "items": {
                 "type": "object",
@@ -909,27 +1002,35 @@
                     "enum": [
                       "note",
                       "frame"
-                    ]
+                    ],
+                    "description": "note: sticky note; frame: titled area, moving what lies inside it"
                   },
                   "text": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "text of the note, title of the frame"
                   },
                   "x": {
-                    "type": "number"
+                    "type": "number",
+                    "description": "left edge"
                   },
                   "y": {
-                    "type": "number"
+                    "type": "number",
+                    "description": "top edge"
                   },
                   "width": {
-                    "type": "number"
+                    "type": "number",
+                    "description": "width"
                   },
                   "height": {
-                    "type": "number"
+                    "type": "number",
+                    "description": "height"
                   },
                   "color": {
+                    "description": "color (CSS color)",
                     "type": "string"
                   },
                   "locked": {
+                    "description": "not moved or resized on the canvas",
                     "type": "boolean"
                   }
                 },
@@ -960,18 +1061,23 @@
                   "type": "object",
                   "properties": {
                     "x": {
-                      "type": "number"
+                      "type": "number",
+                      "description": "left edge"
                     },
                     "y": {
-                      "type": "number"
+                      "type": "number",
+                      "description": "top edge"
                     },
                     "width": {
-                      "type": "number"
+                      "type": "number",
+                      "description": "width"
                     },
                     "height": {
-                      "type": "number"
+                      "type": "number",
+                      "description": "height"
                     },
                     "locked": {
+                      "description": "not moved or resized on the canvas",
                       "type": "boolean"
                     },
                     "labels": {
@@ -988,15 +1094,18 @@
                           "right",
                           "top",
                           "bottom"
-                        ]
+                        ],
+                        "description": "direction from the port's handle where its name is drawn"
                       }
                     }
                   },
                   "required": [
                     "x",
                     "y"
-                  ]
-                }
+                  ],
+                  "description": "position and size of the placed module"
+                },
+                "description": "placed modules of the dependency, by module path"
               }
             },
             "orientation": {
@@ -1024,10 +1133,12 @@
                       "type": "object",
                       "properties": {
                         "x": {
-                          "type": "number"
+                          "type": "number",
+                          "description": "x"
                         },
                         "y": {
-                          "type": "number"
+                          "type": "number",
+                          "description": "y"
                         }
                       },
                       "required": [
@@ -1047,7 +1158,8 @@
                           "right",
                           "top",
                           "bottom"
-                        ]
+                        ],
+                        "description": "side of the module"
                       },
                       "at": {
                         "type": "number",
@@ -1072,7 +1184,8 @@
                           "right",
                           "top",
                           "bottom"
-                        ]
+                        ],
+                        "description": "side of the module"
                       },
                       "at": {
                         "type": "number",
@@ -1092,7 +1205,8 @@
                     "minimum": 0,
                     "maximum": 1
                   }
-                }
+                },
+                "description": "shape of the link"
               }
             }
           },
@@ -1119,13 +1233,16 @@
           "properties": {
             "kind": {
               "type": "string",
-              "const": "struct"
+              "const": "struct",
+              "description": "struct: named fields"
             },
             "name": {
               "type": "string",
-              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+              "description": "name of the type"
             },
             "description": {
+              "description": "free text documenting it",
               "type": "string"
             },
             "fields": {
@@ -1135,12 +1252,15 @@
                 "properties": {
                   "name": {
                     "type": "string",
-                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                    "description": "name of the field"
                   },
                   "type": {
+                    "description": "type of the field",
                     "$ref": "#/$defs/TypeRef"
                   },
                   "description": {
+                    "description": "free text documenting it",
                     "type": "string"
                   },
                   "default": {
@@ -1152,7 +1272,8 @@
                   "name",
                   "type"
                 ]
-              }
+              },
+              "description": "fields of the struct, in order"
             }
           },
           "required": [
@@ -1166,13 +1287,16 @@
           "properties": {
             "kind": {
               "type": "string",
-              "const": "enum"
+              "const": "enum",
+              "description": "enum: named integer values"
             },
             "name": {
               "type": "string",
-              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+              "description": "name of the type"
             },
             "description": {
+              "description": "free text documenting it",
               "type": "string"
             },
             "underlying": {
@@ -1186,7 +1310,8 @@
                 "uint16",
                 "uint32",
                 "uint64"
-              ]
+              ],
+              "description": "integer type holding the values"
             },
             "values": {
               "type": "array",
@@ -1195,19 +1320,22 @@
                 "properties": {
                   "name": {
                     "type": "string",
-                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                    "description": "name of the value"
                   },
                   "value": {
                     "type": "integer",
                     "minimum": -9007199254740991,
-                    "maximum": 9007199254740991
+                    "maximum": 9007199254740991,
+                    "description": "integer value"
                   }
                 },
                 "required": [
                   "name",
                   "value"
                 ]
-              }
+              },
+              "description": "values of the enum"
             }
           },
           "required": [
@@ -1222,13 +1350,16 @@
           "properties": {
             "kind": {
               "type": "string",
-              "const": "exception"
+              "const": "exception",
+              "description": "exception: named fields, raised by messages and methods"
             },
             "name": {
               "type": "string",
-              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+              "description": "name of the type"
             },
             "description": {
+              "description": "free text documenting it",
               "type": "string"
             },
             "fields": {
@@ -1238,12 +1369,15 @@
                 "properties": {
                   "name": {
                     "type": "string",
-                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                    "description": "name of the field"
                   },
                   "type": {
+                    "description": "type of the field",
                     "$ref": "#/$defs/TypeRef"
                   },
                   "description": {
+                    "description": "free text documenting it",
                     "type": "string"
                   },
                   "default": {
@@ -1255,7 +1389,8 @@
                   "name",
                   "type"
                 ]
-              }
+              },
+              "description": "fields of the exception, in order"
             }
           },
           "required": [
@@ -1270,13 +1405,16 @@
           "properties": {
             "kind": {
               "type": "string",
-              "const": "bitmask"
+              "const": "bitmask",
+              "description": "bitmask: named flags, combined with |"
             },
             "name": {
               "type": "string",
-              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+              "description": "name of the type"
             },
             "description": {
+              "description": "free text documenting it",
               "type": "string"
             },
             "underlying": {
@@ -1286,7 +1424,8 @@
                 "uint16",
                 "uint32",
                 "uint64"
-              ]
+              ],
+              "description": "unsigned integer type holding the flags"
             },
             "flags": {
               "type": "array",
@@ -1295,7 +1434,8 @@
                 "properties": {
                   "name": {
                     "type": "string",
-                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                    "description": "name of the flag"
                   },
                   "bit": {
                     "type": "integer",
@@ -1308,7 +1448,8 @@
                   "name",
                   "bit"
                 ]
-              }
+              },
+              "description": "flags of the bitmask"
             }
           },
           "required": [
@@ -1324,13 +1465,16 @@
           "properties": {
             "kind": {
               "type": "string",
-              "const": "union"
+              "const": "union",
+              "description": "union: one of its cases, selected by the discriminator"
             },
             "name": {
               "type": "string",
-              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+              "description": "name of the type"
             },
             "description": {
+              "description": "free text documenting it",
               "type": "string"
             },
             "discriminator": {
@@ -1344,12 +1488,15 @@
                 "properties": {
                   "name": {
                     "type": "string",
-                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                    "description": "name of the field"
                   },
                   "type": {
+                    "description": "type of the field",
                     "$ref": "#/$defs/TypeRef"
                   },
                   "description": {
+                    "description": "free text documenting it",
                     "type": "string"
                   },
                   "labels": {
@@ -1380,7 +1527,8 @@
                   "name",
                   "type"
                 ]
-              }
+              },
+              "description": "cases of the union, each holding a value of its type"
             }
           },
           "required": [
@@ -1396,16 +1544,20 @@
           "properties": {
             "kind": {
               "type": "string",
-              "const": "alias"
+              "const": "alias",
+              "description": "alias: another name for a type"
             },
             "name": {
               "type": "string",
-              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+              "description": "name of the type"
             },
             "description": {
+              "description": "free text documenting it",
               "type": "string"
             },
             "type": {
+              "description": "the type it names",
               "$ref": "#/$defs/TypeRef"
             }
           },
@@ -1420,13 +1572,16 @@
           "properties": {
             "kind": {
               "type": "string",
-              "const": "primitive"
+              "const": "primitive",
+              "description": "custom primitive: an opaque type mapped to a native type"
             },
             "name": {
               "type": "string",
-              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+              "description": "name of the type"
             },
             "description": {
+              "description": "free text documenting it",
               "type": "string"
             }
           },
@@ -1445,7 +1600,8 @@
           "properties": {
             "kind": {
               "type": "string",
-              "const": "primitive"
+              "const": "primitive",
+              "description": "a built-in type"
             },
             "name": {
               "type": "string",
@@ -1464,7 +1620,8 @@
                 "float64",
                 "string",
                 "bytes"
-              ]
+              ],
+              "description": "the built-in type"
             },
             "max": {
               "description": "string, bytes: most UTF-8 bytes",
@@ -1483,15 +1640,18 @@
           "properties": {
             "kind": {
               "type": "string",
-              "const": "array"
+              "const": "array",
+              "description": "a fixed number of items"
             },
             "of": {
+              "description": "type of the items",
               "$ref": "#/$defs/TypeRef"
             },
             "size": {
               "type": "integer",
               "exclusiveMinimum": 0,
-              "maximum": 9007199254740991
+              "maximum": 9007199254740991,
+              "description": "number of items"
             }
           },
           "required": [
@@ -1509,9 +1669,11 @@
                 "vector",
                 "list",
                 "set"
-              ]
+              ],
+              "description": "vector, list: items in order, any number; set: distinct items"
             },
             "of": {
+              "description": "type of the items",
               "$ref": "#/$defs/TypeRef"
             },
             "max": {
@@ -1531,9 +1693,11 @@
           "properties": {
             "kind": {
               "type": "string",
-              "const": "optional"
+              "const": "optional",
+              "description": "a value or none (null)"
             },
             "of": {
+              "description": "type of the value",
               "$ref": "#/$defs/TypeRef"
             }
           },
@@ -1547,12 +1711,15 @@
           "properties": {
             "kind": {
               "type": "string",
-              "const": "map"
+              "const": "map",
+              "description": "entries from keys to values"
             },
             "key": {
+              "description": "type of the keys",
               "$ref": "#/$defs/TypeRef"
             },
             "value": {
+              "description": "type of the values",
               "$ref": "#/$defs/TypeRef"
             },
             "max": {
@@ -1573,7 +1740,8 @@
           "properties": {
             "kind": {
               "type": "string",
-              "const": "ref"
+              "const": "ref",
+              "description": "a type defined in the project, a module or a dependency"
             },
             "name": {
               "type": "string",
@@ -1624,9 +1792,11 @@
       "properties": {
         "name": {
           "type": "string",
-          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "description": "name of the interface"
         },
         "description": {
+          "description": "free text documenting it",
           "type": "string"
         },
         "messages": {
@@ -1636,9 +1806,11 @@
             "properties": {
               "name": {
                 "type": "string",
-                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                "description": "name of the message"
               },
               "description": {
+                "description": "free text documenting it",
                 "type": "string"
               },
               "params": {
@@ -1648,12 +1820,15 @@
                   "properties": {
                     "name": {
                       "type": "string",
-                      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                      "description": "name of the parameter"
                     },
                     "type": {
+                      "description": "type of the parameter",
                       "$ref": "#/$defs/TypeRef"
                     },
                     "description": {
+                      "description": "free text documenting it",
                       "type": "string"
                     },
                     "direction": {
@@ -1670,7 +1845,8 @@
                     "name",
                     "type"
                   ]
-                }
+                },
+                "description": "parameters, in order"
               },
               "returns": {
                 "anyOf": [
@@ -1680,7 +1856,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "type of the returned value; null: none"
               },
               "raises": {
                 "description": "exceptions it may raise (names of exception types)",
@@ -1696,7 +1873,8 @@
               "params",
               "returns"
             ]
-          }
+          },
+          "description": "messages exchanged through the ports of this interface"
         }
       },
       "required": [
@@ -1709,12 +1887,15 @@
       "properties": {
         "name": {
           "type": "string",
-          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "description": "name of the constant"
         },
         "description": {
+          "description": "free text documenting it",
           "type": "string"
         },
         "type": {
+          "description": "type of the value",
           "$ref": "#/$defs/TypeRef"
         },
         "value": {
@@ -1764,9 +1945,11 @@
       "properties": {
         "name": {
           "type": "string",
-          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "description": "name of the module, unique among its siblings"
         },
         "description": {
+          "description": "free text documenting it",
           "type": "string"
         },
         "kind": {
@@ -1787,12 +1970,14 @@
           }
         },
         "metadata": {
+          "description": "free key: value pairs, passed to generators",
           "type": "object",
           "propertyNames": {
             "type": "string"
           },
           "additionalProperties": {
-            "type": "string"
+            "type": "string",
+            "description": "value of this metadata entry"
           }
         },
         "color": {
@@ -1826,12 +2011,15 @@
             "properties": {
               "name": {
                 "type": "string",
-                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                "description": "name of the attribute"
               },
               "type": {
+                "description": "type of the attribute",
                 "$ref": "#/$defs/TypeRef"
               },
               "description": {
+                "description": "free text documenting it",
                 "type": "string"
               },
               "default": {
@@ -1870,9 +2058,11 @@
             "properties": {
               "name": {
                 "type": "string",
-                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                "description": "name of the method"
               },
               "description": {
+                "description": "free text documenting it",
                 "type": "string"
               },
               "params": {
@@ -1882,12 +2072,15 @@
                   "properties": {
                     "name": {
                       "type": "string",
-                      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                      "description": "name of the parameter"
                     },
                     "type": {
+                      "description": "type of the parameter",
                       "$ref": "#/$defs/TypeRef"
                     },
                     "description": {
+                      "description": "free text documenting it",
                       "type": "string"
                     },
                     "direction": {
@@ -1908,7 +2101,8 @@
                     "name",
                     "type"
                   ]
-                }
+                },
+                "description": "parameters, in order"
               },
               "returns": {
                 "anyOf": [
@@ -1918,7 +2112,8 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "type of the returned value; null: none"
               },
               "raises": {
                 "description": "exceptions it may raise (names of exception types)",
@@ -1972,7 +2167,8 @@
             "properties": {
               "name": {
                 "type": "string",
-                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                "description": "name of the port, unique in its module"
               },
               "role": {
                 "type": "string",
@@ -1991,9 +2187,11 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "description": "name of the interface it carries; null: none yet"
               },
               "description": {
+                "description": "free text documenting it",
                 "type": "string"
               }
             },
@@ -2002,9 +2200,11 @@
               "role",
               "interface"
             ]
-          }
+          },
+          "description": "ports of the module, which links connect"
         },
         "modules": {
+          "description": "modules inside this one",
           "type": "array",
           "items": {
             "$ref": "#/$defs/Module"
@@ -2023,7 +2223,8 @@
           "properties": {
             "kind": {
               "type": "string",
-              "const": "struct"
+              "const": "struct",
+              "description": "struct: named fields"
             },
             "access": {
               "description": "public (default): used anywhere; protected: by the module and the modules deriving from it; private: by the module",
@@ -2036,9 +2237,11 @@
             },
             "name": {
               "type": "string",
-              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+              "description": "name of the type"
             },
             "description": {
+              "description": "free text documenting it",
               "type": "string"
             },
             "fields": {
@@ -2048,12 +2251,15 @@
                 "properties": {
                   "name": {
                     "type": "string",
-                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                    "description": "name of the field"
                   },
                   "type": {
+                    "description": "type of the field",
                     "$ref": "#/$defs/TypeRef"
                   },
                   "description": {
+                    "description": "free text documenting it",
                     "type": "string"
                   },
                   "default": {
@@ -2065,7 +2271,8 @@
                   "name",
                   "type"
                 ]
-              }
+              },
+              "description": "fields of the struct, in order"
             }
           },
           "required": [
@@ -2079,7 +2286,8 @@
           "properties": {
             "kind": {
               "type": "string",
-              "const": "enum"
+              "const": "enum",
+              "description": "enum: named integer values"
             },
             "access": {
               "description": "public (default): used anywhere; protected: by the module and the modules deriving from it; private: by the module",
@@ -2092,9 +2300,11 @@
             },
             "name": {
               "type": "string",
-              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+              "description": "name of the type"
             },
             "description": {
+              "description": "free text documenting it",
               "type": "string"
             },
             "underlying": {
@@ -2108,7 +2318,8 @@
                 "uint16",
                 "uint32",
                 "uint64"
-              ]
+              ],
+              "description": "integer type holding the values"
             },
             "values": {
               "type": "array",
@@ -2117,19 +2328,22 @@
                 "properties": {
                   "name": {
                     "type": "string",
-                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                    "description": "name of the value"
                   },
                   "value": {
                     "type": "integer",
                     "minimum": -9007199254740991,
-                    "maximum": 9007199254740991
+                    "maximum": 9007199254740991,
+                    "description": "integer value"
                   }
                 },
                 "required": [
                   "name",
                   "value"
                 ]
-              }
+              },
+              "description": "values of the enum"
             }
           },
           "required": [
@@ -2144,7 +2358,8 @@
           "properties": {
             "kind": {
               "type": "string",
-              "const": "exception"
+              "const": "exception",
+              "description": "exception: named fields, raised by messages and methods"
             },
             "access": {
               "description": "public (default): used anywhere; protected: by the module and the modules deriving from it; private: by the module",
@@ -2157,9 +2372,11 @@
             },
             "name": {
               "type": "string",
-              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+              "description": "name of the type"
             },
             "description": {
+              "description": "free text documenting it",
               "type": "string"
             },
             "fields": {
@@ -2169,12 +2386,15 @@
                 "properties": {
                   "name": {
                     "type": "string",
-                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                    "description": "name of the field"
                   },
                   "type": {
+                    "description": "type of the field",
                     "$ref": "#/$defs/TypeRef"
                   },
                   "description": {
+                    "description": "free text documenting it",
                     "type": "string"
                   },
                   "default": {
@@ -2186,7 +2406,8 @@
                   "name",
                   "type"
                 ]
-              }
+              },
+              "description": "fields of the exception, in order"
             }
           },
           "required": [
@@ -2201,7 +2422,8 @@
           "properties": {
             "kind": {
               "type": "string",
-              "const": "bitmask"
+              "const": "bitmask",
+              "description": "bitmask: named flags, combined with |"
             },
             "access": {
               "description": "public (default): used anywhere; protected: by the module and the modules deriving from it; private: by the module",
@@ -2214,9 +2436,11 @@
             },
             "name": {
               "type": "string",
-              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+              "description": "name of the type"
             },
             "description": {
+              "description": "free text documenting it",
               "type": "string"
             },
             "underlying": {
@@ -2226,7 +2450,8 @@
                 "uint16",
                 "uint32",
                 "uint64"
-              ]
+              ],
+              "description": "unsigned integer type holding the flags"
             },
             "flags": {
               "type": "array",
@@ -2235,7 +2460,8 @@
                 "properties": {
                   "name": {
                     "type": "string",
-                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                    "description": "name of the flag"
                   },
                   "bit": {
                     "type": "integer",
@@ -2248,7 +2474,8 @@
                   "name",
                   "bit"
                 ]
-              }
+              },
+              "description": "flags of the bitmask"
             }
           },
           "required": [
@@ -2264,7 +2491,8 @@
           "properties": {
             "kind": {
               "type": "string",
-              "const": "union"
+              "const": "union",
+              "description": "union: one of its cases, selected by the discriminator"
             },
             "access": {
               "description": "public (default): used anywhere; protected: by the module and the modules deriving from it; private: by the module",
@@ -2277,9 +2505,11 @@
             },
             "name": {
               "type": "string",
-              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+              "description": "name of the type"
             },
             "description": {
+              "description": "free text documenting it",
               "type": "string"
             },
             "discriminator": {
@@ -2293,12 +2523,15 @@
                 "properties": {
                   "name": {
                     "type": "string",
-                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                    "description": "name of the field"
                   },
                   "type": {
+                    "description": "type of the field",
                     "$ref": "#/$defs/TypeRef"
                   },
                   "description": {
+                    "description": "free text documenting it",
                     "type": "string"
                   },
                   "labels": {
@@ -2329,7 +2562,8 @@
                   "name",
                   "type"
                 ]
-              }
+              },
+              "description": "cases of the union, each holding a value of its type"
             }
           },
           "required": [
@@ -2345,7 +2579,8 @@
           "properties": {
             "kind": {
               "type": "string",
-              "const": "alias"
+              "const": "alias",
+              "description": "alias: another name for a type"
             },
             "access": {
               "description": "public (default): used anywhere; protected: by the module and the modules deriving from it; private: by the module",
@@ -2358,12 +2593,15 @@
             },
             "name": {
               "type": "string",
-              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+              "description": "name of the type"
             },
             "description": {
+              "description": "free text documenting it",
               "type": "string"
             },
             "type": {
+              "description": "the type it names",
               "$ref": "#/$defs/TypeRef"
             }
           },
@@ -2378,7 +2616,8 @@
           "properties": {
             "kind": {
               "type": "string",
-              "const": "primitive"
+              "const": "primitive",
+              "description": "custom primitive: an opaque type mapped to a native type"
             },
             "access": {
               "description": "public (default): used anywhere; protected: by the module and the modules deriving from it; private: by the module",
@@ -2391,9 +2630,11 @@
             },
             "name": {
               "type": "string",
-              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+              "description": "name of the type"
             },
             "description": {
+              "description": "free text documenting it",
               "type": "string"
             }
           },
@@ -2410,12 +2651,15 @@
       "properties": {
         "name": {
           "type": "string",
-          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "description": "name of the constant"
         },
         "description": {
+          "description": "free text documenting it",
           "type": "string"
         },
         "type": {
+          "description": "type of the value",
           "$ref": "#/$defs/TypeRef"
         },
         "value": {
@@ -2447,12 +2691,14 @@
           "properties": {
             "host": {
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "description": "host name or IP address"
             },
             "port": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 65535
+              "maximum": 65535,
+              "description": "port number"
             }
           }
         },
@@ -2462,12 +2708,14 @@
           "properties": {
             "host": {
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "description": "host name or IP address"
             },
             "port": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 65535
+              "maximum": 65535,
+              "description": "port number"
             }
           }
         },
@@ -2498,12 +2746,14 @@
           "properties": {
             "host": {
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "description": "host name or IP address"
             },
             "port": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 65535
+              "maximum": 65535,
+              "description": "port number"
             }
           }
         },
@@ -2541,7 +2791,8 @@
             "type": "string"
           },
           "additionalProperties": {
-            "type": "string"
+            "type": "string",
+            "description": "value of this setting"
           }
         }
       }

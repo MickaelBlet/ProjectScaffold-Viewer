@@ -6,7 +6,7 @@ import { insertCompletionText, startCompletion, type CompletionSource } from '@c
 import { setDiagnostics, type Diagnostic } from '@codemirror/lint'
 import { getChunks, unifiedMergeView } from '@codemirror/merge'
 import { Prec, type EditorState, type Extension } from '@codemirror/state'
-import { EditorView, keymap } from '@codemirror/view'
+import { EditorView, hoverTooltip, keymap } from '@codemirror/view'
 import { FileProjectSchema } from '@/model/schema'
 import { modulePaths, notePath, typeNames } from '@/model/project'
 import { locateValidation, targetPath } from '@/model/locate'
@@ -32,6 +32,7 @@ import { navigate, navigateToNote } from '@/actions'
 import { targetAt } from '@/components/sourceTarget'
 import {
   complete,
+  describeKey,
   filterItems,
   structureAt,
   type JsonSchema,
@@ -125,6 +126,23 @@ const changeKeys = Prec.high(
 
 const NO_EXTENSIONS: Extension = []
 
+/** Description of the key under the pointer, from the file schema. */
+const keyDescriptions = hoverTooltip((view, pos) => {
+  const found = describeKey(view.state.doc.toString(), pos, fileSchema())
+  if (!found) return null
+  return {
+    pos: found.from,
+    end: found.to,
+    above: true,
+    create: () => {
+      const dom = document.createElement('div')
+      dom.className = 'cm-keyDescription'
+      dom.textContent = found.text
+      return { dom }
+    }
+  }
+})
+
 /** Handlers of the editor, set up by the effect binding it to the project. */
 interface Handlers {
   /** Apply the text now if it has changes waiting. */
@@ -189,6 +207,10 @@ export function SourcePanel({ format }: { format: Format }): ReactNode {
           ]
         : NO_EXTENSIONS,
     [showChanges, savedText]
+  )
+  const extensions = useMemo(
+    (): Extension => (format === 'yaml' ? [changes, keyDescriptions] : changes),
+    [changes, format]
   )
 
   /** Keys and values the schema allows at the caret, and names of the project. */
@@ -426,7 +448,7 @@ export function SourcePanel({ format }: { format: Format }): ReactNode {
         fileName={`project.${format}`}
         label={`Project ${format.toUpperCase()}`}
         completion={completion}
-        extensions={changes}
+        extensions={extensions}
         onChange={() => handlers.current.input()}
         // Shortcuts (save, export...) see the text as typed.
         onKeyDown={(e) => (e.ctrlKey || e.metaKey) && handlers.current.flush()}
