@@ -1,10 +1,11 @@
 import type { ReactNode } from 'react'
-import { ACCESS_MARKS, findImported, IDENTIFIER_RE, importedParent, refNamer } from '@/model/project'
+import { findImported, IDENTIFIER_RE, importedParent, refNamer } from '@/model/project'
 import { printTypeRef } from '@/model/typeExpr'
 import { deleteItems, renameDependency, useProjectStore } from '@/store/project'
 import { select } from '@/store/ui'
 import { navigate, openImportSource, refreshDependencies, showDependency } from '@/actions'
 import { CommitInput, Row, Section } from '@/components/fields'
+import { AccessIcon } from '@/components/Icon'
 
 /** A module of a dependency placed on the canvas: read-only, refreshed from that project. */
 export function ImportedInspector({ id }: { id: string }): ReactNode {
@@ -53,7 +54,11 @@ export function ImportedInspector({ id }: { id: string }): ReactNode {
             <tbody>
               {attributes.map((a) => (
                 <tr key={a.id} title={a.description}>
-                  <td>{ACCESS_MARKS[a.access ?? 'public']}</td>
+                  <td>
+                    <span className="attr-access">
+                      <AccessIcon access={a.access} />
+                    </span>
+                  </td>
                   <td>{a.name}</td>
                   <td>
                     {type(a.type)}
@@ -73,7 +78,11 @@ export function ImportedInspector({ id }: { id: string }): ReactNode {
             <tbody>
               {methods.map((m) => (
                 <tr key={m.id} title={m.description}>
-                  <td>{ACCESS_MARKS[m.access ?? 'public']}</td>
+                  <td>
+                    <span className="attr-access">
+                      <AccessIcon access={m.access} />
+                    </span>
+                  </td>
                   <td>
                     {m.name}(
                     {m.params
