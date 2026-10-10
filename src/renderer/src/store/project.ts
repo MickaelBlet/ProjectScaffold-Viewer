@@ -8,7 +8,6 @@ import {
   defaultSize,
   globalTypeNames,
   memberNames,
-  moduleConsts,
   moduleTypes,
   findImported,
   growImportedAncestors,
@@ -152,11 +151,9 @@ export function deleteItems(ids: Id[]): void {
     for (const id of ids)
       if (d.modules.some((m) => m.id === id)) for (const s of subtreeIds(d, id)) gone.add(s)
     d.modules = d.modules.filter((m) => !gone.has(m.id))
-    // Types and constants of removed modules go with them.
+    // Types of removed modules go with them.
     if (d.types.some((t) => t.module && gone.has(t.module)))
       d.types = d.types.filter((t) => !t.module || !gone.has(t.module))
-    if (d.consts.some((c) => c.module && gone.has(c.module)))
-      d.consts = d.consts.filter((c) => !c.module || !gone.has(c.module))
     for (const m of d.modules)
       if (m.bases?.some((b) => gone.has(b))) {
         m.bases = m.bases.filter((b) => !gone.has(b))
@@ -436,12 +433,12 @@ export function addType(kind: TypeDef['kind'], moduleId?: Id): Id {
   return id
 }
 
-/** Names a new type or constant of the project (null) or of a module may not take. */
+/** Names a new type of the project (null) or of a module may not take. */
 function typeScopeNames(d: Project, moduleId: Id | null, exceptId?: Id): string[] {
   const mod = moduleId ? d.modules.find((m) => m.id === moduleId) : undefined
   if (!mod) return globalTypeNames(d, exceptId)
   return [
-    ...[...moduleTypes(d, mod.id), ...moduleConsts(d, mod.id)]
+    ...moduleTypes(d, mod.id)
       .filter((t) => t.id !== exceptId)
       .map((t) => t.name),
     ...memberNames(d, mod)
@@ -462,30 +459,15 @@ export function setTypeModule(id: Id, moduleId: Id | null): void {
   })
 }
 
-/** Move a constant to a module (public) or to the project (null), renamed if its name is taken there. */
-export function setConstModule(id: Id, moduleId: Id | null): void {
-  update((d) => {
-    const c = d.consts.find((x) => x.id === id)
-    if (!c || c.dependency || (c.module ?? null) === moduleId) return
-    c.name = uniqueName(c.name, typeScopeNames(d, moduleId, id))
-    if (moduleId) c.module = moduleId
-    else {
-      delete c.module
-      delete c.access
-    }
-  })
-}
-
-/** Add a constant to the project (shown in the project inspector), or to a module (`moduleId`, public). */
-export function addConst(moduleId?: Id): Id {
+/** Add a constant (shown in the project inspector). */
+export function addConst(): Id {
   const id = newId()
   update(
     (d) =>
       void d.consts.push({
         id,
-        name: uniqueName('Constant', typeScopeNames(d, moduleId ?? null)),
+        name: uniqueName('Constant', globalTypeNames(d)),
         description: '',
-        ...(moduleId && { module: moduleId }),
         type: { kind: 'primitive', name: 'uint32' },
         value: 0
       })

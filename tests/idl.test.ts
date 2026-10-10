@@ -11,7 +11,7 @@ import {
 } from '@/model/idl'
 import { addDependency, dependencyOf } from '@/model/dependencies'
 import { pasteClip } from '@/model/clipboard'
-import { constNames, emptyProject, modulePath, typeNames } from '@/model/project'
+import { emptyProject, modulePath, typeNames } from '@/model/project'
 import { printTypeExpr, printTypeRef } from '@/model/typeExpr'
 import { validate } from '@/model/validate'
 import type { Id } from '@/model/types'
@@ -383,7 +383,7 @@ describe('IDL import', () => {
     expect(idlProject('idl/main.idl', files).project.modules.map((m) => m.name)).toEqual(['C'])
   })
 
-  it('nests the components of a file in their IDL modules, with their types and constants', () => {
+  it('nests the components of a file in their IDL modules, with their types', () => {
     const files = new Map([
       [
         'idl/main.idl',
@@ -416,15 +416,15 @@ describe('IDL import', () => {
       expect(m.layout.x + m.layout.width).toBeLessThanOrEqual(parent.layout.width)
       expect(m.layout.y + m.layout.height).toBeLessThanOrEqual(parent.layout.height)
     }
-    // Types and constants of IDL modules are theirs; those at file scope and interfaces the project's.
+    // Types of IDL modules are theirs; those at file scope, constants and interfaces the project's.
     const names = typeNames(p)
     expect(p.types.map((t) => names.get(t.id))).toEqual(['Top', 'B.S'])
-    expect([...constNames(p).values()]).toEqual(['B.MAX'])
+    expect(p.consts.map((c) => c.name)).toEqual(['MAX'])
     expect(p.interfaces.map((i) => i.name)).toEqual(['I', 'J'])
     expect(validate(p).filter((x) => x.severity === 'error')).toEqual([])
   })
 
-  it('gives the types and constants of IDL modules to their modules, named simply there', () => {
+  it('gives the types of IDL modules to their modules, named simply there', () => {
     const files = new Map([
       [
         'idl/main.idl',
@@ -440,7 +440,7 @@ describe('IDL import', () => {
     ])
     const { project: p, warnings } = idlProject('idl/main.idl', files)
     expect(warnings).toEqual([])
-    // Modules holding only types or constants are modules too.
+    // Modules holding only types are modules too.
     expect(p.modules.map((m) => modulePath(p, m.id))).toEqual(['A', 'B', 'B.Deep', 'main'])
     const names = typeNames(p)
     expect(p.types.filter((t) => !t.dependency).map((t) => names.get(t.id))).toEqual([
@@ -449,7 +449,8 @@ describe('IDL import', () => {
       'B.Status',
       'B.Deep.Mode'
     ])
-    expect([...constNames(p).values()].sort()).toEqual(['A.MAX', 'inc/Common.N'])
+    // Constants are the project's.
+    expect(p.consts.map((c) => c.name).sort()).toEqual(['MAX', 'N'])
     // Those of included files: of their module by path, in their own project.
     expect(p.types.find((t) => t.name === 'Kind')).toMatchObject({ modulePath: 'Common' })
     // Public: used by interfaces outside their module.
@@ -466,7 +467,7 @@ describe('IDL import', () => {
       'main/B.Deep.Mode',
       'main/B.Status'
     ])
-    expect([...constNames(d).values()].sort()).toEqual(['inc/Common.N', 'main/A.MAX'])
+    expect(d.consts.map((c) => c.name).sort()).toEqual(['MAX', 'N'])
   })
 
   it('resolves scoped names and qualifies names several modules use', () => {

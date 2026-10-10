@@ -220,6 +220,32 @@ dependencies:
             returns:
               kind: ref
               name: imaging/Imaging.Label
+    constants:
+      - name: WIDTH
+        type:
+          kind: primitive
+          name: uint16
+        value: 1920
+      - name: HEIGHT
+        type:
+          kind: primitive
+          name: uint16
+        value: 1080
+      - name: PIXELS
+        type:
+          kind: primitive
+          name: uint32
+        value: 2073600
+      - name: GAMMA
+        type:
+          kind: primitive
+          name: float64
+        value: 2.2
+      - name: VENDOR
+        type:
+          kind: primitive
+          name: string
+        value: Example Optics
     moduleTypes:
       - module: Imaging
         types:
@@ -323,34 +349,6 @@ dependencies:
                 type:
                   kind: primitive
                   name: uint32
-    moduleConstants:
-      - module: Imaging
-        constants:
-          - name: WIDTH
-            type:
-              kind: primitive
-              name: uint16
-            value: 1920
-          - name: HEIGHT
-            type:
-              kind: primitive
-              name: uint16
-            value: 1080
-          - name: PIXELS
-            type:
-              kind: primitive
-              name: uint32
-            value: 2073600
-          - name: GAMMA
-            type:
-              kind: primitive
-              name: float64
-            value: 2.2
-          - name: VENDOR
-            type:
-              kind: primitive
-              name: string
-            value: Example Optics
     modules:
       - module: Imaging
         ports: []
@@ -388,6 +386,17 @@ dependencies:
     indirect: true
     types: []
     interfaces: []
+    constants:
+      - name: MAX_POINTS
+        type:
+          kind: primitive
+          name: int32
+        value: 1024
+      - name: MAX_ID
+        type:
+          kind: primitive
+          name: int32
+        value: 16
     moduleTypes:
       - module: Sensors
         types:
@@ -539,19 +548,6 @@ dependencies:
                   kind: primitive
                   name: string
                 default: true
-    moduleConstants:
-      - module: Sensors
-        constants:
-          - name: MAX_POINTS
-            type:
-              kind: primitive
-              name: int32
-            value: 1024
-          - name: MAX_ID
-            type:
-              kind: primitive
-              name: int32
-            value: 16
 editor:
   layout:
     Inspector:

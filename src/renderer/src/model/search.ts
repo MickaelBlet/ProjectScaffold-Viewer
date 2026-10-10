@@ -1,5 +1,5 @@
 // Full-text search over the project (names, descriptions and metadata).
-import { constNames, modulePath, typeNames } from './project'
+import { modulePath, typeNames } from './project'
 import type { ProblemTarget } from './validate'
 import type { Project } from './types'
 
@@ -55,14 +55,11 @@ export function searchProject(p: Project, query: string): SearchHit[] {
       check(target, `${path}:${pt.name}`, 'port description', pt.description)
     }
   }
-  const constName = constNames(p)
   for (const c of p.consts) {
     if (c.dependency) continue
     const target = { kind: 'const', id: c.id } as const
-    // Qualified for a constant of a module: Core.Sensor.Max.
-    const name = constName.get(c.id)!
-    check(target, name, 'constant', c.name)
-    check(target, name, 'description', c.description)
+    check(target, c.name, 'constant', c.name)
+    check(target, c.name, 'description', c.description)
   }
   for (const l of p.links) {
     const target = { kind: 'link', id: l.id } as const

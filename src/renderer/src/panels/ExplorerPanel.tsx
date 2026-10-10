@@ -101,7 +101,7 @@ const isDependencyGroup = (s: SectionId): s is DependencyGroup =>
 type DependencyRow = { key: string } & (
   | { kind: 'dependency'; dep: Dependency; open: boolean }
   | { kind: 'group'; dep: Dependency; group: DependencyGroup; count: number; open: boolean }
-  | { kind: 'const'; dep: Dependency; c: ConstDef; label: string; depth: number }
+  | { kind: 'const'; dep: Dependency; c: ConstDef }
   | { kind: 'type'; e: TypeDef; label: string; depth: number }
   | { kind: 'interface'; e: Interface }
   | { kind: 'module'; dep: Dependency; m: ImportedModule; depth: number }
@@ -364,14 +364,6 @@ function moduleMenu(e: MouseEvent, id: Id, hidden: boolean): void {
         }
       }))
     },
-    {
-      label: 'New constant of the module',
-      run: () => {
-        addConst(id)
-        revealInspector()
-        select({ kind: 'module', id })
-      }
-    },
     commandItem('edit.cut'),
     commandItem('edit.copy'),
     commandItem('edit.paste'),
@@ -493,15 +485,8 @@ export function ExplorerPanel(): ReactNode {
   const ownInterfaces = interfaces.filter((i) => !i.dependency)
   const shownTypes = ownTypes.filter((t) => match(t.name))
   const shownInterfaces = ownInterfaces.filter((i) => match(i.name))
-  const ownConsts = consts.filter((c) => !c.dependency && !c.module)
+  const ownConsts = consts.filter((c) => !c.dependency)
   const shownConsts = ownConsts.filter((c) => match(c.name))
-  const constsOfModules = new Map<Id, ConstDef[]>()
-  for (const c of consts)
-    if (c.module) {
-      const list = constsOfModules.get(c.module) ?? []
-      if (!list.length) constsOfModules.set(c.module, list)
-      list.push(c)
-    }
   // Dependencies, each with its constants, types, interfaces and modules in groups ordered as the
   // sections; a dependency or a group folds (all open while filtering). Modules come in the order of
   // their project when it can be read, the ones not placed on the canvas dimmed.
@@ -512,14 +497,10 @@ export function ExplorerPanel(): ReactNode {
     const pick = <T,>(list: T[], name: (x: T) => string): T[] =>
       all ? list : list.filter((x) => match(name(x)))
     const depTypes = types.filter((t) => t.dependency === dep.id)
-    const depConsts = consts.filter((c) => c.dependency === dep.id)
     // From its file, else from what this project keeps of it.
     const read =
       dependencyModules.get(dep.id) ??
-      modulesOfPaths([
-        ...dep.modules.map((m) => m.path),
-        ...[...depTypes, ...depConsts].map((e) => e.modulePath ?? '')
-      ])
+      modulesOfPaths([...dep.modules.map((m) => m.path), ...depTypes.map((t) => t.modulePath ?? '')])
     const known = new Set(read.map((m) => m.path))
     // A tree: each module followed by its content, placed with it.
     const depth = (path: string): number => path.split('.').length - 1
@@ -534,7 +515,7 @@ export function ExplorerPanel(): ReactNode {
         .filter((m) => !known.has(m.path))
         .map((m): ModuleRow => ({ kind: 'module', key: m.id, dep, m, depth: depth(m.path) }))
     ]
-    // Types and constants of modules under their module; in their group while it is not listed.
+    // Types of modules under their module; in their group while it is not listed.
     const listed = new Set(moduleRows.map((r) => r.m.path))
     const qualified = (e: { name: string; modulePath?: string }): string =>
       e.modulePath ? `${e.modulePath}.${e.name}` : e.name
@@ -546,17 +527,12 @@ export function ExplorerPanel(): ReactNode {
       label: depth ? e.name : qualified(e),
       depth
     })
-    const constRow = (c: ConstDef, depth: number): DependencyRow => ({
-      kind: 'const',
-      key: c.id,
-      dep,
-      c,
-      label: depth ? c.name : qualified(c),
-      depth
-    })
     const pickedModules = pick(moduleRows, (r) => r.m.path)
     const groups: { [G in DependencyGroup]: DependencyRow[] } = {
-      constants: pick(depConsts.filter(inGroup), qualified).map((c) => constRow(c, 0)),
+      constants: pick(
+        consts.filter((c) => c.dependency === dep.id),
+        (c) => c.name
+      ).map((c) => ({ kind: 'const', key: c.id, dep, c })),
       types: pick(depTypes.filter(inGroup), qualified).map((e) => typeRow(e, 0)),
       interfaces: pick(
         interfaces.filter((i) => i.dependency === dep.id),
@@ -568,11 +544,7 @@ export function ExplorerPanel(): ReactNode {
           ...pick(
             depTypes.filter((t) => t.modulePath === r.m.path),
             qualified
-          ).map((t) => typeRow(t, r.depth + 1)),
-          ...pick(
-            depConsts.filter((c) => c.modulePath === r.m.path),
-            qualified
-          ).map((c) => constRow(c, r.depth + 1))
+          ).map((t) => typeRow(t, r.depth + 1))
         ])
       ]
     }
@@ -601,21 +573,17 @@ export function ExplorerPanel(): ReactNode {
     setCollapsed(next)
   }
   // Modules of dependencies placed on the canvas, after the project's own: nested under their parent
-  // (all open while filtering), each with its public types and constants first.
+  // (all open while filtering), each with its public types first.
   const imported = dependencies.flatMap((dep) => dep.modules.map((m) => ({ dep, m })))
-  const publicOf = new Map<string, { types: TypeDef[]; consts: ConstDef[] }>()
-  for (const e of [...types, ...consts])
-    if (e.dependency && e.modulePath && !e.access) {
-      const key = `${e.dependency}|${e.modulePath}`
-      const of = publicOf.get(key) ?? { types: [], consts: [] }
-      publicOf.set(key, of)
-      if ('value' in e) of.consts.push(e)
-      else of.types.push(e)
+  const publicOf = new Map<string, TypeDef[]>()
+  for (const t of types)
+    if (t.dependency && t.modulePath && !t.access) {
+      const key = `${t.dependency}|${t.modulePath}`
+      publicOf.set(key, [...(publicOf.get(key) ?? []), t])
     }
   const shownImported: (
     | { kind: 'module'; dep: Dependency; m: ImportedModule; depth: number; parent: boolean; open: boolean }
     | { kind: 'type'; dep: Dependency; t: TypeDef; depth: number }
-    | { kind: 'const'; dep: Dependency; c: ConstDef; depth: number }
   )[] = []
   const importedParents: Id[] = []
   for (const dep of dependencies) {
@@ -624,18 +592,14 @@ export function ExplorerPanel(): ReactNode {
       const parent = importedParent(dep, m)?.path ?? null
       children.set(parent, [...(children.get(parent) ?? []), m])
     }
-    const own = (m: ImportedModule) => publicOf.get(`${dep.id}|${m.path}`) ?? { types: [], consts: [] }
-    const hits = (m: ImportedModule): boolean => {
-      const { types: t, consts: c } = own(m)
-      return (
-        match(m.path) || [...t, ...c].some((e) => match(e.name)) || (children.get(m.path) ?? []).some(hits)
-      )
-    }
+    const own = (m: ImportedModule): TypeDef[] => publicOf.get(`${dep.id}|${m.path}`) ?? []
+    const hits = (m: ImportedModule): boolean =>
+      match(m.path) || own(m).some((t) => match(t.name)) || (children.get(m.path) ?? []).some(hits)
     const visit = (m: ImportedModule, depth: number): void => {
       if (f && !hits(m)) return
       const kids = children.get(m.path) ?? []
-      const { types: t, consts: c } = own(m)
-      const parent = kids.length + t.length + c.length > 0
+      const t = own(m)
+      const parent = kids.length + t.length > 0
       if (parent) importedParents.push(m.id)
       const open = !!f || !collapsed.has(m.id)
       shownImported.push({ kind: 'module', dep, m, depth, parent, open })
@@ -643,41 +607,33 @@ export function ExplorerPanel(): ReactNode {
       const all = match(m.path)
       for (const x of t)
         if (all || match(x.name)) shownImported.push({ kind: 'type', dep, t: x, depth: depth + 1 })
-      for (const x of c)
-        if (all || match(x.name)) shownImported.push({ kind: 'const', dep, c: x, depth: depth + 1 })
       for (const k of kids) visit(k, depth + 1)
     }
     for (const m of children.get(null) ?? []) visit(m, 0)
   }
   // Folds every module with submodules, dependency and dependency group, or unfolds them all.
   const foldable = [
-    ...modules
-      .filter((m) => moduleChildren.has(m.id) || typesOfModules.has(m.id) || constsOfModules.has(m.id))
-      .map((m) => m.id),
+    ...modules.filter((m) => moduleChildren.has(m.id) || typesOfModules.has(m.id)).map((m) => m.id),
     ...importedParents,
     ...dependencies.flatMap((d) => [d.id, ...DEPENDENCY_GROUPS.map((g) => `${d.id}/${g}`)])
   ]
   const someOpen = foldable.some((key) => !collapsed.has(key))
   const foldAll = (): void => setCollapsed(new Set(someOpen ? foldable : []))
   // Modules nested under their parent, in project order (all open while filtering), each with its
-  // types and constants first.
+  // types first.
   const shownModules: (
     | { kind: 'module'; m: Module; depth: number; parent: boolean; open: boolean }
     | { kind: 'type'; t: TypeDef; depth: number }
-    | { kind: 'const'; c: ConstDef; depth: number }
   )[] = []
   const walk = (list: Module[], depth: number): void => {
     for (const m of list) {
       if (moduleMatches && !moduleMatches.has(m.id)) continue
       const children = moduleChildren.get(m.id) ?? []
       const own = typesOfModules.get(m.id) ?? []
-      const constsHere = constsOfModules.get(m.id) ?? []
       const open = !!moduleMatches || !collapsed.has(m.id)
-      const parent = children.length > 0 || own.length > 0 || constsHere.length > 0
-      shownModules.push({ kind: 'module', m, depth, parent, open })
+      shownModules.push({ kind: 'module', m, depth, parent: children.length > 0 || own.length > 0, open })
       if (!open) continue
       for (const t of own) if (match(t.name)) shownModules.push({ kind: 'type', t, depth: depth + 1 })
-      for (const c of constsHere) if (match(c.name)) shownModules.push({ kind: 'const', c, depth: depth + 1 })
       walk(children, depth + 1)
     }
   }
@@ -688,8 +644,8 @@ export function ExplorerPanel(): ReactNode {
   const typeIds = shownTypes.map((t) => t.id)
   const interfaceIds = shownInterfaces.map((i) => i.id)
   const moduleIds = [
-    ...shownModules.map((x) => (x.kind === 'module' ? x.m.id : x.kind === 'type' ? x.t.id : x.c.id)),
-    ...shownImported.map((x) => (x.kind === 'module' ? x.m.id : x.kind === 'type' ? x.t.id : x.c.id))
+    ...shownModules.map((x) => (x.kind === 'module' ? x.m.id : x.t.id)),
+    ...shownImported.map((x) => (x.kind === 'module' ? x.m.id : x.t.id))
   ]
   const linkIds = shownLinks.map((x) => x.l.id)
   const viewStop = tabStop(viewItems, (id) => id === activeViewId)
@@ -776,7 +732,7 @@ export function ExplorerPanel(): ReactNode {
             tabStop={stop}
             selected={false}
             title={`${r.c.description ? `${r.c.description}\n` : ''}Shown with its dependency in the Inspector.`}
-            style={indent(2 + r.depth)}
+            style={indent(2)}
             onClick={() => {
               revealInspector()
               showDependency(r.dep.id)
@@ -791,7 +747,7 @@ export function ExplorerPanel(): ReactNode {
           >
             {leaf}
             <span className="kind-badge const">C</span>
-            {r.label}
+            {r.c.name}
             <small>{formatValue(r.c.value)}</small>
           </Item>
         )
@@ -1156,38 +1112,6 @@ export function ExplorerPanel(): ReactNode {
           }}
         >
           {shownModules.map((row) => {
-            if (row.kind === 'const') {
-              const c = row.c
-              return (
-                <Item
-                  key={c.id}
-                  selected={false}
-                  tabStop={c.id === moduleStop}
-                  className="module-type"
-                  title={`${c.access ?? 'public'} constant ${paths.get(c.module!)}.${c.name}${c.description ? `\n${c.description}` : ''}\nEdited in its module's inspector.`}
-                  style={indent(row.depth)}
-                  onClick={() => {
-                    revealInspector()
-                    select({ kind: 'module', id: c.module! })
-                  }}
-                  onContextMenu={(e) => {
-                    e.preventDefault()
-                    openContextMenu(e, [
-                      { label: 'Edit in the module', run: () => select({ kind: 'module', id: c.module! }) },
-                      'separator',
-                      { label: 'Delete constant', danger: true, run: () => deleteConst(c.id) }
-                    ])
-                  }}
-                >
-                  {leaf}
-                  <span className="kind-badge const">C</span>
-                  <span className="tree-name">{c.name}</span>
-                  <small>
-                    <AccessIcon access={c.access} /> {formatValue(c.value)}
-                  </small>
-                </Item>
-              )
-            }
             if (row.kind === 'type') {
               const t = row.t
               return (
@@ -1280,35 +1204,6 @@ export function ExplorerPanel(): ReactNode {
                     {KIND_BADGE[t.kind]}
                   </span>
                   <span className="tree-name">{t.name}</span>
-                </Item>
-              )
-            }
-            if (row.kind === 'const') {
-              const c = row.c
-              return (
-                <Item
-                  key={c.id}
-                  selected={false}
-                  tabStop={c.id === moduleStop}
-                  className="module-type"
-                  title={`public constant ${dep.name}/${c.modulePath}.${c.name}${c.description ? `\n${c.description}` : ''}\nShown with its dependency in the Inspector.`}
-                  style={indent(row.depth)}
-                  onClick={() => {
-                    revealInspector()
-                    showDependency(dep.id)
-                  }}
-                  onContextMenu={(e) => {
-                    e.preventDefault()
-                    openContextMenu(e, [
-                      { label: 'Show its dependency', run: () => showDependency(dep.id) },
-                      { label: `Open ${dep.file}`, run: () => openImportSource(dep.file) }
-                    ])
-                  }}
-                >
-                  {leaf}
-                  <span className="kind-badge const">C</span>
-                  <span className="tree-name">{c.name}</span>
-                  <small>{formatValue(c.value)}</small>
                 </Item>
               )
             }

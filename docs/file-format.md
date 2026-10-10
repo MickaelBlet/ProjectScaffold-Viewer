@@ -83,7 +83,7 @@ constants: # { name, description?, type, value }
   - { name: MaxSpeed, type: { kind: primitive, name: float32 }, value: 2.5 }
 ```
 
-A constant's value is checked against its type, as [default values](#default-values) are. Modules have [constants of their own](#types-and-constants-of-modules), named `Core.Sensor.HISTORY`.
+A constant's value is checked against its type, as [default values](#default-values) are.
 
 ## Interfaces
 
@@ -110,12 +110,12 @@ interfaces: # { name, description?, messages }
   - Parameters take `const: true` too, `in` parameters only.
 - **Kind** (optional): `class` (default, left out), `abstract` or `interface`. A `class` has no pure methods and implements every pure method it inherits; an `interface` has only pure methods and no attributes.
 - **Bases** (optional): `bases: [IShape, Core.Base, Robot/Core.Sensor]`, paths of the modules it derives from, in order: of this project, or `Dependency/Module.Path` for a module of a dependency placed on the canvas (`dependencies[].modules`, whose methods are those overridden or implemented); no cycles, no repeats. A method redefining a virtual one of a base without `override` is a warning.
-- **Types** and **constants** (optional): see [Types and constants of modules](#types-and-constants-of-modules).
+- **Types** (optional): see [Types of modules](#types-of-modules).
 - **Ports** and **submodules** (`modules`): see below.
 
-### Types and constants of modules
+### Types of modules
 
-A module has types and constants of its own, like those nested in a C++ class (or in an IDL module): user types (as in `types`) and constants (as in `constants`) with an `access`.
+A module has types of its own, like types nested in a C++ class (or in an IDL module): user types (as in `types`) with an `access`. A constant of a module is a `static` `const` attribute with a `default`.
 
 ```yaml
 modules:
@@ -130,14 +130,13 @@ modules:
               values: [{ name: None, value: 0 }, { name: LowPass, value: 1 }]
             }
           - { kind: struct, name: Sample, access: protected, fields: [...] }
-        constants:
-          - { name: HISTORY, type: { kind: primitive, name: uint16 }, value: 64 }
         attributes:
+          - { name: HISTORY, static: true, const: true, type: { kind: primitive, name: uint16 }, default: 64 }
           - { name: filter, type: { kind: ref, name: Core.Sensor.Filter }, default: LowPass }
 ```
 
 - They are named by their module's path: `Core.Sensor.Filter`; `Robot/Core.Sensor.Filter` for one of a module of dependency `Robot` (in `raises` too).
-- Their names are unique in their module (types and constants together), and apart from its attributes, methods, ports and submodules.
+- Their names are unique in their module, and apart from its attributes, methods, ports and submodules.
 - `access`: `public` (default, left out) for anyone, by path (the project's types, interfaces and constants too); `protected` for the module and those deriving from it; `private` for the module. A public member (or type of a module) using a less accessible type is a warning.
 
 ## Default values

@@ -265,13 +265,14 @@ modules:
                 kind: primitive
                 name: float64
               size: 2
-    constants:
+    attributes:
       - name: MAX_BANDS
+        static: true
+        const: true
         type:
           kind: primitive
           name: uint8
-        value: 8
-    attributes:
+        default: 8
       - name: bands
         type:
           kind: vector

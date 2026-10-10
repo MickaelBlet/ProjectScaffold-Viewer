@@ -42,13 +42,6 @@ modules:
                 type:
                   kind: primitive
                   name: uint64
-        constants:
-          - name: HISTORY
-            description: Samples kept for filtering
-            type:
-              kind: primitive
-              name: uint16
-            value: 64
         attributes:
           - name: rateHz
             type:

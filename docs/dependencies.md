@@ -45,7 +45,7 @@ The dependencies of a dependency come with it (`indirect`). They are read from t
 
 ### Explorer and Inspector
 
-- The Explorer shows a dependency's content in folding groups: _Constants_, _Types_, _Interfaces_, _Modules_. Modules are listed as a tree, each under its parent with its types and constants (in _Types_ and _Constants_ by path while the module is not listed), placed on the canvas, or dimmed when not (when its file can be read: open in a tab, next to the document in VS Code; in the browser, an IDL file picked in the session or open as text, e.g. by its _Open_ entry after a reload); double-click a top-level one to place it with its content.
+- The Explorer shows a dependency's content in folding groups: _Constants_, _Types_, _Interfaces_, _Modules_. Modules are listed as a tree, each under its parent with its types (in _Types_ by path while the module is not listed), placed on the canvas, or dimmed when not (when its file can be read: open in a tab, next to the document in VS Code; in the browser, an IDL file picked in the session or open as text, e.g. by its _Open_ entry after a reload); double-click a top-level one to place it with its content.
 - Clicking the dependency shows it in the Inspector: where it comes from, the dependencies it uses and is used by, its types and interfaces with their members and uses, filtered.
 - Its right-click menu opens it, refreshes it, places a module on the canvas, removes it (when nothing here uses it) or _detaches_ it: its types and interfaces become this project's own.
 
@@ -57,7 +57,7 @@ The dependencies of a dependency come with it (`indirect`). They are read from t
 
 ## Renames stay in sync
 
-Renaming a module (or a parent), a port, a type or constant (of a module too) or an interface in one project renames it in the open projects depending on it. Each document gets the change as its own undoable edit (and becomes unsaved).
+Renaming a module (or a parent), a port, a type (of a module too), a constant or an interface in one project renames it in the open projects depending on it. Each document gets the change as its own undoable edit (and becomes unsaved).
 
 Files that are not open catch up on _Refresh dependencies_: a placed module no longer found by its path is matched to the only other module with the same name (moved) or the same ports (renamed). The dialog lists what was renamed.
 
@@ -85,9 +85,6 @@ dependencies:
     moduleTypes: # the types of its modules, by module path (optional): the public ones are used as Robot/Core.Sensor.Filter
       - module: Core.Sensor
         types: [...]
-    moduleConstants: # the constants of its modules, by module path (optional)
-      - module: Core.Sensor
-        constants: [...]
     modules: # its modules placed on this canvas, with their attributes, methods and ports (optional): top-level ones with their content
       - module: Core
         ports: [{ name: control, role: in, interface: Control }]

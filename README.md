@@ -7,7 +7,7 @@ Saves a language-agnostic YAML/JSON file meant to feed code skeleton generators,
 
 ## Features
 
-- **Diagram editor**: nested modules with ports, attributes, methods, types and constants of their own, C++-like classes and inheritance with access levels, links with constraints (direction, acknowledgement, performance, transport), ELK auto-layout, views per module.
+- **Diagram editor**: nested modules with ports, attributes, methods and types of their own, C++-like classes and inheritance with access levels, links with constraints (direction, acknowledgement, performance, transport), ELK auto-layout, views per module.
 - **Text and diagram together**: the YAML/JSON file is editable as text beside the diagram, with completion and live validation.
 - **Multi-project architectures**: projects depend on each other's types, interfaces and modules; renames follow; workspace files open them all at once.
 - **IDL import**: OMG IDL 4.2 files (CORBA, CCM, DDS / XTypes) as imports or dependencies.

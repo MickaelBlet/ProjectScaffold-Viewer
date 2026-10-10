@@ -159,10 +159,6 @@ export function navigate(
   target: ProblemTarget,
   { zoom = false, stay = false }: { zoom?: boolean; stay?: boolean } = {}
 ): void {
-  // A constant of a module is edited in its module's inspector.
-  const owner =
-    target.kind === 'const' ? getProject().consts.find((c) => c.id === target.id)?.module : undefined
-  if (owner) return navigate({ kind: 'module', id: owner }, { zoom, stay })
   const before = activeDoc().selection
   if (target.kind === 'project' || target.kind === 'const') select({ kind: 'project' })
   else

@@ -83,11 +83,11 @@ export interface IdlFile {
   /** File defining each type, interface, constant and component, by name. */
   origins: Record<string, string>
   /**
-   * Innermost IDL module defining each type, interface and constant written in the files
+   * Innermost IDL module defining each type and interface written in the files
    * (`Robot::Control`, '' at file scope), by name.
    */
   scopes: Record<string, string>
-  /** Qualified IDL name of each type, interface and constant written in the files (`Robot::Status`), by name. */
+  /** Qualified IDL name of each type and interface written in the files (`Robot::Status`), by name. */
   qualified: Record<string, string>
   /** Files each file includes. */
   includes: Record<string, string[]>
@@ -2198,12 +2198,9 @@ class Parser {
 
     const pick = <K extends Entity['kind']>(kind: K) =>
       all.filter((e): e is Extract<Entity, { kind: K }> => e.kind === kind)
-    const written: [string, string][] = [
-      ...all
-        .filter((e) => !e.synthetic && e.kind !== 'component')
-        .map((e): [string, string] => [e.def.name, e.q]),
-      ...this.constDefs.map((c): [string, string] => [c.def.name, c.q])
-    ]
+    const written = all
+      .filter((e) => !e.synthetic && e.kind !== 'component')
+      .map((e): [string, string] => [e.def.name, e.q])
     return {
       types: pick('type').map((e) => e.def),
       interfaces: pick('interface').map((e) => e.def),
@@ -2552,8 +2549,8 @@ const componentScope = (c: IdlComponent): string => {
 
 /**
  * Modules standing for the IDL modules of the file `main`: one per IDL module holding definitions
- * or components (see `nestServers`), and per IDL module enclosing those; types and constants of
- * IDL modules are theirs (see `idlProject`). In files without components (plain CORBA IDL, DDS
+ * or components (see `nestServers`), and per IDL module enclosing those; types of IDL modules
+ * are theirs (see `idlProject`). In files without components (plain CORBA IDL, DDS
  * types), each provides the interfaces of its IDL module on `in` ports, the file's own module
  * those at file scope.
  */
@@ -2567,7 +2564,7 @@ function interfaceServers(idl: IdlFile, main: string): IdlServer[] {
     return byScope.get(scope)!
   }
   const serves = !hasComponents(idl, main, main)
-  for (const e of [...idl.types, ...idl.interfaces, ...idl.constants]) {
+  for (const e of [...idl.types, ...idl.interfaces]) {
     const scope = idl.scopes[e.name]
     if (scope === undefined || !own(e.name)) continue
     if (serves && 'messages' in e) add(scope).push(e)
@@ -2675,9 +2672,8 @@ function nestServers(
 }
 
 /**
- * Make the types and constants of the IDL modules of `p` those of their modules (`modules`, of
- * the file `main`), or of the modules of the included file defining them (by path), named simply
- * there. Returns the qualified IDL names of those named simply.
+ * Make the types of the IDL modules of `p` those of their modules (`modules`, of the file
+ * `main`), or of the modules of the included file defining them (by path), named simply there. Returns the qualified IDL names of those named simply.
  */
 function scopeDefinitions(
   p: Project,
@@ -2687,7 +2683,7 @@ function scopeDefinitions(
 ): Set<string> {
   const simply = new Set<string>()
   const taken = new Map<string, string[]>()
-  for (const e of [...p.types, ...p.consts]) {
+  for (const e of p.types) {
     const scope = idl.scopes[e.name]
     const q = idl.qualified[e.name]
     if (!scope || !q) continue

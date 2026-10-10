@@ -85,8 +85,8 @@ export interface Owned {
 }
 
 /**
- * Module owning a type or constant, like one nested in a C++ class (or in an IDL module): public
- * ones are usable anywhere by their qualified name, others by modules only, as their access allows.
+ * Module owning a type, like one nested in a C++ class (or in an IDL module): public ones are
+ * usable anywhere by their qualified name, others by modules only, as their access allows.
  */
 export interface Scoped {
   /** Module of this project owning it. */
@@ -498,7 +498,7 @@ export interface ImportedModule {
 }
 
 /** Named constant: a value of a type. */
-export interface ConstDef extends Owned, Scoped {
+export interface ConstDef extends Owned {
   id: Id
   name: string
   description: string
@@ -542,7 +542,7 @@ export interface Project {
   binaries: Binary[]
   types: TypeDef[]
   interfaces: Interface[]
-  /** Named constants; their names share the namespace of the types and interfaces (those of modules, their module's). */
+  /** Named constants; their names share the namespace of the types and interfaces. */
   consts: ConstDef[]
   modules: Module[]
   links: Link[]

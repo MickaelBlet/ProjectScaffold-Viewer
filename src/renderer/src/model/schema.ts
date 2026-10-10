@@ -212,8 +212,6 @@ const Constant = z
   })
   .meta({ id: 'Constant' })
 
-const ModuleConstant = Constant.extend({ access: ModuleAccess }).meta({ id: 'ModuleConstant' })
-
 const Param = Field.extend({
   name: Identifier.describe('name of the parameter'),
   type: typeRef('type of the parameter'),
@@ -290,7 +288,6 @@ export interface FileModule {
   color?: string
   binary?: string
   types?: z.infer<typeof ModuleTypeDef>[]
-  constants?: z.infer<typeof ModuleConstant>[]
   attributes?: z.infer<typeof Attribute>[]
   methods?: FileMethod[]
   ports: z.infer<typeof Port>[]
@@ -325,10 +322,6 @@ const Module: z.ZodType<FileModule> = z
         .describe(
           'types of the module, like types nested in a class (or in an IDL module), named Module.Path.Name'
         ),
-      constants: z
-        .array(ModuleConstant)
-        .optional()
-        .describe('constants of the module, like constants nested in a class, named Module.Path.Name'),
       attributes: z.array(Attribute).optional().describe('typed properties of the module'),
       methods: z.array(Method).optional().describe('method prototypes of the module'),
       ports: z.array(Port).describe('ports of the module, which links connect'),
@@ -380,15 +373,6 @@ const Dependency = z
       .describe(
         'types of its modules, as last read from it, by module path: its public ones are used by this project as Dependency/Module.Path.Name'
       ),
-    moduleConstants: z
-      .array(
-        z.object({
-          module: QualifiedName.describe('path of the module in the dependency'),
-          constants: z.array(ModuleConstant).describe('constants of the module')
-        })
-      )
-      .optional()
-      .describe('constants of its modules, as last read from it, by module path'),
     modules: z
       .array(
         z.object({
@@ -696,4 +680,3 @@ export type FileLink = z.infer<typeof Link>
 export type FileEditor = z.infer<typeof Editor>
 export type FileDependency = z.infer<typeof Dependency>
 export type FileConstant = z.infer<typeof Constant>
-export type FileModuleConstant = z.infer<typeof ModuleConstant>

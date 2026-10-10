@@ -3,7 +3,7 @@
 ProjectScaffold reads OMG IDL files (IDL 4.2: CORBA, CCM, DDS / XTypes) in three ways:
 
 - **Import**: _Insert › Import projects or IDL files_ (or right click the canvas / a module) adds one of their interfaces or components, or all, with the types they use (files without interfaces nor components: all their types). Types and interfaces this project has by name are used as they are.
-- **Dependency**: an IDL file can be a [dependency](dependencies.md). It stands for a project named after the file (types, interfaces, constants, components as modules to place; its IDL modules as nested modules holding their components, types and constants, and providing their interfaces on `in` ports in files without components), the files it includes being its dependencies. `scaffold-gen -d` generates it like a project file.
+- **Dependency**: an IDL file can be a [dependency](dependencies.md). It stands for a project named after the file (types, interfaces, constants, components as modules to place; its IDL modules as nested modules holding their components and types, and providing their interfaces on `in` ports in files without components), the files it includes being its dependencies. `scaffold-gen -d` generates it like a project file.
 - **Text**: see [Editing IDL files](#editing-idl-files).
 
 The import dialog lists what was approximated.
@@ -33,7 +33,7 @@ In [`examples/idl/`](../examples/idl):
 ### Scopes
 
 - Imported, modules are flattened: entities keep their simple name, qualified with their modules (`Robot_Status`) when several share it.
-- As a dependency, every IDL module holding definitions or components is a module (nested like them); the components, types and constants it defines are [those of that module](file-format.md#types-and-constants-of-modules), named simply there (`Plant.Tank`, `Robot.Status`), public. Those defined at file scope and interfaces stay the project's. In files without components, these modules provide the interfaces of their IDL module on `in` ports (the file's own module those at file scope).
+- As a dependency, every IDL module holding types, interfaces or components is a module (nested like them); the components and types it defines are [those of that module](file-format.md#types-of-modules), named simply there (`Plant.Tank`, `Robot.Status`), public. Those defined at file scope, interfaces and constants stay the project's. In files without components, these modules provide the interfaces of their IDL module on `in` ports (the file's own module those at file scope).
 - Scoped names (`::A::B`, inherited scopes) are resolved.
 - Template modules are instantiated (`module Buffers<long, 8> Longs;`).
 

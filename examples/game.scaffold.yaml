@@ -210,18 +210,21 @@ modules:
                 type:
                   kind: primitive
                   name: bool
-        constants:
+        attributes:
           - name: MAX_ENTITIES
+            static: true
+            const: true
             type:
               kind: primitive
               name: uint32
-            value: 4096
+            default: 4096
           - name: NONE
+            static: true
+            const: true
             type:
               kind: ref
               name: Entity
-            value: 4294967295
-        attributes:
+            default: 4294967295
           - name: slots
             access: private
             type:
@@ -350,21 +353,24 @@ modules:
                     type:
                       kind: ref
                       name: Entity
-            constants:
+            attributes:
               - name: GRAVITY
+                static: true
+                const: true
                 type:
                   kind: ref
                   name: Vec2
-                value:
+                default:
                   x: 0
                   y: 0
               - name: SUBSTEPS
                 access: private
+                static: true
+                const: true
                 type:
                   kind: primitive
                   name: uint8
-                value: 4
-            attributes:
+                default: 4
               - name: bodies
                 type:
                   kind: map
@@ -483,12 +489,14 @@ modules:
             type:
               kind: primitive
               name: uint16
-        constants:
+        attributes:
           - name: CHANNELS
+            static: true
+            const: true
             type:
               kind: primitive
               name: uint8
-            value: 32
+            default: 32
         ports: []
 links:
   - name: platform_tick

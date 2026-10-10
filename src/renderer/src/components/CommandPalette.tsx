@@ -4,7 +4,7 @@ import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'rea
 import { commands, keyLabel, runCommand } from '@/commands'
 import { formatValue } from '@/model/defaults'
 import { fuzzyFilter } from '@/model/fuzzy'
-import { constNames, modulePaths, typeNames } from '@/model/project'
+import { modulePaths, typeNames } from '@/model/project'
 import { GLOBAL_VIEW, type Id } from '@/model/types'
 import { getProject } from '@/store/project'
 import { storage } from '@/storage'
@@ -57,7 +57,7 @@ function entityEntries(): Entry[] {
   const p = getProject()
   const paths = modulePaths(p)
   const deps = new Map(p.dependencies.map((d) => [d.id, d.name]))
-  const qualified = new Map([...typeNames(p), ...constNames(p)])
+  const qualified = typeNames(p)
   // A dependency's entities by qualified name, so that its name finds them; those of modules by their path.
   const named = (e: { id: Id; name: string; dependency?: Id; module?: Id; modulePath?: string }): string =>
     e.module || e.modulePath

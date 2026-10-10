@@ -3,7 +3,6 @@ import { isReservedTypeName, mapTypeRef, printTypeExpr, walkTypeRef } from './ty
 import {
   GLOBAL_VIEW,
   type Access,
-  type ConstDef,
   type Orientation,
   type Id,
   type Dependency,
@@ -550,30 +549,22 @@ export function uniqueName(base: string, taken: Iterable<string>): string {
 
 /**
  * Names that must be unique together: user types, interfaces and constants share one namespace
- * (types and constants of modules have their module's).
+ * (types of modules have their module's).
  */
 export function globalTypeNames(p: Project, exceptId?: Id): string[] {
-  return [
-    ...p.types.filter((t) => !isModuleType(t)),
-    ...p.interfaces,
-    ...p.consts.filter((c) => !isModuleType(c))
-  ]
+  return [...p.types.filter((t) => !isModuleType(t)), ...p.interfaces, ...p.consts]
     .filter((e) => e.id !== exceptId)
     .map((e) => e.name)
 }
 
-// Types and constants of modules
+// Types of modules
 
-/** Whether a type or constant belongs to a module, of this project or of a dependency. */
+/** Whether a type belongs to a module, of this project or of a dependency. */
 export const isModuleType = (t: Scoped): boolean => !!t.module || !!t.modulePath
 
 /** Types of a module of this project. */
 export const moduleTypes = (p: Pick<Project, 'types'>, moduleId: Id): TypeDef[] =>
   p.types.filter((t) => t.module === moduleId)
-
-/** Constants of a module of this project. */
-export const moduleConsts = (p: Pick<Project, 'consts'>, moduleId: Id): ConstDef[] =>
-  p.consts.filter((c) => c.module === moduleId)
 
 /**
  * Names of the types as the file writes them, by id: `Name` for the project's and dependencies'
@@ -596,15 +587,8 @@ function qualifiedTypeName(
   return t.name
 }
 
-/** Names of the constants as the file writes them, by id (see `typeNames`). */
-export function constNames(p: Pick<Project, 'consts' | 'modules' | 'dependencies'>): Map<Id, string> {
-  const paths = modulePaths(p)
-  const deps = new Map(p.dependencies.map((x) => [x.id, x.name]))
-  return new Map(p.consts.map((c) => [c.id, qualifiedTypeName(c, paths, deps)]))
-}
-
-/** Name of a type or constant as the file writes it (see `typeNames`). */
-export function typeQualifiedName(p: Project, t: TypeDef | ConstDef): string {
+/** Name of a type as the file writes it (see `typeNames`). */
+export function typeQualifiedName(p: Project, t: TypeDef): string {
   if (!isModuleType(t)) return t.name
   return qualifiedTypeName(t, modulePaths(p), new Map(p.dependencies.map((x) => [x.id, x.name])))
 }
@@ -626,7 +610,6 @@ export function canUseType(p: Project, contextModuleId: Id | null, t: TypeDef): 
 export function refContext(p: Project, owner: UsageOwner): Id | null {
   if (owner.kind === 'module') return owner.id
   if (owner.kind === 'type') return p.types.find((t) => t.id === owner.id)?.module ?? null
-  if (owner.kind === 'const') return p.consts.find((c) => c.id === owner.id)?.module ?? null
   return null
 }
 
@@ -673,8 +656,8 @@ export function typeScope(p: Project, contextModuleId: Id | null): TypeScope {
 }
 
 export type NameTarget =
-  | { kind: 'type' | 'const'; id?: Id; module?: Id }
-  | { kind: 'interface'; id?: Id }
+  | { kind: 'type'; id?: Id; module?: Id }
+  | { kind: 'interface' | 'const'; id?: Id }
   | { kind: 'module'; id?: Id; parentId: Id | null }
   | { kind: 'port'; id?: Id; moduleId: Id }
   | { kind: 'other' }
@@ -692,7 +675,7 @@ export function nameError(p: Project, target: NameTarget, name: string): string 
     case 'interface':
     case 'const':
       if (isReservedTypeName(name)) return `'${name}' is a reserved type name`
-      if (target.kind !== 'interface' && target.module)
+      if (target.kind === 'type' && target.module)
         return moduleTypeNameError(p, target.module, name, target.id)
       if (globalTypeNames(p, target.id).includes(name))
         return `A type, interface or constant named '${name}' already exists`
@@ -712,21 +695,17 @@ export function nameError(p: Project, target: NameTarget, name: string): string 
   }
 }
 
-/** Check the name of a type or constant of a module: unique among its types, constants, members and submodules. */
+/** Check the name of a type of a module: unique among its types, members and submodules. */
 function moduleTypeNameError(p: Project, moduleId: Id, name: string, exceptId?: Id): string | null {
   const mod = p.modules.find((m) => m.id === moduleId)
-  if (
-    [...moduleTypes(p, moduleId), ...moduleConsts(p, moduleId)].some(
-      (e) => e.id !== exceptId && e.name === name
-    )
-  )
-    return `This module already has a type or constant named '${name}'`
+  if (moduleTypes(p, moduleId).some((t) => t.id !== exceptId && t.name === name))
+    return `This module already has a type named '${name}'`
   if (mod && memberNames(p, mod).includes(name))
     return `This module already has an attribute, method, port or submodule named '${name}'`
   return null
 }
 
-/** Names of a module's attributes, methods, ports and submodules: its types and constants take none of them. */
+/** Names of a module's attributes, methods, ports and submodules: its types take none of them. */
 export function memberNames(p: Project, m: Module): string[] {
   return [
     ...m.attributes.map((a) => a.name),
@@ -776,14 +755,7 @@ export function* allTypeRefs(
       for (const c of t.cases) yield { ref: c.type, where: `${name}.${c.name}`, owner, access }
     }
   }
-  const consts = constNames(p)
-  for (const c of p.consts)
-    yield {
-      ref: c.type,
-      where: consts.get(c.id)!,
-      owner: { kind: 'const', id: c.id },
-      access: isModuleType(c) ? (c.access ?? 'public') : undefined
-    }
+  for (const c of p.consts) yield { ref: c.type, where: c.name, owner: { kind: 'const', id: c.id } }
   for (const i of p.interfaces) {
     const owner = { kind: 'interface', id: i.id } as const
     for (const m of i.messages) {

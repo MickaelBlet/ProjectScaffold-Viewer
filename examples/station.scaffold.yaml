@@ -194,15 +194,6 @@ dependencies:
                 type:
                   kind: primitive
                   name: uint64
-    moduleConstants:
-      - module: Core.Sensor
-        constants:
-          - name: HISTORY
-            description: Samples kept for filtering
-            type:
-              kind: primitive
-              name: uint16
-            value: 64
     modules:
       - module: Core
         ports:

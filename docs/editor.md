@@ -22,7 +22,7 @@ Explorer, Inspector, Problems, Output, Search and Settings are dockable panels.
 
 - Drag a tab to dock it on any side, stack it with others or float it. The layout is kept; _Window › Reset panel layout_ restores the default one.
 - The Explorer's sections are reordered by dragging their header (or Alt+↑ / Alt+↓) and hidden from their right-click menu (_Reset sections_ restores them).
-- In the Explorer's _Modules_, dragging a module onto another (or onto the list) moves it inside (or to the top level). The modules of dependencies placed on the canvas follow the project's own, nested like in their project, each with its public types and constants.
+- In the Explorer's _Modules_, dragging a module onto another (or onto the list) moves it inside (or to the top level). The modules of dependencies placed on the canvas follow the project's own, nested like in their project, each with its public types.
 
 ### Views
 
@@ -112,11 +112,11 @@ Ctrl+C / X / V / D copy, cut, paste and duplicate several items at once: modules
 - Both can be `static` and `const` (checkboxes in the inspector), shown before their name on the canvas.
 - Both have an access level, `public` (default), `protected` or `private`, chosen with the `+ # -` buttons of the inspector and shown before their name on the canvas as in UML (`+ name`, `# name`, `- name`).
 
-### Types and constants of modules
+### Types of modules
 
-A module has types and constants of its own, like those nested in a C++ class:
+A module has types of its own, like types nested in a C++ class (its constants are `static` `const` attributes with a default value):
 
-- Add types from the _Types_ section of the module's inspector (one button per kind) or _New type of the module_ in its right-click menu in the Explorer; constants from its _Constants_ section, where they are edited, or _New constant of the module_. The Explorer lists them under their module with their access mark. The type's inspector moves a type to a module or back to the project (_Module_) and sets its access.
+- Add them from the _Types_ section of the module's inspector (one button per kind) or _New type of the module_ in its right-click menu in the Explorer, which lists them under their module with their access mark. The type's inspector moves a type to a module or back to the project (_Module_) and sets its access.
 - `+ # -` sets who uses them: anyone (`public`), the module and the modules deriving from it (`protected`), the module only (`private`).
 - In a module, type expressions name its own types and those of its bases by name, the others by their path: `Core.Sensor.Filter` (`Robot/Core.Sensor.Filter` for those of a dependency's modules). Outside modules, only public ones are offered, by path.
 

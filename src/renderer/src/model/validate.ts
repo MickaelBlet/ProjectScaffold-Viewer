@@ -8,11 +8,9 @@ import {
   globalTypeNames,
   isModuleType,
   memberNames,
-  moduleConsts,
   moduleTypes,
   refContext,
   typeNames,
-  constNames,
   findImported,
   findPort,
   IDENTIFIER_RE,
@@ -75,7 +73,6 @@ export function validate(p: Project): Problem[] {
   }
   const types = new Map(p.types.map((t) => [t.id, t]))
   const interfaces = new Map(p.interfaces.map((i) => [i.id, i]))
-  const modules = new Set(p.modules.map((m) => m.id))
 
   /** Follow aliases to the underlying type; null for dangling or cyclic aliases. */
   const resolve = (t: TypeRef, seen = new Set<Id>()): TypeRef | TypeDef | null => {
@@ -123,15 +120,11 @@ export function validate(p: Project): Problem[] {
   for (const n of duplicates(globalTypeNames(p)))
     push('error', { kind: 'project' }, `Duplicate type/interface/constant name '${n}'`)
 
-  const constName = constNames(p)
   for (const c of p.consts) {
     const target = { kind: 'const', id: c.id } as const
-    const name = constName.get(c.id)!
     if (isReservedTypeName(c.name)) push('error', target, `'${c.name}' is a reserved type name`)
-    if (c.module && !modules.has(c.module))
-      push('error', target, `Constant '${c.name}': its module was deleted`)
-    checkTypeRef(c.type, target, name)
-    for (const e of valueErrors(c.value, c.type, p.types)) push('error', target, `Constant '${name}': ${e}`)
+    checkTypeRef(c.type, target, c.name)
+    for (const e of valueErrors(c.value, c.type, p.types)) push('error', target, `Constant '${c.name}': ${e}`)
   }
 
   for (const t of p.types) {
@@ -327,13 +320,13 @@ export function validate(p: Project): Problem[] {
       push('error', target, `${path}: runs in no binary (the project has binaries)`)
     for (const n of duplicates(m.ports.map((pt) => pt.name)))
       push('error', target, `${path}: duplicate port '${n}'`)
-    const ownTypes = [...moduleTypes(p, m.id), ...moduleConsts(p, m.id)]
+    const ownTypes = moduleTypes(p, m.id)
     for (const n of duplicates(ownTypes.map((t) => t.name)))
-      push('error', target, `${path}: duplicate type or constant '${n}'`)
+      push('error', target, `${path}: duplicate type '${n}'`)
     const members = new Set(memberNames(p, m))
     for (const t of ownTypes)
       if (members.has(t.name))
-        push('error', target, `${path}: '${t.name}' is both a type or constant and a member or submodule`)
+        push('error', target, `${path}: '${t.name}' is both a type and a member or submodule`)
     for (const n of duplicates(m.attributes.map((a) => a.name)))
       push('error', target, `${path}: duplicate attribute '${n}'`)
     for (const a of m.attributes) {

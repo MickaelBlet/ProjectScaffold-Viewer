@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { fromFile, loadText, saveText, toFile } from '@/model/serialize'
 import { validate } from '@/model/validate'
 import { parseTypeExpr, printTypeExpr } from '@/model/typeExpr'
-import { canUseType, constNames, modulePath, nameError, typeNames, typeScope } from '@/model/project'
+import { canUseType, modulePath, nameError, typeNames, typeScope } from '@/model/project'
 import { diffRenames } from '@/model/sync'
 import { applyDependencyRenames } from '@/model/dependencies'
 import { outline } from '@/model/outline'
@@ -145,9 +145,7 @@ describe('types of modules', () => {
     expect(nameError(p, { kind: 'type', module: sensor.id }, 'Mode')).toBeNull()
     expect(nameError(p, { kind: 'type' }, 'Filter')).toBeNull()
     const clash = produce(p, (d) => void (typeOf(d, 'Core.Sensor.Filter').name = 'filter'))
-    expect(messages(clash)).toEqual([
-      "Core.Sensor: 'filter' is both a type or constant and a member or submodule"
-    ])
+    expect(messages(clash)).toEqual(["Core.Sensor: 'filter' is both a type and a member or submodule"])
   })
 
   it('carries renames of modules and of their types to dependent projects', () => {
@@ -201,83 +199,6 @@ describe('types of modules', () => {
       0,
       'types',
       1
-    ])
-  })
-})
-
-describe('constants of modules', () => {
-  const constOf = (p: Project, key: string) => p.consts.find((c) => constNames(p).get(c.id) === key)!
-
-  it('loads them owned by their module, and writes them back there', () => {
-    const p = fromFile(example)
-    const history = constOf(p, 'Core.Sensor.HISTORY')
-    expect(history.module).toBe(byPath(p, 'Core.Sensor').id)
-    const file = toFile(p, { editor: false })
-    expect(file.constants ?? []).toEqual([])
-    expect(file.modules[0]!.modules![0]!.constants).toEqual(example.modules[0].modules[0].constants)
-    expect(messages(load())).toEqual([])
-  })
-
-  it('reads those of the modules of a dependency by their path', () => {
-    const station = fromFile(YAML.parse(readFileSync('examples/station.scaffold.yaml', 'utf8')))
-    expect(constOf(station, 'Robot/Core.Sensor.HISTORY')).toMatchObject({
-      modulePath: 'Core.Sensor',
-      value: 64
-    })
-    expect(
-      toFile(station, { editor: false }).dependencies!.find((x) => x.name === 'Robot')!.moduleConstants
-    ).toEqual([{ module: 'Core.Sensor', constants: [expect.objectContaining({ name: 'HISTORY' })] }])
-  })
-
-  it('names them uniquely in their module, with its types and members', () => {
-    const p = load()
-    const sensor = byPath(p, 'Core.Sensor')
-    expect(nameError(p, { kind: 'const', module: sensor.id }, 'Filter')).toMatch(
-      /already has a type or constant/
-    )
-    expect(nameError(p, { kind: 'type', module: sensor.id }, 'HISTORY')).toMatch(
-      /already has a type or constant/
-    )
-    expect(nameError(p, { kind: 'const', module: sensor.id }, 'rateHz')).toMatch(/attribute, method/)
-    expect(nameError(p, { kind: 'const' }, 'HISTORY')).toBeNull()
-    const clash = produce(p, (d) => void (constOf(d, 'Core.Sensor.HISTORY').name = 'Filter'))
-    expect(messages(clash)).toEqual(["Core.Sensor: duplicate type or constant 'Filter'"])
-  })
-
-  it('carries their renames to dependent projects', () => {
-    const p = load()
-    const next = produce(p, (d) => void (byPath(d, 'Core.Sensor').name = 'Lidar'))
-    const r = diffRenames(p, next)!
-    expect(r.moduleConsts).toEqual(new Map([['Core.Sensor.HISTORY', 'Core.Lidar.HISTORY']]))
-    expect(r.consts.size).toBe(0)
-    const station = fromFile(YAML.parse(readFileSync('examples/station.scaffold.yaml', 'utf8')))
-    const after = produce(station, (d) => applyDependencyRenames(d, 'robot.scaffold.yaml', r))
-    expect(constOf(after, 'Robot/Core.Lidar.HISTORY')).toBeDefined()
-  })
-
-  it('copies them with their module', () => {
-    const p = load()
-    const q = produce(
-      p,
-      (d) => void pasteClip(d, copyItems(p, [byPath(p, 'Core.Sensor').id])!, { parent: 'original' })
-    )
-    const copy = q.modules.find((m) => m.name === 'Sensor2')!
-    expect(q.consts.filter((c) => c.module === copy.id).map((c) => c.name)).toEqual(['HISTORY'])
-    expect(messages(q)).toEqual([])
-  })
-
-  it('outlines and locates them in the text', () => {
-    const core = outline(exampleText).find((n) => n.name === 'Modules')!.children[0]!
-    const sensor = core.children.find((n) => n.name === 'Sensor')!
-    expect(sensor.children.find((n) => n.name === 'HISTORY')?.kind).toBe('constant')
-    const p = fromFile(example)
-    expect(targetPath(example, p, { kind: 'const', id: constOf(p, 'Core.Sensor.HISTORY').id })).toEqual([
-      'modules',
-      0,
-      'modules',
-      0,
-      'constants',
-      0
     ])
   })
 })

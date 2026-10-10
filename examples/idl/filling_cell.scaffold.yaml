@@ -484,6 +484,12 @@ dependencies:
           - name: release
             params: []
             returns: null
+    constants:
+      - name: JOINTS
+        type:
+          kind: primitive
+          name: uint16
+        value: 6
     moduleTypes:
       - module: Robot
         types:
@@ -558,19 +564,22 @@ dependencies:
                 type:
                   kind: primitive
                   name: uint16
-    moduleConstants:
-      - module: Robot
-        constants:
-          - name: JOINTS
-            type:
-              kind: primitive
-              name: uint16
-            value: 6
   - name: sensors_dds
     file: sensors_dds.idl
     indirect: true
     types: []
     interfaces: []
+    constants:
+      - name: MAX_POINTS
+        type:
+          kind: primitive
+          name: int32
+        value: 1024
+      - name: MAX_ID
+        type:
+          kind: primitive
+          name: int32
+        value: 16
     moduleTypes:
       - module: Sensors
         types:
@@ -722,19 +731,6 @@ dependencies:
                   kind: primitive
                   name: string
                 default: true
-    moduleConstants:
-      - module: Sensors
-        constants:
-          - name: MAX_POINTS
-            type:
-              kind: primitive
-              name: int32
-            value: 1024
-          - name: MAX_ID
-            type:
-              kind: primitive
-              name: int32
-            value: 16
 editor:
   layout:
     Cell:

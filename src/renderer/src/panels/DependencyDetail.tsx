@@ -401,9 +401,7 @@ export function DependencyDetail({ lib }: { lib: Dependency }): ReactNode {
                 <div className="lib-entity-head">
                   <span className="chevron" aria-hidden />
                   <span className="kind-badge const">C</span>
-                  <span className="lib-entity-name">
-                    {c.modulePath ? `${c.modulePath}.${c.name}` : c.name}
-                  </span>
+                  <span className="lib-entity-name">{c.name}</span>
                   <small>
                     {print(c.type)} = {formatValue(c.value)}
                   </small>

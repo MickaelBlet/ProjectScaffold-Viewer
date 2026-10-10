@@ -388,31 +388,6 @@
                   ]
                 }
               },
-              "moduleConstants": {
-                "description": "constants of its modules, as last read from it, by module path",
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "module": {
-                      "type": "string",
-                      "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$",
-                      "description": "path of the module in the dependency"
-                    },
-                    "constants": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/$defs/ModuleConstant"
-                      },
-                      "description": "constants of the module"
-                    }
-                  },
-                  "required": [
-                    "module",
-                    "constants"
-                  ]
-                }
-              },
               "modules": {
                 "description": "its modules placed on this canvas so that links reach them, with their attributes, methods and ports as last read (types named as in this project): top-level modules, each with all the modules inside it",
                 "type": "array",
@@ -1996,13 +1971,6 @@
             "$ref": "#/$defs/ModuleTypeDef"
           }
         },
-        "constants": {
-          "description": "constants of the module, like constants nested in a class, named Module.Path.Name",
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/ModuleConstant"
-          }
-        },
         "attributes": {
           "description": "typed properties of the module",
           "type": "array",
@@ -2644,42 +2612,6 @@
           ],
           "description": "custom primitive: an opaque type that generators map to a native type"
         }
-      ]
-    },
-    "ModuleConstant": {
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string",
-          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
-          "description": "name of the constant"
-        },
-        "description": {
-          "description": "free text documenting it",
-          "type": "string"
-        },
-        "type": {
-          "description": "type of the value",
-          "$ref": "#/$defs/TypeRef"
-        },
-        "value": {
-          "description": "checked against the type, as default values are",
-          "$ref": "#/$defs/__schema1"
-        },
-        "access": {
-          "description": "public (default): used anywhere; protected: by the module and the modules deriving from it; private: by the module",
-          "type": "string",
-          "enum": [
-            "public",
-            "protected",
-            "private"
-          ]
-        }
-      },
-      "required": [
-        "name",
-        "type",
-        "value"
       ]
     },
     "TransportSettings": {

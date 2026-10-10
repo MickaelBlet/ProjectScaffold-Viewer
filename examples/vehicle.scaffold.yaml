@@ -237,13 +237,14 @@ modules:
             interface: TorqueCommand
       - name: Bms
         description: Battery management
-        constants:
+        attributes:
           - name: CELLS
+            static: true
+            const: true
             type:
               kind: primitive
               name: uint8
-            value: 96
-        attributes:
+            default: 96
           - name: maxCellTemp
             type:
               kind: primitive
