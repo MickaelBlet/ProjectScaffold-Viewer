@@ -602,11 +602,61 @@ export function ExplorerPanel(): ReactNode {
     if (!next.delete(id)) next.add(id)
     setCollapsed(next)
   }
+  // Modules of dependencies placed on the canvas, after the project's own: nested under their parent
+  // (all open while filtering), each with its public types and constants first.
+  const imported = dependencies.flatMap((dep) => dep.modules.map((m) => ({ dep, m })))
+  const publicOf = new Map<string, { types: TypeDef[]; consts: ConstDef[] }>()
+  for (const e of [...types, ...consts])
+    if (e.dependency && e.modulePath && !e.access) {
+      const key = `${e.dependency}|${e.modulePath}`
+      const of = publicOf.get(key) ?? { types: [], consts: [] }
+      publicOf.set(key, of)
+      if ('value' in e) of.consts.push(e)
+      else of.types.push(e)
+    }
+  const shownImported: (
+    | { kind: 'module'; dep: Dependency; m: ImportedModule; depth: number; parent: boolean; open: boolean }
+    | { kind: 'type'; dep: Dependency; t: TypeDef; depth: number }
+    | { kind: 'const'; dep: Dependency; c: ConstDef; depth: number }
+  )[] = []
+  const importedParents: Id[] = []
+  for (const dep of dependencies) {
+    const children = new Map<string | null, ImportedModule[]>()
+    for (const m of dep.modules) {
+      const parent = importedParent(dep, m)?.path ?? null
+      children.set(parent, [...(children.get(parent) ?? []), m])
+    }
+    const own = (m: ImportedModule) => publicOf.get(`${dep.id}|${m.path}`) ?? { types: [], consts: [] }
+    const hits = (m: ImportedModule): boolean => {
+      const { types: t, consts: c } = own(m)
+      return (
+        match(m.path) || [...t, ...c].some((e) => match(e.name)) || (children.get(m.path) ?? []).some(hits)
+      )
+    }
+    const visit = (m: ImportedModule, depth: number): void => {
+      if (f && !hits(m)) return
+      const kids = children.get(m.path) ?? []
+      const { types: t, consts: c } = own(m)
+      const parent = kids.length + t.length + c.length > 0
+      if (parent) importedParents.push(m.id)
+      const open = !!f || !collapsed.has(m.id)
+      shownImported.push({ kind: 'module', dep, m, depth, parent, open })
+      if (!open) return
+      const all = match(m.path)
+      for (const x of t)
+        if (all || match(x.name)) shownImported.push({ kind: 'type', dep, t: x, depth: depth + 1 })
+      for (const x of c)
+        if (all || match(x.name)) shownImported.push({ kind: 'const', dep, c: x, depth: depth + 1 })
+      for (const k of kids) visit(k, depth + 1)
+    }
+    for (const m of children.get(null) ?? []) visit(m, 0)
+  }
   // Folds every module with submodules, dependency and dependency group, or unfolds them all.
   const foldable = [
     ...modules
       .filter((m) => moduleChildren.has(m.id) || typesOfModules.has(m.id) || constsOfModules.has(m.id))
       .map((m) => m.id),
+    ...importedParents,
     ...dependencies.flatMap((d) => [d.id, ...DEPENDENCY_GROUPS.map((g) => `${d.id}/${g}`)])
   ]
   const someOpen = foldable.some((key) => !collapsed.has(key))
@@ -634,9 +684,6 @@ export function ExplorerPanel(): ReactNode {
     }
   }
   walk(moduleChildren.get(null) ?? [], 0)
-  // Modules of dependencies placed on the canvas, after the project's own (always top level).
-  const imported = dependencies.flatMap((dep) => dep.modules.map((m) => ({ dep, m })))
-  const shownImported = imported.filter(({ m }) => match(paths.get(m.id) ?? m.path))
   const shownBinaries = binaries.filter((b) => match(b.name))
   const binaryIds = shownBinaries.map((b) => b.id)
   const shownLinks = allLinks.filter((x) => match(x.l.name) || match(x.from) || match(x.to))
@@ -644,7 +691,7 @@ export function ExplorerPanel(): ReactNode {
   const interfaceIds = shownInterfaces.map((i) => i.id)
   const moduleIds = [
     ...shownModules.map((x) => (x.kind === 'module' ? x.m.id : x.kind === 'type' ? x.t.id : x.c.id)),
-    ...shownImported.map((x) => x.m.id)
+    ...shownImported.map((x) => (x.kind === 'module' ? x.m.id : x.kind === 'type' ? x.t.id : x.c.id))
   ]
   const linkIds = shownLinks.map((x) => x.l.id)
   const viewStop = tabStop(viewItems, (id) => id === activeViewId)
@@ -1212,24 +1259,94 @@ export function ExplorerPanel(): ReactNode {
               </Item>
             )
           })}
-          {shownImported.map(({ dep, m }) => (
-            <Item
-              key={m.id}
-              selected={isSelected(m.id)}
-              tabStop={m.id === moduleStop}
-              className={isSelected(m.id) ? 'active' : ''}
-              title={`${m.path} of ${dep.name} (${dep.file}), placed on the canvas`}
-              style={indent(0)}
-              onClick={(e) => clickItem(e, m.id, moduleIds)}
-              onDoubleClick={() => navigate({ kind: 'module', id: m.id })}
-              onContextMenu={(e) => importedMenu(e, dep, m)}
-            >
-              {leaf}
-              <span className="kind-badge mod">M</span>
-              <span className="tree-name">{m.path}</span>
-              <small>{dep.name}</small>
-            </Item>
-          ))}
+          {shownImported.map((row) => {
+            const { dep } = row
+            if (row.kind === 'type') {
+              const t = row.t
+              return (
+                <Item
+                  key={t.id}
+                  selected={isSelected(t.id)}
+                  tabStop={t.id === moduleStop}
+                  className={`module-type ${isSelected(t.id) ? 'active' : ''}`}
+                  title={`public ${t.kind} ${dep.name}/${t.modulePath}.${t.name}`}
+                  style={indent(row.depth)}
+                  onClick={(e) => clickItem(e, t.id, moduleIds)}
+                  onDoubleClick={() => openEditor('type', t.id)}
+                  onContextMenu={(e) => entityMenu(e, 'type', t.id)}
+                >
+                  {leaf}
+                  <span className={`kind-badge ${t.kind}`} title={t.kind}>
+                    {KIND_BADGE[t.kind]}
+                  </span>
+                  <span className="tree-name">{t.name}</span>
+                </Item>
+              )
+            }
+            if (row.kind === 'const') {
+              const c = row.c
+              return (
+                <Item
+                  key={c.id}
+                  selected={false}
+                  tabStop={c.id === moduleStop}
+                  className="module-type"
+                  title={`public constant ${dep.name}/${c.modulePath}.${c.name}${c.description ? `\n${c.description}` : ''}\nShown with its dependency in the Inspector.`}
+                  style={indent(row.depth)}
+                  onClick={() => {
+                    revealInspector()
+                    showDependency(dep.id)
+                  }}
+                  onContextMenu={(e) => {
+                    e.preventDefault()
+                    openContextMenu(e, [
+                      { label: 'Show its dependency', run: () => showDependency(dep.id) },
+                      { label: `Open ${dep.file}`, run: () => openImportSource(dep.file) }
+                    ])
+                  }}
+                >
+                  {leaf}
+                  <span className="kind-badge const">C</span>
+                  <span className="tree-name">{c.name}</span>
+                  <small>{formatValue(c.value)}</small>
+                </Item>
+              )
+            }
+            const { m, depth, parent, open } = row
+            return (
+              <Item
+                key={m.id}
+                selected={isSelected(m.id)}
+                tabStop={m.id === moduleStop}
+                className={isSelected(m.id) ? 'active' : ''}
+                title={`${m.path} of ${dep.name} (${dep.file}), placed on the canvas`}
+                style={indent(depth)}
+                onClick={(e) => clickItem(e, m.id, moduleIds)}
+                onKeyDown={(e) => {
+                  // Right expands, Left collapses.
+                  if (!parent || f || e.key !== (open ? 'ArrowLeft' : 'ArrowRight')) return
+                  e.preventDefault()
+                  toggle(m.id)
+                }}
+                onDoubleClick={() => navigate({ kind: 'module', id: m.id })}
+                onContextMenu={(e) => importedMenu(e, dep, m)}
+              >
+                <span
+                  className="chevron"
+                  aria-hidden
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (parent) toggle(m.id)
+                  }}
+                >
+                  {parent && <Icon name={open ? 'chevron-down' : 'chevron-right'} />}
+                </span>
+                <span className="kind-badge mod">M</span>
+                <span className="tree-name">{leafName(m.path, depth)}</span>
+                <small>{depth ? (m.ports.length ? `${m.ports.length}p` : '') : dep.name}</small>
+              </Item>
+            )
+          })}
           {!shownModules.length && !shownImported.length && (
             <Empty>{f ? 'No match' : 'No modules yet'}</Empty>
           )}

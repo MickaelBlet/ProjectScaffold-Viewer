@@ -22,7 +22,7 @@ Explorer, Inspector, Problems, Output, Search and Settings are dockable panels.
 
 - Drag a tab to dock it on any side, stack it with others or float it. The layout is kept; _Window › Reset panel layout_ restores the default one.
 - The Explorer's sections are reordered by dragging their header (or Alt+↑ / Alt+↓) and hidden from their right-click menu (_Reset sections_ restores them).
-- In the Explorer's _Modules_, dragging a module onto another (or onto the list) moves it inside (or to the top level). The modules of dependencies placed on the canvas follow the project's own.
+- In the Explorer's _Modules_, dragging a module onto another (or onto the list) moves it inside (or to the top level). The modules of dependencies placed on the canvas follow the project's own, nested like in their project, each with its public types and constants.
 
 ### Views
 
