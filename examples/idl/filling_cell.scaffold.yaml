@@ -314,8 +314,24 @@ dependencies:
       - module: Plant
         ports: []
       - module: Plant.Equipment
+        attributes:
+          - name: serial
+            const: true
+            type:
+              kind: primitive
+              name: string
+        methods:
+          - name: calibrate
+            params: []
+            returns: null
         ports: []
       - module: Plant.Tank
+        attributes:
+          - name: capacity
+            type:
+              kind: primitive
+              name: float64
+            description: m3
         ports:
           - name: inlet
             role: in
@@ -335,6 +351,14 @@ dependencies:
             role: out
             interface: Maintenance
       - module: Plant.Supervisor
+        attributes:
+          - name: tanks
+            type:
+              kind: vector
+              of:
+                kind: primitive
+                name: string
+              max: 4
         ports:
           - name: levels
             role: in

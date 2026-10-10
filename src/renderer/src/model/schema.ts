@@ -336,10 +336,17 @@ const Dependency = z
       .optional()
       .describe('constants of its modules, as last read from it, by module path'),
     modules: z
-      .array(z.object({ module: QualifiedName, ports: z.array(Port) }))
+      .array(
+        z.object({
+          module: QualifiedName,
+          attributes: z.array(Attribute).optional(),
+          methods: z.array(Method).optional(),
+          ports: z.array(Port)
+        })
+      )
       .optional()
       .describe(
-        'its modules placed on this canvas so that links reach them, with their ports as last read: top-level modules, each with all the modules inside it'
+        'its modules placed on this canvas so that links reach them, with their attributes, methods and ports as last read (types named as in this project): top-level modules, each with all the modules inside it'
       )
   })
   .describe(
@@ -564,6 +571,7 @@ export type FileModuleTypeDef = z.infer<typeof ModuleTypeDef>
 export type FileMessage = z.infer<typeof Message>
 export type FileInterface = z.infer<typeof Interface>
 export type FileMethod = z.infer<typeof Method>
+export type FileAttribute = z.infer<typeof Attribute>
 export type FileLink = z.infer<typeof Link>
 export type FileEditor = z.infer<typeof Editor>
 export type FileDependency = z.infer<typeof Dependency>

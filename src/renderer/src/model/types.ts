@@ -484,6 +484,10 @@ export interface ImportedModule {
   id: Id
   /** Qualified module path in the other project. */
   path: string
+  /** Attributes as last read (absent: none), their types those of the dependencies here. */
+  attributes?: Attribute[]
+  /** Methods as last read (absent: none), their types those of the dependencies here. */
+  methods?: Method[]
   ports: ImportedPort[]
   /** Editor-only absolute canvas position. */
   position: { x: number; y: number }

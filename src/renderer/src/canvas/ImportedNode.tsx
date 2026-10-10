@@ -5,6 +5,7 @@ import type { ImportedPort, LinkAnchor, Side } from '@/model/types'
 import { setModuleLayout, useProjectStore } from '@/store/project'
 import { Icon } from '@/components/Icon'
 import type { PortNodeData } from './flowGraph'
+import { Attributes, Methods } from './ModuleNode'
 import { anchorStyle, inward, PortPoint } from './PortPoint'
 import { usePortLayout } from './usePortLayout'
 import { useDrawn } from './viewContext'
@@ -21,6 +22,7 @@ export const ImportedNode = memo(function ImportedNode({
   // As the canvas's view draws it (outside a drill-down view: its ports linked to the view).
   const dep = useDrawn((p) => p.dependencies.find((x) => x.modules.some((m) => m.id === id)))
   const interfaces = useProjectStore((s) => s.project.interfaces)
+  const types = useProjectStore((s) => s.project.types)
   const orientation = useProjectStore((s) => s.project.orientation)
   const module = dep?.modules.find((m) => m.id === id)
   const { floating, anchors, top, bottom, left, right } = usePortLayout(
@@ -97,6 +99,8 @@ export const ImportedNode = memo(function ImportedNode({
           )}
         </span>
       </div>
+      {!!module.attributes?.length && <Attributes attributes={module.attributes} types={types} />}
+      {!!module.methods?.length && <Methods methods={module.methods} types={types} />}
       {rows > 0 && (
         // A container's side ports are centered on its frame, over its content.
         <div className={`module-ports ${content.length ? 'framed' : ''}`}>

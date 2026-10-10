@@ -25,10 +25,12 @@ import {
   growImportedAncestors,
   importedSize,
   LAYOUT_PAD,
-  modulePath
+  modulePath,
+  typeNames
 } from '@/model/project'
+import { printTypeRef } from '@/model/typeExpr'
 import { validate } from '@/model/validate'
-import type { ImportedModule, Module, Project } from '@/model/types'
+import type { ImportedModule, Module, Project, TypeRef } from '@/model/types'
 
 const jsonSchema = JSON.parse(readFileSync('schema/scaffold.schema.json', 'utf8'))
 const load = (yaml: string): Project => fromFile(YAML.parse(yaml))
@@ -453,6 +455,37 @@ describe('placed modules', () => {
     expect(p.types.find((t) => t.name === 'Primitive')!.dependency).toBe(p.dependencies[0]!.id)
     expect(modulePath(p, sensorOf(p).id)).toBe('Robot/Core.Sensor')
     expect(errors(p)).toEqual([])
+  })
+
+  it('places modules with their attributes and methods, typed with the types here', () => {
+    const { p } = monitor()
+    const names = typeNames(p)
+    const type = (t: TypeRef) => printTypeRef(t, (id) => names.get(id))
+    expect(sensorOf(p).attributes!.map((a) => [a.name, type(a.type)])).toEqual([
+      ['rateHz', 'float32'],
+      ['maxRateHz', 'float32'],
+      ['filter', 'Robot/Core.Sensor.Filter'],
+      ['last', 'Robot/Core.Sensor.Sample']
+    ])
+    const controller = p.dependencies[0]!.modules.find((m) => m.path === 'Core.Controller')!
+    expect(controller.methods!.map((m) => [m.name, m.params.map((prm) => type(prm.type))])).toEqual([
+      ['setMode', ['Mode']],
+      ['tune', ['Robot/Core.Sensor.Filter']],
+      ['reset', []],
+      ['isRunning', []],
+      ['instances', []]
+    ])
+    // Saved and read back as they are, valid against the JSON Schema.
+    const file = toFile(p, { editor: true })
+    expect(new Ajv2020({ strict: false }).validate(jsonSchema, JSON.parse(JSON.stringify(file)))).toBe(true)
+    const back = fromFile(file)
+    expect(toFile(back, { editor: true })).toEqual(file)
+    expect(errors(back)).toEqual([])
+    // Refreshed from the same project: unchanged.
+    const fresh = produce(p, (d) => {
+      refreshDependencies(d, new Map([[d.dependencies[0]!.id, robot]]), 'station.scaffold.yaml')
+    })
+    expect(fresh.dependencies[0]!.modules).toBe(p.dependencies[0]!.modules)
   })
 
   it('reuses the dependency and an already placed module', () => {

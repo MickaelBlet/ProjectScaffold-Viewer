@@ -28,7 +28,7 @@ _Insert › Add dependency…_ (or + in the Explorer's _Dependencies_) picks an 
 
 _Insert › Link to another project…_ (or the canvas menu) picks a dependency or another project, then one of its top-level modules.
 
-- The module is drawn in the project view (dashed, `↗ Project`, resizable), with ports linked to like any other.
+- The module is drawn in the project view (dashed, `↗ Project`, resizable), with its attributes and methods (read-only, also in its inspector) and ports linked to like any other.
 - It comes with all the modules inside it, drawn where its project puts them; move and resize them in it (it grows to hold them; kept on refresh), they are removed with it; their ports are linked to as well. A module placed alone by an earlier version is placed with its top-level module on the next refresh, its links kept.
 - The project becomes a dependency if it was not one, so the interfaces of its ports are used here, not copied.
 - Double-click a placed module to switch to its project's tab.
@@ -87,10 +87,12 @@ dependencies:
     moduleConstants: # the constants of its modules, by module path (optional)
       - module: Core.Sensor
         constants: [...]
-    modules: # its modules placed on this canvas, with their ports (optional): top-level ones with their content
+    modules: # its modules placed on this canvas, with their attributes, methods and ports (optional): top-level ones with their content
       - module: Core
         ports: [{ name: control, role: in, interface: Control }]
       - module: Core.Sensor
+        attributes: [...] # as in `modules[].attributes` (optional)
+        methods: [...] # as in `modules[].methods` (optional)
         ports: [{ name: out, role: out, interface: Telemetry }]
   - name: Common
     file: common.scaffold.yaml
@@ -109,6 +111,7 @@ links:
 - This project uses the public types of a dependency's modules by their path after the dependency's name: `Robot/Core.Sensor.Filter`.
 - A dependency's types and interfaces only reference their own dependency's and those of the dependencies it `uses`.
 - A placed port's interface is matched by name with those of this project and its dependencies.
+- The types of placed attributes and methods are named as in this project: `Mode`, `Robot/Core.Sensor.Filter`.
 - One end of a link must be in this project.
 
 Generated code: the types and interfaces of dependencies are included from their own generated code; `scaffold-gen -d` generates the dependencies too ([ProjectScaffold-Generator › Command line](https://github.com/MickaelBlet/ProjectScaffold-Generator/blob/master/docs/code-generation.md#command-line)).

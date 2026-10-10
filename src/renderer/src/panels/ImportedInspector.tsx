@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
-import { findImported, IDENTIFIER_RE, importedParent } from '@/model/project'
+import { ACCESS_MARKS, findImported, IDENTIFIER_RE, importedParent, typeNames } from '@/model/project'
+import { printTypeRef } from '@/model/typeExpr'
 import { deleteItems, renameDependency, useProjectStore } from '@/store/project'
 import { select } from '@/store/ui'
 import { navigate, openImportSource, refreshDependencies, showDependency } from '@/actions'
@@ -14,6 +15,10 @@ export function ImportedInspector({ id }: { id: string }): ReactNode {
   // Content of a placed module: placed and removed with it.
   const parent = importedParent(dep, module)
   const links = project.links.filter((l) => l.from.moduleId === id || l.to.moduleId === id)
+  const names = typeNames(project)
+  const type = (t: Parameters<typeof printTypeRef>[0]): string => printTypeRef(t, (x) => names.get(x))
+  const attributes = module.attributes ?? []
+  const methods = module.methods ?? []
 
   return (
     <>
@@ -38,9 +43,53 @@ export function ImportedInspector({ id }: { id: string }): ReactNode {
       </Row>
       {parent && <p className="muted">Inside {parent.path}: placed and removed with it.</p>}
       <p className="muted">
-        Ports as last read from {dep.file}. Their interfaces are those of the same name here, from the
-        dependency.
+        Attributes, methods and ports as last read from {dep.file}. Port interfaces are those of the same name
+        here, from the dependency.
       </p>
+
+      {attributes.length > 0 && (
+        <Section title={`Attributes (${attributes.length})`}>
+          <table className="grid">
+            <tbody>
+              {attributes.map((a) => (
+                <tr key={a.id} title={a.description}>
+                  <td>{ACCESS_MARKS[a.access ?? 'public']}</td>
+                  <td>{a.name}</td>
+                  <td>
+                    {type(a.type)}
+                    {a.const && ' const'}
+                    {a.static && ' static'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Section>
+      )}
+
+      {methods.length > 0 && (
+        <Section title={`Methods (${methods.length})`}>
+          <table className="grid">
+            <tbody>
+              {methods.map((m) => (
+                <tr key={m.id} title={m.description}>
+                  <td>{ACCESS_MARKS[m.access ?? 'public']}</td>
+                  <td>
+                    {m.name}(
+                    {m.params
+                      .map(
+                        (prm) =>
+                          `${prm.direction === 'in' ? '' : `${prm.direction} `}${prm.name}: ${type(prm.type)}`
+                      )
+                      .join(', ')}
+                    ){m.returns && `: ${type(m.returns)}`}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Section>
+      )}
 
       <Section title={`Ports (${module.ports.length})`}>
         <table className="grid">

@@ -82,7 +82,7 @@ const qualifierText = (q: { static?: boolean; const?: boolean }): string =>
     .map((k) => `${k} `)
     .join('')
 
-function Attributes({ attributes, types }: { attributes: Attribute[]; types: TypeDef[] }): ReactNode {
+export function Attributes({ attributes, types }: { attributes: Attribute[]; types: TypeDef[] }): ReactNode {
   const nameOf = (id: string): string | undefined => types.find((t) => t.id === id)?.name
   return (
     <ul className="module-attrs">
@@ -108,7 +108,7 @@ function Attributes({ attributes, types }: { attributes: Attribute[]; types: Typ
 }
 
 /** Method compartment below the attributes: `virtual name(a: T, out b: U): R const = 0`. */
-function Methods({ methods, types }: { methods: Method[]; types: TypeDef[] }): ReactNode {
+export function Methods({ methods, types }: { methods: Method[]; types: TypeDef[] }): ReactNode {
   const nameOf = (id: string): string | undefined => types.find((t) => t.id === id)?.name
   return (
     <ul className="module-attrs module-methods">

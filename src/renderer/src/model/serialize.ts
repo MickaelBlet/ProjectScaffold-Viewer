@@ -3,10 +3,12 @@ import YAML, { LineCounter, YAMLParseError, isMap, isScalar, isSeq, type Node as
 import {
   FileProjectSchema,
   SCHEMA_VERSION,
+  type FileAttribute,
   type FileConstant,
   type FileEditor,
   type FileInterface,
   type FileMessage,
+  type FileMethod,
   type FileModule,
   type FileModuleConstant,
   type FileModuleTypeDef,
@@ -382,6 +384,8 @@ export function toFile(p: Project, options: { editor: boolean }): FileProject {
           modules: x.modules.length
             ? x.modules.map((m) => ({
                 module: m.path,
+                attributes: m.attributes?.length ? m.attributes.map(attribute) : undefined,
+                methods: m.methods?.length ? m.methods.map(method) : undefined,
                 ports: m.ports.map((pt) => ({
                   name: pt.name,
                   role: pt.role,
@@ -781,6 +785,37 @@ export function fromFile(data: unknown, prev?: Project): Project {
     messages: messages(i.messages, i.name, prevInterfaces[idx]?.messages, [...at, 'messages'])
   }))
 
+  /** Attributes of a module (`path`) or placed module, at `at` in the file data. */
+  const attributesOf = (
+    list: readonly FileAttribute[],
+    path: string,
+    before: readonly Attribute[] | undefined,
+    at: DataPath
+  ): Attribute[] => {
+    const was = named(before, list)
+    return list.map((a, j) => ({
+      ...valueField(a, path, was[j], [...at, j]),
+      ...access(a),
+      ...qualifiers(a)
+    }))
+  }
+  /** Methods of a module (`path`) or placed module, at `at` in the file data. */
+  const methodsOf = (
+    list: readonly FileMethod[],
+    path: string,
+    before: readonly Method[] | undefined,
+    at: DataPath
+  ): Method[] =>
+    messages(list, path, before, at).map((x, j): Method => {
+      const fx = list[j]!
+      return {
+        ...x,
+        ...access(fx),
+        ...qualifiers(fx),
+        params: x.params.map((prm, k) => ({ ...prm, ...qualifiers(fx.params[k]!) }))
+      }
+    })
+
   const layout = f.editor?.layout ?? {}
   const modules: Module[] = []
   const moduleByPath = new Map<string, Module>()
@@ -819,7 +854,6 @@ export function fromFile(data: unknown, prev?: Project): Project {
       const was = before[i]
       const renamed = !!was && prevPaths.get(was.id) !== path
       const ports = named(was?.ports, fm.ports)
-      const attributes = named(was?.attributes, fm.attributes ?? [])
       const height = leafHeight(portRows(fm)) + compartmentsHeight(fm)
       const portNames = new Set<string>()
       const mod: Module = {
@@ -829,20 +863,8 @@ export function fromFile(data: unknown, prev?: Project): Project {
         parentId,
         ...(fm.kind && fm.kind !== 'class' && { kind: fm.kind }),
         metadata: { ...(fm.metadata ?? {}) },
-        attributes: (fm.attributes ?? []).map((a, j) => ({
-          ...valueField(a, path, attributes[j], [...at, i, 'attributes', j]),
-          ...access(a),
-          ...qualifiers(a)
-        })),
-        methods: messages(fm.methods ?? [], path, was?.methods, [...at, i, 'methods']).map((x, j): Method => {
-          const fx = fm.methods![j]!
-          return {
-            ...x,
-            ...access(fx),
-            ...qualifiers(fx),
-            params: x.params.map((prm, k) => ({ ...prm, ...qualifiers(fx.params[k]!) }))
-          }
-        }),
+        attributes: attributesOf(fm.attributes ?? [], path, was?.attributes, [...at, i, 'attributes']),
+        methods: methodsOf(fm.methods ?? [], path, was?.methods, [...at, i, 'methods']),
         ports: fm.ports.map((pt, j) => {
           if (portNames.has(pt.name))
             report(`Duplicate port '${path}:${pt.name}'`, [...at, i, 'ports', j, 'name'])
@@ -958,7 +980,11 @@ export function fromFile(data: unknown, prev?: Project): Project {
         const saved = f.editor?.dependencies?.[i.name]?.[m.module]
         const at = saved ?? was?.position
         const position = at ? { x: at.x, y: at.y } : { x: importX, y: importY }
-        if (!at) importY += leafHeight(portRows(m)) + GAP_Y
+        if (!at) importY += leafHeight(portRows(m)) + compartmentsHeight(m) + GAP_Y
+        const placed = `${i.name}/${m.module}`
+        const data: DataPath = ['dependencies', idx, 'modules', j]
+        const attributes = attributesOf(m.attributes ?? [], placed, was?.attributes, [...data, 'attributes'])
+        const methods = methodsOf(m.methods ?? [], placed, was?.methods, [...data, 'methods'])
         const size = saved
           ? saved.width !== undefined && saved.height !== undefined
             ? { width: saved.width, height: saved.height }
@@ -969,6 +995,8 @@ export function fromFile(data: unknown, prev?: Project): Project {
           path: m.module,
           position,
           ...(size && { size }),
+          ...(attributes.length && { attributes }),
+          ...(methods.length && { methods }),
           ports: m.ports.map((pt, k) => {
             if (portNames.has(pt.name))
               report(`${where}: duplicate port '${pt.name}'`, [
