@@ -286,7 +286,7 @@ textarea {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 4px;
-  padding: 3px 6px;
+  padding: 3px var(--input-pad-x);
   min-width: 0;
 }
 /* As tall as inputs and buttons (line height, padding and border): a select is shorter by default. */
@@ -1248,7 +1248,7 @@ input.number {
   border-spacing: 0 4px;
 }
 .grid td {
-  padding: 8px 2px;
+  padding: var(--entry-pad) var(--cell-pad);
   vertical-align: top;
   border-block: 1px solid var(--border);
   background: var(--row);
@@ -1257,12 +1257,12 @@ input.number {
   background: var(--row);
 }
 .grid td:first-child {
-  padding-left: 8px;
+  padding-left: var(--entry-pad);
   border-left: 1px solid var(--border);
   border-radius: 6px 0 0 6px;
 }
 .grid td:last-child {
-  padding-right: 8px;
+  padding-right: var(--entry-pad);
   border-right: 1px solid var(--border);
   border-radius: 0 6px 6px 0;
 }
@@ -1294,16 +1294,33 @@ input.number {
 }
 /*
  * Entries of the inspector's lists (fields, metadata, binaries, references; table rows above): rounded,
- * every other one shaded (type trees between field rows do not count).
+ * every other one shaded (type trees between field rows do not count). Their content is inset by
+ * --entry-pad on every side, whatever pads it (the cells of field rows and tables).
  */
+:root {
+  --entry-pad: 6px;
+  --cell-pad: 2px;
+  --input-pad-x: 4px;
+}
 .field-row,
 .metadata .kv,
 .binary-item,
 ul.plain > li {
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 6px;
+  padding: var(--entry-pad);
   background: var(--row);
+}
+.field-row {
+  padding: calc(var(--entry-pad) - var(--cell-pad));
+}
+/* Entries of text (links, badges): their text lines up with the text of inputs and selects. */
+ul.plain > li {
+  padding-inline: calc(var(--entry-pad) + var(--input-pad-x));
+}
+/* Add button under a list of fields: in line with the content of its entries. */
+.field-list + .link-button {
+  margin-left: var(--entry-pad);
 }
 .field-row:nth-child(even of .field-row),
 .metadata .kv:nth-child(even of .kv),
@@ -1316,7 +1333,7 @@ ul.plain > li + li {
 }
 .field-row > * {
   min-width: 0;
-  padding: 2px;
+  padding: var(--cell-pad);
 }
 .field-row > .name {
   grid-column: 1;
