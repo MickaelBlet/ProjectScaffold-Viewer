@@ -82,21 +82,6 @@ function validationProblems(text: string, format: Format, project: Project): Tex
   }
 }
 
-/** Per-chunk button of the changes view: revert only, accepting would hide a change not saved yet. */
-function revertButton(type: 'accept' | 'reject', action: (e: MouseEvent) => void): HTMLElement {
-  const button = document.createElement('button')
-  if (type === 'accept') {
-    button.hidden = true
-    return button
-  }
-  button.type = 'button'
-  button.name = 'reject'
-  button.textContent = 'Revert'
-  button.title = 'Revert to the saved text'
-  button.onmousedown = action
-  return button
-}
-
 /** Moves the caret to the start of the next (1) or previous (-1) change, around at the ends. */
 function goToChange(view: EditorView, dir: 1 | -1): boolean {
   const chunks = getChunks(view.state)?.chunks
@@ -201,7 +186,7 @@ export function SourcePanel({ format }: { format: Format }): ReactNode {
     (): Extension =>
       showChanges
         ? [
-            unifiedMergeView({ original: savedText, mergeControls: revertButton, gutter: true }),
+            unifiedMergeView({ original: savedText, mergeControls: false, gutter: true }),
             changeKeys,
             EditorView.updateListener.of((u) => setChangeCount(getChunks(u.state)?.chunks.length ?? 0))
           ]
@@ -367,9 +352,7 @@ export function SourcePanel({ format }: { format: Format }): ReactNode {
   const errors = problems.filter((p) => p.severity === 'error').length
   const warnings = problems.length - errors
   const changesTitle =
-    savedText === null
-      ? 'Not saved yet: no changes to show'
-      : 'Show the changes since the last save, each with a button to revert it'
+    savedText === null ? 'Not saved yet: no changes to show' : 'Show the changes since the last save'
 
   return (
     <section className="source-editor">

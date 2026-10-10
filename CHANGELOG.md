@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - A file naming an unknown type, module, exception or port interface opens: the reference keeps its name and is reported as an error in _Problems_ (export blocked) until fixed; it was a load error.
+- Text editor: changes since the last save no longer have a _Revert_ button each (it showed on every edit); they stay highlighted.
 - Inspector: the `+ # -` access buttons of a module's methods are beside the method's name, small and square as those of attributes.
 - Inspector: the new type buttons of a module's _Types_ section are laid out as in the Explorer (small, aligned right, wrapping), the section title on one line; the access buttons of its types after their name, small and square as those of attributes.
 - Inspector: the content of list entries (fields, tables, metadata, lists of types and links) is inset the same on every side, the text of links and badges lined up with the text of inputs, the add button under a list of fields with the entries.
