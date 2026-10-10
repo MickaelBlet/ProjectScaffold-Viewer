@@ -23,7 +23,7 @@ In [`examples/idl/`](../examples/idl):
 
 ## Preprocessor
 
-- `#include` and IDL `import "file";`. VS Code reads included files next to the IDL file and in its parent folders; elsewhere, pick them along with it.
+- `#include` and IDL `import "file";`. VS Code reads included files next to the IDL file and in its parent folders; elsewhere, pick them along with it. The browser keeps the IDL files picked, read again after a page reload.
 - `#define` (function-like, `#`, `##`), `#undef`, `#if` / `#ifdef` / `#ifndef` / `#elif` / `#else`, `#error`.
 - `#pragma` is ignored.
 

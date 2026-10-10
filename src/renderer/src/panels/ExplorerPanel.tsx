@@ -56,7 +56,7 @@ import {
   showDependency
 } from '@/actions'
 import { dependencyMenu } from './DependencyDetail'
-import { useDependencyModules, type DependencyModule } from './dependencyModules'
+import { modulesOfPaths, useDependencyModules, type DependencyModule } from './dependencyModules'
 import { childrenByParent, dropModule, matching, MODULE_DRAG, toggleHidden } from './moduleTree'
 import { openEditor, openView, revealInspector } from '@/shell/controllers'
 import { AccessIcon, Icon } from '@/components/Icon'
@@ -511,7 +511,15 @@ export function ExplorerPanel(): ReactNode {
     const all = match(dep.name)
     const pick = <T,>(list: T[], name: (x: T) => string): T[] =>
       all ? list : list.filter((x) => match(name(x)))
-    const read = dependencyModules.get(dep.id) ?? []
+    const depTypes = types.filter((t) => t.dependency === dep.id)
+    const depConsts = consts.filter((c) => c.dependency === dep.id)
+    // From its file, else from what this project keeps of it.
+    const read =
+      dependencyModules.get(dep.id) ??
+      modulesOfPaths([
+        ...dep.modules.map((m) => m.path),
+        ...[...depTypes, ...depConsts].map((e) => e.modulePath ?? '')
+      ])
     const known = new Set(read.map((m) => m.path))
     // A tree: each module followed by its content, placed with it.
     const depth = (path: string): number => path.split('.').length - 1
@@ -530,8 +538,6 @@ export function ExplorerPanel(): ReactNode {
     const listed = new Set(moduleRows.map((r) => r.m.path))
     const qualified = (e: { name: string; modulePath?: string }): string =>
       e.modulePath ? `${e.modulePath}.${e.name}` : e.name
-    const depTypes = types.filter((t) => t.dependency === dep.id)
-    const depConsts = consts.filter((c) => c.dependency === dep.id)
     const inGroup = (e: { modulePath?: string }): boolean => !e.modulePath || !listed.has(e.modulePath)
     const typeRow = (e: TypeDef, depth: number): DependencyRow => ({
       kind: 'type',

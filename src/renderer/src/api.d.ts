@@ -63,8 +63,9 @@ export interface Api {
    */
   changedOnDisk(path: string): Promise<string | null>
   /**
-   * Reads again a file picked earlier in this session (an IDL dependency), by path or file name;
-   * null when it is not at hand anymore. Absent when the host cannot.
+   * Reads again a file picked earlier (an IDL dependency), by path or file name: from the file when
+   * access is granted, else as last read (picked before a page reload); null when it is not at hand.
+   * Absent when the host cannot.
    */
   readPicked?(path: string): Promise<string | null>
   /** False when saving downloads a copy instead of writing the file (Firefox, Safari). */

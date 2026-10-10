@@ -29,6 +29,35 @@ function modulesOf(p: Project): DependencyModule[] {
   return out
 }
 
+/**
+ * Modules of a dependency whose file cannot be read, from what this project keeps of it: the paths of
+ * its placed modules and of the modules holding its types and constants, with the modules above them,
+ * as a tree in the order they come; ports are not known.
+ */
+export function modulesOfPaths(paths: Iterable<string>): DependencyModule[] {
+  const children = new Map<string | null, string[]>()
+  const add = (path: string): void => {
+    if (children.has(path)) return
+    children.set(path, [])
+    const dot = path.lastIndexOf('.')
+    const parent = dot < 0 ? null : path.slice(0, dot)
+    if (parent !== null) add(parent)
+    const siblings = children.get(parent) ?? []
+    children.set(parent, siblings)
+    siblings.push(path)
+  }
+  for (const path of paths) if (path) add(path)
+  const out: DependencyModule[] = []
+  const visit = (parent: string | null): void => {
+    for (const path of children.get(parent) ?? []) {
+      out.push({ id: path, path, ports: 0 })
+      visit(path)
+    }
+  }
+  visit(null)
+  return out
+}
+
 /** Modules of each dependency by id; dependencies whose file cannot be read are left out. */
 export function useDependencyModules(dependencies: Dependency[]): Map<Id, DependencyModule[]> {
   // Opening or closing a tab can make a dependency readable.

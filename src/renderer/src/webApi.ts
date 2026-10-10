@@ -11,7 +11,7 @@ interface FileHandle {
   name: string
   getFile(): Promise<File>
   createWritable(): Promise<{ write(data: string): Promise<void>; close(): Promise<void> }>
-  queryPermission?(opts: { mode: 'readwrite' }): Promise<Permission>
+  queryPermission?(opts: { mode: 'read' | 'readwrite' }): Promise<Permission>
   requestPermission?(opts: { mode: 'readwrite' }): Promise<Permission>
 }
 
@@ -65,6 +65,8 @@ const fs = window as unknown as FsAccessWindow
 const handles = new Map<string, FileHandle>()
 /** Modification time of each file as last read or written here, by path. */
 const stamps = new Map<string, number>()
+
+const isIdl = (name: string): boolean => /\.idl$/i.test(name)
 
 function isAbort(e: unknown): boolean {
   return e instanceof DOMException && e.name === 'AbortError'
@@ -129,13 +131,31 @@ async function changedOnDisk(path: string): Promise<string | null> {
 }
 
 async function readPicked(path: string): Promise<string | null> {
-  const handle = handles.get(path) ?? handles.get(path.split(/[\\/]/).pop() ?? path)
-  if (!handle) return null
-  try {
-    return await read(handle, path)
-  } catch {
-    return null
-  }
+  const name = path.split(/[\\/]/).pop() ?? path
+  const handle = handles.get(path) ?? handles.get(name)
+  const entry = (await loadPicked()).find((e) => e.name === name)
+  if (handle)
+    try {
+      const content = await read(handle, path)
+      if (entry && content !== entry.content) await rememberPicked({ ...entry, content })
+      return content
+    } catch {
+      // Moved, deleted or access revoked: its content as last read.
+    }
+  if (!entry) return null
+  if (!handle && entry.handle)
+    try {
+      // Read again only when access is still granted: never ask while reading in the background.
+      if ((await entry.handle.queryPermission?.({ mode: 'read' })) === 'granted') {
+        const content = await read(entry.handle, path)
+        handles.set(name, entry.handle)
+        if (content !== entry.content) await rememberPicked({ ...entry, content })
+        return content
+      }
+    } catch {
+      // Moved or deleted: its content as last read.
+    }
+  return entry.content
 }
 
 /** Picks files; project files (no `filter`) go to the recent files. */
@@ -159,7 +179,9 @@ async function pickFiles(multiple: boolean, filter?: FileFilter): Promise<OpenRe
         // Other files (IDL) can be saved again, but are no recent documents.
         handles.set(handle.name, handle)
         if (filter) {
-          files.push({ path: handle.name, content: await read(handle) })
+          const content = await read(handle)
+          if (isIdl(handle.name)) await rememberPicked({ name: handle.name, content, handle })
+          files.push({ path: handle.name, content })
           continue
         }
         const content = await read(handle)
@@ -176,6 +198,7 @@ async function pickFiles(multiple: boolean, filter?: FileFilter): Promise<OpenRe
   for (const file of await pickWithInput(multiple, accept)) {
     const content = await file.text()
     if (!filter) await remember({ name: file.name, content })
+    else if (isIdl(file.name)) await rememberPicked({ name: file.name, content })
     files.push({ path: file.name, content })
   }
   return files
@@ -192,6 +215,8 @@ async function saveFile(req: SaveRequest): Promise<string | null> {
     await remember({ name: path, content: req.content, handle: handles.get(path) })
     await updateWorkspaceFile(path, req.content)
   }
+  if (path && isIdl(path) && (await loadPicked()).some((e) => e.name === path))
+    await rememberPicked({ name: path, content: req.content, handle: handles.get(path) })
   return path
 }
 
@@ -295,6 +320,39 @@ async function remember(entry: RecentEntry): Promise<void> {
   const previous = list.find((e) => e.name === entry.name)
   const handle = entry.handle ?? previous?.handle
   await storeRecent([{ ...entry, handle }, ...list.filter((e) => e !== previous)].slice(0, MAX_RECENT))
+}
+
+// IDL files picked (dependencies, includes), so that they are read again after a page reload.
+const PICKED_KEY = 'picked'
+const MAX_PICKED = 50
+
+async function loadPicked(): Promise<RecentEntry[]> {
+  try {
+    const list = await withStore<RecentEntry[] | undefined>(
+      'readonly',
+      (s) => s.get(PICKED_KEY) as IDBRequest<RecentEntry[] | undefined>
+    )
+    return Array.isArray(list) ? list : []
+  } catch {
+    return []
+  }
+}
+
+async function rememberPicked(entry: RecentEntry): Promise<void> {
+  const list = await loadPicked()
+  const previous = list.find((e) => e.name === entry.name)
+  const next = [{ ...entry, handle: entry.handle ?? previous?.handle }, ...list.filter((e) => e !== previous)]
+  try {
+    await withStore('readwrite', (s) => s.put(next.slice(0, MAX_PICKED), PICKED_KEY))
+  } catch {
+    try {
+      // Handles cannot be stored (file:// origin): keep the contents.
+      const contents = next.slice(0, MAX_PICKED).map(({ name, content }) => ({ name, content }))
+      await withStore('readwrite', (s) => s.put(contents, PICKED_KEY))
+    } catch {
+      // Blocked storage: picked files are read in this session only.
+    }
+  }
 }
 
 /** Handle of the most recent project file: pickers start in its folder. */
