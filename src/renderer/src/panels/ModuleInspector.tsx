@@ -337,15 +337,15 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
           messages={mod.methods}
           noun="method"
           onChange={(fn) => withModule(id, (m) => fn(m.methods))}
+          headerExtra={(x, change) => (
+            <AccessToggles value={x.access} onChange={(v) => change((y) => setAccess(y, v))} />
+          )}
           extra={(x, change) => (
-            <>
-              <AccessToggles value={x.access} onChange={(v) => change((y) => setAccess(y, v))} />
-              <QualifierToggles
-                qualifiers={METHOD_QUALIFIERS}
-                value={x}
-                onChange={(q, on) => change((y) => setMethodQualifier(y, q, on))}
-              />
-            </>
+            <QualifierToggles
+              qualifiers={METHOD_QUALIFIERS}
+              value={x}
+              onChange={(q, on) => change((y) => setMethodQualifier(y, q, on))}
+            />
           )}
           paramExtra={(prm, change) =>
             // Only `in` parameters can be const.

@@ -1425,9 +1425,10 @@ button.qualifier.on {
   background: var(--accent-soft);
   border-color: var(--accent);
 }
-/* In a field row or a module's type row: single-letter square toggles, centered on the inputs. */
+/* In a field row, a module's type row or a card header: single-letter square toggles, centered on the inputs. */
 .field-row .qualifiers,
-.type-row .qualifiers {
+.type-row .qualifiers,
+.card-header .qualifiers {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1444,7 +1445,8 @@ button.qualifier.on {
   margin-left: 2px;
 }
 .field-row button.qualifier,
-.type-row button.qualifier {
+.type-row button.qualifier,
+.card-header button.qualifier {
   width: 20px;
   height: 20px;
   padding: 0;

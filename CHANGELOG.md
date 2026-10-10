@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Inspector: the `+ # -` access buttons of a module's methods are beside the method's name, small and square as those of attributes.
 - Inspector: the new type buttons of a module's _Types_ section are laid out as in the Explorer (small, aligned right, wrapping), the section title on one line; the access buttons of its types after their name, small and square as those of attributes.
 - Inspector: the content of list entries (fields, tables, metadata, lists of types and links) is inset the same on every side, the text of links and badges lined up with the text of inputs, the add button under a list of fields with the entries.
 - Placed modules of dependencies are see-through, apart from the project's own modules.

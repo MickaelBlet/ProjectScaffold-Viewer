@@ -27,6 +27,8 @@ export function MessageList<M extends Message>(props: {
   onChange: (fn: (messages: M[]) => void) => void
   /** Show that out parameters and return values need a bidirectional link. */
   linkHints?: boolean
+  /** Extra settings of an entry, beside its name. */
+  headerExtra?: (m: M, change: (fn: (m: M) => void) => void) => ReactNode
   /** Extra settings of an entry, below its description. */
   extra?: (m: M, change: (fn: (m: M) => void) => void) => ReactNode
   /** Extra settings of a parameter, left of its type. */
@@ -49,6 +51,7 @@ export function MessageList<M extends Message>(props: {
           validate={(n) => (IDENTIFIER_RE.test(n) ? null : 'Must be an identifier')}
           onCommit={(n) => withMessage(m.id, (x) => void (x.name = n))}
         />
+        {props.headerExtra?.(m, (fn) => withMessage(m.id, fn))}
         <IconButton
           icon="x"
           title={`Delete ${props.noun}`}
