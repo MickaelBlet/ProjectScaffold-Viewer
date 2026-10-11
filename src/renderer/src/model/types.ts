@@ -419,6 +419,8 @@ export interface Module {
   bases?: Id[]
   /** Type arguments of its generic bases, by base. */
   baseArgs?: Record<Id, TypeRef[]>
+  /** Interfaces whose messages it has as public methods. */
+  implements?: Id[]
   /** No module may derive from it. */
   final?: boolean
   /** Operations derived from its attributes. */

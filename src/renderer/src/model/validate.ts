@@ -11,6 +11,7 @@ import {
   memberNames,
   missingName,
   moduleTypes,
+  unimplementedMessages,
   typeParamsOf,
   parseDependencyModuleRef,
   refContext,
@@ -768,6 +769,20 @@ export function validate(p: Project): Problem[] {
       checkParams(x.params, target, `${path}.${x.name}`)
     }
     checkLifecycle(m, target, path, ancestors)
+    for (const id of duplicates(m.implements ?? []))
+      push('error', target, `${path} implements ${interfaces.get(id)?.name ?? id} more than once`)
+    for (const id of m.implements ?? [])
+      if (!interfaces.has(id))
+        push('error', target, `${path} implements ${missingText(id, 'interface', 'interface')}`)
+    if (m.kind !== 'abstract' && m.kind !== 'interface')
+      for (const { iface, message, method } of unimplementedMessages(p, m))
+        push(
+          'error',
+          target,
+          method
+            ? `${path}.${message.name}: not as ${iface.name}.${message.name} it implements (public, same parameters, result and exceptions)`
+            : `${path} does not implement ${iface.name}.${message.name}`
+        )
     if (m.derives) {
       if (m.kind) push('error', target, `${path}: an ${m.kind} module derives no operations`)
       checkDerives(

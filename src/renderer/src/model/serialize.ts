@@ -352,6 +352,9 @@ export function toFile(p: Project, options: { editor: boolean }): FileProject {
             })
           : undefined,
         bases: m.bases?.length ? m.bases.map(baseName) : undefined,
+        implements: m.implements?.length
+          ? m.implements.map((i) => typeName.get(i) ?? missingName(i) ?? '__deleted__')
+          : undefined,
         final: m.final || undefined,
         derives: m.derives?.length ? [...m.derives] : undefined,
         instantiation: m.instantiation,
@@ -949,6 +952,13 @@ export function fromFile(data: unknown, prev?: Project): Project {
         description: fm.description ?? '',
         parentId,
         ...(fm.kind && fm.kind !== 'class' && { kind: fm.kind }),
+        ...(fm.implements?.length && {
+          implements: fm.implements.map((name, k) => {
+            if (!interfaceNames.has(name))
+              report(`Module '${path}': unknown interface '${name}'`, [...at, i, 'implements', k])
+            return typeIds.get(name) ?? missingRef(name)
+          })
+        }),
         ...(fm.final && { final: true }),
         ...(fm.derives?.length && { derives: [...fm.derives] }),
         ...(fm.instantiation && { instantiation: fm.instantiation }),

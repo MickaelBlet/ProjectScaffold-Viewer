@@ -2147,6 +2147,14 @@
             "pattern": "^([A-Za-z_][A-Za-z0-9_]*\\/)?[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*(<.+>)?$"
           }
         },
+        "implements": {
+          "description": "interfaces whose messages it has as public methods (same parameters, result and exceptions)",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+          }
+        },
         "final": {
           "description": "no module may derive from it (not abstract nor an interface)",
           "type": "boolean"

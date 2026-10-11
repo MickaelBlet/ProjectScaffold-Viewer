@@ -400,6 +400,7 @@ export interface FileModule {
   kind?: (typeof MODULE_KINDS)[number]
   typeParams?: z.infer<typeof TypeParamSchema>[]
   bases?: string[]
+  implements?: string[]
   final?: boolean
   derives?: (typeof DERIVES)[number][]
   instantiation?: (typeof INSTANTIATIONS)[number]
@@ -439,6 +440,12 @@ const Module: z.ZodType<FileModule> = z
         .optional()
         .describe(
           'paths of the modules it derives from, in order: of this project, or `Dependency/Module.Path` for a module of a dependency placed on the canvas'
+        ),
+      implements: z
+        .array(Identifier)
+        .optional()
+        .describe(
+          'interfaces whose messages it has as public methods (same parameters, result and exceptions)'
         ),
       final: z.boolean().optional().describe('no module may derive from it (not abstract nor an interface)'),
       derives: Derives,

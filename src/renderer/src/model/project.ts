@@ -10,6 +10,7 @@ import {
   type ImportedModule,
   type Interface,
   type LinkConstraints,
+  type Message,
   type Method,
   type Module,
   type Note,
@@ -561,6 +562,35 @@ export function canDerive(p: Project, id: Id, baseId: Id): boolean {
 /** Type parameters of a generic module, in order (none for another one). */
 export const typeParamsOf = (p: Pick<Project, 'types'>, moduleId: Id): PrimitiveDef[] =>
   p.types.filter((t): t is PrimitiveDef => t.kind === 'primitive' && !!t.typeParam && t.module === moduleId)
+
+/** Parameters (directions and types), result and exceptions of a message or method. */
+export function messageSignature(m: Message): string {
+  const params = m.params.map((prm) => `${prm.direction} ${typeKey(prm.type)}`)
+  const raises = [...(m.raises ?? [])].sort().join(', ')
+  return `(${params.join(', ')})${m.returns ? typeKey(m.returns) : ''}${raises ? ` raises ${raises}` : ''}`
+}
+
+/**
+ * Messages of the interfaces a module implements it has no public method for (same name and
+ * signature); `method`: one of the name with another signature or access.
+ */
+export function unimplementedMessages(
+  p: Pick<Project, 'interfaces'>,
+  m: Module
+): { iface: Interface; message: Message; method?: Method }[] {
+  const out: { iface: Interface; message: Message; method?: Method }[] = []
+  for (const id of m.implements ?? []) {
+    const iface = p.interfaces.find((i) => i.id === id)
+    if (!iface) continue
+    for (const message of iface.messages) {
+      const named = m.methods.filter((x) => x.name === message.name)
+      const sig = messageSignature(message)
+      if (!named.some((x) => !x.access && !x.static && messageSignature(x) === sig))
+        out.push({ iface, message, ...(named[0] && { method: named[0] }) })
+    }
+  }
+  return out
+}
 
 /** A type reference as text naming user types by id: equal for the same type. */
 export const typeKey = (t: TypeRef): string =>

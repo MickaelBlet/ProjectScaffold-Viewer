@@ -515,7 +515,18 @@ modules:
         interface: AudioSink
   - name: Display
     description: Shows the gain reduction
+    implements:
+      - LevelSink
     color: "#d6c21f"
+    methods:
+      - name: level
+        description: Shows a level, from either port
+        params:
+          - name: db
+            type:
+              kind: primitive
+              name: float32
+        returns: null
     ports:
       - name: compressor
         role: in

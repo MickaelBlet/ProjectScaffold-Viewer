@@ -13,6 +13,7 @@ import {
   setMethodQualifier,
   setQualifier,
   uniqueName,
+  unimplementedMessages,
   unimplementedMethods
 } from '@/model/project'
 import {
@@ -105,6 +106,8 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
       .sort((a, b) => a.label.localeCompare(b.label))
   ]
   const unimplemented = unimplementedMethods(project, id)
+  // Messages of implemented interfaces with no method of the name yet.
+  const missing = unimplementedMessages(project, mod).filter((u) => !u.method)
   const binaryOptions = [
     { value: '', label: '— none —' },
     ...project.binaries.map((b) => ({ value: b.id, label: b.name }))
@@ -208,6 +211,44 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
       <TextArea value={mod.description} onChange={(v) => withModule(id, (m) => void (m.description = v))} />
 
       <TypeParamsSection mod={mod} project={project} />
+
+      <Section title={`Implements (${mod.implements?.length ?? 0})`}>
+        <div className="raises">
+          {(mod.implements ?? []).map((iid) => (
+            <span key={iid} className="chip">
+              <button
+                type="button"
+                className="link-button"
+                onClick={() => navigate({ kind: 'interface', id: iid })}
+              >
+                {project.interfaces.find((i) => i.id === iid)?.name ?? '<deleted>'}
+              </button>
+              <IconButton
+                icon="x"
+                title="No longer implemented"
+                onClick={() =>
+                  withModule(id, (m) => {
+                    m.implements = m.implements?.filter((x) => x !== iid)
+                    if (!m.implements?.length) delete m.implements
+                  })
+                }
+              />
+            </span>
+          ))}
+          {project.interfaces.some((i) => !mod.implements?.includes(i.id)) && (
+            <Select
+              value=""
+              options={[
+                { value: '', label: '+ interface…' },
+                ...project.interfaces
+                  .filter((i) => !mod.implements?.includes(i.id))
+                  .map((i) => ({ value: i.id, label: i.name }))
+              ]}
+              onChange={(v) => v && withModule(id, (m) => void (m.implements = [...(m.implements ?? []), v]))}
+            />
+          )}
+        </div>
+      </Section>
 
       <Section title={`Bases (${bases.length})`}>
         <ul className="plain">
@@ -369,12 +410,20 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
         title={`Methods (${mod.methods.length})`}
         actions={
           <>
-            {unimplemented.length > 0 && (
+            {unimplemented.length + missing.length > 0 && (
               <button
                 type="button"
-                title={`Override ${unimplemented.map((u) => u.method.name).join(', ')}`}
+                title={`Implement ${[...unimplemented.map((u) => u.method.name), ...missing.map((u) => u.message.name)].join(', ')}`}
                 onClick={() =>
                   withModule(id, (m) => {
+                    for (const { message } of missing) {
+                      const copy = structuredClone(message)
+                      m.methods.push({
+                        ...copy,
+                        id: newId(),
+                        params: copy.params.map((prm) => ({ ...prm, id: newId() }))
+                      })
+                    }
                     for (const { method } of unimplemented) {
                       const copy = structuredClone(method)
                       delete copy.pure
@@ -389,7 +438,7 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
                   })
                 }
               >
-                <Icon name="plus" /> implement ({unimplemented.length})
+                <Icon name="plus" /> implement ({unimplemented.length + missing.length})
               </button>
             )}
             <button type="button" onClick={() => withModule(id, (m) => addMessage(m.methods, 'method'))}>

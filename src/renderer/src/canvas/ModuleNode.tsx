@@ -326,6 +326,10 @@ export const ModuleNode = memo(function ModuleNode({
       })
       .join(', ')
   })
+  const implemented = useProjectStore((s) => {
+    const ids = s.project.modules.find((m) => m.id === id)?.implements ?? []
+    return ids.map((i) => s.project.interfaces.find((x) => x.id === i)?.name ?? '?').join(', ')
+  })
   const typeParams = useProjectStore((s) =>
     typeParamsOf(s.project, id)
       .map((t) => t.name)
@@ -412,6 +416,7 @@ export const ModuleNode = memo(function ModuleNode({
               </span>
             )}
             {bases && <span className="module-bases"> : {bases}</span>}
+            {implemented && <span className="module-bases"> ⊸ {implemented}</span>}
             {binary && (
               <small
                 className="module-binary"
