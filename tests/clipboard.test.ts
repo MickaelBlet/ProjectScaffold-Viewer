@@ -152,3 +152,14 @@ describe('clipboard attributes', () => {
     expect(validate(target).filter((pr) => pr.severity === 'error')).toEqual([])
   })
 })
+
+describe('parseClip', () => {
+  it('rejects clips missing lists', () => {
+    const clip = copyItems(example, [example.modules[0]!.id])!
+    expect(parseClip(JSON.stringify(clip))).toEqual(clip)
+    expect(parseClip(JSON.stringify({ ...clip, types: undefined }))).toBeNull()
+    expect(parseClip(JSON.stringify({ ...clip, names: [] }))).toBeNull()
+    expect(parseClip(JSON.stringify({ format: clip.format, modules: [] }))).toBeNull()
+    expect(parseClip('null')).toBeNull()
+  })
+})

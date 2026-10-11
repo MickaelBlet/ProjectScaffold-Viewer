@@ -367,6 +367,14 @@ class Sync {
     const sourceShape = shaper(source, file)
     const paths = modulePaths(source)
     const shared: string[] = []
+    // Entities here of other origins by name (types of modules aside), in order.
+    const others = new Map<string, Entity[]>()
+    for (const x of entities(this.d))
+      if (!scoped(x) && x.dependency !== dep.id) {
+        const named = others.get(x.name)
+        if (named) named.push(x)
+        else others.set(x.name, [x])
+      }
     for (const kind of KINDS) {
       const here = shaper(this.d, '')
       const hereKey = keyer(this.d)
@@ -376,9 +384,7 @@ class Sync {
       const was = pair(current, hereKey, next.map(sourceKey))
       const kept = new Set<Entity>()
       for (const [i, e] of next.entries()) {
-        const taken =
-          !scoped(e) &&
-          entities(this.d).find((x) => !scoped(x) && x.name === e.name && x.dependency !== dep.id)
+        const taken = !scoped(e) && others.get(e.name)?.[0]
         const target = was[i]
         if (taken) {
           const alike =
@@ -388,8 +394,10 @@ class Sync {
             here(taken) === sourceShape(e)
           // An own entity with the same definition becomes the dependency's; one of another
           // dependency stays that one's, shared.
-          if (alike && !taken.dependency) taken.dependency = dep.id
-          else if (alike) shared.push(e.name)
+          if (alike && !taken.dependency) {
+            taken.dependency = dep.id
+            others.get(e.name)!.shift()
+          } else if (alike) shared.push(e.name)
           else this.result.conflicts.push(`${dep.name}: ${e.name} is already defined differently here`)
           continue
         }
@@ -839,12 +847,6 @@ export function applyDependencyRenames(d: Project, file: string, r: Renames): vo
           if (to) pt.name = to
         }
     }
-    const rename = (kind: Kind, renames: Map<string, string>): void => {
-      for (const e of d[kind] as Entity[]) {
-        const to = e.dependency === dep.id && !scoped(e) ? renames.get(e.name) : undefined
-        if (to && !entities(d).some((x) => !scoped(x) && x.name === to)) e.name = to
-      }
-    }
     for (const t of d.types) {
       const to =
         t.dependency === dep.id && t.modulePath ? r.moduleTypes.get(`${t.modulePath}.${t.name}`) : undefined
@@ -852,6 +854,18 @@ export function applyDependencyRenames(d: Project, file: string, r: Renames): vo
       const at = to.lastIndexOf('.')
       t.modulePath = to.slice(0, at)
       t.name = to.slice(at + 1)
+    }
+    // Entities by name (types of modules aside), kept current as they are renamed.
+    const taken = new Map<string, number>()
+    for (const x of entities(d)) if (!scoped(x)) taken.set(x.name, (taken.get(x.name) ?? 0) + 1)
+    const rename = (kind: Kind, renames: Map<string, string>): void => {
+      for (const e of d[kind] as Entity[]) {
+        const to = e.dependency === dep.id && !scoped(e) ? renames.get(e.name) : undefined
+        if (!to || taken.get(to)) continue
+        taken.set(e.name, taken.get(e.name)! - 1)
+        taken.set(to, 1)
+        e.name = to
+      }
     }
     rename('types', r.types)
     rename('interfaces', r.interfaces)

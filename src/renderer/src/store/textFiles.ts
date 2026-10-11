@@ -143,6 +143,22 @@ export function dropTextFile(docId: Id, ref: TextFileRef): void {
   })
 }
 
+export const hasTextFiles = (docId: Id): boolean =>
+  Object.keys(useTextFiles.getState().files).some((k) => k.startsWith(`${docId}|`))
+
+/** Gives the files of a document to the document replacing it in its tab. */
+export function moveDocTextFiles(from: Id, to: Id): void {
+  const rekey = <T>(record: Record<string, T>): Record<string, T> =>
+    Object.fromEntries(
+      Object.entries(record).map(([k, v]) => [
+        k.startsWith(`${from}|`) ? `${to}${k.slice(from.length)}` : k,
+        v
+      ])
+    )
+  useTextFiles.setState((s) => ({ files: rekey(s.files) }))
+  useTextReveals.setState((s) => rekey(s), true)
+}
+
 /** Forgets the files of a closed document. */
 export function dropDocTextFiles(docId: Id): void {
   useTextFiles.setState((s) => ({

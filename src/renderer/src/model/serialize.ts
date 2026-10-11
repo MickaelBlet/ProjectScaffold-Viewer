@@ -14,6 +14,7 @@ import {
   type FileProject,
   type FileTypeDef
 } from './schema'
+import { safeIntegers } from './defaults'
 import { mapTypeRef } from './typeExpr'
 import { pair } from './reuse'
 import {
@@ -1139,9 +1140,18 @@ export function stringify(file: FileProject, format: Format): string {
   return format === 'json' ? JSON.stringify(file, null, 2) + '\n' : YAML.stringify(file, { lineWidth: 0 })
 }
 
+/** JSON.parse keeping integers too large for a number as decimal text, where the browser tells their source. */
+const readJson = (text: string): unknown =>
+  JSON.parse(text, (_key, value: unknown, context?: { source?: string }) =>
+    typeof value === 'number' && !Number.isSafeInteger(value) && /^-?\d+$/.test(context?.source ?? '')
+      ? context!.source
+      : value
+  )
+
+/** Integers too large for a number are kept as decimal text, as in default values (see defaults.ts). */
 export function parseText(text: string, format: Format): unknown {
   try {
-    return format === 'json' ? JSON.parse(text) : YAML.parse(text)
+    return format === 'json' ? readJson(text) : safeIntegers(YAML.parse(text, { intAsBigInt: true }))
   } catch (e) {
     const message = `Invalid ${format.toUpperCase()}: ${(e as Error).message}`
     throw new LoadError([{ message, line: syntaxErrorLine(text, e) }])

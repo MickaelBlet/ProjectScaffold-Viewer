@@ -17,7 +17,7 @@ npm run lint                         # eslint, type-checked rules + react-hooks
 npm run schema                       # regenerate schema/*.schema.json from model/schema.ts
 scripts/build_web.sh --check         # lint + test + build
 scripts/build_desktop.sh             # Tauri + Electron in Docker (docker buildx bake)
-scripts/build_all.sh [--check] [web|desktop]...   # all of the above (default: all)
+scripts/build_all.sh [--check] [web|desktop]...   # all of the above in parallel (default: all)
 ```
 
 - `--check` runs lint, tests and build in parallel. ESLint (`--cache`) and `tsc` (`incremental`) cache in `node_modules/.cache/`; the ESLint cache does not see type changes in imported files, so delete it when type-aware results look stale.

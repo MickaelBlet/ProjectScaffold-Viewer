@@ -141,8 +141,15 @@ export function copyProject(source: Project, target: Project, withNotes: boolean
 
 export function parseClip(text: string): Clip | null {
   try {
-    const data = JSON.parse(text) as Clip
-    return data?.format === CLIP_FORMAT && Array.isArray(data.modules) ? data : null
+    const data = JSON.parse(text) as Clip | null
+    if (data?.format !== CLIP_FORMAT) return null
+    const lists = [data.modules, data.links, data.notes, data.types, data.interfaces, data.consts ?? []]
+    const maps = [data.rootParents, data.names]
+    const valid =
+      lists.every(Array.isArray) &&
+      maps.every((m) => !!m && typeof m === 'object' && !Array.isArray(m)) &&
+      (data.selectedTypes === undefined || Array.isArray(data.selectedTypes))
+    return valid ? data : null
   } catch {
     return null
   }

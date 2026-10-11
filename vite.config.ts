@@ -1,5 +1,6 @@
 // Single self-contained HTML file (dist-web/index.html) that works
 // from file:// or any static host.
+import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { defineConfig, type Plugin } from 'vite'
@@ -14,9 +15,11 @@ function singleFile(): Plugin {
       const html = bundle['index.html']
       if (!html || html.type !== 'asset') return
       let source = String(html.source)
+      const hashes: string[] = []
       for (const [name, file] of Object.entries(bundle)) {
         if (file.type === 'chunk' && file.isEntry) {
           const code = file.code.replace(/<\/script/gi, '<\\/script')
+          hashes.push(`'sha256-${createHash('sha256').update(code).digest('base64')}'`)
           source = source.replace(
             new RegExp(`<script[^>]*src="[^"]*${name}"[^>]*></script>`),
             () => `<script type="module">${code}</script>`
@@ -34,8 +37,8 @@ function singleFile(): Plugin {
           delete bundle[name]
         }
       }
-      // Inline scripts need 'unsafe-inline'; the page still loads nothing external.
-      html.source = source.replace("script-src 'self'", "script-src 'self' 'unsafe-inline'")
+      // The inlined script is allowed by its hash: no other inline script runs.
+      html.source = source.replace("script-src 'self'", () => `script-src 'self' ${hashes.join(' ')}`)
     }
   }
 }

@@ -326,7 +326,6 @@ const allCommands: Command[] = [
     title: 'Add module',
     category: 'Insert',
     keys: ['Ctrl+M'],
-    global: true,
     run: () => void addModuleAt()
   },
   {

@@ -35,7 +35,7 @@ import {
   type DocState
 } from '@/store/documents'
 import { parseSettings, settingsText, useSettings } from '@/store/settings'
-import { dirtyFiles, dropDocTextFiles } from '@/store/textFiles'
+import { dirtyFiles, dropDocTextFiles, hasTextFiles, moveDocTextFiles } from '@/store/textFiles'
 import { log } from '@/store/output'
 import { FULL_LAYOUT } from '@/host'
 import { setStatus, showDialog, useUiStore } from '@/store/ui'
@@ -61,7 +61,8 @@ export function anyDirty(): boolean {
 function showLoaded(project: Project, filePath: string | null): DocState {
   const doc = createDoc(project, filePath)
   const current = activeDoc()
-  if (isPristine(current)) replaceDoc(current.id, doc)
+  // Kept when it has text files open beside it.
+  if (isPristine(current) && !hasTextFiles(current.id)) replaceDoc(current.id, doc)
   else addDoc(doc)
   return doc
 }
@@ -106,6 +107,8 @@ function showProject(path: string, data: unknown): DocState {
   if (already) {
     doc = { ...createDoc(project, path), layout: already.layout }
     replaceDoc(already.id, doc)
+    // The text files edited beside it stay, with their tabs (in the layout).
+    moveDocTextFiles(already.id, doc.id)
   } else doc = showLoaded(project, path)
   const hasLayout = !!(data as { editor?: unknown }).editor
   if (!hasLayout && project.modules.length && useSettings.getState().autoLayoutOnOpen)
@@ -447,9 +450,11 @@ export async function saveProject(saveAs = false): Promise<void> {
 
 export async function saveAll(): Promise<void> {
   const { activeId } = useDocs.getState()
-  for (const d of useDocs.getState().docs) {
-    if (!isDocDirty(d)) continue
-    activateDoc(d.id)
+  for (const { id } of useDocs.getState().docs) {
+    // Closed or saved meanwhile (while a save dialog was open).
+    const d = findDoc(id)
+    if (!d || !isDocDirty(d)) continue
+    activateDoc(id)
     await saveProject()
   }
   activateDoc(activeId)

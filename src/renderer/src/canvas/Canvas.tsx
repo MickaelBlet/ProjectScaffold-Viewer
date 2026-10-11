@@ -81,6 +81,7 @@ import { ImportedNode } from './ImportedNode'
 import { LinkEdge } from './LinkEdge'
 import { InheritEdge } from './InheritEdge'
 import { compactSvg, svgToPng } from './exportImage'
+import { useTrackpad } from './useTrackpad'
 
 const nodeTypes = { module: ModuleNode, note: NoteNode, imported: ImportedNode }
 const edgeTypes = { link: LinkEdge, inherit: InheritEdge }
@@ -214,6 +215,7 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
   const flow = useReactFlow()
   const { screenToFlowPosition, getInternalNode, fitView } = flow
   const container = useRef<HTMLDivElement>(null)
+  useTrackpad(container)
   const [guides, setGuides] = useState<Guide[]>([])
 
   const view = useMemo(() => findView(project, viewId), [project, viewId])

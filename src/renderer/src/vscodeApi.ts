@@ -37,8 +37,11 @@ function listen<T>(set: Set<T>, cb: T): () => void {
   return () => set.delete(cb)
 }
 
-function onMessage(e: MessageEvent<ToPage>): void {
+function onMessage(e: MessageEvent<ToPage | null>): void {
+  // VS Code's frame around the page relays the extension's messages: no other window is heard.
+  if (e.source !== window.parent) return
   const msg = e.data
+  if (!msg || typeof msg !== 'object') return
   switch (msg.type) {
     case 'update':
       if (externalListeners.size) externalListeners.forEach((cb) => cb(msg.text))

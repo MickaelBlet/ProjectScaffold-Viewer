@@ -2,7 +2,16 @@ import { readFileSync } from 'node:fs'
 import { Ajv2020 } from 'ajv/dist/2020.js'
 import YAML from 'yaml'
 import { describe, expect, it } from 'vitest'
-import { fromFile, LoadError, loadText, reloadText, sameContent, saveText, toFile } from '@/model/serialize'
+import {
+  fromFile,
+  LoadError,
+  loadText,
+  parseText,
+  reloadText,
+  sameContent,
+  saveText,
+  toFile
+} from '@/model/serialize'
 import { validate } from '@/model/validate'
 import type { StructDef } from '@/model/types'
 import type { FileProject } from '@/model/schema'
@@ -417,5 +426,19 @@ describe('module methods', () => {
     const ids = (q: typeof p) =>
       q.modules.flatMap((m) => m.methods.flatMap((x) => [x.id, ...x.params.map((prm) => prm.id)]))
     expect(ids(again)).toEqual(ids(p))
+  })
+})
+
+describe('parseText', () => {
+  it('keeps integers too large for a number as decimal text', () => {
+    const yaml = 'consts:\n  - name: MAX\n    value: 9223372036854775807\n    small: 0x10\n'
+    expect(parseText(yaml, 'yaml')).toEqual({
+      consts: [{ name: 'MAX', value: '9223372036854775807', small: 16 }]
+    })
+    expect(parseText('{ "big": -9223372036854775808, "int": 12, "float": 1.5e300 }', 'json')).toEqual({
+      big: '-9223372036854775808',
+      int: 12,
+      float: 1.5e300
+    })
   })
 })

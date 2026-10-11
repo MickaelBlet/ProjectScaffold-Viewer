@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { fromFile } from '@/model/serialize'
 import { applyDependencyRenames, followInterfaceRenames, placeModule } from '@/model/dependencies'
 import { emptyProject, modulePath } from '@/model/project'
-import { diffRenames, relativeFile } from '@/model/sync'
+import { diffRenames, isDependencyFile, relativeFile } from '@/model/sync'
 import type { Project } from '@/model/types'
 
 const robot = fromFile(YAML.parse(readFileSync('examples/robot.scaffold.yaml', 'utf8')))
@@ -96,5 +96,19 @@ describe('relativeFile', () => {
     expect(relativeFile(null, '/w/other.yaml')).toBe('other.yaml')
     expect(relativeFile('main.yaml', 'other.yaml')).toBe('other.yaml')
     expect(relativeFile('C:\\w\\main.yaml', 'D:\\w\\other.yaml')).toBe('other.yaml')
+  })
+})
+
+describe('isDependencyFile', () => {
+  it('compares full paths when they have folders', () => {
+    expect(isDependencyFile('/w/app/main.yaml', '../b/common.yaml', '/w/b/common.yaml')).toBe(true)
+    expect(isDependencyFile('/w/app/main.yaml', '../b/common.yaml', '/w/a/common.yaml')).toBe(false)
+    expect(isDependencyFile('C:\\w\\app\\main.yaml', '../B/common.yaml', 'c:\\w\\b\\Common.yaml')).toBe(true)
+  })
+
+  it('compares names otherwise', () => {
+    expect(isDependencyFile(null, '../b/common.yaml', '/w/a/common.yaml')).toBe(true)
+    expect(isDependencyFile('main.yaml', 'common.yaml', 'common.yaml')).toBe(true)
+    expect(isDependencyFile('/w/app/main.yaml', 'common.yaml', '/x/common.yaml')).toBe(true)
   })
 })

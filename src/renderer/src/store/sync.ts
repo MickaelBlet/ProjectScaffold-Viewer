@@ -3,7 +3,7 @@
 // document gets the change as an undoable edit of its own; closed files catch up on Refresh.
 import { produce } from 'immer'
 import { applyDependencyRenames, refreshDependencies } from '@/model/dependencies'
-import { baseName, diffRenames, sameFile } from '@/model/sync'
+import { baseName, diffRenames, isDependencyFile } from '@/model/sync'
 import type { Id, Project } from '@/model/types'
 import { docTitle } from '@/fileOps'
 import { findDoc, projectListeners, useDocs } from './documents'
@@ -37,15 +37,21 @@ function carryRenames(docId: Id, prev: Project, next: Project): void {
   pushToDependents(docId, prev, next)
 }
 
+/** The dependency of the project saved as `from` on the file at `path`. */
+const dependencyOn = (
+  from: string | null,
+  p: Project,
+  path: string
+): Project['dependencies'][number] | undefined =>
+  p.dependencies.find((x) => isDependencyFile(from, x.file, path))
+
 /** Update the open documents depending on `docId`, carrying its renames since `prev` when given. */
 function pushToDependents(docId: Id, prev: Project | null, next: Project): void {
   const file = findDoc(docId)?.filePath ?? null
   if (!file) return void conflicted.delete(docId)
   const linked = useDocs
     .getState()
-    .docs.filter(
-      (d) => d.id !== docId && d.store.getState().project.dependencies.some((x) => sameFile(x.file, file))
-    )
+    .docs.filter((d) => d.id !== docId && dependencyOn(d.filePath, d.store.getState().project, file))
 
   const renames = prev && linked.length ? diffRenames(prev, next) : null
   const updated: string[] = []
@@ -55,8 +61,8 @@ function pushToDependents(docId: Id, prev: Project | null, next: Project): void 
     for (const d of linked) {
       const p = d.store.getState().project
       const q = produce(p, (draft) => {
-        if (renames) applyDependencyRenames(draft, file, renames)
-        const dep = draft.dependencies.find((x) => sameFile(x.file, file))!
+        const dep = dependencyOn(d.filePath, draft, file)!
+        if (renames) applyDependencyRenames(draft, dep.file, renames)
         const self = d.filePath ? baseName(d.filePath) : null
         conflicts.push(...refreshDependencies(draft, new Map([[dep.id, next]]), self).conflicts)
       })

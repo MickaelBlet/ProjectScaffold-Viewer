@@ -22,7 +22,7 @@ Explorer, Inspector, Problems, Output, Search and Settings are dockable panels.
 
 - Drag a tab to dock it on any side, stack it with others or float it. The layout is kept; _Window › Reset panel layout_ restores the default one.
 - The Explorer's sections are reordered by dragging their header (or Alt+↑ / Alt+↓) and hidden from their right-click menu (_Reset sections_ restores them).
-- In the Explorer's _Modules_, dragging a module onto another (or onto the list) moves it inside (or to the top level). The modules of dependencies placed on the canvas follow the project's own, nested like in their project, each with its public types.
+- In the Explorer's _Modules_, dragging a module onto another (or onto the list) moves it inside (or to the top level); without dragging, _Move to…_ (right-click menu, or the folder button of _Parent_ in the inspector) picks where from a list. The modules of dependencies placed on the canvas follow the project's own, nested like in their project, each with its public types.
 
 ### Views
 
@@ -74,6 +74,7 @@ Ctrl+Shift+F searches names, descriptions and metadata of the project.
 
 - Right click the canvas for its menu; right click anything for its actions.
 - Double-click the canvas to zoom in, Shift+double-click to zoom out.
+- Mouse wheel zooms. Trackpad: pinch to zoom, scroll with two fingers to pan (in Chromium and WebKit any scroll; elsewhere a scroll starting sideways, or Shift+wheel).
 - **+ Module** (Ctrl+M) adds a module. Drop a module onto another to nest it; drag it out to move it up.
 - F2 or double-click a module name to rename it in place.
 

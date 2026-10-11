@@ -32,6 +32,8 @@ scripts/build_electron.sh   # -> dist-electron/linux/, dist-electron/windows/
 scripts/build_desktop.sh    # both at once (parallel, shared web build, docker buildx bake)
 ```
 
+The `Dockerfile` pins its base images by digest and checks the tools it downloads (`rustup-init`, an NSIS include) against their SHA-256: update the digest or checksum along with a version.
+
 Local development windows:
 
 ```sh
@@ -46,5 +48,5 @@ npm test                     # unit tests (model, serialization, validation, can
 npm run lint
 npm run typecheck
 npm run schema               # regenerate schema/*.schema.json from the model
-scripts/build_all.sh         # web, desktop (Docker); args: [--check] [web|desktop]...
+scripts/build_all.sh         # web, desktop (Docker) in parallel; args: [--check] [web|desktop]...
 ```

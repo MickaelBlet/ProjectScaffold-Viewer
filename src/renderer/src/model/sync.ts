@@ -23,6 +23,20 @@ export const baseName = (path: string): string => path.split(/[\\/]/).pop() ?? p
 
 export const sameFile = (a: string, b: string): boolean => baseName(a) === baseName(b)
 
+const hasFolder = (path: string): boolean => /[\\/]/.test(path)
+
+/**
+ * Whether the dependency `file` of the project saved as `from` is the file at `path`: by full path
+ * when the paths have folders, else by name (browser, unsaved project, dependency on another drive).
+ */
+export function isDependencyFile(from: string | null, file: string, path: string): boolean {
+  if (!from || !hasFolder(from) || !hasFolder(file) || !hasFolder(path)) return sameFile(file, path)
+  // Windows paths ignore case.
+  const key = (p: string): string =>
+    /^[A-Za-z]:/.test(p) ? normalizeFile(p).toLowerCase() : normalizeFile(p)
+  return key(resolveRelative(from, file)) === key(path)
+}
+
 /**
  * `file` relative to the folder of the project file `from`, for a dependency. The name alone when
  * `from` is unknown (unsaved project, browser) or on another drive.
@@ -57,6 +71,8 @@ export function resolveRelative(file: string, nested: string): string {
   const dir = file.split(/[\\/]/).slice(0, -1)
   return normalizeFile([...dir, nested].join('/'))
 }
+
+const byId = <T extends { id: Id }>(items: readonly T[]): Map<Id, T> => new Map(items.map((x) => [x.id, x]))
 
 /** Module paths by id, in one pass. */
 function paths(p: Project): Map<Id, string> {
@@ -93,10 +109,11 @@ export function diffRenames(prev: Project, next: Project): Renames | null {
     consts: new Map(),
     moduleTypes: new Map()
   }
-  if (prev.modules !== next.modules) {
-    const before = paths(prev)
-    const after = paths(next)
-    const prevModules = new Map(prev.modules.map((m) => [m.id, m]))
+  const modulesChanged = prev.modules !== next.modules
+  const before = modulesChanged || prev.types !== next.types ? paths(prev) : new Map<Id, string>()
+  const after = modulesChanged ? paths(next) : before
+  if (modulesChanged) {
+    const prevModules = byId(prev.modules)
     for (const m of next.modules) {
       const old = prevModules.get(m.id)
       if (!old) continue
@@ -112,34 +129,32 @@ export function diffRenames(prev: Project, next: Project): Renames | null {
       if (names.size) r.ports.set(to, names)
     }
   }
-  if (prev.interfaces !== next.interfaces)
+  if (prev.interfaces !== next.interfaces) {
+    const prevInterfaces = byId(prev.interfaces)
     for (const i of next.interfaces) {
-      const was = prev.interfaces.find((x) => x.id === i.id)
+      const was = prevInterfaces.get(i.id)
       if (was && was.name !== i.name && !i.dependency) r.interfaces.set(was.name, i.name)
     }
-  if (prev.types !== next.types)
-    for (const t of next.types) {
-      const was = prev.types.find((x) => x.id === t.id)
-      if (was && was.name !== t.name && !t.dependency && !t.module && !was.module)
-        r.types.set(was.name, t.name)
-    }
-  if (prev.types !== next.types || prev.modules !== next.modules) {
-    const before = paths(prev)
-    const after = paths(next)
-    const prevTypes = new Map(prev.types.map((t) => [t.id, t]))
+  }
+  if (prev.types !== next.types || modulesChanged) {
+    const prevTypes = byId(prev.types)
     for (const t of next.types) {
       const was = prevTypes.get(t.id)
+      if (was && was.name !== t.name && !t.dependency && !t.module && !was.module)
+        r.types.set(was.name, t.name)
       if (!t.module || !was?.module) continue
       const from = `${before.get(was.module)}.${was.name}`
       const to = `${after.get(t.module)}.${t.name}`
       if (from !== to) r.moduleTypes.set(from, to)
     }
   }
-  if (prev.consts !== next.consts)
+  if (prev.consts !== next.consts) {
+    const prevConsts = byId(prev.consts)
     for (const c of next.consts) {
-      const was = prev.consts.find((x) => x.id === c.id)
+      const was = prevConsts.get(c.id)
       if (was && was.name !== c.name && !c.dependency) r.consts.set(was.name, c.name)
     }
+  }
   return r.modules.size ||
     r.ports.size ||
     r.interfaces.size ||

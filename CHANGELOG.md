@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Canvas: trackpad gestures. A two-finger scroll pans the canvas (any scroll of a trackpad or Magic Mouse in Chromium and WebKit; elsewhere a scroll starting sideways, or Shift+wheel; the mouse wheel still zooms), a pinch zooms in WebKit too (Safari, Tauri on macOS).
+- Modules: _Move to…_ (Explorer right-click menu, or the folder button of the _Parent_ row in the inspector) picks the module to move a module into, or the top level, from a list: re-parenting without dragging.
 - Customizable toolbar: _Settings › Toolbar_ chooses the buttons right of the menus (any command, each with its icon, picked from a menu by category, separators, order). Default: undo, redo, previous / next selection.
 - Module views have their own layout: modules moved or resized in a module's own view (the module itself too, moved with its content or resized) keep their place in the _Project_ view, and the other way round. Stored in `editor.views[].layout`; _View › Reset view layout_ goes back to the _Project_ view's layout.
 - Module views also have their own link shapes (bends, attachments, badges), port name places, notes and frames (added from the view's right-click menu or _Insert_), independent of the _Project_ view; links and port names a module view has not set are drawn automatically. Outside modules are drawn as compact modules (their linked ports, dashed, see-through but for their tinted header: the links and badges under them show): selected, moved, resized, aligned and hidden like the others, the links to them shaped the same way, their place the view's own (delete, copy and group leave them out). Stored in `editor.views[].links`, `labels`, `notes` and `outside` (placed modules of dependencies as `Dependency/Module`; _Sync selection_ selects the module or link under the text cursor there); _View › Reset view layout_ clears them too (not the notes).
@@ -42,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New links are bidirectional when their interface has a message returning a value or with `out` / `inout` parameters (IDL operations with results, for instance), in place of unidirectional (an error until changed).
 - Canvas: modules and links look up the project through indexes built once per edit, not a scan per module and link: edits of large projects redraw faster.
 - Build: Vite 8 (Rolldown) and `@vitejs/plugin-react` 6, `vite build` about ten times faster; `scripts/build_web.sh --check` runs lint, tests and build in parallel (`build_all.sh --check` through it); `npm run lint` caches its results and `tsc` checks incrementally, both in `node_modules/.cache/`.
+- Build: `scripts/build_all.sh` runs the web build (and checks) beside the Docker desktop build; the Docker web build copies only its inputs and skips the typecheck, so changes to docs, tests or other files keep the desktop builds cached.
 
 ### Removed
 
@@ -68,9 +71,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - IDL files depended on without components (plain CORBA IDL) give modules to place: one per IDL module, nested like them (`Robot` holding `Control`; the file's name at file scope), providing each of its interfaces on an `in` port.
 - Browser: the Explorer lists the modules of IDL dependencies, read from the file picked in the session or open as text (_Open_ on the dependency after a reload), with the files they include; they were listed only for files open as documents.
 - Explorer: double-clicking (or _Place on the canvas_) a module of an IDL dependency not placed yet places it: it did nothing, the module being looked up by an id the IDL file gets anew at each read; modules are now found by their path.
+- Opening a project file: integers too large for a JavaScript number (`int64` / `uint64` constants and default values beyond 2^53) are kept exact, as decimal text like values typed in the inspector; they were rounded, and saved rounded.
+- Opening again a project already open (and unmodified) keeps the IDL files edited beside it, with their unsaved changes; they were dropped without asking. A project opened from an _Untitled_ tab holding IDL files opens in a tab of its own.
+- Inspector: a type expression typed in a field, union case or parameter, then left by clicking _Remove_ or _Move up / down_ on its row, is set on that row; it went to the row taking its place (or failed on the last row).
+- Ctrl+M (_Add module_) no longer adds a module while typing in a field of the inspector, the settings or the search box.
+- Renames and definitions reach only the open documents depending on the edited file itself, compared by full path: a file of the same name in another folder took them too.
+- Pasting a clip of another version missing some of its parts does nothing, instead of failing with an error.
+- _Save all_ skips a document closed while a save dialog was open; it saved the active document again.
+- Faster Explorer on large projects (its tree is no longer rebuilt on every selection change) and faster renames carried to dependent documents.
 
 ### Security
 
+- The page's Content Security Policy allows its single inline script by hash instead of `'unsafe-inline'`: no other inline script can run (browser, Electron, Tauri; VS Code sets its own).
+- VS Code: the page only takes messages from the VS Code frame around it.
+- Desktop builds (Docker): base images pinned by digest, the NSIS include and `rustup-init` downloaded over HTTPS and checked against their SHA-256, Node taken from the pinned Node image instead of a NodeSource setup script.
 - VS Code: a project's dependencies and IDL includes read only project and IDL files, and ask before reading one out of the workspace and of the document's folder (once per folder); any file of the machine was read before.
 
 ## [1.0.0] - 2026-10-05

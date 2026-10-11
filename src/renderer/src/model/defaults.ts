@@ -10,17 +10,21 @@ export function formatValue(v: Value): string {
   return YAML.stringify(v, { collectionStyle: 'flow', lineWidth: 0 }).trim()
 }
 
+/** YAML parsed with `intAsBigInt`: integers too large for a number are kept as decimal text. */
+export function safeIntegers(v: unknown): unknown {
+  if (typeof v === 'bigint')
+    return v >= Number.MIN_SAFE_INTEGER && v <= Number.MAX_SAFE_INTEGER ? Number(v) : String(v)
+  if (Array.isArray(v)) return v.map(safeIntegers)
+  if (v && typeof v === 'object')
+    return Object.fromEntries(
+      Object.entries(v as Record<string, unknown>).map(([k, e]) => [k, safeIntegers(e)])
+    )
+  return v
+}
+
 /** Reads a YAML flow literal; integers too large for a number are kept as decimal text. Throws on bad syntax. */
 export function parseValue(text: string): Value {
-  const norm = (v: unknown): Value => {
-    if (typeof v === 'bigint')
-      return v >= Number.MIN_SAFE_INTEGER && v <= Number.MAX_SAFE_INTEGER ? Number(v) : String(v)
-    if (Array.isArray(v)) return v.map(norm)
-    if (v && typeof v === 'object')
-      return Object.fromEntries(Object.entries(v as Record<string, unknown>).map(([k, e]) => [k, norm(e)]))
-    return v as Value
-  }
-  return norm(YAML.parse(text, { intAsBigInt: true }))
+  return safeIntegers(YAML.parse(text, { intAsBigInt: true })) as Value
 }
 
 const isMapping = (v: Value): v is { [key: string]: Value } =>

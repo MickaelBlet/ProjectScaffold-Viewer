@@ -172,7 +172,9 @@ export function TypeEditor(props: {
               setDraft(e.target.value)
               updateSuggestions(e.target.value, e.target.selectionStart ?? e.target.value.length)
             }}
-            onBlur={() => setTimeout(commit, 120)}
+            // At once (a suggestion picked with the mouse keeps the focus): a row removed or moved by the
+            // click that blurs must not take a late commit.
+            onBlur={commit}
             onKeyDown={(e) => {
               if (suggest) {
                 if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {

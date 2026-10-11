@@ -6,6 +6,7 @@
 // Sections can be reordered (drag their header, Alt+Up / Alt+Down) and hidden; kept in the settings.
 import {
   Fragment,
+  useCallback,
   useMemo,
   useState,
   type CSSProperties,
@@ -57,7 +58,14 @@ import {
 } from '@/actions'
 import { dependencyMenu } from './DependencyDetail'
 import { modulesOfPaths, useDependencyModules, type DependencyModule } from './dependencyModules'
-import { childrenByParent, dropModule, matching, MODULE_DRAG, toggleHidden } from './moduleTree'
+import {
+  childrenByParent,
+  dropModule,
+  matching,
+  MODULE_DRAG,
+  pickNewParent,
+  toggleHidden
+} from './moduleTree'
 import { openEditor, openView, revealInspector } from '@/shell/controllers'
 import { AccessIcon, Icon } from '@/components/Icon'
 import { TYPE_KIND_BADGE, TYPE_KINDS } from '@/components/fields'
@@ -353,6 +361,7 @@ function moduleMenu(e: MouseEvent, id: Id, hidden: boolean): void {
     { label: hidden ? 'Show in view' : 'Hide in view', run: () => toggleHidden(id, hidden) },
     'separator',
     commandItem('edit.rename'),
+    { label: 'Move to…', run: () => pickNewParent(id) },
     commandItem('insert.submodule'),
     {
       label: 'New type of the module',
@@ -451,13 +460,16 @@ export function ExplorerPanel(): ReactNode {
   const order = useMemo(() => sectionOrder(savedOrder, SECTIONS), [savedOrder])
   const hidden = order.filter((id) => savedHidden.includes(id))
   const f = filter.trim().toLowerCase()
-  const match = (name: string): boolean => !f || name.toLowerCase().includes(f)
+  const match = useCallback((name: string): boolean => !f || name.toLowerCase().includes(f), [f])
   const isSelected = (id: Id): boolean => selectedIds.includes(id) || id === selectedLink
 
   // Paths and link ends change with modules and links only, not with every edit.
   const paths = useMemo(() => modulePaths({ modules, dependencies }), [modules, dependencies])
   const moduleChildren = useMemo(() => childrenByParent(modules), [modules])
-  const moduleMatches = f ? matching(moduleChildren, (m) => match(paths.get(m.id) ?? m.name)) : null
+  const moduleMatches = useMemo(
+    () => (f ? matching(moduleChildren, (m) => match(paths.get(m.id) ?? m.name)) : null),
+    [f, moduleChildren, match, paths]
+  )
   const allLinks = useMemo(
     () =>
       links
@@ -475,13 +487,16 @@ export function ExplorerPanel(): ReactNode {
     ...views.filter((v) => match(v.name)).map((v) => v.id)
   ]
   const ownTypes = types.filter((t) => !t.dependency && !t.module)
-  const typesOfModules = new Map<Id, TypeDef[]>()
-  for (const t of types)
-    if (t.module) {
-      const list = typesOfModules.get(t.module) ?? []
-      if (!list.length) typesOfModules.set(t.module, list)
-      list.push(t)
-    }
+  const typesOfModules = useMemo(() => {
+    const byModule = new Map<Id, TypeDef[]>()
+    for (const t of types)
+      if (t.module) {
+        const list = byModule.get(t.module) ?? []
+        if (!list.length) byModule.set(t.module, list)
+        list.push(t)
+      }
+    return byModule
+  }, [types])
   const ownInterfaces = interfaces.filter((i) => !i.dependency)
   const shownTypes = ownTypes.filter((t) => match(t.name))
   const shownInterfaces = ownInterfaces.filter((i) => match(i.name))
@@ -490,82 +505,86 @@ export function ExplorerPanel(): ReactNode {
   // Dependencies, each with its constants, types, interfaces and modules in groups ordered as the
   // sections; a dependency or a group folds (all open while filtering). Modules come in the order of
   // their project when it can be read, the ones not placed on the canvas dimmed.
-  const isOpen = (key: string): boolean => !!f || !collapsed.has(key)
-  const dependencyRows: DependencyRow[] = []
-  for (const dep of dependencies) {
-    const all = match(dep.name)
-    const pick = <T,>(list: T[], name: (x: T) => string): T[] =>
-      all ? list : list.filter((x) => match(name(x)))
-    const depTypes = types.filter((t) => t.dependency === dep.id)
-    // From its file, else from what this project keeps of it.
-    const read =
-      dependencyModules.get(dep.id) ??
-      modulesOfPaths([...dep.modules.map((m) => m.path), ...depTypes.map((t) => t.modulePath ?? '')])
-    const known = new Set(read.map((m) => m.path))
-    // A tree: each module followed by its content, placed with it.
-    const depth = (path: string): number => path.split('.').length - 1
-    const moduleRows: ModuleRow[] = [
-      ...read.map((m): ModuleRow => {
-        const placed = dep.modules.find((x) => x.path === m.path)
-        return placed
-          ? { kind: 'module', key: placed.id, dep, m: placed, depth: depth(m.path) }
-          : { kind: 'unplaced', key: `${dep.id}:${m.id}`, dep, m, depth: depth(m.path) }
-      }),
-      ...dep.modules
-        .filter((m) => !known.has(m.path))
-        .map((m): ModuleRow => ({ kind: 'module', key: m.id, dep, m, depth: depth(m.path) }))
-    ]
-    // Types of modules under their module; in their group while it is not listed.
-    const listed = new Set(moduleRows.map((r) => r.m.path))
-    const qualified = (e: { name: string; modulePath?: string }): string =>
-      e.modulePath ? `${e.modulePath}.${e.name}` : e.name
-    const inGroup = (e: { modulePath?: string }): boolean => !e.modulePath || !listed.has(e.modulePath)
-    const typeRow = (e: TypeDef, depth: number): DependencyRow => ({
-      kind: 'type',
-      key: e.id,
-      e,
-      label: depth ? e.name : qualified(e),
-      depth
-    })
-    const pickedModules = pick(moduleRows, (r) => r.m.path)
-    const groups: { [G in DependencyGroup]: DependencyRow[] } = {
-      constants: pick(
-        consts.filter((c) => c.dependency === dep.id),
-        (c) => c.name
-      ).map((c) => ({ kind: 'const', key: c.id, dep, c })),
-      types: pick(depTypes.filter(inGroup), qualified).map((e) => typeRow(e, 0)),
-      interfaces: pick(
-        interfaces.filter((i) => i.dependency === dep.id),
-        (i) => i.name
-      ).map((e) => ({ kind: 'interface', key: e.id, e })),
-      modules: [
-        ...moduleRows.flatMap((r) => [
-          ...(pickedModules.includes(r) ? [r] : []),
-          ...pick(
-            depTypes.filter((t) => t.modulePath === r.m.path),
-            qualified
-          ).map((t) => typeRow(t, r.depth + 1))
-        ])
+  // Rebuilt when the project, the filter or folds change, not with the selection.
+  const dependencyRows = useMemo(() => {
+    const isOpen = (key: string): boolean => !!f || !collapsed.has(key)
+    const dependencyRows: DependencyRow[] = []
+    for (const dep of dependencies) {
+      const all = match(dep.name)
+      const pick = <T,>(list: T[], name: (x: T) => string): T[] =>
+        all ? list : list.filter((x) => match(name(x)))
+      const depTypes = types.filter((t) => t.dependency === dep.id)
+      // From its file, else from what this project keeps of it.
+      const read =
+        dependencyModules.get(dep.id) ??
+        modulesOfPaths([...dep.modules.map((m) => m.path), ...depTypes.map((t) => t.modulePath ?? '')])
+      const known = new Set(read.map((m) => m.path))
+      // A tree: each module followed by its content, placed with it.
+      const depth = (path: string): number => path.split('.').length - 1
+      const moduleRows: ModuleRow[] = [
+        ...read.map((m): ModuleRow => {
+          const placed = dep.modules.find((x) => x.path === m.path)
+          return placed
+            ? { kind: 'module', key: placed.id, dep, m: placed, depth: depth(m.path) }
+            : { kind: 'unplaced', key: `${dep.id}:${m.id}`, dep, m, depth: depth(m.path) }
+        }),
+        ...dep.modules
+          .filter((m) => !known.has(m.path))
+          .map((m): ModuleRow => ({ kind: 'module', key: m.id, dep, m, depth: depth(m.path) }))
       ]
+      // Types of modules under their module; in their group while it is not listed.
+      const listed = new Set(moduleRows.map((r) => r.m.path))
+      const qualified = (e: { name: string; modulePath?: string }): string =>
+        e.modulePath ? `${e.modulePath}.${e.name}` : e.name
+      const inGroup = (e: { modulePath?: string }): boolean => !e.modulePath || !listed.has(e.modulePath)
+      const typeRow = (e: TypeDef, depth: number): DependencyRow => ({
+        kind: 'type',
+        key: e.id,
+        e,
+        label: depth ? e.name : qualified(e),
+        depth
+      })
+      const pickedModules = pick(moduleRows, (r) => r.m.path)
+      const groups: { [G in DependencyGroup]: DependencyRow[] } = {
+        constants: pick(
+          consts.filter((c) => c.dependency === dep.id),
+          (c) => c.name
+        ).map((c) => ({ kind: 'const', key: c.id, dep, c })),
+        types: pick(depTypes.filter(inGroup), qualified).map((e) => typeRow(e, 0)),
+        interfaces: pick(
+          interfaces.filter((i) => i.dependency === dep.id),
+          (i) => i.name
+        ).map((e) => ({ kind: 'interface', key: e.id, e })),
+        modules: [
+          ...moduleRows.flatMap((r) => [
+            ...(pickedModules.includes(r) ? [r] : []),
+            ...pick(
+              depTypes.filter((t) => t.modulePath === r.m.path),
+              qualified
+            ).map((t) => typeRow(t, r.depth + 1))
+          ])
+        ]
+      }
+      const counts: { [G in DependencyGroup]: number } = {
+        constants: groups.constants.length,
+        types: groups.types.length,
+        interfaces: groups.interfaces.length,
+        modules: pickedModules.length
+      }
+      const shown = order.filter(isDependencyGroup).filter((g) => groups[g].length)
+      if (f && !all && !shown.length) continue
+      const open = isOpen(dep.id)
+      dependencyRows.push({ kind: 'dependency', key: dep.id, dep, open })
+      if (!open) continue
+      for (const group of shown) {
+        const key = `${dep.id}/${group}`
+        const groupOpen = isOpen(key)
+        dependencyRows.push({ kind: 'group', key, dep, group, count: counts[group], open: groupOpen })
+        if (groupOpen) dependencyRows.push(...groups[group])
+      }
     }
-    const counts: { [G in DependencyGroup]: number } = {
-      constants: groups.constants.length,
-      types: groups.types.length,
-      interfaces: groups.interfaces.length,
-      modules: pickedModules.length
-    }
-    const shown = order.filter(isDependencyGroup).filter((g) => groups[g].length)
-    if (f && !all && !shown.length) continue
-    const open = isOpen(dep.id)
-    dependencyRows.push({ kind: 'dependency', key: dep.id, dep, open })
-    if (!open) continue
-    for (const group of shown) {
-      const key = `${dep.id}/${group}`
-      const groupOpen = isOpen(key)
-      dependencyRows.push({ kind: 'group', key, dep, group, count: counts[group], open: groupOpen })
-      if (groupOpen) dependencyRows.push(...groups[group])
-    }
-  }
+    return dependencyRows
+  }, [dependencies, dependencyModules, types, interfaces, consts, order, f, match, collapsed])
   const dependencyIds = dependencyRows.map((r) => r.key)
   const toggle = (id: string): void => {
     const next = new Set(collapsed)
@@ -575,42 +594,45 @@ export function ExplorerPanel(): ReactNode {
   // Modules of dependencies placed on the canvas, after the project's own: nested under their parent
   // (all open while filtering), each with its public types first.
   const imported = dependencies.flatMap((dep) => dep.modules.map((m) => ({ dep, m })))
-  const publicOf = new Map<string, TypeDef[]>()
-  for (const t of types)
-    if (t.dependency && t.modulePath && !t.access) {
-      const key = `${t.dependency}|${t.modulePath}`
-      publicOf.set(key, [...(publicOf.get(key) ?? []), t])
+  const { shownImported, importedParents } = useMemo(() => {
+    const publicOf = new Map<string, TypeDef[]>()
+    for (const t of types)
+      if (t.dependency && t.modulePath && !t.access) {
+        const key = `${t.dependency}|${t.modulePath}`
+        publicOf.set(key, [...(publicOf.get(key) ?? []), t])
+      }
+    const shownImported: (
+      | { kind: 'module'; dep: Dependency; m: ImportedModule; depth: number; parent: boolean; open: boolean }
+      | { kind: 'type'; dep: Dependency; t: TypeDef; depth: number }
+    )[] = []
+    const importedParents: Id[] = []
+    for (const dep of dependencies) {
+      const children = new Map<string | null, ImportedModule[]>()
+      for (const m of dep.modules) {
+        const parent = importedParent(dep, m)?.path ?? null
+        children.set(parent, [...(children.get(parent) ?? []), m])
+      }
+      const own = (m: ImportedModule): TypeDef[] => publicOf.get(`${dep.id}|${m.path}`) ?? []
+      const hits = (m: ImportedModule): boolean =>
+        match(m.path) || own(m).some((t) => match(t.name)) || (children.get(m.path) ?? []).some(hits)
+      const visit = (m: ImportedModule, depth: number): void => {
+        if (f && !hits(m)) return
+        const kids = children.get(m.path) ?? []
+        const t = own(m)
+        const parent = kids.length + t.length > 0
+        if (parent) importedParents.push(m.id)
+        const open = !!f || !collapsed.has(m.id)
+        shownImported.push({ kind: 'module', dep, m, depth, parent, open })
+        if (!open) return
+        const all = match(m.path)
+        for (const x of t)
+          if (all || match(x.name)) shownImported.push({ kind: 'type', dep, t: x, depth: depth + 1 })
+        for (const k of kids) visit(k, depth + 1)
+      }
+      for (const m of children.get(null) ?? []) visit(m, 0)
     }
-  const shownImported: (
-    | { kind: 'module'; dep: Dependency; m: ImportedModule; depth: number; parent: boolean; open: boolean }
-    | { kind: 'type'; dep: Dependency; t: TypeDef; depth: number }
-  )[] = []
-  const importedParents: Id[] = []
-  for (const dep of dependencies) {
-    const children = new Map<string | null, ImportedModule[]>()
-    for (const m of dep.modules) {
-      const parent = importedParent(dep, m)?.path ?? null
-      children.set(parent, [...(children.get(parent) ?? []), m])
-    }
-    const own = (m: ImportedModule): TypeDef[] => publicOf.get(`${dep.id}|${m.path}`) ?? []
-    const hits = (m: ImportedModule): boolean =>
-      match(m.path) || own(m).some((t) => match(t.name)) || (children.get(m.path) ?? []).some(hits)
-    const visit = (m: ImportedModule, depth: number): void => {
-      if (f && !hits(m)) return
-      const kids = children.get(m.path) ?? []
-      const t = own(m)
-      const parent = kids.length + t.length > 0
-      if (parent) importedParents.push(m.id)
-      const open = !!f || !collapsed.has(m.id)
-      shownImported.push({ kind: 'module', dep, m, depth, parent, open })
-      if (!open) return
-      const all = match(m.path)
-      for (const x of t)
-        if (all || match(x.name)) shownImported.push({ kind: 'type', dep, t: x, depth: depth + 1 })
-      for (const k of kids) visit(k, depth + 1)
-    }
-    for (const m of children.get(null) ?? []) visit(m, 0)
-  }
+    return { shownImported, importedParents }
+  }, [dependencies, types, f, match, collapsed])
   // Folds every module with submodules, dependency and dependency group, or unfolds them all.
   const foldable = [
     ...modules.filter((m) => moduleChildren.has(m.id) || typesOfModules.has(m.id)).map((m) => m.id),
@@ -621,23 +643,26 @@ export function ExplorerPanel(): ReactNode {
   const foldAll = (): void => setCollapsed(new Set(someOpen ? foldable : []))
   // Modules nested under their parent, in project order (all open while filtering), each with its
   // types first.
-  const shownModules: (
-    | { kind: 'module'; m: Module; depth: number; parent: boolean; open: boolean }
-    | { kind: 'type'; t: TypeDef; depth: number }
-  )[] = []
-  const walk = (list: Module[], depth: number): void => {
-    for (const m of list) {
-      if (moduleMatches && !moduleMatches.has(m.id)) continue
-      const children = moduleChildren.get(m.id) ?? []
-      const own = typesOfModules.get(m.id) ?? []
-      const open = !!moduleMatches || !collapsed.has(m.id)
-      shownModules.push({ kind: 'module', m, depth, parent: children.length > 0 || own.length > 0, open })
-      if (!open) continue
-      for (const t of own) if (match(t.name)) shownModules.push({ kind: 'type', t, depth: depth + 1 })
-      walk(children, depth + 1)
+  const shownModules = useMemo(() => {
+    const shownModules: (
+      | { kind: 'module'; m: Module; depth: number; parent: boolean; open: boolean }
+      | { kind: 'type'; t: TypeDef; depth: number }
+    )[] = []
+    const walk = (list: Module[], depth: number): void => {
+      for (const m of list) {
+        if (moduleMatches && !moduleMatches.has(m.id)) continue
+        const children = moduleChildren.get(m.id) ?? []
+        const own = typesOfModules.get(m.id) ?? []
+        const open = !!moduleMatches || !collapsed.has(m.id)
+        shownModules.push({ kind: 'module', m, depth, parent: children.length > 0 || own.length > 0, open })
+        if (!open) continue
+        for (const t of own) if (match(t.name)) shownModules.push({ kind: 'type', t, depth: depth + 1 })
+        walk(children, depth + 1)
+      }
     }
-  }
-  walk(moduleChildren.get(null) ?? [], 0)
+    walk(moduleChildren.get(null) ?? [], 0)
+    return shownModules
+  }, [moduleChildren, moduleMatches, typesOfModules, match, collapsed])
   const shownBinaries = binaries.filter((b) => match(b.name))
   const binaryIds = shownBinaries.map((b) => b.id)
   const shownLinks = allLinks.filter((x) => match(x.l.name) || match(x.from) || match(x.to))

@@ -53,6 +53,7 @@ import {
 } from '@/model/types'
 import { Icon } from '@/components/Icon'
 import { DefaultInput, FieldList, setDefault } from './TypeInspector'
+import { pickNewParent } from './moduleTree'
 import { addMessage, MessageList } from './MessageList'
 
 function withTypeOf(id: string, fn: (t: TypeDef) => void): void {
@@ -132,9 +133,13 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
                 reparentModule(id, null, abs.x, abs.y)
               }}
             />
+            <IconButton icon="folder" title="Move to…" onClick={() => pickNewParent(id)} />
           </span>
         ) : (
-          <span className="muted">top level</span>
+          <span className="row-inline">
+            <span className="muted">top level</span>
+            <IconButton icon="folder" title="Move to…" onClick={() => pickNewParent(id)} />
+          </span>
         )}
       </Row>
       <Row label="Kind">

@@ -1,8 +1,9 @@
 // Module tree of the Explorer: modules by parent, filtering, hiding in the focused view, drag to re-parent.
-import { absolutePosition, belowContent, LAYOUT_PAD, subtreeIds } from '@/model/project'
+import { absolutePosition, belowContent, LAYOUT_PAD, modulePaths, subtreeIds } from '@/model/project'
 import type { Id, Module, Project } from '@/model/types'
 import { activeDoc } from '@/store/documents'
 import { getProject, reparentModule, setHidden } from '@/store/project'
+import { quickPick } from '@/store/ui'
 import { storedViewFor } from '@/actions'
 
 /** Data type of a module dragged in the tree. */
@@ -43,4 +44,22 @@ export function dropModule(id: Id, parentId: Id | null): void {
   if (!id || !canDrop(p, id, parentId)) return
   const pos = parentId ? { x: LAYOUT_PAD, y: belowContent(p, parentId, id) } : absolutePosition(p, id)
   reparentModule(id, parentId, pos.x, pos.y)
+}
+
+/** Pick the module to move a module into (or the top level): drag and drop without a pointer. */
+export function pickNewParent(id: Id): void {
+  const p = getProject()
+  const m = p.modules.find((x) => x.id === id)
+  if (!m) return
+  const paths = modulePaths(p)
+  const targets = p.modules.filter((x) => x.id !== m.parentId && canDrop(p, id, x.id))
+  quickPick(`Move ${paths.get(id) ?? m.name} to`, [
+    ...(m.parentId ? [{ key: '', label: 'Top level', kind: '', run: () => dropModule(id, null) }] : []),
+    ...targets.map((x) => ({
+      key: x.id,
+      label: paths.get(x.id) ?? x.name,
+      kind: 'M',
+      run: () => dropModule(id, x.id)
+    }))
+  ])
 }
