@@ -222,7 +222,9 @@ export function toFile(p: Project, options: { editor: boolean }): FileProject {
     ...qualifiers(m),
     params: methodParams(m),
     returns: m.returns ? ref(m.returns) : null,
-    raises: raises(m)
+    raises: raises(m),
+    pre: m.pre?.length ? [...m.pre] : undefined,
+    post: m.post?.length ? [...m.post] : undefined
   })
   const constructor = (c: Constructor) => ({
     description: opt(c.description),
@@ -336,6 +338,7 @@ export function toFile(p: Project, options: { editor: boolean }): FileProject {
         copy: m.copy,
         move: m.move,
         locks: m.locks?.length ? m.locks.map((l) => ({ name: l.name, kind: l.kind })) : undefined,
+        invariants: m.invariants?.length ? [...m.invariants] : undefined,
         metadata: optMeta(m.metadata),
         color: m.color,
         binary: m.binaryId ? binaryName.get(m.binaryId) : undefined,
@@ -850,6 +853,8 @@ export function fromFile(data: unknown, prev?: Project): Project {
         ...x,
         ...access(fx),
         ...qualifiers(fx),
+        ...(fx.pre?.length && { pre: [...fx.pre] }),
+        ...(fx.post?.length && { post: [...fx.post] }),
         params: x.params.map((prm, k) => {
           const fp = fx.params[k]!
           return {
@@ -918,6 +923,7 @@ export function fromFile(data: unknown, prev?: Project): Project {
         ...(fm.copy && { copy: fm.copy }),
         ...(fm.move && { move: fm.move }),
         ...(locks?.length && { locks }),
+        ...(fm.invariants?.length && { invariants: [...fm.invariants] }),
         ...(fm.constructors && {
           constructors: constructorsOf(fm.constructors, path, fm.name, was?.constructors, [
             ...at,

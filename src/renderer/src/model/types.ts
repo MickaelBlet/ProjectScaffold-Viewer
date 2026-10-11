@@ -301,6 +301,10 @@ export interface Method extends Message {
   pure?: boolean
   /** May be called from several threads at once. */
   threadSafe?: boolean
+  /** Conditions holding when it is called: expressions on its parameters and the attributes. */
+  pre?: string[]
+  /** Conditions holding when it returns: `result` is its returned value. */
+  post?: string[]
   /** Overrides a virtual method of a base module (virtual only). */
   override?: boolean
   /** Cannot be overridden by derived modules (virtual only). */
@@ -400,6 +404,8 @@ export interface Module {
   instantiation?: Instantiation
   /** Locks guarding its attributes. */
   locks?: Lock[]
+  /** Conditions on its attributes holding between calls of its public methods. */
+  invariants?: string[]
   metadata: Metadata
   /** Typed properties of the module, shown on the canvas apart from its ports. */
   attributes: Attribute[]

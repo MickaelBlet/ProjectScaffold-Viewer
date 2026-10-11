@@ -335,6 +335,8 @@ modules:
                       kind: primitive
                       name: float32
                 returns: null
+                pre:
+                  - dt > 0
             ports:
               - name: tick
                 role: in

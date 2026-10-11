@@ -100,6 +100,8 @@ const Field = z.object({
   description: Description
 })
 
+const Conditions = z.array(z.string()).optional()
+
 const Constraints = z
   .object({
     min: z.number().optional().describe('lowest value (numbers)'),
@@ -302,6 +304,12 @@ const Method = Message.extend({
   override: z.boolean().optional().describe('overrides a virtual method of a base module (virtual only)'),
   final: z.boolean().optional().describe('cannot be overridden by derived modules (virtual only)'),
   threadSafe: z.boolean().optional().describe('may be called from several threads at once'),
+  pre: Conditions.describe(
+    'preconditions: expressions on its parameters and the attributes, holding when called'
+  ),
+  post: Conditions.describe(
+    'postconditions: expressions holding when it returns (`result`: its returned value)'
+  ),
   noexcept: z.boolean().optional().describe('raises no exception'),
   nodiscard: z.boolean().optional().describe('its result must be used (methods returning a value)')
 })
@@ -363,6 +371,7 @@ export interface FileModule {
   copy?: (typeof SPECIAL_MEMBERS)[number]
   move?: (typeof SPECIAL_MEMBERS)[number]
   locks?: z.infer<typeof Lock>[]
+  invariants?: string[]
   metadata?: Record<string, string>
   color?: string
   binary?: string
@@ -406,6 +415,9 @@ const Module: z.ZodType<FileModule> = z
         'move constructor and assignment: default (by the compiler), delete (not movable) or custom (written by hand); absent: implicit'
       ),
       locks: z.array(Lock).optional().describe('locks guarding its attributes (`guardedBy`)'),
+      invariants: Conditions.describe(
+        'conditions on its attributes holding between calls of its public methods (expressions)'
+      ),
       metadata: Metadata,
       color: z.string().optional().describe('accent color (CSS color)'),
       binary: Identifier.optional().describe(

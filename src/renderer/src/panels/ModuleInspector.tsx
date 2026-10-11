@@ -59,6 +59,7 @@ import { pickNewParent } from './moduleTree'
 import { LifecycleSection } from './LifecycleSection'
 import { FieldDetails, hasDetails } from './FieldDetails'
 import { Locks } from './Locks'
+import { AddConditions, ConditionList, setConditions, withCondition } from './Conditions'
 import { addMessage, MessageList } from './MessageList'
 
 /** Method qualifiers in two rows: about derivation, then the others. */
@@ -325,6 +326,25 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
       <LifecycleSection mod={mod} types={project.types} withModule={(fn) => withModule(id, fn)} />
 
       <Section
+        title={`Invariants (${mod.invariants?.length ?? 0})`}
+        actions={
+          <button
+            type="button"
+            title="A condition on the attributes holding between calls of public methods"
+            onClick={() => withModule(id, (m) => void (m.invariants = withCondition(m.invariants)))}
+          >
+            <Icon name="plus" /> invariant
+          </button>
+        }
+      >
+        <ConditionList
+          label=""
+          values={mod.invariants ?? []}
+          onChange={(v) => withModule(id, (m) => setConditions(m, 'invariants', v))}
+        />
+      </Section>
+
+      <Section
         title={`Methods (${mod.methods.length})`}
         actions={
           <>
@@ -375,6 +395,22 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
                 qualifiers={OTHER_QUALIFIERS}
                 value={x}
                 onChange={(q, on) => change((y) => setMethodQualifier(y, q, on))}
+              />
+              <ConditionList
+                label="Preconditions"
+                values={x.pre ?? []}
+                onChange={(v) => change((y) => setConditions(y, 'pre', v))}
+              />
+              <ConditionList
+                label="Postconditions (result: the returned value)"
+                values={x.post ?? []}
+                onChange={(v) => change((y) => setConditions(y, 'post', v))}
+              />
+              <AddConditions
+                lists={[
+                  { label: 'precondition', add: () => change((y) => void (y.pre = withCondition(y.pre))) },
+                  { label: 'postcondition', add: () => change((y) => void (y.post = withCondition(y.post))) }
+                ]}
               />
             </>
           )}

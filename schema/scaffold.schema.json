@@ -606,6 +606,20 @@
                             "description": "may be called from several threads at once",
                             "type": "boolean"
                           },
+                          "pre": {
+                            "description": "preconditions: expressions on its parameters and the attributes, holding when called",
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "post": {
+                            "description": "postconditions: expressions holding when it returns (`result`: its returned value)",
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
                           "noexcept": {
                             "description": "raises no exception",
                             "type": "boolean"
@@ -2132,6 +2146,13 @@
             ]
           }
         },
+        "invariants": {
+          "description": "conditions on its attributes holding between calls of its public methods (expressions)",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "metadata": {
           "description": "free key: value pairs, passed to generators",
           "type": "object",
@@ -2471,6 +2492,20 @@
               "threadSafe": {
                 "description": "may be called from several threads at once",
                 "type": "boolean"
+              },
+              "pre": {
+                "description": "preconditions: expressions on its parameters and the attributes, holding when called",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "post": {
+                "description": "postconditions: expressions holding when it returns (`result`: its returned value)",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
               },
               "noexcept": {
                 "description": "raises no exception",

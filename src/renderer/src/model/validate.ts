@@ -31,6 +31,7 @@ import { normalizeFile } from './sync'
 import { isReservedTypeName, walkTypeRef } from './typeExpr'
 import { resolve as resolveType, valueErrors } from './defaults'
 import { constraintErrors, constraintValueErrors, moduleRefs } from './constraints'
+import { unknownNames } from './contracts'
 import { binariesOf, crosses } from './binaries'
 import { DEFAULT_HOST, foreignFields } from './transports'
 import {
@@ -330,6 +331,51 @@ export function validate(p: Project): Problem[] {
   }
 
   /** Parameters and return type of an interface message or a module method. */
+  /** Names any contract may use: types (first part of a path), constants, enum values, dependencies. */
+  let contractNames: Set<string> | undefined
+  const contractGlobals = (): Set<string> =>
+    (contractNames ??= new Set([
+      ...p.types.map((t) => t.name),
+      ...p.types.flatMap((t) => (t.kind === 'enum' ? t.values.map((v) => v.name) : [])),
+      ...p.types.flatMap((t) => (t.kind === 'bitmask' ? t.flags.map((v) => v.name) : [])),
+      ...p.consts.map((c) => c.name),
+      ...p.modules.filter((x) => !x.parentId).map((x) => x.name),
+      ...p.dependencies.map((d) => d.name)
+    ]))
+
+  /** Preconditions, postconditions and invariants of a module (`path`): the names they use. */
+  const checkContracts = (
+    m: Module,
+    target: ProblemTarget,
+    path: string,
+    ancestors: ReturnType<typeof ancestorModules>
+  ): void => {
+    const members = new Set([
+      ...contractGlobals(),
+      ...m.attributes.map((a) => a.name),
+      ...m.methods.map((x) => x.name),
+      ...(m.locks ?? []).map((l) => l.name),
+      ...moduleTypes(p, m.id).map((t) => t.name),
+      ...ancestors.flatMap((b) => [
+        ...(b.attributes ?? []).map((a) => a.name),
+        ...baseMethods(b).map((x) => x.name)
+      ])
+    ])
+    const check = (expression: string, known: ReadonlySet<string>, where: string): void => {
+      if (!expression.trim()) push('warning', target, `${where}: empty condition`)
+      for (const n of unknownNames(expression, known))
+        push('warning', target, `${where}: '${n}' names nothing here`)
+    }
+    for (const e of m.invariants ?? []) check(e, members, `${path} invariant`)
+    for (const x of m.methods) {
+      if (!x.pre?.length && !x.post?.length) continue
+      const params = new Set([...members, ...x.params.map((prm) => prm.name)])
+      for (const e of x.pre ?? []) check(e, params, `${path}.${x.name} precondition`)
+      const after = new Set([...params, ...(x.returns ? ['result'] : [])])
+      for (const e of x.post ?? []) check(e, after, `${path}.${x.name} postcondition`)
+    }
+  }
+
   /** Qualifiers, accessors and lock of an attribute (`where`) of `m`. */
   const checkAttribute = (m: Module, a: Attribute, target: ProblemTarget, where: string): void => {
     if (a.mutable && (a.static || a.const))
@@ -602,6 +648,7 @@ export function validate(p: Project): Problem[] {
       checkParams(x.params, target, `${path}.${x.name}`)
     }
     checkLifecycle(m, target, path, ancestors)
+    checkContracts(m, target, path, ancestors)
     if (m.kind === 'interface' && m.attributes.length)
       push('error', target, `${path}: an interface module cannot have attributes`)
     const bases = m.bases ?? []

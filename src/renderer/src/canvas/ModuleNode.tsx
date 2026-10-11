@@ -262,8 +262,13 @@ export function Methods({
           : ''
         const mark = ACCESS_MARKS[m.access ?? 'public']
         const sig = `${mark} ${before}${m.name}(${params})${returns}${after}${raises}`
+        const contract = [
+          ...(m.pre ?? []).map((e) => `pre: ${e}`),
+          ...(m.post ?? []).map((e) => `post: ${e}`)
+        ]
+        const title = [sig, m.description, ...contract].filter(Boolean).join('\n')
         return (
-          <li key={m.id} title={m.description ? `${sig}\n${m.description}` : sig}>
+          <li key={m.id} title={title}>
             <span className="attr-access">
               <AccessIcon access={m.access} />
             </span>
@@ -373,7 +378,12 @@ export const ModuleNode = memo(function ModuleNode({
         {renaming ? (
           <RenameInput id={id} name={mod.name} parentId={mod.parentId} />
         ) : (
-          <span className={`module-name ${mod.kind ?? ''}`}>
+          <span
+            className={`module-name ${mod.kind ?? ''}`}
+            title={
+              mod.invariants?.length ? mod.invariants.map((e) => `invariant: ${e}`).join('\n') : undefined
+            }
+          >
             {(mod.kind || mod.instantiation) && (
               <span className="module-kind">
                 «{[mod.kind, mod.instantiation].filter(Boolean).join(', ')}»{' '}

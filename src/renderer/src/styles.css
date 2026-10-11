@@ -1507,6 +1507,27 @@ button.qualifier.on {
   flex: 1;
   font-weight: 600;
 }
+/* Preconditions, postconditions and invariants: expressions. */
+.conditions {
+  display: grid;
+  gap: 2px;
+  margin: 4px 0;
+}
+.conditions-label {
+  font-size: 11px;
+  color: var(--muted);
+}
+.condition .field {
+  flex: 1;
+}
+.condition input,
+.field.code input {
+  font-family: ui-monospace, 'SF Mono', Consolas, monospace;
+}
+.add-conditions {
+  display: flex;
+  gap: 12px;
+}
 /* Constructor signature, in place of a name input. */
 .card-title {
   flex: 1;
