@@ -3,6 +3,7 @@ import { z } from 'zod'
 import {
   ACCESS_LEVELS,
   ACCESSORS,
+  DERIVES,
   INSTANTIATIONS,
   INT_PRIMITIVES,
   LOCK_KINDS,
@@ -115,6 +116,13 @@ const Field = z.object({
 
 const Conditions = z.array(z.string()).optional()
 
+const Derives = z
+  .array(z.enum(DERIVES))
+  .optional()
+  .describe(
+    'operations derived from the fields or attributes: equality (==), ordering (<, member by member), hash, string (a text form)'
+  )
+
 const Constraints = z
   .object({
     min: z.number().optional().describe('lowest value (numbers)'),
@@ -148,6 +156,7 @@ const typeDefs = <E extends z.ZodRawShape>(extra: E) =>
       ...extra,
       name: Identifier.describe('name of the type'),
       description: Description,
+      derives: Derives,
       fields: z.array(ValueField).describe('fields of the struct, in order')
     }),
     z.object({
@@ -392,6 +401,7 @@ export interface FileModule {
   typeParams?: z.infer<typeof TypeParamSchema>[]
   bases?: string[]
   final?: boolean
+  derives?: (typeof DERIVES)[number][]
   instantiation?: (typeof INSTANTIATIONS)[number]
   copy?: (typeof SPECIAL_MEMBERS)[number]
   move?: (typeof SPECIAL_MEMBERS)[number]
@@ -431,6 +441,7 @@ const Module: z.ZodType<FileModule> = z
           'paths of the modules it derives from, in order: of this project, or `Dependency/Module.Path` for a module of a dependency placed on the canvas'
         ),
       final: z.boolean().optional().describe('no module may derive from it (not abstract nor an interface)'),
+      derives: Derives,
       instantiation: z
         .enum(INSTANTIATIONS)
         .optional()

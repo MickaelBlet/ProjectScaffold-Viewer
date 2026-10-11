@@ -36,6 +36,7 @@ import {
   CommitInput,
   IconButton,
   MetadataEditor,
+  DeriveToggles,
   QualifierToggles,
   Row,
   Section,
@@ -182,6 +183,19 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
           </label>
         </span>
       </Row>
+      {!mod.kind && (
+        <Row label="Derives">
+          <DeriveToggles
+            value={mod.derives}
+            onChange={(v) =>
+              withModule(id, (m) => {
+                if (v.length) m.derives = v
+                else delete m.derives
+              })
+            }
+          />
+        </Row>
+      )}
       {!mod.parentId && (project.binaries.length > 0 || mod.binaryId) && (
         <Row label="Binary">
           <Select

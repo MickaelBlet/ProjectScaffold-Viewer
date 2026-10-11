@@ -37,6 +37,7 @@ import {
   type TypeRef
 } from '@/model/types'
 import { AccessIcon, Icon } from '@/components/Icon'
+import { DERIVE_LABELS } from '@/components/fields'
 import { MODULE_HANDLE } from './constants'
 import type { PortNodeData } from './flowGraph'
 import { anchorStyle, inward, PortPoint } from './PortPoint'
@@ -405,6 +406,11 @@ export const ModuleNode = memo(function ModuleNode({
             {path ?? mod.name}
             {typeParams && <span className="module-kind">{`<${typeParams}>`}</span>}
             {mod.final && <span className="module-kind"> {'{final}'}</span>}
+            {!!mod.derives?.length && (
+              <span className="module-kind" title={`Derives ${mod.derives.join(', ')}`}>
+                {` {${mod.derives.map((d) => DERIVE_LABELS[d]).join(', ')}}`}
+              </span>
+            )}
             {bases && <span className="module-bases"> : {bases}</span>}
             {binary && (
               <small

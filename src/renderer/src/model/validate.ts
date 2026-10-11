@@ -42,6 +42,7 @@ import {
   type Id,
   type Attribute,
   type Constructor,
+  type Derive,
   type Message,
   type MethodParam,
   type Module,
@@ -232,6 +233,44 @@ export function validate(p: Project): Problem[] {
       for (const e of constraintValueErrors(f.default, c)) push('error', target, `${where} default: ${e}`)
   }
 
+  /**
+   * Operations derived from members (`what`): they need equality first, and every member, nested
+   * struct included, to support them.
+   */
+  const checkDerives = (
+    derives: readonly Derive[],
+    members: readonly ValueField[],
+    target: ProblemTarget,
+    what: string
+  ): void => {
+    for (const n of duplicates([...derives])) push('error', target, `${what}: derives ${n} more than once`)
+    for (const d of ['ordering', 'hash'] as const)
+      if (derives.includes(d) && !derives.includes('equality'))
+        push('error', target, `${what}: derives ${d}, which needs equality`)
+    for (const f of members)
+      for (const d of derives) {
+        const why = deriveError(f, d)
+        if (why) push('error', target, `${what}.${f.name}: ${why}, no ${d}`)
+      }
+  }
+
+  /** Why a member does not support a derived operation; null when it does. */
+  const deriveError = (f: ValueField, d: Derive): string | null => {
+    if (d === 'string') return null
+    if (f.ownership === 'weak') return 'a weak reference'
+    let why: string | null = null
+    walkTypeRef(f.type, (n) => {
+      if (why) return
+      if (n.kind === 'map' && d !== 'equality') why = 'a map'
+      if (n.kind !== 'ref') return
+      const r = resolve(n)
+      if (r?.kind === 'struct' && !(r.derives ?? []).includes(d))
+        why = `struct '${r.name}' does not derive ${d}`
+      else if (r?.kind === 'union' && d !== 'equality') why = `union '${r.name}'`
+    })
+    return why
+  }
+
   // Project
   if (!p.name.trim()) push('warning', { kind: 'project' }, 'Project has no name')
 
@@ -255,6 +294,7 @@ export function validate(p: Project): Problem[] {
       case 'exception':
         if (t.kind === 'struct' && !t.fields.length)
           push('warning', target, `Struct '${t.name}' has no fields`)
+        if (t.kind === 'struct' && t.derives) checkDerives(t.derives, t.fields, target, `Struct '${t.name}'`)
         for (const n of duplicates(t.fields.map((f) => f.name)))
           push(
             'error',
@@ -728,6 +768,15 @@ export function validate(p: Project): Problem[] {
       checkParams(x.params, target, `${path}.${x.name}`)
     }
     checkLifecycle(m, target, path, ancestors)
+    if (m.derives) {
+      if (m.kind) push('error', target, `${path}: an ${m.kind} module derives no operations`)
+      checkDerives(
+        m.derives,
+        m.attributes.filter((a) => !a.static),
+        target,
+        path
+      )
+    }
     checkGenerics(m, target, path)
     checkContracts(m, target, path, ancestors)
     if (m.kind === 'interface' && m.attributes.length)

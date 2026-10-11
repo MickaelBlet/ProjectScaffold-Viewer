@@ -119,12 +119,20 @@ export interface Scoped {
   access?: StoredAccess
 }
 
+/**
+ * Operations derived from the fields or attributes: `equality` (==), `ordering` (<, by member in
+ * order), `hash`, `string` (a text form).
+ */
+export const DERIVES = ['equality', 'ordering', 'hash', 'string'] as const
+export type Derive = (typeof DERIVES)[number]
+
 export interface StructDef extends Owned, Scoped {
   id: Id
   kind: 'struct'
   name: string
   description: string
   fields: ValueField[]
+  derives?: Derive[]
 }
 
 export interface EnumValue {
@@ -413,6 +421,8 @@ export interface Module {
   baseArgs?: Record<Id, TypeRef[]>
   /** No module may derive from it. */
   final?: boolean
+  /** Operations derived from its attributes. */
+  derives?: Derive[]
   /** Absent: none declared (the implicit default constructor). */
   constructors?: Constructor[]
   copy?: SpecialMember

@@ -90,6 +90,8 @@ attributes:
 - An exception is listed by the `raises` of messages and methods: `raises: [Busy]`.
 - Modules have [types of their own](#types-of-modules), named `Core.Sensor.Filter`.
 
+Structs take `derives` too: `{ kind: struct, name: Point, derives: [equality, ordering, hash], fields: [...] }`, operations derived from their fields (see [Modules](#modules)). Generators: C++ `operator==`, `operator<` (or `<=>`), `std::hash`, `operator<<`; Python `__eq__`, `__lt__`, `__hash__`, `__str__`.
+
 ## Constants
 
 ```yaml
@@ -135,6 +137,7 @@ interfaces: # { name, description?, messages }
 - **Destructor** (optional, absent: implicit): `{ access?, virtual? }`; `virtual` absent: virtual when the module has virtual methods. A public destructor with `virtual: false` beside virtual methods is a warning.
 - **Copy** and **move** (optional, absent: implicit): `default` (by the compiler), `delete` (not copyable / movable) or `custom` (written by hand): C++ copy / move constructor and assignment.
 - **Instantiation** (optional, absent: free): `singleton` (constructors not public, `copy` / `move` `delete` when set), `utility` (static attributes and methods only, no constructors, no ports), `value` (a `class` without virtual methods, not `copy: delete`; ports are a warning).
+- **Derives** (optional): `derives: [equality, ordering, hash, string]`, operations derived from the (non-static) attributes, as on structs: `ordering` and `hash` need `equality`; every member supports them (a nested struct derives them too; a map is neither ordered nor hashed, a union only compared; a `weak` reference none but `string`). A `class` only.
 - **Type parameters** (optional): `typeParams: [{ name, description?, constraint?, derivesFrom?, default? }]` make the module generic (`Ring<T>`): its members use them by name, the file names them `Module.Path.T` (private types of the module). `constraint`: `numeric` or `integral` (absent: any type); `derivesFrom`: path of a module the argument is or derives from; `default`: the argument when left out (the last parameters only). A reference to a generic module gives its arguments, `{ kind: ref, name: Ring, args: [{ kind: primitive, name: float32 }] }` (`Ring<float32>` in type expressions), checked against the parameters; a module without them takes none.
 - **Bases** (optional): `bases: [IShape, Core.Base, Robot/Core.Sensor]`, paths of the modules it derives from (with the type arguments of a generic one: `Ring<float32>`), in order: of this project, or `Dependency/Module.Path` for a module of a dependency placed on the canvas (`dependencies[].modules`, whose methods are those overridden or implemented); no cycles, no repeats. A method redefining a virtual one of a base without `override` is a warning.
 - **Types** (optional): see [Types of modules](#types-of-modules).

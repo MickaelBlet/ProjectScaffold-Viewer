@@ -286,6 +286,9 @@ modules:
             value: 4
       - kind: struct
         name: Band
+        derives:
+          - equality
+          - string
         fields:
           - name: shape
             type:

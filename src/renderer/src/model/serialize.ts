@@ -243,6 +243,7 @@ export function toFile(p: Project, options: { editor: boolean }): FileProject {
           kind: 'struct',
           name: t.name,
           description: opt(t.description),
+          derives: t.derives?.length ? [...t.derives] : undefined,
           fields: t.fields.map(valueField)
         }
       case 'enum':
@@ -352,6 +353,7 @@ export function toFile(p: Project, options: { editor: boolean }): FileProject {
           : undefined,
         bases: m.bases?.length ? m.bases.map(baseName) : undefined,
         final: m.final || undefined,
+        derives: m.derives?.length ? [...m.derives] : undefined,
         instantiation: m.instantiation,
         copy: m.copy,
         move: m.move,
@@ -751,6 +753,7 @@ export function fromFile(data: unknown, prev?: Project): Project {
         return {
           ...base,
           kind: 'struct',
+          ...(t.derives?.length && { derives: [...t.derives] }),
           fields: t.fields.map((fl, j) => valueField(fl, t.name, fields[j], [...at, 'fields', j]))
         }
       }
@@ -947,6 +950,7 @@ export function fromFile(data: unknown, prev?: Project): Project {
         parentId,
         ...(fm.kind && fm.kind !== 'class' && { kind: fm.kind }),
         ...(fm.final && { final: true }),
+        ...(fm.derives?.length && { derives: [...fm.derives] }),
         ...(fm.instantiation && { instantiation: fm.instantiation }),
         ...(fm.copy && { copy: fm.copy }),
         ...(fm.move && { move: fm.move }),

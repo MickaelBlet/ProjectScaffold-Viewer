@@ -1300,6 +1300,19 @@
               "description": "free text documenting it",
               "type": "string"
             },
+            "derives": {
+              "description": "operations derived from the fields or attributes: equality (==), ordering (<, member by member), hash, string (a text form)",
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "equality",
+                  "ordering",
+                  "hash",
+                  "string"
+                ]
+              }
+            },
             "fields": {
               "type": "array",
               "items": {
@@ -2138,6 +2151,19 @@
           "description": "no module may derive from it (not abstract nor an interface)",
           "type": "boolean"
         },
+        "derives": {
+          "description": "operations derived from the fields or attributes: equality (==), ordering (<, member by member), hash, string (a text form)",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "equality",
+              "ordering",
+              "hash",
+              "string"
+            ]
+          }
+        },
         "instantiation": {
           "description": "absent: instances made freely; singleton: one instance (constructors not public, no copy nor move); utility: static members only, never instantiated; value: copied freely, no virtual methods",
           "type": "string",
@@ -2652,6 +2678,19 @@
             "description": {
               "description": "free text documenting it",
               "type": "string"
+            },
+            "derives": {
+              "description": "operations derived from the fields or attributes: equality (==), ordering (<, member by member), hash, string (a text form)",
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "equality",
+                  "ordering",
+                  "hash",
+                  "string"
+                ]
+              }
             },
             "fields": {
               "type": "array",

@@ -18,6 +18,7 @@ import { navigate } from '@/actions'
 import {
   AccessToggles,
   CommitInput,
+  DeriveToggles,
   IconButton,
   NumberInput,
   Row,
@@ -371,6 +372,19 @@ export function TypeInspector({ id }: { id: string }): ReactNode {
         )}
         <TextArea value={t.description} onChange={(v) => withType(id, (x) => void (x.description = v))} />
 
+        {t.kind === 'struct' && (
+          <Row label="Derives">
+            <DeriveToggles
+              value={t.derives}
+              onChange={(v) =>
+                withType<'struct'>(id, (x) => {
+                  if (v.length) x.derives = v
+                  else delete x.derives
+                })
+              }
+            />
+          </Row>
+        )}
         {(t.kind === 'struct' || t.kind === 'exception') && (
           <Section title={`Fields (${t.fields.length})`}>
             <FieldList
