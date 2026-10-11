@@ -247,7 +247,13 @@ const Attribute = ValueField.extend({
 })
 
 const MethodParam = Param.extend({
-  const: z.boolean().optional().describe('not changed by the method (in parameters only)')
+  const: z.boolean().optional().describe('not changed by the method (in parameters only)'),
+  default: z
+    .json()
+    .optional()
+    .describe(
+      'value when the caller leaves it out, as attribute defaults (in parameters only; the following parameters have one too)'
+    )
 })
 
 const Method = Message.extend({

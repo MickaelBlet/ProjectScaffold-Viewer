@@ -202,7 +202,7 @@ export function toFile(p: Project, options: { editor: boolean }): FileProject {
     description: opt(m.description),
     ...access(m),
     ...qualifiers(m),
-    params: m.params.map((prm) => ({ ...param(prm), ...qualifiers(prm) })),
+    params: m.params.map((prm) => ({ ...param(prm), ...qualifiers(prm), default: prm.default })),
     returns: m.returns ? ref(m.returns) : null,
     raises: raises(m)
   })
@@ -771,7 +771,14 @@ export function fromFile(data: unknown, prev?: Project): Project {
         ...x,
         ...access(fx),
         ...qualifiers(fx),
-        params: x.params.map((prm, k) => ({ ...prm, ...qualifiers(fx.params[k]!) }))
+        params: x.params.map((prm, k) => {
+          const fp = fx.params[k]!
+          return {
+            ...prm,
+            ...qualifiers(fp),
+            ...(fp.default !== undefined && { default: fp.default })
+          }
+        })
       }
     })
 

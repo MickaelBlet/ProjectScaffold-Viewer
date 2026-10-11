@@ -36,8 +36,13 @@ export function MessageList<M extends Message>(props: {
     prm: M['params'][number],
     change: (fn: (prm: M['params'][number]) => void) => void
   ) => ReactNode
+  /** Value cell of a parameter, after its type (a default value). */
+  paramValue?: (
+    prm: M['params'][number],
+    change: (fn: (prm: M['params'][number]) => void) => void
+  ) => ReactNode
 }): ReactNode {
-  const { messages, onChange, paramExtra } = props
+  const { messages, onChange, paramExtra, paramValue } = props
   const withMessage = (mid: string, fn: (m: M) => void): void =>
     onChange((ms) => {
       const m = ms.find((m) => m.id === mid)
@@ -80,6 +85,9 @@ export function MessageList<M extends Message>(props: {
         )}
         before={
           paramExtra && ((prm, idx) => paramExtra(prm, (fn) => withMessage(m.id, (x) => fn(x.params[idx]!))))
+        }
+        value={
+          paramValue && ((prm, idx) => paramValue(prm, (fn) => withMessage(m.id, (x) => fn(x.params[idx]!))))
         }
         onChange={(fn) => withMessage(m.id, (x) => fn(x.params))}
       />

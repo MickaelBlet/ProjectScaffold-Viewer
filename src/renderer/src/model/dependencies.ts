@@ -99,10 +99,18 @@ function portsOf(source: Project, m: Module, previous: ImportedPort[] = []): Imp
   })
 }
 
-/** Copies of the attributes or methods (`list`) of a module, keeping the ids `previous` has by name. */
+/**
+ * Copies of the attributes or methods (`list`) of a module, keeping the ids `previous` has by name
+ * (in order for overloads).
+ */
 function membersOf<T extends Attribute | Method>(list: readonly T[], previous: readonly T[] = []): T[] {
-  return list.map((x) => {
-    const was = previous.find((y) => y.name === x.name)
+  const before = pair(
+    previous,
+    (y) => y.name,
+    list.map((x) => x.name)
+  )
+  return list.map((x, i) => {
+    const was = before[i]
     const copy = { ...structuredClone(x), id: was?.id ?? newId() }
     if ('params' in copy && was && 'params' in was) copy.params = membersOf(copy.params, was.params)
     return copy

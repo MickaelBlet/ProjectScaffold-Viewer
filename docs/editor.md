@@ -133,6 +133,7 @@ Modules work as C++-like classes:
 - _Bases_: modules it derives from (of this project, or placed modules of dependencies, see [Dependencies](dependencies.md#linking-to-a-dependencys-modules)), shown as `Name : Base` and as UML arrows from the module to each base (hollow triangle, dashed to an interface). Clicking an arrow selects the module; right click goes to or removes the base. _View › Inheritance arrows_ hides them.
 - _Final_ (beside _Kind_): no module may derive from it, shown as `Name {final}`.
 - Methods can be `virtual`, `pure` (`= 0`), `override` and `final` (first row of toggles), `static`, `const`, `noexcept` and `nodiscard` (second row), shown as `nodiscard virtual name(): R const noexcept override = 0`.
+- Methods of the same name with other parameters are overloads. An `in` parameter takes a default value in its last cell, shown as `x: int32 = 1`.
 - _Implement_ in the Methods section adds the pure methods a module inherits and lacks, as overrides.
 
 ### Arrange

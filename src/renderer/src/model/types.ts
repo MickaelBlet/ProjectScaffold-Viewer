@@ -236,6 +236,8 @@ export interface Attribute extends ValueField {
 export interface MethodParam extends Param {
   /** Not changed by the method (`in` parameters only). */
   const?: boolean
+  /** Value when the caller leaves it out (`in` parameters only, then the following ones too). */
+  default?: Value
 }
 
 /** Method prototype of a module: a message with C++-like qualifiers. */

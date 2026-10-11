@@ -173,7 +173,7 @@ export function Methods({ methods, moduleId }: { methods: Method[]; moduleId: Id
         const params = m.params
           .map(
             (prm) =>
-              `${prm.direction === 'in' ? '' : `${prm.direction} `}${qualifierText(prm)}${prm.name}: ${printTypeRef(prm.type, nameOf)}`
+              `${prm.direction === 'in' ? '' : `${prm.direction} `}${qualifierText(prm)}${prm.name}: ${printTypeRef(prm.type, nameOf)}${prm.default === undefined ? '' : ` = ${formatValue(prm.default)}`}`
           )
           .join(', ')
         const returns = m.returns ? `: ${printTypeRef(m.returns, nameOf)}` : ''

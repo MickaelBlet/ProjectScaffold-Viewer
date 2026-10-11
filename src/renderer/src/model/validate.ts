@@ -21,6 +21,8 @@ import {
   isImportedId,
   linkRoles,
   methodSignature,
+  overloadKey,
+  overloadName,
   modulePath,
   unimplementedMethods
 } from './project'
@@ -122,7 +124,11 @@ export function validate(p: Project): Problem[] {
     })
   }
 
-  const checkDefault = (f: ValueField, target: ProblemTarget, where: string): void => {
+  const checkDefault = (
+    f: Pick<ValueField, 'type' | 'default'>,
+    target: ProblemTarget,
+    where: string
+  ): void => {
     if (f.default === undefined) return
     for (const e of valueErrors(f.default, f.type, p.types, isModule))
       push('error', target, `${where} default: ${e}`)
@@ -358,8 +364,9 @@ export function validate(p: Project): Problem[] {
       checkTypeRef(a.type, target, `${path}.${a.name}`)
       checkDefault(a, target, `${path}.${a.name}`)
     }
-    for (const n of duplicates(m.methods.map((x) => x.name)))
-      push('error', target, `${path}: duplicate method '${n}'`)
+    // Overloads share a name, with other parameter types or const.
+    for (const n of duplicates(m.methods.map(overloadName)))
+      push('error', target, `${path}: duplicate method '${n.slice(0, n.indexOf('('))}'`)
     const attributes = new Set(m.attributes.map((a) => a.name))
     const ancestors = ancestorModules(p, m.id)
     for (const x of m.methods) {
@@ -375,9 +382,16 @@ export function validate(p: Project): Problem[] {
         push('error', target, `${where}: pure method in a concrete module (make it abstract or an interface)`)
       if (m.kind === 'interface' && !x.pure)
         push('error', target, `${where}: methods of an interface module must be pure`)
-      const inherited = ancestors
-        .map((a) => ({ base: a, method: baseMethods(a).find((y) => y.name === x.name && y.virtual) }))
-        .find((e) => e.method)
+      // The overload of the same parameters, else (for an override) the only one of the name.
+      const virtuals = (a: (typeof ancestors)[number]) =>
+        baseMethods(a).filter((y) => y.name === x.name && y.virtual)
+      const inherited =
+        ancestors
+          .map((a) => ({ base: a, method: virtuals(a).find((y) => overloadKey(y) === overloadKey(x)) }))
+          .find((e) => e.method) ??
+        (x.override
+          ? ancestors.map((a) => ({ base: a, method: virtuals(a)[0] })).find((e) => e.method)
+          : undefined)
       if (inherited?.method!.final)
         push('error', target, `${where}: overrides final ${modulePath(p, inherited.base.id)}.${x.name}`)
       else if (inherited?.method!.noexcept && !x.noexcept)
@@ -409,13 +423,19 @@ export function validate(p: Project): Problem[] {
       if (attributes.has(x.name))
         push('error', target, `${path}: '${x.name}' is both an attribute and a method`)
       checkMessage(x, target, `${path}.${x.name}`)
-      for (const prm of x.params)
+      let defaulted: string | null = null
+      for (const prm of x.params) {
+        const at = `${path}.${x.name}(${prm.name})`
         if (prm.const && prm.direction !== 'in')
-          push(
-            'error',
-            target,
-            `${path}.${x.name}(${prm.name}): an ${prm.direction} parameter cannot be const`
-          )
+          push('error', target, `${at}: an ${prm.direction} parameter cannot be const`)
+        if (prm.default !== undefined) {
+          if (prm.direction !== 'in')
+            push('error', target, `${at}: an ${prm.direction} parameter cannot have a default`)
+          else checkDefault(prm, target, at)
+          defaulted ??= prm.name
+        } else if (defaulted)
+          push('error', target, `${at}: needs a default or to move before ${defaulted}, which has one`)
+      }
     }
     if (m.kind === 'interface' && m.attributes.length)
       push('error', target, `${path}: an interface module cannot have attributes`)

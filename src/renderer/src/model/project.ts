@@ -542,9 +542,25 @@ export function methodSignature(m: Method): string {
   return `(${params.join(', ')})${m.returns ? type(m.returns) : ''}${m.const ? ' const' : ''}`
 }
 
+/** Parameter types (with directions) and const of a method: overloads of a name differ by it. */
+export function overloadKey(m: Method): string {
+  const type = (t: TypeRef): string => printTypeExpr(mapTypeRef(t, (r) => ({ kind: 'ref', name: r.id })))
+  const params = m.params.map(
+    (prm) => `${prm.direction === 'in' ? '' : `${prm.direction} `}${type(prm.type)}`
+  )
+  return `(${params.join(', ')})${m.const ? ' const' : ''}`
+}
+
+/** A method by name and overload key: `f(int32) const`. */
+export const overloadName = (m: Method): string => `${m.name}${overloadKey(m)}`
+
+/** The method of `methods` `m` overrides or redefines: same name and overload key. */
+export const sameOverload = (methods: readonly Method[], m: Method): Method | undefined =>
+  methods.find((x) => x.name === m.name && overloadKey(x) === overloadKey(m))
+
 /**
- * Pure methods a module inherits and does not implement: those of its bases not defined (by name)
- * in itself or in a base nearer to it on the way.
+ * Pure methods a module inherits and does not implement: those of its bases not defined (by name
+ * and overload key) in itself or in a base nearer to it on the way.
  */
 export function unimplementedMethods(p: Project, id: Id): { base: BaseModule; method: Method }[] {
   const out = new Map<string, { base: BaseModule; method: Method }>()
@@ -554,14 +570,16 @@ export function unimplementedMethods(p: Project, id: Id): { base: BaseModule; me
       const base = baseModule(p, b)
       if (!base || stack.has(b)) continue
       const methods = baseMethods(base)
-      for (const x of methods)
-        if (x.pure && !defined.has(x.name) && !out.has(x.name)) out.set(x.name, { base, method: x })
-      const names = new Set([...defined, ...methods.filter((x) => !x.pure).map((x) => x.name)])
+      for (const x of methods) {
+        const key = overloadName(x)
+        if (x.pure && !defined.has(key) && !out.has(key)) out.set(key, { base, method: x })
+      }
+      const names = new Set([...defined, ...methods.filter((x) => !x.pure).map(overloadName)])
       walk(base, names, new Set([...stack, b]))
     }
   }
   const mod = p.modules.find((m) => m.id === id)
-  if (mod) walk(mod, new Set(mod.methods.map((x) => x.name)), new Set([id]))
+  if (mod) walk(mod, new Set(mod.methods.map(overloadName)), new Set([id]))
   return [...out.values()]
 }
 

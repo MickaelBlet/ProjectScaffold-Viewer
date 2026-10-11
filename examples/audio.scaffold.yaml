@@ -186,6 +186,28 @@ modules:
         returns:
           kind: primitive
           name: uint32
+      - name: mix
+        description: Blends the processed signal into the dry one
+        params:
+          - name: wet
+            type:
+              kind: primitive
+              name: float32
+            default: 1
+        returns: null
+      - name: mix
+        description: Blends with a gain for each signal
+        params:
+          - name: wet
+            type:
+              kind: primitive
+              name: float32
+          - name: dry
+            type:
+              kind: primitive
+              name: float32
+            default: 0
+        returns: null
     ports: []
   - name: Source
     description: Reads the input device

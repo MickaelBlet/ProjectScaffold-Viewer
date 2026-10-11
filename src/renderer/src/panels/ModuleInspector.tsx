@@ -338,6 +338,16 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
               />
             </>
           )}
+          paramValue={(prm, change) =>
+            // Only `in` parameters have a default.
+            prm.direction === 'in' && (
+              <DefaultInput
+                field={prm}
+                types={project.types}
+                onChange={(v) => change((y) => setDefault(y, v))}
+              />
+            )
+          }
           paramExtra={(prm, change) =>
             // Only `in` parameters can be const.
             prm.direction === 'in' && (

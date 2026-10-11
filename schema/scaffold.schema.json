@@ -484,6 +484,10 @@
                                 "const": {
                                   "description": "not changed by the method (in parameters only)",
                                   "type": "boolean"
+                                },
+                                "default": {
+                                  "description": "value when the caller leaves it out, as attribute defaults (in parameters only; the following parameters have one too)",
+                                  "$ref": "#/$defs/__schema2"
                                 }
                               },
                               "required": [
@@ -2072,6 +2076,10 @@
                     "const": {
                       "description": "not changed by the method (in parameters only)",
                       "type": "boolean"
+                    },
+                    "default": {
+                      "description": "value when the caller leaves it out, as attribute defaults (in parameters only; the following parameters have one too)",
+                      "$ref": "#/$defs/__schema2"
                     }
                   },
                   "required": [
@@ -2632,6 +2640,37 @@
             "name"
           ],
           "description": "custom primitive: an opaque type that generators map to a native type"
+        }
+      ]
+    },
+    "__schema2": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/__schema2"
+          }
+        },
+        {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/__schema2"
+          }
         }
       ]
     },

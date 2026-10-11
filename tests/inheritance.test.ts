@@ -167,7 +167,11 @@ describe('inheritance checks', () => {
     ])
     const q = load()
     delete method(q, 'Circle', 'area').const
-    expect(messages(q)).toEqual(['Base.Circle.area: signature differs from IShape.area it overrides'])
+    // Not const, it is another overload: the pure one stays unimplemented.
+    expect(messages(q)).toEqual([
+      'Base.Circle.area: signature differs from IShape.area it overrides',
+      'Base.Circle does not implement pure method IShape.area (implement it or make the module abstract)'
+    ])
   })
 
   it('warns about virtual methods redefined without override', () => {
@@ -179,9 +183,9 @@ describe('inheritance checks', () => {
   it('lists pure methods left to implement', () => {
     const p = load()
     expect(unimplementedMethods(p, mod(p, 'Circle').id)).toEqual([])
-    expect(unimplementedMethods(p, mod(p, 'Base').id).map((u) => [modulePath(p, u.base.id), u.method.name])).toEqual([
-      ['IShape', 'area']
-    ])
+    expect(
+      unimplementedMethods(p, mod(p, 'Base').id).map((u) => [modulePath(p, u.base.id), u.method.name])
+    ).toEqual([['IShape', 'area']])
     mod(p, 'Circle').methods = []
     expect(unimplementedMethods(p, mod(p, 'Circle').id).map((u) => u.method.name)).toEqual(['area'])
   })
