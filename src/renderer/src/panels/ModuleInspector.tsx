@@ -56,6 +56,12 @@ import { DefaultInput, FieldList, setDefault } from './TypeInspector'
 import { pickNewParent } from './moduleTree'
 import { addMessage, MessageList } from './MessageList'
 
+/** Method qualifiers in two rows: about derivation, then the others. */
+const INHERITANCE_QUALIFIERS = METHOD_QUALIFIERS.filter((q) =>
+  ['virtual', 'pure', 'override', 'final'].includes(q)
+)
+const OTHER_QUALIFIERS = METHOD_QUALIFIERS.filter((q) => !INHERITANCE_QUALIFIERS.includes(q))
+
 function withTypeOf(id: string, fn: (t: TypeDef) => void): void {
   update((d) => {
     const t = d.types.find((t) => t.id === id)
@@ -143,18 +149,30 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
         )}
       </Row>
       <Row label="Kind">
-        <Select
-          value={mod.kind ?? 'class'}
-          options={MODULE_KINDS}
-          onChange={(k) =>
-            withModule(id, (m) => {
-              if (k === 'class') delete m.kind
-              else m.kind = k
-              // An interface only declares pure methods.
-              if (k === 'interface') for (const x of m.methods) setMethodQualifier(x, 'pure', true)
-            })
-          }
-        />
+        <span className="row-inline">
+          <Select
+            value={mod.kind ?? 'class'}
+            options={MODULE_KINDS}
+            onChange={(k) =>
+              withModule(id, (m) => {
+                if (k === 'class') delete m.kind
+                else m.kind = k
+                // An interface only declares pure methods; abstract modules are derived from.
+                if (k === 'interface') for (const x of m.methods) setMethodQualifier(x, 'pure', true)
+                if (k !== 'class') delete m.final
+              })
+            }
+          />
+          <label className="check" title="No module may derive from it">
+            <input
+              type="checkbox"
+              checked={!!mod.final}
+              disabled={!!mod.kind}
+              onChange={(e) => withModule(id, (m) => setQualifier(m, 'final', e.target.checked))}
+            />
+            final
+          </label>
+        </span>
       </Row>
       {!mod.parentId && (project.binaries.length > 0 || mod.binaryId) && (
         <Row label="Binary">
@@ -307,11 +325,18 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
             <AccessToggles value={x.access} onChange={(v) => change((y) => setAccess(y, v))} />
           )}
           extra={(x, change) => (
-            <QualifierToggles
-              qualifiers={METHOD_QUALIFIERS}
-              value={x}
-              onChange={(q, on) => change((y) => setMethodQualifier(y, q, on))}
-            />
+            <>
+              <QualifierToggles
+                qualifiers={INHERITANCE_QUALIFIERS}
+                value={x}
+                onChange={(q, on) => change((y) => setMethodQualifier(y, q, on))}
+              />
+              <QualifierToggles
+                qualifiers={OTHER_QUALIFIERS}
+                value={x}
+                onChange={(q, on) => change((y) => setMethodQualifier(y, q, on))}
+              />
+            </>
           )}
           paramExtra={(prm, change) =>
             // Only `in` parameters can be const.

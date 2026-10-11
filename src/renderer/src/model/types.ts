@@ -204,7 +204,16 @@ export interface Message {
 /** C++-like qualifiers of module attributes and method parameters. */
 export const QUALIFIERS = ['static', 'const'] as const
 /** C++-like qualifiers of module methods: `pure` is `= 0`. */
-export const METHOD_QUALIFIERS = ['static', 'const', 'virtual', 'pure', 'override'] as const
+export const METHOD_QUALIFIERS = [
+  'static',
+  'const',
+  'virtual',
+  'pure',
+  'override',
+  'final',
+  'noexcept',
+  'nodiscard'
+] as const
 export type Qualifier = (typeof METHOD_QUALIFIERS)[number]
 
 /** C++-like access level of a module's types, attributes and methods. */
@@ -242,6 +251,12 @@ export interface Method extends Message {
   pure?: boolean
   /** Overrides a virtual method of a base module (virtual only). */
   override?: boolean
+  /** Cannot be overridden by derived modules (virtual only). */
+  final?: boolean
+  /** Raises no exception. */
+  noexcept?: boolean
+  /** Its result must be used. */
+  nodiscard?: boolean
   /** Who may call it: public (default), protected (derived modules) or private (the module). */
   access?: StoredAccess
 }
@@ -289,6 +304,8 @@ export interface Module {
   kind?: Exclude<ModuleKind, 'class'>
   /** Modules this one derives from, in order. */
   bases?: Id[]
+  /** No module may derive from it. */
+  final?: boolean
   metadata: Metadata
   /** Typed properties of the module, shown on the canvas apart from its ports. */
   attributes: Attribute[]
@@ -488,6 +505,8 @@ export interface ImportedModule {
   attributes?: Attribute[]
   /** Methods as last read (absent: none), their types those of the dependencies here. */
   methods?: Method[]
+  /** No module may derive from it. */
+  final?: boolean
   ports: ImportedPort[]
   /** Editor-only absolute canvas position. */
   position: { x: number; y: number }

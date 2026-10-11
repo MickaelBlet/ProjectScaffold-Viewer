@@ -366,8 +366,11 @@ export function validate(p: Project): Problem[] {
       const where = `${path}.${x.name}`
       if (x.static && x.const) push('error', target, `${where}: a static method cannot be const`)
       if (x.static && x.virtual) push('error', target, `${where}: a static method cannot be virtual`)
-      if ((x.pure || x.override) && !x.virtual)
-        push('error', target, `${where}: a ${x.pure ? 'pure' : 'override'} method must be virtual`)
+      const virtualOnly = x.pure ? 'pure' : x.override ? 'override' : x.final ? 'final' : null
+      if (virtualOnly && !x.virtual)
+        push('error', target, `${where}: a ${virtualOnly} method must be virtual`)
+      if (x.pure && x.final) push('error', target, `${where}: a pure method cannot be final`)
+      if (x.nodiscard && !x.returns) push('warning', target, `${where}: nodiscard but returns nothing`)
       if (x.pure && !m.kind)
         push('error', target, `${where}: pure method in a concrete module (make it abstract or an interface)`)
       if (m.kind === 'interface' && !x.pure)
@@ -375,6 +378,14 @@ export function validate(p: Project): Problem[] {
       const inherited = ancestors
         .map((a) => ({ base: a, method: baseMethods(a).find((y) => y.name === x.name && y.virtual) }))
         .find((e) => e.method)
+      if (inherited?.method!.final)
+        push('error', target, `${where}: overrides final ${modulePath(p, inherited.base.id)}.${x.name}`)
+      else if (inherited?.method!.noexcept && !x.noexcept)
+        push(
+          'warning',
+          target,
+          `${where}: not noexcept, as ${modulePath(p, inherited.base.id)}.${x.name} it overrides is`
+        )
       if (x.override) {
         if (!inherited) push('error', target, `${where}: overrides no virtual method of a base`)
         else if (methodSignature(x) !== methodSignature(inherited.method!))
@@ -389,7 +400,7 @@ export function validate(p: Project): Problem[] {
             target,
             `${where}: access differs from ${modulePath(p, inherited.base.id)}.${x.name} it overrides`
           )
-      } else if (inherited)
+      } else if (inherited && !inherited.method!.final)
         push(
           'warning',
           target,
@@ -416,6 +427,15 @@ export function validate(p: Project): Problem[] {
           target,
           `${path} derives from a deleted module${isImportedId(b) ? ' of a dependency' : ''}`
         )
+    if (m.final && m.kind)
+      push(
+        'error',
+        target,
+        `${path}: ${m.kind === 'abstract' ? 'an abstract' : 'an interface'} module cannot be final`
+      )
+    for (const b of bases)
+      if (b !== m.id && baseModule(p, b)?.final)
+        push('error', target, `${path} derives from final module ${modulePath(p, b)}`)
     if (bases.includes(m.id)) push('error', target, `${path} derives from itself`)
     else if (bases.some((b) => ancestorModules(p, b).some((a) => a.id === m.id)))
       push('error', target, `${path} derives from itself through its bases`)

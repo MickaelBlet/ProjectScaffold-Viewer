@@ -304,6 +304,7 @@ export function toFile(p: Project, options: { editor: boolean }): FileProject {
         description: opt(m.description),
         kind: m.kind,
         bases: m.bases?.length ? m.bases.map((b) => modulePath(p, b)) : undefined,
+        final: m.final || undefined,
         metadata: optMeta(m.metadata),
         color: m.color,
         binary: m.binaryId ? binaryName.get(m.binaryId) : undefined,
@@ -366,6 +367,7 @@ export function toFile(p: Project, options: { editor: boolean }): FileProject {
           modules: x.modules.length
             ? x.modules.map((m) => ({
                 module: m.path,
+                final: m.final || undefined,
                 attributes: m.attributes?.length ? m.attributes.map(attribute) : undefined,
                 methods: m.methods?.length ? m.methods.map(method) : undefined,
                 ports: m.ports.map((pt) => ({
@@ -819,6 +821,7 @@ export function fromFile(data: unknown, prev?: Project): Project {
         description: fm.description ?? '',
         parentId,
         ...(fm.kind && fm.kind !== 'class' && { kind: fm.kind }),
+        ...(fm.final && { final: true }),
         metadata: { ...(fm.metadata ?? {}) },
         attributes: attributesOf(fm.attributes ?? [], path, was?.attributes, [...at, i, 'attributes']),
         methods: methodsOf(fm.methods ?? [], path, was?.methods, [...at, i, 'methods']),
@@ -952,6 +955,7 @@ export function fromFile(data: unknown, prev?: Project): Project {
           position,
           ...(size && { size }),
           ...((saved ? saved.locked : was?.locked) && { locked: true }),
+          ...(m.final && { final: true }),
           ...(attributes.length && { attributes }),
           ...(methods.length && { methods }),
           ports: m.ports.map((pt, k) => {

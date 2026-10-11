@@ -458,17 +458,41 @@ export function setAccess(e: { access?: StoredAccess }, access: Access): void {
 /** UML mark of an access level: `+` public, `#` protected, `-` private. */
 export const ACCESS_MARKS: Record<Access, string> = { public: '+', protected: '#', private: '-' }
 
-/** Set a qualifier of a method, keeping the others consistent: `pure` and `override` imply `virtual`, which excludes `static`. */
+/** Qualifiers that make a method virtual. */
+const VIRTUAL_QUALIFIERS = ['pure', 'override', 'final'] as const
+
+/**
+ * Set a qualifier of a method, keeping the others consistent: `pure`, `override` and `final` imply
+ * `virtual`, which excludes `static`; `pure` excludes `final`.
+ */
 export function setMethodQualifier(m: Method, q: Qualifier, on: boolean): void {
   setQualifier(m, q, on)
   if (!on) {
-    if (q === 'virtual') for (const k of ['pure', 'override'] as const) setQualifier(m, k, false)
+    if (q === 'virtual') for (const k of VIRTUAL_QUALIFIERS) setQualifier(m, k, false)
     return
   }
-  if (q === 'static') for (const k of ['virtual', 'pure', 'override'] as const) setQualifier(m, k, false)
-  else if (q === 'pure' || q === 'override' || q === 'virtual') {
+  if (q === 'static') for (const k of ['virtual', ...VIRTUAL_QUALIFIERS] as const) setQualifier(m, k, false)
+  else if (q === 'virtual' || (VIRTUAL_QUALIFIERS as readonly Qualifier[]).includes(q)) {
     m.virtual = true
     setQualifier(m, 'static', false)
+    if (q === 'pure') setQualifier(m, 'final', false)
+    if (q === 'final') setQualifier(m, 'pure', false)
+  }
+}
+
+/** Qualifiers of a method as drawn around its name and parameters: `virtual f(…) const override = 0`. */
+export function methodQualifierText(m: Method): { before: string; after: string } {
+  const before = [m.nodiscard && 'nodiscard', m.static ? 'static' : m.virtual && 'virtual']
+  const after = [m.const && 'const', m.noexcept && 'noexcept', m.override && 'override', m.final && 'final']
+  return {
+    before: before
+      .filter(Boolean)
+      .map((k) => `${k} `)
+      .join(''),
+    after: `${after
+      .filter(Boolean)
+      .map((k) => ` ${k}`)
+      .join('')}${m.pure ? ' = 0' : ''}`
   }
 }
 

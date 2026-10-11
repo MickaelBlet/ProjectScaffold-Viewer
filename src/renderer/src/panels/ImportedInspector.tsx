@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { findImported, IDENTIFIER_RE, importedParent, refNamer } from '@/model/project'
+import { findImported, IDENTIFIER_RE, importedParent, methodQualifierText, refNamer } from '@/model/project'
 import { printTypeRef } from '@/model/typeExpr'
 import { deleteItems, renameDependency, useProjectStore } from '@/store/project'
 import { select } from '@/store/ui'
@@ -84,6 +84,7 @@ export function ImportedInspector({ id }: { id: string }): ReactNode {
                     </span>
                   </td>
                   <td>
+                    {methodQualifierText(m).before}
                     {m.name}(
                     {m.params
                       .map(
@@ -92,6 +93,7 @@ export function ImportedInspector({ id }: { id: string }): ReactNode {
                       )
                       .join(', ')}
                     ){m.returns && `: ${type(m.returns)}`}
+                    {methodQualifierText(m).after}
                   </td>
                 </tr>
               ))}

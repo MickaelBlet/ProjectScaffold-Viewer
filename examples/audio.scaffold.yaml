@@ -142,6 +142,7 @@ modules:
         description: Checks the format, then applies the effect unless bypassed
         virtual: true
         override: true
+        final: true
         params:
           - name: buffer
             type:
@@ -180,6 +181,7 @@ modules:
       - name: instances
         description: Effects alive
         static: true
+        nodiscard: true
         params: []
         returns:
           kind: primitive
@@ -206,6 +208,7 @@ modules:
   - name: Equalizer
     bases:
       - Effect
+    final: true
     color: "#2e9e8f"
     types:
       - kind: enum

@@ -197,7 +197,13 @@ function moduleText(map: YAMLMap): string | undefined {
   const kind = text(map, 'kind')
   const bases = map.get('bases', true)
   const names = isSeq(bases) ? bases.items.map((b) => (isScalar(b) ? String(b.value) : '?')) : []
-  const detail = [kind !== 'class' && kind, names.length && `: ${names.join(', ')}`].filter(Boolean).join(' ')
+  const detail = [
+    kind !== 'class' && kind,
+    map.get('final') === true && 'final',
+    names.length && `: ${names.join(', ')}`
+  ]
+    .filter(Boolean)
+    .join(' ')
   return detail || text(map, 'description')
 }
 

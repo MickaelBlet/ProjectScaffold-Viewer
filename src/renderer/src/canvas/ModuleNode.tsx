@@ -5,6 +5,7 @@ import {
   findImported,
   indexById,
   isModuleType,
+  methodQualifierText,
   minSize,
   modulePath,
   nameError,
@@ -179,8 +180,7 @@ export function Methods({ methods, moduleId }: { methods: Method[]; moduleId: Id
         const deleted = [...m.params.map((prm) => prm.type), ...(m.returns ? [m.returns] : [])].some((t) =>
           hasDeletedRef(t, nameOf)
         )
-        const before = m.static ? 'static ' : m.virtual ? 'virtual ' : ''
-        const after = `${m.const ? ' const' : ''}${m.override ? ' override' : ''}${m.pure ? ' = 0' : ''}`
+        const { before, after } = methodQualifierText(m)
         const raises = m.raises?.length
           ? ` throws ${m.raises.map((id) => nameOf(id) ?? '<deleted>').join(', ')}`
           : ''
@@ -300,6 +300,7 @@ export const ModuleNode = memo(function ModuleNode({
           <span className={`module-name ${mod.kind ?? ''}`}>
             {mod.kind && <span className="module-kind">«{mod.kind}» </span>}
             {path ?? mod.name}
+            {mod.final && <span className="module-kind"> {'{final}'}</span>}
             {bases && <span className="module-bases"> : {bases}</span>}
             {binary && (
               <small

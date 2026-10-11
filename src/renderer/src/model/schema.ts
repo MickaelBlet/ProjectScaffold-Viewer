@@ -263,7 +263,10 @@ const Method = Message.extend({
     .boolean()
     .optional()
     .describe('pure virtual (`= 0`): not implemented by this module (virtual only)'),
-  override: z.boolean().optional().describe('overrides a virtual method of a base module (virtual only)')
+  override: z.boolean().optional().describe('overrides a virtual method of a base module (virtual only)'),
+  final: z.boolean().optional().describe('cannot be overridden by derived modules (virtual only)'),
+  noexcept: z.boolean().optional().describe('raises no exception'),
+  nodiscard: z.boolean().optional().describe('its result must be used (methods returning a value)')
 })
 
 const Interface = z
@@ -286,6 +289,7 @@ export interface FileModule {
   description?: string
   kind?: (typeof MODULE_KINDS)[number]
   bases?: string[]
+  final?: boolean
   metadata?: Record<string, string>
   color?: string
   binary?: string
@@ -313,6 +317,7 @@ const Module: z.ZodType<FileModule> = z
         .describe(
           'paths of the modules it derives from, in order: of this project, or `Dependency/Module.Path` for a module of a dependency placed on the canvas'
         ),
+      final: z.boolean().optional().describe('no module may derive from it (not abstract nor an interface)'),
       metadata: Metadata,
       color: z.string().optional().describe('accent color (CSS color)'),
       binary: Identifier.optional().describe(
@@ -379,6 +384,7 @@ const Dependency = z
       .array(
         z.object({
           module: QualifiedName.describe('path of the module in the dependency'),
+          final: z.boolean().optional().describe('no module may derive from it'),
           attributes: z.array(Attribute).optional().describe('attributes of the module'),
           methods: z.array(Method).optional().describe('methods of the module'),
           ports: z.array(Port).describe('ports of the module')

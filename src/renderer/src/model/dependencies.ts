@@ -152,6 +152,7 @@ function placedTree(
       position: top ? position : (kept ?? { x, y }),
       ...(size && { size }),
       ...(was?.locked && { locked: true }),
+      ...(m.final && { final: true }),
       ...(attributes.length && { attributes }),
       ...(methods.length && { methods }),
       ports: portsOf(source, m, was?.ports)
