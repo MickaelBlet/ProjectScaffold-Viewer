@@ -660,6 +660,12 @@ const allCommands: Command[] = [
     global: true,
     run: tool('output')
   },
+  {
+    id: 'window.stateMachine',
+    title: 'State machine',
+    category: 'Window',
+    run: tool('stateMachine')
+  },
   { id: 'window.clearOutput', title: 'Clear output', category: 'Window', run: clearOutput },
   {
     id: 'window.search',

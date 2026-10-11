@@ -61,6 +61,7 @@ import { pickNewParent } from './moduleTree'
 import { LifecycleSection } from './LifecycleSection'
 import { FieldDetails, hasDetails } from './FieldDetails'
 import { Locks } from './Locks'
+import { StateMachineSection } from './StateMachineSection'
 import { BaseArgs, TypeParamsSection } from './TypeParams'
 import { AddConditions, ConditionList, setConditions, withCondition } from './Conditions'
 import { addMessage, MessageList } from './MessageList'
@@ -507,6 +508,8 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
           }
         />
       </Section>
+
+      <StateMachineSection mod={mod} withModule={(fn) => withModule(id, fn)} />
 
       <Section
         title={`Ports (${mod.ports.length})`}

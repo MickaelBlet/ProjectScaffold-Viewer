@@ -74,6 +74,7 @@ const COMMAND_ICONS: Partial<Record<string, IconName>> = {
   'window.inspector': 'info',
   'window.problems': 'warning',
   'window.output': 'output',
+  'window.stateMachine': 'states',
   'window.search': 'search',
   'window.settings': 'gear',
   'window.clearOutput': 'eraser',

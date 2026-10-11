@@ -50,7 +50,7 @@ export function activeCanvas(): CanvasController | undefined {
 
 // Dock layouts
 
-export type ToolId = 'explorer' | 'inspector' | 'problems' | 'output' | 'search' | 'settings'
+export type ToolId = 'explorer' | 'inspector' | 'problems' | 'output' | 'search' | 'settings' | 'stateMachine'
 
 export const TOOL_TITLES: Record<ToolId, string> = {
   explorer: 'Explorer',
@@ -58,7 +58,8 @@ export const TOOL_TITLES: Record<ToolId, string> = {
   problems: 'Problems',
   output: 'Output',
   search: 'Search',
-  settings: 'Settings'
+  settings: 'Settings',
+  stateMachine: 'State machine'
 }
 
 /** Width of the side tools, height of the bottom ones, when first opened. */
@@ -68,7 +69,8 @@ const TOOL_SIZES: Record<ToolId, number> = {
   settings: 440,
   problems: 170,
   output: 170,
-  search: 300
+  search: 300,
+  stateMachine: 260
 }
 
 let outer: DockviewApi | null = null
@@ -330,6 +332,11 @@ const TOOL_PLACES: Record<ToolId, Place[]> = {
   ],
   output: [
     ['problems', 'within'],
+    [EDITOR_AREA, 'below']
+  ],
+  stateMachine: [
+    ['problems', 'within'],
+    ['output', 'within'],
     [EDITOR_AREA, 'below']
   ]
 }

@@ -374,6 +374,38 @@ export interface Destructor {
 export const INSTANTIATIONS = ['singleton', 'utility', 'value'] as const
 export type Instantiation = (typeof INSTANTIATIONS)[number]
 
+/** State of a module's state machine; `entry` / `exit`: methods of the module run on entering / leaving it. */
+export interface State {
+  id: Id
+  name: string
+  description: string
+  entry?: Id
+  exit?: Id
+  /** The machine stops there: no transition leaves it. */
+  final?: boolean
+}
+
+/**
+ * Transition between two states, taken when the method `trigger` is called (absent: as soon as the
+ * state is entered) and `guard` holds; `action`: a method of the module run on the way.
+ */
+export interface Transition {
+  id: Id
+  from: Id
+  to: Id
+  trigger?: Id
+  guard?: string
+  action?: Id
+}
+
+/** Behavior of a module: the states it goes through as its methods are called. */
+export interface StateMachine {
+  /** State the module starts in. */
+  initial?: Id
+  states: State[]
+  transitions: Transition[]
+}
+
 /**
  * C++-like kind of a module: `class` (default) is concrete, `abstract` may have pure methods,
  * `interface` has only pure methods and no attributes.
@@ -435,6 +467,7 @@ export interface Module {
   locks?: Lock[]
   /** Conditions on its attributes holding between calls of its public methods. */
   invariants?: string[]
+  stateMachine?: StateMachine
   metadata: Metadata
   /** Typed properties of the module, shown on the canvas apart from its ports. */
   attributes: Attribute[]

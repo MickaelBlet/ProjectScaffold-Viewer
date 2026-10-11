@@ -279,6 +279,43 @@ export function pasteClip(d: Project, clip: Clip, options: PasteOptions): Id[] {
   const offset = options.offset ?? 30
   const shift = options.at ? { x: options.at.x - box.x, y: options.at.y - box.y } : { x: offset, y: offset }
 
+  /** Copies of the methods of `m` and of its state machine, naming them. */
+  const methodsAndMachine = (m: Module): Pick<Module, 'methods' | 'stateMachine'> => {
+    const methods = m.methods.map(message)
+    const methodIds = new Map(m.methods.map((x, i) => [x.id, methods[i]!.id]))
+    const sm = m.stateMachine
+    if (!sm) return { methods }
+    const stateIds = new Map(sm.states.map((x) => [x.id, newId()]))
+    const state = (id: Id): Id => stateIds.get(id) ?? id
+    const method = (id: Id): Id => methodIds.get(id) ?? id
+    return {
+      methods,
+      stateMachine: {
+        ...(sm.initial && { initial: state(sm.initial) }),
+        states: sm.states.map((x) => {
+          const { entry, exit, ...rest } = x
+          return {
+            ...rest,
+            id: state(x.id),
+            ...(entry && { entry: method(entry) }),
+            ...(exit && { exit: method(exit) })
+          }
+        }),
+        transitions: sm.transitions.map((t) => {
+          const { trigger, action, ...rest } = t
+          return {
+            ...rest,
+            id: newId(),
+            from: state(t.from),
+            to: state(t.to),
+            ...(trigger && { trigger: method(trigger) }),
+            ...(action && { action: method(action) })
+          }
+        })
+      }
+    }
+  }
+
   const portIds = new Map<Id, Id>()
   for (const m of clip.modules) {
     const isRoot = m.id in clip.rootParents
@@ -311,7 +348,7 @@ export function pasteClip(d: Project, clip: Clip, options: PasteOptions): Id[] {
       ...(m.constructors && {
         constructors: m.constructors.map((c) => ({ ...c, id: newId(), params: c.params.map(field) }))
       }),
-      methods: m.methods.map(message),
+      ...methodsAndMachine(m),
       ports: m.ports.map((pt) => {
         const pid = newId()
         portIds.set(pt.id, pid)

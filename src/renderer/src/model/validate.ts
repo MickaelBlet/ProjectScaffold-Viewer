@@ -47,6 +47,7 @@ import {
   type Message,
   type MethodParam,
   type Module,
+  type Transition,
   type PrimitiveDef,
   type Project,
   type TypeDef,
@@ -464,14 +465,9 @@ export function validate(p: Project): Problem[] {
       ...p.dependencies.map((d) => d.name)
     ]))
 
-  /** Preconditions, postconditions and invariants of a module (`path`): the names they use. */
-  const checkContracts = (
-    m: Module,
-    target: ProblemTarget,
-    path: string,
-    ancestors: ReturnType<typeof ancestorModules>
-  ): void => {
-    const members = new Set([
+  /** Names the conditions of a module may use: its members, those of its bases, the project's. */
+  const contractMembers = (m: Module, ancestors: ReturnType<typeof ancestorModules>): Set<string> =>
+    new Set([
       ...contractGlobals(),
       ...m.attributes.map((a) => a.name),
       ...m.methods.map((x) => x.name),
@@ -482,11 +478,28 @@ export function validate(p: Project): Problem[] {
         ...baseMethods(b).map((x) => x.name)
       ])
     ])
-    const check = (expression: string, known: ReadonlySet<string>, where: string): void => {
-      if (!expression.trim()) push('warning', target, `${where}: empty condition`)
-      for (const n of unknownNames(expression, known))
-        push('warning', target, `${where}: '${n}' names nothing here`)
-    }
+  /** A condition (`where`): not empty, naming only `known` names. */
+  const checkCondition = (
+    expression: string,
+    known: ReadonlySet<string>,
+    target: ProblemTarget,
+    where: string
+  ): void => {
+    if (!expression.trim()) push('warning', target, `${where}: empty condition`)
+    for (const n of unknownNames(expression, known))
+      push('warning', target, `${where}: '${n}' names nothing here`)
+  }
+
+  /** Preconditions, postconditions and invariants of a module (`path`): the names they use. */
+  const checkContracts = (
+    m: Module,
+    target: ProblemTarget,
+    path: string,
+    ancestors: ReturnType<typeof ancestorModules>
+  ): void => {
+    const members = contractMembers(m, ancestors)
+    const check = (expression: string, known: ReadonlySet<string>, where: string): void =>
+      checkCondition(expression, known, target, where)
     for (const e of m.invariants ?? []) check(e, members, `${path} invariant`)
     for (const x of m.methods) {
       if (!x.pre?.length && !x.post?.length) continue
@@ -494,6 +507,83 @@ export function validate(p: Project): Problem[] {
       for (const e of x.pre ?? []) check(e, params, `${path}.${x.name} precondition`)
       const after = new Set([...params, ...(x.returns ? ['result'] : [])])
       for (const e of x.post ?? []) check(e, after, `${path}.${x.name} postcondition`)
+    }
+  }
+
+  /** State machine of a module (`path`): states, methods and guards it names, reachable states. */
+  const checkStateMachine = (
+    m: Module,
+    target: ProblemTarget,
+    path: string,
+    ancestors: ReturnType<typeof ancestorModules>
+  ): void => {
+    const sm = m.stateMachine
+    if (!sm) return
+    const where = `${path} state machine`
+    const states = new Map(sm.states.map((x) => [x.id, x]))
+    const stateName = (id: Id): string => states.get(id)?.name ?? '?'
+    if (!sm.states.length) push('warning', target, `${where}: no states`)
+    for (const n of duplicates(sm.states.map((x) => x.name)))
+      push('error', target, `${where}: duplicate state '${n}'`)
+    for (const x of sm.states)
+      if (!IDENTIFIER_RE.test(x.name))
+        push('error', target, `${where}: state '${x.name}' is not an identifier`)
+    if (sm.initial === undefined) {
+      if (sm.states.length) push('error', target, `${where}: no initial state`)
+    } else if (!states.has(sm.initial)) push('error', target, `${where}: unknown initial state`)
+    const method = (id: Id | undefined, what: string): void => {
+      if (id === undefined) return
+      const x = m.methods.find((y) => y.id === id)
+      if (!x) push('error', target, `${where}: ${what} ${missingText(id, 'method', 'method', 'names')}`)
+      else if (m.methods.some((y) => y !== x && y.name === x.name))
+        push('error', target, `${where}: ${what} names overloaded method '${x.name}'`)
+    }
+    for (const x of sm.states) {
+      method(x.entry, `entry of ${x.name}`)
+      method(x.exit, `exit of ${x.name}`)
+    }
+    const members = contractMembers(m, ancestors)
+    const taken = new Map<string, Transition[]>()
+    for (const t of sm.transitions) {
+      const name = `${stateName(t.from)} -> ${stateName(t.to)}`
+      if (!states.has(t.from) || !states.has(t.to))
+        push('error', target, `${where}: transition ${name} joins an unknown state`)
+      else if (states.get(t.from)!.final)
+        push('error', target, `${where}: transition ${name} leaves final state ${stateName(t.from)}`)
+      method(t.trigger, `trigger of ${name}`)
+      method(t.action, `action of ${name}`)
+      if (t.guard !== undefined) {
+        const trigger = m.methods.find((y) => y.id === t.trigger)
+        const known = new Set([...members, ...(trigger?.params ?? []).map((prm) => prm.name)])
+        checkCondition(t.guard, known, target, `${where}: guard of ${name}`)
+      }
+      const key = `${t.from}:${t.trigger ?? ''}`
+      const list = taken.get(key)
+      if (list) list.push(t)
+      else taken.set(key, [t])
+    }
+    for (const list of taken.values()) {
+      if (list.length < 2 || list.every((t) => t.guard?.trim())) continue
+      const t = list[0]!
+      const trigger = m.methods.find((y) => y.id === t.trigger)?.name
+      push(
+        'error',
+        target,
+        `${where}: ${stateName(t.from)} has ${list.length} transitions ${trigger ? `on ${trigger}` : 'without trigger'}, not all guarded`
+      )
+    }
+    if (sm.initial !== undefined && states.has(sm.initial)) {
+      const reached = new Set([sm.initial])
+      for (let todo = [sm.initial]; todo.length;) {
+        const from = todo.pop()!
+        for (const t of sm.transitions)
+          if (t.from === from && !reached.has(t.to)) {
+            reached.add(t.to)
+            todo.push(t.to)
+          }
+      }
+      for (const x of sm.states)
+        if (!reached.has(x.id)) push('warning', target, `${where}: state ${x.name} is never reached`)
     }
   }
 
@@ -794,6 +884,7 @@ export function validate(p: Project): Problem[] {
     }
     checkGenerics(m, target, path)
     checkContracts(m, target, path, ancestors)
+    checkStateMachine(m, target, path, ancestors)
     if (m.kind === 'interface' && m.attributes.length)
       push('error', target, `${path}: an interface module cannot have attributes`)
     const bases = m.bases ?? []

@@ -6,6 +6,7 @@ import {
   type FileAttribute,
   type FileConstant,
   type FileConstructor,
+  type FileStateMachine,
   type FileEditor,
   type FileInterface,
   type FileMessage,
@@ -60,6 +61,9 @@ import {
   type Metadata,
   type Method,
   type Module,
+  type State,
+  type StateMachine,
+  type Transition,
   type Note,
   type Ownership,
   type Param,
@@ -235,6 +239,29 @@ export function toFile(p: Project, options: { editor: boolean }): FileProject {
     params: methodParams(c)
   })
   const destructor = (d: Destructor) => ({ ...access(d), virtual: d.virtual })
+  /** The state machine of `m`, naming its states and methods. */
+  const stateMachine = (m: Module, sm: StateMachine): FileStateMachine => {
+    const state = (id: Id): string => sm.states.find((x) => x.id === id)?.name ?? '__deleted__'
+    const method = (id: Id | undefined): string | undefined =>
+      id && (m.methods.find((x) => x.id === id)?.name ?? '__deleted__')
+    return {
+      initial: sm.initial && state(sm.initial),
+      states: sm.states.map((x) => ({
+        name: x.name,
+        description: opt(x.description),
+        entry: method(x.entry),
+        exit: method(x.exit),
+        final: x.final || undefined
+      })),
+      transitions: sm.transitions.map((t) => ({
+        from: state(t.from),
+        to: state(t.to),
+        trigger: method(t.trigger),
+        guard: t.guard,
+        action: method(t.action)
+      }))
+    }
+  }
 
   const typeDef = (t: TypeDef): FileTypeDef => {
     switch (t.kind) {
@@ -370,6 +397,7 @@ export function toFile(p: Project, options: { editor: boolean }): FileProject {
         constructors: m.constructors?.length ? m.constructors.map(constructor) : undefined,
         destructor: m.destructor && destructor(m.destructor),
         methods: m.methods.length ? m.methods.map(method) : undefined,
+        stateMachine: m.stateMachine && stateMachine(m, m.stateMachine),
         ports: m.ports.map((pt) => ({
           name: pt.name,
           role: pt.role,
@@ -900,6 +928,67 @@ export function fromFile(data: unknown, prev?: Project): Project {
       }
     })
 
+  /** State machine of a module (`path`) with methods `methods`, at `at` in the file data. */
+  const stateMachineOf = (
+    fsm: FileStateMachine,
+    path: string,
+    before: StateMachine | undefined,
+    methods: readonly Method[],
+    at: DataPath
+  ): StateMachine => {
+    const stateWas = named(before?.states, fsm.states)
+    const states = fsm.states.map((x, j): State => ({
+      id: stateWas[j]?.id ?? newId(),
+      name: x.name,
+      description: x.description ?? '',
+      ...(x.final && { final: true })
+    }))
+    const stateId = (name: string, where: DataPath): Id => {
+      const st = states.find((x) => x.name === name)
+      if (!st) report(`${path}: unknown state '${name}'`, where)
+      return st?.id ?? missingRef(name)
+    }
+    const methodId = (name: string | undefined, where: DataPath): Id | undefined => {
+      if (name === undefined) return undefined
+      const m = methods.find((x) => x.name === name)
+      if (!m) report(`${path}: unknown method '${name}'`, where)
+      return m?.id ?? missingRef(name)
+    }
+    for (const [j, x] of fsm.states.entries()) {
+      const entry = methodId(x.entry, [...at, 'states', j, 'entry'])
+      const exit = methodId(x.exit, [...at, 'states', j, 'exit'])
+      if (entry) states[j]!.entry = entry
+      if (exit) states[j]!.exit = exit
+    }
+    const nameOf = new Map(before?.states.map((x) => [x.id, x.name]))
+    const key = (from: string | undefined, to: string | undefined, trigger: string | undefined): string =>
+      `${from}>${to}:${trigger ?? ''}`
+    const transitionWas = pair(
+      before?.transitions ?? [],
+      (t) =>
+        key(nameOf.get(t.from), nameOf.get(t.to), t.trigger && methods.find((x) => x.id === t.trigger)?.name),
+      fsm.transitions.map((t) => key(t.from, t.to, t.trigger))
+    )
+    const transitions = fsm.transitions.map((t, j): Transition => {
+      const where = [...at, 'transitions', j]
+      const trigger = methodId(t.trigger, [...where, 'trigger'])
+      const action = methodId(t.action, [...where, 'action'])
+      return {
+        id: transitionWas[j]?.id ?? newId(),
+        from: stateId(t.from, [...where, 'from']),
+        to: stateId(t.to, [...where, 'to']),
+        ...(trigger && { trigger }),
+        ...(t.guard !== undefined && { guard: t.guard }),
+        ...(action && { action })
+      }
+    })
+    return {
+      ...(fsm.initial !== undefined && { initial: stateId(fsm.initial, [...at, 'initial']) }),
+      states,
+      transitions
+    }
+  }
+
   const layout = f.editor?.layout ?? {}
   const modules: Module[] = []
   const moduleByPath = new Map<string, Module>()
@@ -1015,6 +1104,12 @@ export function fromFile(data: unknown, prev?: Project): Project {
         else if (!binaryId) report(`Module '${path}': unknown binary '${fm.binary}'`, [...at, i, 'binary'])
         else mod.binaryId = binaryId
       }
+      if (fm.stateMachine)
+        mod.stateMachine = stateMachineOf(fm.stateMachine, path, was?.stateMachine, mod.methods, [
+          ...at,
+          i,
+          'stateMachine'
+        ])
       modules.push(mod)
       moduleByPath.set(path, mod)
       if (fm.bases?.length) derived.push({ mod, path, bases: fm.bases, at: [...at, i, 'bases'] })

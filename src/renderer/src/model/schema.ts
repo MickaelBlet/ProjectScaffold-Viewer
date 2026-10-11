@@ -379,6 +379,41 @@ const Lock = z.object({
     .describe('mutex; shared: readers-writer lock; recursive: may be taken again by its holder')
 })
 
+const MethodName = Identifier.describe('name of a method of the module (not overloaded)')
+
+const StateMachine = z
+  .object({
+    initial: Identifier.optional().describe('name of the state the module starts in'),
+    states: z
+      .array(
+        z.object({
+          name: Identifier.describe('name of the state, unique in the machine'),
+          description: Description,
+          entry: MethodName.optional().describe('method run on entering the state'),
+          exit: MethodName.optional().describe('method run on leaving the state'),
+          final: z.boolean().optional().describe('the machine stops there: no transition leaves it')
+        })
+      )
+      .describe('states of the module'),
+    transitions: z
+      .array(
+        z.object({
+          from: Identifier.describe('name of the state it leaves'),
+          to: Identifier.describe('name of the state it enters'),
+          trigger: MethodName.optional().describe(
+            'method whose call takes it; absent: taken as soon as `from` is entered'
+          ),
+          guard: z
+            .string()
+            .optional()
+            .describe('condition taking it (expression on the attributes and the parameters of the trigger)'),
+          action: MethodName.optional().describe('method run on the way')
+        })
+      )
+      .describe('transitions between the states')
+  })
+  .describe('behavior of the module: the states it goes through as its methods are called')
+
 const Interface = z
   .object({
     name: Identifier.describe('name of the interface'),
@@ -416,6 +451,7 @@ export interface FileModule {
   constructors?: z.infer<typeof Constructor>[]
   destructor?: z.infer<typeof Destructor>
   methods?: FileMethod[]
+  stateMachine?: z.infer<typeof StateMachine>
   ports: z.infer<typeof Port>[]
   modules?: FileModule[]
 }
@@ -485,6 +521,7 @@ const Module: z.ZodType<FileModule> = z
         'destructor of the module, when not the implicit one (virtual when the module has virtual methods)'
       ),
       methods: z.array(Method).optional().describe('method prototypes of the module'),
+      stateMachine: StateMachine.optional(),
       ports: z.array(Port).describe('ports of the module, which links connect'),
       modules: z.array(Module).optional().describe('modules inside this one')
     })
@@ -826,6 +863,7 @@ export type FileMessage = z.infer<typeof Message>
 export type FileInterface = z.infer<typeof Interface>
 export type FileMethod = z.infer<typeof Method>
 export type FileConstructor = z.infer<typeof Constructor>
+export type FileStateMachine = z.infer<typeof StateMachine>
 export type FileAttribute = z.infer<typeof Attribute>
 export type FileLink = z.infer<typeof Link>
 export type FileEditor = z.infer<typeof Editor>

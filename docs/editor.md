@@ -18,7 +18,7 @@ Several projects open at once, in tabs, each with its own undo history.
 
 ### Panels
 
-Explorer, Inspector, Problems, Output, Search and Settings are dockable panels.
+Explorer, Inspector, Problems, Output, Search, Settings and State machine are dockable panels.
 
 - Drag a tab to dock it on any side, stack it with others or float it. The layout is kept; _Window › Reset panel layout_ restores the default one.
 - The Explorer's sections are reordered by dragging their header (or Alt+↑ / Alt+↓) and hidden from their right-click menu (_Reset sections_ restores them).
@@ -141,6 +141,7 @@ Modules work as C++-like classes:
 - _Lifecycle_: instances (free, singleton, utility, value; shown as `«singleton»`), copy and move (implicit, default, delete, custom), the destructor (implicit, declared, virtual, not virtual, with its access) and constructors (_+ constructor_: access, `explicit`, `defaulted`, `deleted`, parameters; a parameter named like an attribute sets it). Constructors and the destructor head the method compartment: `explicit Sensor(id: uint32)`, `virtual ~Sensor()`.
 - Methods of the same name with other parameters are overloads. An `in` parameter takes a default value in its last cell, shown as `x: int32 = 1`.
 - _Implement_ in the Methods section adds the pure methods a module inherits and lacks, as overrides.
+- _State machine_ (_+ state_, _+ transition_): states (name, initial, final, entry and exit methods) and transitions (from, to, the method triggering it, a guard, an action method). The eye button opens the _State machine_ panel (_Window › State machine_), drawing the machine of the selected module as a UML state diagram, laid out automatically: `trigger [guard] / action()` on the arrows, a dot before the initial state, a double border around final ones.
 
 ### Arrange
 

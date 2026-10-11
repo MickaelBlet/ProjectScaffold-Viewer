@@ -13,6 +13,7 @@ import { Inspector } from '@/panels/Inspector'
 import { ProblemsPanel, useProblemCounts } from '@/panels/ProblemsPanel'
 import { SearchPanel } from '@/panels/SearchPanel'
 import { SettingsPanel } from '@/panels/SettingsPanel'
+import { StateMachinePanel } from '@/panels/StateMachinePanel'
 import { OutputPanel } from '@/panels/OutputPanel'
 import { EditorArea } from './EditorArea'
 import {
@@ -63,7 +64,8 @@ export const TOOL_ICONS: Record<ToolId, IconName> = {
   problems: 'warning',
   output: 'output',
   search: 'search',
-  settings: 'gear'
+  settings: 'gear',
+  stateMachine: 'states'
 }
 
 function ProblemsBadge(): ReactNode {
@@ -111,7 +113,8 @@ const components = {
   problems: ProblemsToolPanel,
   output: tool('output', OutputPanel),
   search: tool('search', SearchPanel),
-  settings: tool('settings', SettingsPanel)
+  settings: tool('settings', SettingsPanel),
+  stateMachine: tool('stateMachine', StateMachinePanel)
 }
 
 export function DockShell(): ReactNode {

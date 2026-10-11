@@ -260,6 +260,47 @@ modules:
             - kind: primitive
               name: float32
         description: Levels of the last blocks
+    methods:
+      - name: open
+        params: []
+        returns: null
+      - name: start
+        params: []
+        returns: null
+      - name: stop
+        params: []
+        returns: null
+      - name: close
+        params: []
+        returns: null
+      - name: flush
+        access: private
+        params: []
+        returns: null
+    stateMachine:
+      initial: Closed
+      states:
+        - name: Closed
+        - name: Opened
+        - name: Running
+          exit: flush
+      transitions:
+        - from: Closed
+          to: Opened
+          trigger: open
+          guard: blockSize > 0
+        - from: Opened
+          to: Running
+          trigger: start
+        - from: Running
+          to: Opened
+          trigger: stop
+        - from: Opened
+          to: Closed
+          trigger: close
+        - from: Running
+          to: Closed
+          trigger: close
     ports:
       - name: out
         role: out
@@ -661,7 +702,7 @@ editor:
       x: 20
       y: 526
       width: 200
-      height: 116
+      height: 232
     Equalizer:
       x: 336
       y: 335
