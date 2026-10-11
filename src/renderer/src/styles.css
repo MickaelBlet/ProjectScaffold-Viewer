@@ -1367,6 +1367,25 @@ ul.plain > li + li {
 .field-tree .type-tree {
   margin: 0 0 4px 4px;
 }
+/* Constraints, ownership, accessors and lock of a field, below its row. */
+.field-details {
+  display: grid;
+  gap: 4px;
+  margin: 0 0 6px 4px;
+}
+.field-details .detail {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.field-details .detail > span:first-child {
+  flex: none;
+  width: 80px;
+  color: var(--muted);
+}
+.field-details .detail input.number {
+  width: 72px;
+}
 @container (max-width: 560px) {
   .field-list.has-value {
     grid-template-columns: minmax(0, 1fr) auto auto minmax(0, 2fr) 0 auto;
@@ -3126,6 +3145,41 @@ mark {
   stroke: var(--muted);
   stroke-width: 1.5;
   stroke-linejoin: round;
+}
+/* UML associations: dotted, a diamond on the owner (filled when owned), an open arrow. */
+.react-flow__edge-path.association-edge {
+  stroke: var(--muted);
+  stroke-width: 1.2;
+  stroke-dasharray: 2 3;
+}
+.react-flow__edge-path.association-edge.owned,
+.react-flow__edge-path.association-edge.shared {
+  stroke-dasharray: none;
+}
+.association-diamond {
+  fill: var(--bg);
+  stroke: var(--muted);
+  stroke-width: 1.2;
+  stroke-linejoin: round;
+}
+.association-diamond.owned {
+  fill: var(--muted);
+}
+.association-arrow {
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 1.2;
+  stroke-linejoin: round;
+}
+.association-label {
+  position: absolute;
+  padding: 0 3px;
+  border-radius: 3px;
+  font-size: 10px;
+  color: var(--muted);
+  white-space: nowrap;
+  pointer-events: none;
+  background: var(--bg);
 }
 
 /* Default value of a bitmask: opens the flags to toggle. */

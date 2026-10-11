@@ -116,11 +116,15 @@ interfaces: # { name, description?, messages }
 
 ## Modules
 
-- **Attributes** (optional): typed properties, `{ name, access?, static?, const?, type, description?, default? }` like struct fields. `static`: shared by all instances of the module; `const`: not changed after initialization.
+- **Attributes** (optional): typed properties, `{ name, access?, static?, const?, mutable?, atomic?, type, description?, default?, constraints?, ownership?, accessors?, guardedBy? }` like struct fields (see [Constraints and ownership](#constraints-and-ownership)). `static`: shared by all instances of the module; `const`: not changed after initialization; `mutable`: changed by const methods too (not `static` nor `const`); `atomic`: read and written atomically (booleans, characters, numbers, enums, bitmasks; no `guardedBy`).
+  - `accessors`: `read` (a getter only) or `none`; absent: a getter and a setter (no setter when `const`).
+  - `guardedBy`: name of a lock of the module, held to use the attribute.
+- **Locks** (optional): `locks: [{ name, kind }]`, `kind` `mutex`, `shared` (readers-writer) or `recursive`; names apart from the module's attributes and methods.
 - **Methods** (optional): prototypes, `{ name, description?, access?, static?, const?, virtual?, pure?, override?, final?, noexcept?, nodiscard?, params, returns, raises? }` like interface messages. Methods may share a name (overloads) when their parameter types (with directions) or `const` differ; an override matches the method of the same parameters. Method and attribute names differ.
   - `access`: `public` (default, left out), `protected` (the module and the modules deriving from it) or `private` (the module). An attribute's member stays private: its access is that of its getter and setter (none when `private`). An override with another access than the method it overrides is a warning.
   - `static`: called without a module instance; `const`: leaves the module's state unchanged (not both).
   - `virtual`: can be overridden by derived modules (not `static`); `pure`: pure virtual, `= 0`; `override`: overrides a virtual method of a base, with the same parameters (types, directions, `const`), return type and `const`. `final`: cannot be overridden by derived modules (an override of it is an error). `pure`, `override` and `final` require `virtual`; `pure` excludes `final`.
+  - `threadSafe`: may be called from several threads at once.
   - `noexcept`: raises no exception (an override of a `noexcept` method without it is a warning); `nodiscard`: its result must be used (a warning without `returns`). Generators: C++ `noexcept`, `[[nodiscard]]` (C++17), `final`.
   - Parameters take `const: true` too, `in` parameters only, and a `default` value (checked against the type as attribute defaults; `in` parameters only, and the parameters after one with a default have one too).
 - **Kind** (optional): `class` (default, left out), `abstract` or `interface`. A `class` has no pure methods and implements every pure method it inherits; an `interface` has only pure methods and no attributes.
@@ -158,6 +162,13 @@ modules:
 - They are named by their module's path: `Core.Sensor.Filter`; `Robot/Core.Sensor.Filter` for one of a module of dependency `Robot` (in `raises` too).
 - Their names are unique in their module, and apart from its attributes, methods, ports and submodules.
 - `access`: `public` (default, left out) for anyone, by path (the project's types, interfaces and constants too); `protected` for the module and those deriving from it; `private` for the module. A public member (or type of a module) using a less accessible type is a warning.
+
+## Constraints and ownership
+
+Struct fields, exception fields and module attributes take:
+
+- `constraints: { min?, max?, unit?, pattern? }`, of the value, or of each item of an array, vector, list, set or optional (aliases followed). `min`, `max` and `unit` apply to numbers (integers within the range of their type), `pattern` to text (a regular expression the whole value matches). Default values are checked against them.
+- `ownership`: how a field whose type references modules holds them: `owned` (only owner; not with `copy: default`), `shared` (one of the owners), `weak` (no ownership, may expire: a warning when no field holds the module as `shared`) or `borrowed` (no ownership, outlived by them). Generators: C++ `std::unique_ptr`, `std::shared_ptr`, `std::weak_ptr`, a reference or plain pointer.
 
 ## Default values
 

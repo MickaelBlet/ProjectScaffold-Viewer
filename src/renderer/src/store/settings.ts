@@ -32,6 +32,8 @@ export interface Settings {
   autoOrientLinks: boolean
   /** Arrows from modules to their bases. */
   inheritance: boolean
+  /** Arrows from modules to the modules their attributes reference. */
+  associations: boolean
   /** Arrange files without editor layout with ELK when opening them. */
   autoLayoutOnOpen: boolean
   /** Selecting on the canvas or in the Explorer brings the Inspector to the front. */
@@ -95,6 +97,7 @@ export const DEFAULT_SETTINGS: Settings = {
   edgeBadges: true,
   autoOrientLinks: true,
   inheritance: true,
+  associations: true,
   autoLayoutOnOpen: true,
   revealInspector: true,
   forceAnimations: true,

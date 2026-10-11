@@ -310,11 +310,16 @@ modules:
                   kind: primitive
                   name: float32
                 default: 220
+                constraints:
+                  min: 0
+                  max: 1000
+                  unit: px/s
               - name: world
                 type:
                   kind: ref
                   name: Engine.World
                 description: The world the player moves in (a module used as a type)
+                ownership: borrowed
               - name: ship
                 type:
                   kind: ref

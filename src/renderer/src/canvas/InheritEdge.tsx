@@ -2,21 +2,21 @@ import { memo, type ReactNode } from 'react'
 import { BaseEdge, useInternalNode, type Edge, type EdgeProps, type InternalNode } from '@xyflow/react'
 import type { InheritEdgeData } from './inheritEdges'
 
-interface Box {
+export interface Box {
   x: number
   y: number
   width: number
   height: number
 }
 
-const boxOf = (n: InternalNode): Box => ({
+export const boxOf = (n: InternalNode): Box => ({
   ...n.internals.positionAbsolute,
   width: n.measured.width ?? n.width ?? 0,
   height: n.measured.height ?? n.height ?? 0
 })
 
 /** Where the segment from the center of `b` towards `to` leaves `b`. */
-function borderPoint(b: Box, to: { x: number; y: number }): { x: number; y: number } {
+export function borderPoint(b: Box, to: { x: number; y: number }): { x: number; y: number } {
   const cx = b.x + b.width / 2
   const cy = b.y + b.height / 2
   const dx = to.x - cx

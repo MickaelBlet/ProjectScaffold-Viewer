@@ -415,6 +415,38 @@
                             "description": "default value: a mapping for a struct or map, a list for an array, vector, list or set, null for an empty optional, an enum value name, a list of bitmask flag names, a one-entry mapping `case: value` for a union; any value for a custom primitive",
                             "$ref": "#/$defs/__schema0"
                           },
+                          "constraints": {
+                            "type": "object",
+                            "properties": {
+                              "min": {
+                                "description": "lowest value (numbers)",
+                                "type": "number"
+                              },
+                              "max": {
+                                "description": "highest value (numbers)",
+                                "type": "number"
+                              },
+                              "unit": {
+                                "description": "unit of the value (numbers): m, s, Hz…",
+                                "type": "string"
+                              },
+                              "pattern": {
+                                "description": "regular expression the whole value matches (text)",
+                                "type": "string"
+                              }
+                            },
+                            "description": "bounds and form of the value, of each item of a container; checked on default values"
+                          },
+                          "ownership": {
+                            "description": "how it holds the modules its type references: owned (only owner), shared (one of the owners), weak (no ownership, may expire), borrowed (no ownership, outlived by them)",
+                            "type": "string",
+                            "enum": [
+                              "owned",
+                              "shared",
+                              "weak",
+                              "borrowed"
+                            ]
+                          },
                           "access": {
                             "description": "public (default): public accessors; protected: accessors for derived modules; private: no accessors",
                             "type": "string",
@@ -431,6 +463,27 @@
                           "const": {
                             "description": "not changed after initialization",
                             "type": "boolean"
+                          },
+                          "mutable": {
+                            "description": "changed by const methods too (not static nor const)",
+                            "type": "boolean"
+                          },
+                          "atomic": {
+                            "description": "read and written atomically (scalars only)",
+                            "type": "boolean"
+                          },
+                          "accessors": {
+                            "description": "read: a getter only; none: no accessors; absent: a getter and a setter (no setter when const)",
+                            "type": "string",
+                            "enum": [
+                              "read",
+                              "none"
+                            ]
+                          },
+                          "guardedBy": {
+                            "description": "name of the lock of the module (`locks`) held to use it",
+                            "type": "string",
+                            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
                           }
                         },
                         "required": [
@@ -547,6 +600,10 @@
                           },
                           "final": {
                             "description": "cannot be overridden by derived modules (virtual only)",
+                            "type": "boolean"
+                          },
+                          "threadSafe": {
+                            "description": "may be called from several threads at once",
                             "type": "boolean"
                           },
                           "noexcept": {
@@ -1250,6 +1307,38 @@
                   "default": {
                     "description": "default value: a mapping for a struct or map, a list for an array, vector, list or set, null for an empty optional, an enum value name, a list of bitmask flag names, a one-entry mapping `case: value` for a union; any value for a custom primitive",
                     "$ref": "#/$defs/__schema0"
+                  },
+                  "constraints": {
+                    "type": "object",
+                    "properties": {
+                      "min": {
+                        "description": "lowest value (numbers)",
+                        "type": "number"
+                      },
+                      "max": {
+                        "description": "highest value (numbers)",
+                        "type": "number"
+                      },
+                      "unit": {
+                        "description": "unit of the value (numbers): m, s, Hz…",
+                        "type": "string"
+                      },
+                      "pattern": {
+                        "description": "regular expression the whole value matches (text)",
+                        "type": "string"
+                      }
+                    },
+                    "description": "bounds and form of the value, of each item of a container; checked on default values"
+                  },
+                  "ownership": {
+                    "description": "how it holds the modules its type references: owned (only owner), shared (one of the owners), weak (no ownership, may expire), borrowed (no ownership, outlived by them)",
+                    "type": "string",
+                    "enum": [
+                      "owned",
+                      "shared",
+                      "weak",
+                      "borrowed"
+                    ]
                   }
                 },
                 "required": [
@@ -1367,6 +1456,38 @@
                   "default": {
                     "description": "default value: a mapping for a struct or map, a list for an array, vector, list or set, null for an empty optional, an enum value name, a list of bitmask flag names, a one-entry mapping `case: value` for a union; any value for a custom primitive",
                     "$ref": "#/$defs/__schema0"
+                  },
+                  "constraints": {
+                    "type": "object",
+                    "properties": {
+                      "min": {
+                        "description": "lowest value (numbers)",
+                        "type": "number"
+                      },
+                      "max": {
+                        "description": "highest value (numbers)",
+                        "type": "number"
+                      },
+                      "unit": {
+                        "description": "unit of the value (numbers): m, s, Hz…",
+                        "type": "string"
+                      },
+                      "pattern": {
+                        "description": "regular expression the whole value matches (text)",
+                        "type": "string"
+                      }
+                    },
+                    "description": "bounds and form of the value, of each item of a container; checked on default values"
+                  },
+                  "ownership": {
+                    "description": "how it holds the modules its type references: owned (only owner), shared (one of the owners), weak (no ownership, may expire), borrowed (no ownership, outlived by them)",
+                    "type": "string",
+                    "enum": [
+                      "owned",
+                      "shared",
+                      "weak",
+                      "borrowed"
+                    ]
                   }
                 },
                 "required": [
@@ -1984,6 +2105,33 @@
             "custom"
           ]
         },
+        "locks": {
+          "description": "locks guarding its attributes (`guardedBy`)",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                "description": "name of the lock, apart from the members of the module"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "mutex",
+                  "shared",
+                  "recursive"
+                ],
+                "description": "mutex; shared: readers-writer lock; recursive: may be taken again by its holder"
+              }
+            },
+            "required": [
+              "name",
+              "kind"
+            ]
+          }
+        },
         "metadata": {
           "description": "free key: value pairs, passed to generators",
           "type": "object",
@@ -2034,6 +2182,38 @@
                 "description": "default value: a mapping for a struct or map, a list for an array, vector, list or set, null for an empty optional, an enum value name, a list of bitmask flag names, a one-entry mapping `case: value` for a union; any value for a custom primitive",
                 "$ref": "#/$defs/__schema0"
               },
+              "constraints": {
+                "type": "object",
+                "properties": {
+                  "min": {
+                    "description": "lowest value (numbers)",
+                    "type": "number"
+                  },
+                  "max": {
+                    "description": "highest value (numbers)",
+                    "type": "number"
+                  },
+                  "unit": {
+                    "description": "unit of the value (numbers): m, s, Hz…",
+                    "type": "string"
+                  },
+                  "pattern": {
+                    "description": "regular expression the whole value matches (text)",
+                    "type": "string"
+                  }
+                },
+                "description": "bounds and form of the value, of each item of a container; checked on default values"
+              },
+              "ownership": {
+                "description": "how it holds the modules its type references: owned (only owner), shared (one of the owners), weak (no ownership, may expire), borrowed (no ownership, outlived by them)",
+                "type": "string",
+                "enum": [
+                  "owned",
+                  "shared",
+                  "weak",
+                  "borrowed"
+                ]
+              },
               "access": {
                 "description": "public (default): public accessors; protected: accessors for derived modules; private: no accessors",
                 "type": "string",
@@ -2050,6 +2230,27 @@
               "const": {
                 "description": "not changed after initialization",
                 "type": "boolean"
+              },
+              "mutable": {
+                "description": "changed by const methods too (not static nor const)",
+                "type": "boolean"
+              },
+              "atomic": {
+                "description": "read and written atomically (scalars only)",
+                "type": "boolean"
+              },
+              "accessors": {
+                "description": "read: a getter only; none: no accessors; absent: a getter and a setter (no setter when const)",
+                "type": "string",
+                "enum": [
+                  "read",
+                  "none"
+                ]
+              },
+              "guardedBy": {
+                "description": "name of the lock of the module (`locks`) held to use it",
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
               }
             },
             "required": [
@@ -2267,6 +2468,10 @@
                 "description": "cannot be overridden by derived modules (virtual only)",
                 "type": "boolean"
               },
+              "threadSafe": {
+                "description": "may be called from several threads at once",
+                "type": "boolean"
+              },
               "noexcept": {
                 "description": "raises no exception",
                 "type": "boolean"
@@ -2388,6 +2593,38 @@
                   "default": {
                     "description": "default value: a mapping for a struct or map, a list for an array, vector, list or set, null for an empty optional, an enum value name, a list of bitmask flag names, a one-entry mapping `case: value` for a union; any value for a custom primitive",
                     "$ref": "#/$defs/__schema0"
+                  },
+                  "constraints": {
+                    "type": "object",
+                    "properties": {
+                      "min": {
+                        "description": "lowest value (numbers)",
+                        "type": "number"
+                      },
+                      "max": {
+                        "description": "highest value (numbers)",
+                        "type": "number"
+                      },
+                      "unit": {
+                        "description": "unit of the value (numbers): m, s, Hz…",
+                        "type": "string"
+                      },
+                      "pattern": {
+                        "description": "regular expression the whole value matches (text)",
+                        "type": "string"
+                      }
+                    },
+                    "description": "bounds and form of the value, of each item of a container; checked on default values"
+                  },
+                  "ownership": {
+                    "description": "how it holds the modules its type references: owned (only owner), shared (one of the owners), weak (no ownership, may expire), borrowed (no ownership, outlived by them)",
+                    "type": "string",
+                    "enum": [
+                      "owned",
+                      "shared",
+                      "weak",
+                      "borrowed"
+                    ]
                   }
                 },
                 "required": [
@@ -2523,6 +2760,38 @@
                   "default": {
                     "description": "default value: a mapping for a struct or map, a list for an array, vector, list or set, null for an empty optional, an enum value name, a list of bitmask flag names, a one-entry mapping `case: value` for a union; any value for a custom primitive",
                     "$ref": "#/$defs/__schema0"
+                  },
+                  "constraints": {
+                    "type": "object",
+                    "properties": {
+                      "min": {
+                        "description": "lowest value (numbers)",
+                        "type": "number"
+                      },
+                      "max": {
+                        "description": "highest value (numbers)",
+                        "type": "number"
+                      },
+                      "unit": {
+                        "description": "unit of the value (numbers): m, s, Hz…",
+                        "type": "string"
+                      },
+                      "pattern": {
+                        "description": "regular expression the whole value matches (text)",
+                        "type": "string"
+                      }
+                    },
+                    "description": "bounds and form of the value, of each item of a container; checked on default values"
+                  },
+                  "ownership": {
+                    "description": "how it holds the modules its type references: owned (only owner), shared (one of the owners), weak (no ownership, may expire), borrowed (no ownership, outlived by them)",
+                    "type": "string",
+                    "enum": [
+                      "owned",
+                      "shared",
+                      "weak",
+                      "borrowed"
+                    ]
                   }
                 },
                 "required": [

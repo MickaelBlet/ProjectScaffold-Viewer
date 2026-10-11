@@ -40,11 +40,12 @@ import {
   viewNotes
 } from './project'
 import {
-  METHOD_QUALIFIERS,
+  ALL_QUALIFIERS,
   type Access,
   type Attribute,
   type Binary,
   type ConstDef,
+  type Constraints,
   type Constructor,
   type Destructor,
   type Field,
@@ -54,11 +55,13 @@ import {
   type Interface,
   type Link,
   type LinkRoute,
+  type Lock,
   type Message,
   type Metadata,
   type Method,
   type Module,
   type Note,
+  type Ownership,
   type Param,
   type Qualifier,
   type Project,
@@ -100,7 +103,7 @@ type DataPath = (string | number)[]
 const opt = (s: string): string | undefined => (s ? s : undefined)
 /** Qualifiers of `q` that are set, the others left out. */
 const qualifiers = (q: { [K in Qualifier]?: boolean }): { [K in Qualifier]?: true } =>
-  Object.fromEntries(METHOD_QUALIFIERS.filter((k) => q[k]).map((k) => [k, true]))
+  Object.fromEntries(ALL_QUALIFIERS.filter((k) => q[k]).map((k) => [k, true]))
 /** Access level of `x` when not public. */
 const access = (x: { access?: Access }): { access?: StoredAccess } =>
   x.access === 'protected' || x.access === 'private' ? { access: x.access } : {}
@@ -181,7 +184,9 @@ export function toFile(p: Project, options: { editor: boolean }): FileProject {
   const field = (f: Field) => ({ name: f.name, type: ref(f.type), description: opt(f.description) })
   const valueField = (f: ValueField) => ({
     ...field(f),
-    default: f.default
+    default: f.default,
+    constraints: f.constraints && Object.keys(f.constraints).length ? { ...f.constraints } : undefined,
+    ownership: f.ownership
   })
   const param = (prm: Param) => ({
     ...field(prm),
@@ -196,9 +201,17 @@ export function toFile(p: Project, options: { editor: boolean }): FileProject {
     returns: m.returns ? ref(m.returns) : null,
     raises: raises(m)
   })
-  const attribute = (a: Attribute) => {
+  /** An attribute; `locks`: those of its module, which `guardedBy` names. */
+  const attribute = (a: Attribute, locks: readonly Lock[] = []) => {
     const { name, ...rest } = valueField(a)
-    return { name, ...access(a), ...qualifiers(a), ...rest }
+    return {
+      name,
+      ...access(a),
+      ...qualifiers(a),
+      ...rest,
+      accessors: a.accessors,
+      guardedBy: a.guardedBy ? locks.find((l) => l.id === a.guardedBy)?.name : undefined
+    }
   }
   const methodParams = (m: Pick<Method, 'params'>) =>
     m.params.map((prm) => ({ ...param(prm), ...qualifiers(prm), default: prm.default }))
@@ -322,11 +335,12 @@ export function toFile(p: Project, options: { editor: boolean }): FileProject {
         instantiation: m.instantiation,
         copy: m.copy,
         move: m.move,
+        locks: m.locks?.length ? m.locks.map((l) => ({ name: l.name, kind: l.kind })) : undefined,
         metadata: optMeta(m.metadata),
         color: m.color,
         binary: m.binaryId ? binaryName.get(m.binaryId) : undefined,
         types: types.length ? types.map(moduleTypeDef) : undefined,
-        attributes: m.attributes.length ? m.attributes.map(attribute) : undefined,
+        attributes: m.attributes.length ? m.attributes.map((a) => attribute(a, m.locks)) : undefined,
         constructors: m.constructors?.length ? m.constructors.map(constructor) : undefined,
         destructor: m.destructor && destructor(m.destructor),
         methods: m.methods.length ? m.methods.map(method) : undefined,
@@ -387,7 +401,7 @@ export function toFile(p: Project, options: { editor: boolean }): FileProject {
             ? x.modules.map((m) => ({
                 module: m.path,
                 final: m.final || undefined,
-                attributes: m.attributes?.length ? m.attributes.map(attribute) : undefined,
+                attributes: m.attributes?.length ? m.attributes.map((a) => attribute(a)) : undefined,
                 methods: m.methods?.length ? m.methods.map(method) : undefined,
                 ports: m.ports.map((pt) => ({
                   name: pt.name,
@@ -638,13 +652,22 @@ export function fromFile(data: unknown, prev?: Project): Project {
     description: fl.description ?? ''
   })
   const valueField = (
-    fl: { name: string; type: FileTypeRef; description?: string; default?: unknown },
+    fl: {
+      name: string
+      type: FileTypeRef
+      description?: string
+      default?: unknown
+      constraints?: Constraints
+      ownership?: Ownership
+    },
     where: string,
     was: { id: Id } | undefined,
     at: DataPath
   ): ValueField => {
     const vf: ValueField = field(fl, where, was, at)
     if (fl.default !== undefined) vf.default = fl.default as Value
+    if (fl.constraints && Object.keys(fl.constraints).length) vf.constraints = { ...fl.constraints }
+    if (fl.ownership) vf.ownership = fl.ownership
     return vf
   }
   /** Messages of an interface or methods of a module (`owner`), at `at` in the file data. */
@@ -764,18 +787,27 @@ export function fromFile(data: unknown, prev?: Project): Project {
   }))
 
   /** Attributes of a module (`path`) or placed module, at `at` in the file data. */
+  /** Attributes of a module (`path`) or placed module, at `at`; `locks`: those of the module. */
   const attributesOf = (
     list: readonly FileAttribute[],
     path: string,
     before: readonly Attribute[] | undefined,
-    at: DataPath
+    at: DataPath,
+    locks: readonly Lock[] = []
   ): Attribute[] => {
     const was = named(before, list)
-    return list.map((a, j) => ({
-      ...valueField(a, path, was[j], [...at, j]),
-      ...access(a),
-      ...qualifiers(a)
-    }))
+    return list.map((a, j) => {
+      const lock = a.guardedBy ? locks.find((l) => l.name === a.guardedBy) : undefined
+      if (a.guardedBy && !lock)
+        report(`${path}.${a.name}: unknown lock '${a.guardedBy}'`, [...at, j, 'guardedBy'])
+      return {
+        ...valueField(a, path, was[j], [...at, j]),
+        ...access(a),
+        ...qualifiers(a),
+        ...(a.accessors && { accessors: a.accessors }),
+        ...(lock && { guardedBy: lock.id })
+      }
+    })
   }
   /** Constructors of a module (`path`, named `name`), at `at` in the file data: read as methods. */
   const constructorsOf = (
@@ -869,6 +901,12 @@ export function fromFile(data: unknown, prev?: Project): Project {
       const ports = named(was?.ports, fm.ports)
       const height = leafHeight(portRows(fm)) + compartmentsHeight(fm)
       const portNames = new Set<string>()
+      const lockWas = named(was?.locks, fm.locks ?? [])
+      const locks = fm.locks?.map((l, k): Lock => ({
+        id: lockWas[k]?.id ?? newId(),
+        name: l.name,
+        kind: l.kind
+      }))
       const mod: Module = {
         id: idOf(was, () => `module:${path}`),
         name: fm.name,
@@ -879,6 +917,7 @@ export function fromFile(data: unknown, prev?: Project): Project {
         ...(fm.instantiation && { instantiation: fm.instantiation }),
         ...(fm.copy && { copy: fm.copy }),
         ...(fm.move && { move: fm.move }),
+        ...(locks?.length && { locks }),
         ...(fm.constructors && {
           constructors: constructorsOf(fm.constructors, path, fm.name, was?.constructors, [
             ...at,
@@ -893,7 +932,7 @@ export function fromFile(data: unknown, prev?: Project): Project {
           }
         }),
         metadata: { ...(fm.metadata ?? {}) },
-        attributes: attributesOf(fm.attributes ?? [], path, was?.attributes, [...at, i, 'attributes']),
+        attributes: attributesOf(fm.attributes ?? [], path, was?.attributes, [...at, i, 'attributes'], locks),
         methods: methodsOf(fm.methods ?? [], path, was?.methods, [...at, i, 'methods']),
         ports: fm.ports.map((pt, j) => {
           if (portNames.has(pt.name))

@@ -46,6 +46,7 @@ import {
   valueFlags
 } from '@/model/defaults'
 import { Icon } from '@/components/Icon'
+import { FieldDetails, hasDetails } from './FieldDetails'
 
 function withType<K extends TypeDef['kind']>(
   id: string,
@@ -217,9 +218,19 @@ export function FieldList<F extends Field = Field>(props: {
   column?: (f: F, i: number) => ReactNode
   value?: (f: F, i: number) => ReactNode
   before?: (f: F, i: number) => ReactNode
+  /** Details of a field, shown below its row with a toggle; `detailed` marks those with some set. */
+  details?: (f: F, i: number) => ReactNode
+  detailed?: (f: F) => boolean
 }): ReactNode {
   const { fields, onChange } = props
   const [trees, setTrees] = useState<ReadonlySet<string>>(new Set())
+  const [open, setOpen] = useState<ReadonlySet<string>>(new Set())
+  const toggleOpen = (id: string): void =>
+    setOpen((s) => {
+      const n = new Set(s)
+      if (!n.delete(id)) n.add(id)
+      return n
+    })
   const toggleTree = (id: string): void =>
     setTrees((s) => {
       const n = new Set(s)
@@ -251,6 +262,14 @@ export function FieldList<F extends Field = Field>(props: {
               </div>
               {props.value && <div className="value">{props.value(f, i)}</div>}
               <div className="actions-cell">
+                {props.details && (
+                  <IconButton
+                    icon="gear"
+                    title="Constraints and details"
+                    active={props.detailed?.(f)}
+                    onClick={() => toggleOpen(f.id)}
+                  />
+                )}
                 <IconButton
                   icon="arrow-up"
                   title="Move up"
@@ -276,6 +295,7 @@ export function FieldList<F extends Field = Field>(props: {
                 <TypeTree value={f.type} onChange={(t) => onChange((fs) => void (fs[i]!.type = t))} />
               </div>
             )}
+            {props.details && open.has(f.id) && <div className="field-tree">{props.details(f, i)}</div>}
           </Fragment>
         ))}
       </div>
@@ -364,6 +384,13 @@ export function TypeInspector({ id }: { id: string }): ReactNode {
                   onChange={(v) => withType<'struct' | 'exception'>(id, (x) => setDefault(x.fields[i]!, v))}
                 />
               )}
+              details={(f, i) => (
+                <FieldDetails
+                  field={f}
+                  change={(fn) => withType<'struct' | 'exception'>(id, (x) => fn(x.fields[i]!))}
+                />
+              )}
+              detailed={hasDetails}
             />
             {t.kind === 'exception' && (
               <p className="muted">Raised by messages and methods (their raises).</p>

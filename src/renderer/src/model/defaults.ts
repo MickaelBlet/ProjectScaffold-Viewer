@@ -80,7 +80,7 @@ export type IsModule = (id: Id) => boolean
 const noModules: IsModule = () => false
 
 /** Follows aliases; the reference itself for a module, null for a deleted type or a cyclic alias. */
-function resolve(
+export function resolve(
   t: TypeRef,
   types: ReadonlyMap<Id, TypeDef>,
   isModule: IsModule = noModules,

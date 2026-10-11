@@ -2,9 +2,12 @@
 import { z } from 'zod'
 import {
   ACCESS_LEVELS,
+  ACCESSORS,
   INSTANTIATIONS,
   INT_PRIMITIVES,
+  LOCK_KINDS,
   MODULE_KINDS,
+  OWNERSHIPS,
   PARAM_DIRECTIONS,
   PERFORMANCE_CLASSES,
   PRIMITIVES,
@@ -97,12 +100,28 @@ const Field = z.object({
   description: Description
 })
 
+const Constraints = z
+  .object({
+    min: z.number().optional().describe('lowest value (numbers)'),
+    max: z.number().optional().describe('highest value (numbers)'),
+    unit: z.string().optional().describe('unit of the value (numbers): m, s, Hz…'),
+    pattern: z.string().optional().describe('regular expression the whole value matches (text)')
+  })
+  .describe('bounds and form of the value, of each item of a container; checked on default values')
+
 const ValueField = Field.extend({
   default: z
     .json()
     .optional()
     .describe(
       'default value: a mapping for a struct or map, a list for an array, vector, list or set, null for an empty optional, an enum value name, a list of bitmask flag names, a one-entry mapping `case: value` for a union; any value for a custom primitive'
+    ),
+  constraints: Constraints.optional(),
+  ownership: z
+    .enum(OWNERSHIPS)
+    .optional()
+    .describe(
+      'how it holds the modules its type references: owned (only owner), shared (one of the owners), weak (no ownership, may expire), borrowed (no ownership, outlived by them)'
     )
 })
 
@@ -245,7 +264,16 @@ const Attribute = ValueField.extend({
     'public (default): public accessors; protected: accessors for derived modules; private: no accessors'
   ),
   static: z.boolean().optional().describe('shared by all instances of the module'),
-  const: z.boolean().optional().describe('not changed after initialization')
+  const: z.boolean().optional().describe('not changed after initialization'),
+  mutable: z.boolean().optional().describe('changed by const methods too (not static nor const)'),
+  atomic: z.boolean().optional().describe('read and written atomically (scalars only)'),
+  accessors: z
+    .enum(ACCESSORS)
+    .optional()
+    .describe(
+      'read: a getter only; none: no accessors; absent: a getter and a setter (no setter when const)'
+    ),
+  guardedBy: Identifier.optional().describe('name of the lock of the module (`locks`) held to use it')
 })
 
 const MethodParam = Param.extend({
@@ -273,6 +301,7 @@ const Method = Message.extend({
     .describe('pure virtual (`= 0`): not implemented by this module (virtual only)'),
   override: z.boolean().optional().describe('overrides a virtual method of a base module (virtual only)'),
   final: z.boolean().optional().describe('cannot be overridden by derived modules (virtual only)'),
+  threadSafe: z.boolean().optional().describe('may be called from several threads at once'),
   noexcept: z.boolean().optional().describe('raises no exception'),
   nodiscard: z.boolean().optional().describe('its result must be used (methods returning a value)')
 })
@@ -302,6 +331,13 @@ const Destructor = z.object({
 
 const SpecialMemberSchema = z.enum(SPECIAL_MEMBERS).optional()
 
+const Lock = z.object({
+  name: Identifier.describe('name of the lock, apart from the members of the module'),
+  kind: z
+    .enum(LOCK_KINDS)
+    .describe('mutex; shared: readers-writer lock; recursive: may be taken again by its holder')
+})
+
 const Interface = z
   .object({
     name: Identifier.describe('name of the interface'),
@@ -326,6 +362,7 @@ export interface FileModule {
   instantiation?: (typeof INSTANTIATIONS)[number]
   copy?: (typeof SPECIAL_MEMBERS)[number]
   move?: (typeof SPECIAL_MEMBERS)[number]
+  locks?: z.infer<typeof Lock>[]
   metadata?: Record<string, string>
   color?: string
   binary?: string
@@ -368,6 +405,7 @@ const Module: z.ZodType<FileModule> = z
       move: SpecialMemberSchema.describe(
         'move constructor and assignment: default (by the compiler), delete (not movable) or custom (written by hand); absent: implicit'
       ),
+      locks: z.array(Lock).optional().describe('locks guarding its attributes (`guardedBy`)'),
       metadata: Metadata,
       color: z.string().optional().describe('accent color (CSS color)'),
       binary: Identifier.optional().describe(

@@ -206,11 +206,13 @@ export function IconButton(props: {
   icon: IconName
   danger?: boolean
   disabled?: boolean
+  /** Shown as on (a toggle). */
+  active?: boolean
 }): ReactNode {
   return (
     <button
       type="button"
-      className={`icon ${props.danger ? 'danger' : ''}`}
+      className={`icon ${props.danger ? 'danger' : ''} ${props.active ? 'active' : ''}`}
       title={props.title}
       aria-label={props.title}
       disabled={props.disabled}

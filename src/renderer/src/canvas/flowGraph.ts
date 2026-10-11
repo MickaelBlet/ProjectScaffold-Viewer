@@ -17,6 +17,7 @@ import { ceilToGrid } from '@/model/grid'
 import { outsideOf, shownModuleIds } from '@/model/viewLayout'
 import type { Id, ImportedPort, LinkAnchor, PortRole, Project, View } from '@/model/types'
 import { inheritEdges } from './inheritEdges'
+import { associationEdges } from './associationEdges'
 import { MODULE_HANDLE, PERF_COLORS, Z } from './constants'
 import {
   containerIds,
@@ -155,7 +156,13 @@ export function toNodes(
 }
 
 /** Links between the modules a view draws (see shownModuleIds). */
-export function toEdges(p: Project, shown: Set<Id>, selectedLink: Id | null, inheritance: boolean): Edge[] {
+export function toEdges(
+  p: Project,
+  shown: Set<Id>,
+  selectedLink: Id | null,
+  inheritance: boolean,
+  associations = false
+): Edge[] {
   const links = p.links.flatMap((l): Edge[] => {
     const source = l.from.moduleId
     const target = l.to.moduleId
@@ -177,7 +184,11 @@ export function toEdges(p: Project, shown: Set<Id>, selectedLink: Id | null, inh
       }
     ]
   })
-  return inheritance ? [...links, ...inheritEdges(p, shown)] : links
+  return [
+    ...links,
+    ...(inheritance ? inheritEdges(p, shown) : []),
+    ...(associations ? associationEdges(p, shown) : [])
+  ]
 }
 
 export interface ConnectEnd {

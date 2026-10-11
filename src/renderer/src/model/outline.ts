@@ -4,7 +4,7 @@ import YAML, { isMap, isScalar, isSeq, type Node as YamlNode, type YAMLMap } fro
 import type { FileTypeRef } from './schema'
 import { printTypeExpr } from './typeExpr'
 import { formatValue } from './defaults'
-import { METHOD_QUALIFIERS, type Value } from './types'
+import { ALL_QUALIFIERS, type Value } from './types'
 
 export type OutlineKind =
   | 'project'
@@ -118,7 +118,7 @@ const TYPE_KINDS = new Set<OutlineKind>([
 
 /** Qualifiers set on an attribute, method or parameter (`static const`, `virtual pure`). */
 function qualifierText(map: YAMLMap): string[] {
-  return METHOD_QUALIFIERS.filter((q) => map.get(q) === true)
+  return ALL_QUALIFIERS.filter((q) => map.get(q) === true)
 }
 
 /** Qualifiers and type of a field, followed by its default value if any. */

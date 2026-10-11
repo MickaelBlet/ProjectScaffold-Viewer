@@ -3,6 +3,7 @@ import { isReservedTypeName, mapTypeRef, printTypeExpr, walkTypeRef } from './ty
 import {
   GLOBAL_VIEW,
   type Access,
+  type Attribute,
   type Orientation,
   type Id,
   type Dependency,
@@ -456,6 +457,14 @@ export function setQualifier(e: { [K in Qualifier]?: boolean }, q: Qualifier, on
   else delete e[q]
 }
 
+/** Set a qualifier of an attribute, keeping the others consistent: `mutable` excludes `static` and `const`. */
+export function setAttributeQualifier(a: Attribute, q: Qualifier, on: boolean): void {
+  setQualifier(a, q, on)
+  if (!on) return
+  if (q === 'mutable') for (const k of ['static', 'const'] as const) setQualifier(a, k, false)
+  else if (q === 'static' || q === 'const') setQualifier(a, 'mutable', false)
+}
+
 /** Set the access level of a type, attribute or method; public is left out. */
 export function setAccess(e: { access?: StoredAccess }, access: Access): void {
   if (access === 'public') delete e.access
@@ -490,7 +499,13 @@ export function setMethodQualifier(m: Method, q: Qualifier, on: boolean): void {
 /** Qualifiers of a method as drawn around its name and parameters: `virtual f(…) const override = 0`. */
 export function methodQualifierText(m: Method): { before: string; after: string } {
   const before = [m.nodiscard && 'nodiscard', m.static ? 'static' : m.virtual && 'virtual']
-  const after = [m.const && 'const', m.noexcept && 'noexcept', m.override && 'override', m.final && 'final']
+  const after = [
+    m.const && 'const',
+    m.noexcept && 'noexcept',
+    m.override && 'override',
+    m.final && 'final',
+    m.threadSafe && 'threadSafe'
+  ]
   return {
     before: before
       .filter(Boolean)

@@ -29,7 +29,8 @@ import {
 } from './project'
 import { normalizeFile } from './sync'
 import { isReservedTypeName, walkTypeRef } from './typeExpr'
-import { valueErrors } from './defaults'
+import { resolve as resolveType, valueErrors } from './defaults'
+import { constraintErrors, constraintValueErrors, moduleRefs } from './constraints'
 import { binariesOf, crosses } from './binaries'
 import { DEFAULT_HOST, foreignFields } from './transports'
 import {
@@ -37,6 +38,7 @@ import {
   INT_RANGES,
   TRANSPORTS,
   type Id,
+  type Attribute,
   type Constructor,
   type Message,
   type MethodParam,
@@ -128,14 +130,48 @@ export function validate(p: Project): Problem[] {
     })
   }
 
+  const moduleName = (id: Id): string => {
+    const of = parseDependencyModuleRef(id)
+    return of
+      ? `${p.dependencies.find((x) => x.id === of.dependency)?.name ?? '?'}/${of.path}`
+      : modulePath(p, id)
+  }
+
+  /** Modules some field or attribute holds as `shared`: those a `weak` one may reference. */
+  let sharedModules: Set<Id> | undefined
+  const shared = (): Set<Id> => {
+    if (sharedModules) return sharedModules
+    const fields = [
+      ...p.modules.flatMap((m) => m.attributes),
+      ...p.types.flatMap((t) => (t.kind === 'struct' || t.kind === 'exception' ? t.fields : []))
+    ]
+    sharedModules = new Set(
+      fields.filter((f) => f.ownership === 'shared').flatMap((f) => moduleRefs(f.type, isModule))
+    )
+    return sharedModules
+  }
+
+  /** Default value, constraints and ownership of a field, attribute or parameter (`where`). */
   const checkDefault = (
-    f: Pick<ValueField, 'type' | 'default'>,
+    f: Pick<ValueField, 'type' | 'default' | 'constraints' | 'ownership'>,
     target: ProblemTarget,
     where: string
   ): void => {
+    const c = f.constraints
+    if (c) for (const e of constraintErrors(c, f.type, p.types)) push('error', target, `${where}: ${e}`)
+    if (f.ownership) {
+      const refs = moduleRefs(f.type, isModule)
+      if (!refs.length) push('error', target, `${where}: ownership applies to types referencing modules`)
+      else if (f.ownership === 'weak')
+        for (const id of refs)
+          if (!shared().has(id))
+            push('warning', target, `${where}: weak, but nothing holds ${moduleName(id)} as shared`)
+    }
     if (f.default === undefined) return
-    for (const e of valueErrors(f.default, f.type, p.types, isModule))
-      push('error', target, `${where} default: ${e}`)
+    const errors = valueErrors(f.default, f.type, p.types, isModule)
+    for (const e of errors) push('error', target, `${where} default: ${e}`)
+    if (c && !errors.length)
+      for (const e of constraintValueErrors(f.default, c)) push('error', target, `${where} default: ${e}`)
   }
 
   // Project
@@ -294,6 +330,33 @@ export function validate(p: Project): Problem[] {
   }
 
   /** Parameters and return type of an interface message or a module method. */
+  /** Qualifiers, accessors and lock of an attribute (`where`) of `m`. */
+  const checkAttribute = (m: Module, a: Attribute, target: ProblemTarget, where: string): void => {
+    if (a.mutable && (a.static || a.const))
+      push('error', target, `${where}: a mutable attribute is not ${a.static ? 'static' : 'const'}`)
+    if (a.accessors === 'read' && a.const)
+      push('warning', target, `${where}: const has no setter already (accessors: read)`)
+    if (a.accessors && a.access === 'private')
+      push('warning', target, `${where}: private has no accessors already (accessors: ${a.accessors})`)
+    if (a.atomic) {
+      if (a.guardedBy) push('error', target, `${where}: atomic, it needs no lock`)
+      const scalar = constrainedScalarOf(a.type)
+      if (scalar === 'other' || scalar === 'string' || scalar === 'bytes')
+        push('error', target, `${where}: atomic applies to booleans, characters, numbers, enums and bitmasks`)
+      if (a.const) push('warning', target, `${where}: const, atomic changes nothing`)
+    }
+    if (a.guardedBy && !m.locks?.some((l) => l.id === a.guardedBy))
+      push('error', target, `${where}: guarded by a deleted lock`)
+  }
+
+  /** What an attribute's value is, for atomic ones: a scalar type, not a container. */
+  const constrainedScalarOf = (t: TypeRef): string => {
+    const r = resolveType(t, types, isModule)
+    if (!r) return 'other'
+    if (r.kind === 'enum' || r.kind === 'bitmask') return r.kind
+    return r.kind === 'primitive' && !('id' in r) ? r.name : 'other'
+  }
+
   /** Qualifiers and defaults of the parameters of a method or constructor (`where`). */
   const checkParams = (params: MethodParam[], target: ProblemTarget, where: string): void => {
     let defaulted: string | null = null
@@ -345,6 +408,14 @@ export function validate(p: Project): Problem[] {
           push('error', target, `${where}: ${prm.name} sets the attribute: an in parameter`)
       }
     }
+    for (const n of duplicates((m.locks ?? []).map((l) => l.name)))
+      push('error', target, `${path}: duplicate lock '${n}'`)
+    const members = new Set([...m.attributes.map((a) => a.name), ...m.methods.map((x) => x.name)])
+    for (const l of m.locks ?? [])
+      if (members.has(l.name)) push('error', target, `${path}: lock '${l.name}' has the name of a member`)
+    for (const a of m.attributes)
+      if (a.ownership === 'owned' && m.copy === 'default')
+        push('error', target, `${path}.${a.name}: owned modules are not copied (copy: default)`)
     if (m.kind === 'interface' && ctors.length)
       push('error', target, `${path}: an interface module has no constructors`)
     // Const attributes get their value from their default, else from every constructor.
@@ -467,6 +538,7 @@ export function validate(p: Project): Problem[] {
     for (const a of m.attributes) {
       checkTypeRef(a.type, target, `${path}.${a.name}`)
       checkDefault(a, target, `${path}.${a.name}`)
+      checkAttribute(m, a, target, `${path}.${a.name}`)
     }
     // Overloads share a name, with other parameter types or const.
     for (const n of duplicates(m.methods.map(overloadName)))

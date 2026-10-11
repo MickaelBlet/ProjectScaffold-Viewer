@@ -199,6 +199,12 @@ export function SettingsPanel(): ReactNode {
             value={s.inheritance}
             onChange={(v) => setSetting('inheritance', v)}
           />
+          <Check
+            label="Association arrows"
+            hint="Arrows from modules to the modules their attributes reference: a diamond on the owner, filled when owned"
+            value={s.associations}
+            onChange={(v) => setSetting('associations', v)}
+          />
           <Check label="Minimap" value={s.minimap} onChange={(v) => setSetting('minimap', v)} />
           <Check
             label="Force animations"

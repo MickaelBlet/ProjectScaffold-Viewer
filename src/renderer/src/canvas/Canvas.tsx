@@ -73,6 +73,7 @@ import { fileName } from '@/fileOps'
 import { openView, registerCanvas, revealInspector } from '@/shell/controllers'
 import { endOf, linkEnds, placedPortEnds, toEdges, toNodes, type ConnectEnd } from './flowGraph'
 import { INHERIT } from './inheritEdges'
+import { ASSOCIATION } from './associationEdges'
 import { reuseUnchanged } from './reuseUnchanged'
 import { floatingPortSides } from './portSides'
 import { ModuleNode } from './ModuleNode'
@@ -80,11 +81,12 @@ import { NoteNode } from './NoteNode'
 import { ImportedNode } from './ImportedNode'
 import { LinkEdge } from './LinkEdge'
 import { InheritEdge } from './InheritEdge'
+import { AssociationEdge } from './AssociationEdge'
 import { compactSvg, svgToPng } from './exportImage'
 import { useTrackpad } from './useTrackpad'
 
 const nodeTypes = { module: ModuleNode, note: NoteNode, imported: ImportedNode }
-const edgeTypes = { link: LinkEdge, inherit: InheritEdge }
+const edgeTypes = { link: LinkEdge, inherit: InheritEdge, association: AssociationEdge }
 
 const GUIDE_PX = 6
 
@@ -209,6 +211,7 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
       theme: s.theme,
       minimap: s.minimap,
       inheritance: s.inheritance,
+      associations: s.associations,
       selectToMove: s.selectToMove
     }))
   )
@@ -247,8 +250,11 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
   )
   const [edges, setEdges] = useEdgesState<Edge>([])
   useEffect(
-    () => setEdges((prev) => reuseUnchanged(prev, toEdges(drawn, shown, selectedLink, settings.inheritance))),
-    [drawn, shown, selectedLink, settings.inheritance, setEdges]
+    () =>
+      setEdges((prev) =>
+        reuseUnchanged(prev, toEdges(drawn, shown, selectedLink, settings.inheritance, settings.associations))
+      ),
+    [drawn, shown, selectedLink, settings.inheritance, settings.associations, setEdges]
   )
 
   const absolute = useCallback(
@@ -810,6 +816,13 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
       ])
       return
     }
+    if (edge.id.startsWith(ASSOCIATION)) {
+      select({ kind: 'module', id: edge.source })
+      openContextMenu(e, [
+        { label: 'Go to referenced module', run: () => navigate({ kind: 'module', id: edge.target }) }
+      ])
+      return
+    }
     select({ kind: 'link', id: edge.id })
     const toggle = (fn: (l: Project['links'][number]) => void) => () =>
       update((d) => {
@@ -923,7 +936,11 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
             if (dep) openImportSource(dep.file)
           }}
           onEdgeClick={(_, e) => {
-            select(e.type === 'inherit' ? { kind: 'module', id: e.source } : { kind: 'link', id: e.id })
+            select(
+              e.type === 'inherit' || e.type === 'association'
+                ? { kind: 'module', id: e.source }
+                : { kind: 'link', id: e.id }
+            )
             revealInspector()
           }}
           onPaneClick={() => select(null)}

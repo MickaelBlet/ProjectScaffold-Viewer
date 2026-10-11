@@ -9,8 +9,10 @@ import {
   nameError,
   newId,
   setAccess,
+  setAttributeQualifier,
   setMethodQualifier,
   setQualifier,
+  uniqueName,
   unimplementedMethods
 } from '@/model/project'
 import {
@@ -55,6 +57,8 @@ import { Icon } from '@/components/Icon'
 import { DefaultInput, FieldList, setDefault } from './TypeInspector'
 import { pickNewParent } from './moduleTree'
 import { LifecycleSection } from './LifecycleSection'
+import { FieldDetails, hasDetails } from './FieldDetails'
+import { Locks } from './Locks'
 import { addMessage, MessageList } from './MessageList'
 
 /** Method qualifiers in two rows: about derivation, then the others. */
@@ -255,7 +259,30 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
         {!types.length && <p className="muted">No types.</p>}
       </Section>
 
-      <Section title={`Attributes (${mod.attributes.length})`}>
+      <Section
+        title={`Attributes (${mod.attributes.length})`}
+        actions={
+          <button
+            type="button"
+            title="A lock guarding attributes"
+            onClick={() =>
+              withModule(id, (m) => {
+                const locks = (m.locks ??= [])
+                locks.push({
+                  id: newId(),
+                  name: uniqueName(
+                    'mutex',
+                    locks.map((l) => l.name)
+                  ),
+                  kind: 'mutex'
+                })
+              })
+            }
+          >
+            <Icon name="plus" /> lock
+          </button>
+        }
+      >
         <FieldList
           fields={mod.attributes}
           addLabel="Add attribute"
@@ -271,7 +298,7 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
                 qualifiers={QUALIFIERS}
                 value={a}
                 short
-                onChange={(q, on) => withModule(id, (m) => setQualifier(m.attributes[i]!, q, on))}
+                onChange={(q, on) => withModule(id, (m) => setAttributeQualifier(m.attributes[i]!, q, on))}
               />
             </>
           )}
@@ -282,7 +309,17 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
               onChange={(v) => withModule(id, (m) => setDefault(m.attributes[i]!, v))}
             />
           )}
+          details={(a, i) => (
+            <FieldDetails
+              field={a}
+              attribute
+              locks={mod.locks}
+              change={(fn) => withModule(id, (m) => fn(m.attributes[i]!))}
+            />
+          )}
+          detailed={hasDetails}
         />
+        <Locks mod={mod} withModule={(fn) => withModule(id, fn)} />
       </Section>
 
       <LifecycleSection mod={mod} types={project.types} withModule={(fn) => withModule(id, fn)} />

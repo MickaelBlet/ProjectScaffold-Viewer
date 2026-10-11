@@ -69,6 +69,25 @@ export interface Field {
   description: string
 }
 
+/** Bounds and form of a value (of each item of a container): checked on default values. */
+export interface Constraints {
+  /** Lowest value (numbers). */
+  min?: number
+  /** Highest value (numbers). */
+  max?: number
+  /** Unit of the value (numbers): `m`, `s`, `Hz`… */
+  unit?: string
+  /** Regular expression the whole value matches (text). */
+  pattern?: string
+}
+
+/**
+ * How a field referencing modules holds them: `owned` (only owner, destroyed with it), `shared`
+ * (one of the owners), `weak` (no ownership, may expire), `borrowed` (no ownership, outlived by them).
+ */
+export const OWNERSHIPS = ['owned', 'shared', 'weak', 'borrowed'] as const
+export type Ownership = (typeof OWNERSHIPS)[number]
+
 /** Field with a default value: struct field or module attribute. */
 export interface ValueField extends Field {
   /**
@@ -76,6 +95,9 @@ export interface ValueField extends Field {
    * list for an array, vector, list or set, null for an empty optional. Opaque for custom primitives.
    */
   default?: Value
+  constraints?: Constraints
+  /** How it holds the modules its type references (a type referencing modules only). */
+  ownership?: Ownership
 }
 
 /** Owner of a type or interface: absent for the project's own ones. */
@@ -201,8 +223,10 @@ export interface Message {
   raises?: Id[]
 }
 
-/** C++-like qualifiers of module attributes and method parameters. */
+/** C++-like qualifiers of method parameters. */
 export const QUALIFIERS = ['static', 'const'] as const
+/** Qualifiers of module attributes: `mutable` is changed by const methods. */
+export const ATTRIBUTE_QUALIFIERS = ['static', 'const', 'mutable', 'atomic'] as const
 /** C++-like qualifiers of module methods: `pure` is `= 0`. */
 export const METHOD_QUALIFIERS = [
   'static',
@@ -212,9 +236,25 @@ export const METHOD_QUALIFIERS = [
   'override',
   'final',
   'noexcept',
-  'nodiscard'
+  'nodiscard',
+  'threadSafe'
 ] as const
-export type Qualifier = (typeof METHOD_QUALIFIERS)[number]
+/** Every qualifier, in the order they are written. */
+export const ALL_QUALIFIERS = [...METHOD_QUALIFIERS, 'mutable', 'atomic'] as const
+export type Qualifier = (typeof ALL_QUALIFIERS)[number]
+
+/** Accessors of an attribute when not both: `read` (a getter), `none`. */
+export const ACCESSORS = ['read', 'none'] as const
+export type Accessors = (typeof ACCESSORS)[number]
+
+/** Lock of a module guarding attributes: `shared` is a readers-writer lock. */
+export const LOCK_KINDS = ['mutex', 'shared', 'recursive'] as const
+export type LockKind = (typeof LOCK_KINDS)[number]
+export interface Lock {
+  id: Id
+  name: string
+  kind: LockKind
+}
 
 /** C++-like access level of a module's types, attributes and methods. */
 export const ACCESS_LEVELS = ['public', 'protected', 'private'] as const
@@ -228,8 +268,16 @@ export interface Attribute extends ValueField {
   static?: boolean
   /** Not changed after initialization. */
   const?: boolean
+  /** Changed by const methods too. */
+  mutable?: boolean
+  /** Read and written atomically (scalars only). */
+  atomic?: boolean
   /** Who may use its accessors: public (default), protected (derived modules) or private (none). */
   access?: StoredAccess
+  /** Accessors when not a getter and a setter (none for a setter of a const attribute). */
+  accessors?: Accessors
+  /** Lock of the module held to use it. */
+  guardedBy?: Id
 }
 
 /** Parameter of a module method. */
@@ -251,6 +299,8 @@ export interface Method extends Message {
   virtual?: boolean
   /** Pure virtual (`= 0`): no implementation here (virtual only). */
   pure?: boolean
+  /** May be called from several threads at once. */
+  threadSafe?: boolean
   /** Overrides a virtual method of a base module (virtual only). */
   override?: boolean
   /** Cannot be overridden by derived modules (virtual only). */
@@ -348,6 +398,8 @@ export interface Module {
   move?: SpecialMember
   destructor?: Destructor
   instantiation?: Instantiation
+  /** Locks guarding its attributes. */
+  locks?: Lock[]
   metadata: Metadata
   /** Typed properties of the module, shown on the canvas apart from its ports. */
   attributes: Attribute[]

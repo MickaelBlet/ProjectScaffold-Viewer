@@ -20,9 +20,10 @@ import { openModuleView } from '@/actions'
 import { printTypeRef, walkTypeRef } from '@/model/typeExpr'
 import { formatValue } from '@/model/defaults'
 import {
-  QUALIFIERS,
+  ATTRIBUTE_QUALIFIERS,
   type Access,
   type Attribute,
+  type Constraints,
   type Constructor,
   type Destructor,
   type Id,
@@ -30,6 +31,7 @@ import {
   type Method,
   type MethodParam,
   type Port,
+  type Qualifier,
   type Side,
   type TypeRef
 } from '@/model/types'
@@ -130,10 +132,26 @@ function useShortNames(moduleId: Id, refs: TypeRef[]): (id: string) => string | 
 }
 
 /** Qualifiers set on an attribute, method or parameter, each followed by a space. */
-const qualifierText = (q: { static?: boolean; const?: boolean }): string =>
-  QUALIFIERS.filter((k) => q[k])
+const qualifierText = (q: { [K in Qualifier]?: boolean }): string =>
+  ATTRIBUTE_QUALIFIERS.filter((k) => q[k])
     .map((k) => `${k} `)
     .join('')
+
+/** Constraints after a type: ` [0..10 m/s]`, ` /[a-z]+/`. */
+function constraintText(c: Constraints | undefined): string {
+  if (!c) return ''
+  const { min, max, unit } = c
+  const bounds =
+    min !== undefined && max !== undefined
+      ? `${min}..${max}`
+      : min !== undefined
+        ? `≥ ${min}`
+        : max !== undefined
+          ? `≤ ${max}`
+          : ''
+  const range = bounds || unit ? ` [${[bounds, unit].filter(Boolean).join(' ')}]` : ''
+  return `${range}${c.pattern ? ` /${c.pattern}/` : ''}`
+}
 
 export function Attributes({ attributes, moduleId }: { attributes: Attribute[]; moduleId: Id }): ReactNode {
   const nameOf = useShortNames(
@@ -146,9 +164,10 @@ export function Attributes({ attributes, moduleId }: { attributes: Attribute[]; 
         const type = printTypeRef(a.type, nameOf)
         const deleted = hasDeletedRef(a.type, nameOf)
         const value = a.default === undefined ? '' : ` = ${formatValue(a.default)}`
-        const qualifiers = qualifierText(a)
+        const qualifiers = `${qualifierText(a)}${a.ownership ? `${a.ownership} ` : ''}`
+        const limits = constraintText(a.constraints)
         const mark = ACCESS_MARKS[a.access ?? 'public']
-        const sig = `${mark} ${qualifiers}${a.name}: ${type}${value}`
+        const sig = `${mark} ${qualifiers}${a.name}: ${type}${limits}${value}`
         return (
           <li key={a.id} title={a.description ? `${sig}\n${a.description}` : sig}>
             <span className="attr-access">
@@ -157,6 +176,7 @@ export function Attributes({ attributes, moduleId }: { attributes: Attribute[]; 
             {qualifiers && <span className="attr-qualifier">{qualifiers}</span>}
             <span className="attr-name">{a.name}</span>
             <span className={`attr-type ${deleted ? 'deleted' : ''}`}>: {type}</span>
+            {limits && <span className="attr-qualifier">{limits}</span>}
             {value && <span className="attr-default">{value}</span>}
           </li>
         )
