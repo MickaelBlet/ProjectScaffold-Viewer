@@ -59,6 +59,7 @@ import { pickNewParent } from './moduleTree'
 import { LifecycleSection } from './LifecycleSection'
 import { FieldDetails, hasDetails } from './FieldDetails'
 import { Locks } from './Locks'
+import { BaseArgs, TypeParamsSection } from './TypeParams'
 import { AddConditions, ConditionList, setConditions, withCondition } from './Conditions'
 import { addMessage, MessageList } from './MessageList'
 
@@ -112,7 +113,8 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
     ...project.interfaces.map((i) => ({ value: i.id, label: i.name }))
   ]
 
-  const types = moduleTypes(project, id)
+  // Type parameters have a section of their own.
+  const types = moduleTypes(project, id).filter((t) => !(t.kind === 'primitive' && t.typeParam))
 
   return (
     // Its attributes and methods name types as it does.
@@ -191,6 +193,8 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
       )}
       <TextArea value={mod.description} onChange={(v) => withModule(id, (m) => void (m.description = v))} />
 
+      <TypeParamsSection mod={mod} project={project} />
+
       <Section title={`Bases (${bases.length})`}>
         <ul className="plain">
           {bases.map((b) => (
@@ -202,6 +206,7 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
               >
                 {modulePath(project, b) || '<deleted>'}
               </button>
+              <BaseArgs mod={mod} base={b} project={project} />
               <IconButton
                 icon="x"
                 title="Remove base"
@@ -210,6 +215,8 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
                   withModule(id, (m) => {
                     m.bases = m.bases?.filter((x) => x !== b)
                     if (!m.bases?.length) delete m.bases
+                    if (m.baseArgs) delete m.baseArgs[b]
+                    if (m.baseArgs && !Object.keys(m.baseArgs).length) delete m.baseArgs
                   })
                 }
               />

@@ -490,7 +490,7 @@ export function ExplorerPanel(): ReactNode {
   const typesOfModules = useMemo(() => {
     const byModule = new Map<Id, TypeDef[]>()
     for (const t of types)
-      if (t.module) {
+      if (t.module && !(t.kind === 'primitive' && t.typeParam)) {
         const list = byModule.get(t.module) ?? []
         if (!list.length) byModule.set(t.module, list)
         list.push(t)

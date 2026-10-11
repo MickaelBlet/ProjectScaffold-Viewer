@@ -1,6 +1,7 @@
 // Textual type expressions, e.g. `map<string, vector<uint16>>`, `array<Vec3, 4>`; bounds:
 // `string<16>`, `bytes<16>`, `vector<T, 8>` (also list and set), `map<K, V, 8>`. Types of modules:
-// `Core.Sensor.Mode`, of a module of a dependency: `Dep/Core.Sensor.Mode`.
+// `Core.Sensor.Mode`, of a module of a dependency: `Dep/Core.Sensor.Mode`. Generic modules take
+// type arguments: `Box<int32>`.
 import {
   BOUNDED_PRIMITIVES,
   CONTAINERS,
@@ -105,8 +106,18 @@ export function parseTypeExpr(src: string): FileTypeRef {
         const value = parseType()
         return { kind: 'map', key, value, ...bound() }
       }
-      default:
-        return { kind: 'ref', name }
+      default: {
+        // A generic module with its type arguments: `Box<int32, Vec3>`.
+        if (peek()?.text !== '<') return { kind: 'ref', name }
+        i++
+        const args = [parseType()]
+        while (peek()?.text === ',') {
+          i++
+          args.push(parseType())
+        }
+        expect('>')
+        return { kind: 'ref', name, args }
+      }
     }
   }
 
@@ -122,7 +133,7 @@ export function printTypeExpr(t: FileTypeRef): string {
     case 'primitive':
       return t.max === undefined ? t.name : `${t.name}<${t.max}>`
     case 'ref':
-      return t.name
+      return t.args?.length ? `${t.name}<${t.args.map(printTypeExpr).join(', ')}>` : t.name
     case 'array':
       return `array<${printTypeExpr(t.of)}, ${t.size}>`
     case 'map':
@@ -146,8 +157,15 @@ export function mapTypeRef<A, B>(
   switch (t.kind) {
     case 'primitive':
       return t
-    case 'ref':
-      return f(t)
+    case 'ref': {
+      const r = f(t)
+      if (!t.args) return r
+      // In place on a new reference: callers may keep it to set its id later.
+      const args = t.args.map((a) => mapTypeRef(a, f))
+      if ((r as unknown) === t) return { ...r, args }
+      ;(r as { args?: TypeRefOf<B>[] }).args = args
+      return r
+    }
     case 'array':
       return { kind: 'array', of: mapTypeRef(t.of, f), size: t.size }
     case 'map':
@@ -173,6 +191,9 @@ export function walkTypeRef<R, M>(t: TypeRefOf<R, M>, visit: (node: TypeRefOf<R,
     case 'map':
       walkTypeRef(t.key, visit)
       walkTypeRef(t.value, visit)
+      break
+    case 'ref':
+      for (const a of t.args ?? []) walkTypeRef(a, visit)
       break
   }
 }

@@ -15,6 +15,7 @@ import {
   type Note,
   type Port,
   type PortRole,
+  type PrimitiveDef,
   type Qualifier,
   type Project,
   type Rect,
@@ -556,6 +557,10 @@ export function ancestorModules(p: Project, id: Id): BaseModule[] {
 export function canDerive(p: Project, id: Id, baseId: Id): boolean {
   return baseId !== id && !ancestorModules(p, baseId).some((m) => m.id === id)
 }
+
+/** Type parameters of a generic module, in order (none for another one). */
+export const typeParamsOf = (p: Pick<Project, 'types'>, moduleId: Id): PrimitiveDef[] =>
+  p.types.filter((t): t is PrimitiveDef => t.kind === 'primitive' && !!t.typeParam && t.module === moduleId)
 
 /** A type reference as text naming user types by id: equal for the same type. */
 export const typeKey = (t: TypeRef): string =>

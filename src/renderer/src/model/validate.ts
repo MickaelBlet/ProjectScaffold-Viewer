@@ -11,6 +11,7 @@ import {
   memberNames,
   missingName,
   moduleTypes,
+  typeParamsOf,
   parseDependencyModuleRef,
   refContext,
   refNamer,
@@ -44,6 +45,7 @@ import {
   type Message,
   type MethodParam,
   type Module,
+  type PrimitiveDef,
   type Project,
   type TypeDef,
   type TypeRef,
@@ -111,8 +113,63 @@ export function validate(p: Project): Problem[] {
     return resolve(def.type, seen)
   }
 
+  /** Type arguments `args` given to the type or module `id` (`name`): its type parameters. */
+  const checkTypeArgs = (
+    id: Id,
+    args: readonly TypeRef[],
+    target: ProblemTarget,
+    where: string,
+    name: string
+  ): void => {
+    const params = p.modules.some((m) => m.id === id) ? typeParamsOf(p, id) : []
+    if (!params.length) {
+      if (args.length) push('error', target, `${where}: ${name} takes no type arguments`)
+      return
+    }
+    if (args.length > params.length)
+      push('error', target, `${where}: ${name} takes ${params.length} type arguments, not ${args.length}`)
+    params.forEach((tp, i) => {
+      const arg = args[i]
+      if (!arg) {
+        if (!tp.typeParam!.default)
+          push('error', target, `${where}: ${name} needs a type argument for ${tp.name}`)
+        return
+      }
+      for (const e of typeArgErrors(arg, tp)) push('error', target, `${where}: ${tp.name} of ${name}: ${e}`)
+    })
+  }
+
+  /** Why a type argument does not fit a type parameter. */
+  const typeArgErrors = (arg: TypeRef, tp: PrimitiveDef): string[] => {
+    const { constraint, derivesFrom } = tp.typeParam!
+    const r = resolve(arg)
+    // A type parameter given on: it fits when it is at least as constrained.
+    const param = r?.kind === 'primitive' && 'id' in r ? r.typeParam : undefined
+    const errors: string[] = []
+    if (constraint) {
+      const name = r?.kind === 'primitive' && !('id' in r) ? r.name : undefined
+      const integral = !!name && (INT_PRIMITIVES as readonly string[]).includes(name)
+      const fits = param
+        ? param.constraint === 'integral' || param.constraint === constraint
+        : constraint === 'integral'
+          ? integral
+          : integral || name === 'float32' || name === 'float64'
+      if (!fits) errors.push(constraint === 'integral' ? 'an integer type' : 'a number type')
+    }
+    if (derivesFrom) {
+      const id = arg.kind === 'ref' ? arg.id : undefined
+      const fits =
+        (param && param.derivesFrom === derivesFrom) ||
+        (!!id && (id === derivesFrom || ancestorModules(p, id).some((b) => b.id === derivesFrom)))
+      if (!fits) errors.push(`a module deriving from ${modulePath(p, derivesFrom)}`)
+    }
+    return errors.map((e) => `expects ${e}`)
+  }
+
   const checkTypeRef = (t: TypeRef, target: ProblemTarget, where: string): void => {
     walkTypeRef(t, (n) => {
+      if (n.kind === 'ref' && exists(n.id))
+        checkTypeArgs(n.id, n.args ?? [], target, where, types.get(n.id)?.name ?? moduleName(n.id))
       if (n.kind === 'ref' && !exists(n.id))
         push('error', target, `${where}: ${missingText(n.id, 'type', 'type or module')}`)
       if (n.kind === 'ref' && types.get(n.id)?.kind === 'exception')
@@ -331,6 +388,29 @@ export function validate(p: Project): Problem[] {
   }
 
   /** Parameters and return type of an interface message or a module method. */
+  /** Type parameters of a module (`path`) and the type arguments of its bases. */
+  const checkGenerics = (m: Module, target: ProblemTarget, path: string): void => {
+    let defaulted: string | null = null
+    for (const tp of typeParamsOf(p, m.id)) {
+      const d = tp.typeParam!.default
+      if (d) {
+        checkTypeRef(d, target, `${path}<${tp.name}> default`)
+        for (const e of typeArgErrors(d, tp)) push('error', target, `${path}<${tp.name}> default: ${e}`)
+        defaulted ??= tp.name
+      } else if (defaulted)
+        push('error', target, `${path}<${tp.name}>: needs a default, as ${defaulted} before it has one`)
+      const from = tp.typeParam!.derivesFrom
+      if (from && !p.modules.some((x) => x.id === from))
+        push('error', target, `${path}<${tp.name}>: derives from a deleted module`)
+    }
+    for (const b of m.bases ?? [])
+      if (p.modules.some((x) => x.id === b)) {
+        const args = m.baseArgs?.[b] ?? []
+        for (const a of args) checkTypeRef(a, target, `${path} base ${modulePath(p, b)}`)
+        checkTypeArgs(b, args, target, `${path} base`, modulePath(p, b))
+      }
+  }
+
   /** Names any contract may use: types (first part of a path), constants, enum values, dependencies. */
   let contractNames: Set<string> | undefined
   const contractGlobals = (): Set<string> =>
@@ -648,6 +728,7 @@ export function validate(p: Project): Problem[] {
       checkParams(x.params, target, `${path}.${x.name}`)
     }
     checkLifecycle(m, target, path, ancestors)
+    checkGenerics(m, target, path)
     checkContracts(m, target, path, ancestors)
     if (m.kind === 'interface' && m.attributes.length)
       push('error', target, `${path}: an interface module cannot have attributes`)
@@ -738,7 +819,12 @@ export function validate(p: Project): Problem[] {
         )
       else if (!canUseType(p, context, used))
         push('error', target, `${where}: '${name}' is ${used.access ?? 'public'} in ${of}`)
-      else if (access && rank[used.access ?? 'public'] > rank[access])
+      // Type parameters stand for their arguments: any member uses them.
+      else if (
+        access &&
+        rank[used.access ?? 'public'] > rank[access] &&
+        !(used.kind === 'primitive' && used.typeParam)
+      )
         push('warning', target, `${where}: ${access} member uses ${used.access} type '${name}'`)
     })
   }

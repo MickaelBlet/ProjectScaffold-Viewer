@@ -16,7 +16,7 @@ import {
   type FileTypeDef
 } from './schema'
 import { safeIntegers } from './defaults'
-import { mapTypeRef } from './typeExpr'
+import { mapTypeRef, parseTypeExpr, printTypeExpr } from './typeExpr'
 import { pair } from './reuse'
 import {
   childModules,
@@ -327,12 +327,30 @@ export function toFile(p: Project, options: { editor: boolean }): FileProject {
   const moduleTree = (parentId: Id | null): FileModule[] =>
     childModules(p, parentId).map((m) => {
       const children = moduleTree(m.id)
-      const types = moduleTypes(p, m.id)
+      const all = moduleTypes(p, m.id)
+      const params = all.filter((t) => t.kind === 'primitive' && t.typeParam)
+      const types = all.filter((t) => !params.includes(t))
+      const baseName = (b: Id): string => {
+        const args = m.baseArgs?.[b]
+        return `${modulePath(p, b)}${args?.length ? `<${args.map((a) => printTypeExpr(ref(a))).join(', ')}>` : ''}`
+      }
       return {
         name: m.name,
         description: opt(m.description),
         kind: m.kind,
-        bases: m.bases?.length ? m.bases.map((b) => modulePath(p, b)) : undefined,
+        typeParams: params.length
+          ? params.map((t) => {
+              const tp = (t.kind === 'primitive' && t.typeParam) || {}
+              return {
+                name: t.name,
+                description: opt(t.description),
+                constraint: tp.constraint,
+                derivesFrom: tp.derivesFrom && modulePath(p, tp.derivesFrom),
+                default: tp.default && ref(tp.default)
+              }
+            })
+          : undefined,
+        bases: m.bases?.length ? m.bases.map(baseName) : undefined,
         final: m.final || undefined,
         instantiation: m.instantiation,
         copy: m.copy,
@@ -547,11 +565,21 @@ export function fromFile(data: unknown, prev?: Project): Project {
     module?: string
     /** Path of the module of its dependency owning it. */
     modulePath?: string
+    /** A type parameter of its module, as written in the file. */
+    param?: NonNullable<FileModule['typeParams']>[number]
   }
   const ownModuleTypes = (list: FileModule[], parentPath: string, at: DataPath): TypeEntry[] =>
     list.flatMap((fm, i) => {
       const path = parentPath ? `${parentPath}.${fm.name}` : fm.name
       return [
+        // Type parameters: private types of the module, named `Module.Path.T` in the file.
+        ...(fm.typeParams ?? []).map((tp, j): TypeEntry => ({
+          e: { kind: 'primitive', name: tp.name, description: tp.description, access: 'private' },
+          at: [...at, i, 'typeParams', j],
+          key: `${path}.${tp.name}`,
+          module: path,
+          param: tp
+        })),
         ...(fm.types ?? []).map((e, j) => ({
           e,
           at: [...at, i, 'types', j],
@@ -1013,7 +1041,33 @@ export function fromFile(data: unknown, prev?: Project): Project {
   typeEntries.forEach((x, i) => {
     const mod = x.module === undefined ? undefined : moduleByPath.get(x.module)
     if (mod) types[i]!.module = mod.id
+    const t = types[i]!
+    if (!x.param || t.kind !== 'primitive') return
+    const tp = x.param
+    const derivesFrom = tp.derivesFrom === undefined ? undefined : moduleByPath.get(tp.derivesFrom)?.id
+    if (tp.derivesFrom !== undefined && !derivesFrom)
+      report(`${x.key}: unknown module '${tp.derivesFrom}'`, [...x.at, 'derivesFrom'])
+    t.typeParam = {
+      ...(tp.constraint && { constraint: tp.constraint }),
+      ...(derivesFrom && { derivesFrom }),
+      ...(tp.default && { default: ref(tp.default, x.key, [...x.at, 'default']) })
+    }
   })
+  // Type arguments of generic bases, read before modules used as types are resolved.
+  const baseArgs = derived.map(({ bases, path, at }) =>
+    bases.map((b, j) => {
+      if (!b.includes('<')) return undefined
+      try {
+        const parsed = parseTypeExpr(b)
+        return parsed.kind === 'ref'
+          ? (parsed.args ?? []).map((a) => ref(a, `${path} base`, [...at, j]))
+          : undefined
+      } catch (e) {
+        report(`Module '${path}': base '${b}': ${(e as Error).message}`, [...at, j])
+        return undefined
+      }
+    })
+  )
   // Modules used as types: of this project by path, of a dependency `Dep/Core.Sensor`.
   const dependencyByName = new Map(fileDependencies.map((x, i) => [x.name, dependencyIds[i]!]))
   for (const { ref, name } of moduleRefs) {
@@ -1100,8 +1154,9 @@ export function fromFile(data: unknown, prev?: Project): Project {
   })
 
   // Bases: modules of this project, or placed modules of dependencies (`Dependency/Module.Path`).
-  for (const { mod, path, bases, at } of derived)
-    mod.bases = bases.flatMap((b, j) => {
+  for (const [k, { mod, path, bases, at }] of derived.entries())
+    mod.bases = bases.flatMap((full, j) => {
+      const b = full.includes('<') ? full.slice(0, full.indexOf('<')) : full
       const slash = b.indexOf('/')
       const base =
         slash < 0
@@ -1116,6 +1171,8 @@ export function fromFile(data: unknown, prev?: Project): Project {
             : `Module '${path}': base '${b}' is not a placed module of a dependency`,
           [...at, j]
         )
+      const args = baseArgs[k]![j]
+      if (base && args) (mod.baseArgs ??= {})[base.id] = args
       return base ? [base.id] : []
     })
 

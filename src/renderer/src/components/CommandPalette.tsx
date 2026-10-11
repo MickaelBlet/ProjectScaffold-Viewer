@@ -73,13 +73,16 @@ function entityEntries(): Entry[] {
       kind: 'M',
       run: () => navigate({ kind: 'module', id: m.id })
     })),
-    ...p.types.map((t) => ({
-      key: t.id,
-      label: named(t),
-      detail: t.kind,
-      kind: 'T',
-      run: () => navigate({ kind: 'type', id: t.id })
-    })),
+    // Type parameters are named in their module only.
+    ...p.types
+      .filter((t) => !(t.kind === 'primitive' && t.typeParam))
+      .map((t) => ({
+        key: t.id,
+        label: named(t),
+        detail: t.kind,
+        kind: 'T',
+        run: () => navigate({ kind: 'type', id: t.id })
+      })),
     ...p.interfaces.map((i) => ({
       key: i.id,
       label: named(i),

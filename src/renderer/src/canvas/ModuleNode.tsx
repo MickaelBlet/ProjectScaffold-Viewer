@@ -11,6 +11,7 @@ import {
   nameError,
   parentIds,
   parseDependencyModuleRef,
+  typeParamsOf,
   typeScope,
   type TypeScope
 } from '@/model/project'
@@ -307,16 +308,28 @@ export const ModuleNode = memo(function ModuleNode({
   // Stable string: re-renders only when a base is added, removed or renamed.
   const bases = useProjectStore((s) => {
     const modules = indexById(s.project.modules)
-    return (modules.get(id)?.bases ?? [])
+    const self = modules.get(id)
+    // Type arguments of generic bases, named as in the module.
+    const nameOf = self?.baseArgs ? typeScope(s.project, id).nameOf : undefined
+    return (self?.bases ?? [])
       .map((b) => {
         // A placed module of a dependency: with its dependency's name.
         const placed = findImported(s.project, b)
-        return placed
+        const args = self?.baseArgs?.[b]
+        const name = placed
           ? `${placed.dep.name}/${placed.module.path.split('.').pop()!}`
           : (modules.get(b)?.name ?? '?')
+        return args?.length && nameOf
+          ? `${name}<${args.map((a) => printTypeRef(a, nameOf)).join(', ')}>`
+          : name
       })
       .join(', ')
   })
+  const typeParams = useProjectStore((s) =>
+    typeParamsOf(s.project, id)
+      .map((t) => t.name)
+      .join(', ')
+  )
   const { floating, anchors, top, bottom, left, right } = usePortLayout(
     id,
     mod?.ports ?? [],
@@ -390,6 +403,7 @@ export const ModuleNode = memo(function ModuleNode({
               </span>
             )}
             {path ?? mod.name}
+            {typeParams && <span className="module-kind">{`<${typeParams}>`}</span>}
             {mod.final && <span className="module-kind"> {'{final}'}</span>}
             {bases && <span className="module-bases"> : {bases}</span>}
             {binary && (

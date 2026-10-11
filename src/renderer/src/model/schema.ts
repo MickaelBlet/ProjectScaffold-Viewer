@@ -12,6 +12,7 @@ import {
   PERFORMANCE_CLASSES,
   PRIMITIVES,
   SPECIAL_MEMBERS,
+  TYPE_CONSTRAINTS,
   UNSIGNED_PRIMITIVES,
   type TypeRefOf
 } from './types'
@@ -25,6 +26,14 @@ const QualifiedName = z
   .string()
   .regex(/^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$/, 'must be a dot-separated module path')
 /** A module path, or `Dependency/Module.Path` for a placed module of a dependency. */
+/** A base of a module: its path, with type arguments for a generic one (`Box<int32>`). */
+const BaseName = z
+  .string()
+  .regex(
+    /^([A-Za-z_][A-Za-z0-9_]*\/)?[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*(<.+>)?$/,
+    'must be a module path, with type arguments for a generic module: Box<int32>'
+  )
+
 const ModulePath = z
   .string()
   .regex(
@@ -88,7 +97,11 @@ export const FileTypeRefSchema: z.ZodType<FileTypeRef> = z
           .describe('a type defined in the project, a module or a dependency, or a module'),
         name: TypeName.describe(
           'type name; a type of a module: Module.Path.Name (Dependency/Module.Path.Name for a module of a dependency); a module (a reference to an instance of it): Module.Path (Dependency/Module.Path)'
-        )
+        ),
+        args: z
+          .array(typeRef('a type argument'))
+          .optional()
+          .describe('type arguments of a generic module, in the order of its typeParams')
       })
     ])
   )
@@ -339,6 +352,17 @@ const Destructor = z.object({
 
 const SpecialMemberSchema = z.enum(SPECIAL_MEMBERS).optional()
 
+const TypeParamSchema = z.object({
+  name: Identifier.describe('name of the parameter, used by name in the module'),
+  description: Description,
+  constraint: z
+    .enum(TYPE_CONSTRAINTS)
+    .optional()
+    .describe('numeric: numbers only; integral: integers only; absent: any type'),
+  derivesFrom: ModulePath.optional().describe('path of a module the argument is or derives from'),
+  default: typeRef('argument when left out (the last parameters only)').optional()
+})
+
 const Lock = z.object({
   name: Identifier.describe('name of the lock, apart from the members of the module'),
   kind: z
@@ -365,6 +389,7 @@ export interface FileModule {
   name: string
   description?: string
   kind?: (typeof MODULE_KINDS)[number]
+  typeParams?: z.infer<typeof TypeParamSchema>[]
   bases?: string[]
   final?: boolean
   instantiation?: (typeof INSTANTIATIONS)[number]
@@ -395,8 +420,12 @@ const Module: z.ZodType<FileModule> = z
         .describe(
           'class (default): concrete; abstract: may have pure methods; interface: only pure methods, no attributes'
         ),
+      typeParams: z
+        .array(TypeParamSchema)
+        .optional()
+        .describe('type parameters of a generic module, in order: named Module.Path.T in the file'),
       bases: z
-        .array(ModulePath)
+        .array(BaseName)
         .optional()
         .describe(
           'paths of the modules it derives from, in order: of this project, or `Dependency/Module.Path` for a module of a dependency placed on the canvas'

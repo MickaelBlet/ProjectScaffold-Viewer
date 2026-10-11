@@ -1866,6 +1866,14 @@
               "type": "string",
               "pattern": "^([A-Za-z_][A-Za-z0-9_]*\\/)?[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$",
               "description": "type name; a type of a module: Module.Path.Name (Dependency/Module.Path.Name for a module of a dependency); a module (a reference to an instance of it): Module.Path (Dependency/Module.Path)"
+            },
+            "args": {
+              "description": "type arguments of a generic module, in the order of its typeParams",
+              "type": "array",
+              "items": {
+                "description": "a type argument",
+                "$ref": "#/$defs/TypeRef"
+              }
             }
           },
           "required": [
@@ -2080,12 +2088,50 @@
             "interface"
           ]
         },
+        "typeParams": {
+          "description": "type parameters of a generic module, in order: named Module.Path.T in the file",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                "description": "name of the parameter, used by name in the module"
+              },
+              "description": {
+                "description": "free text documenting it",
+                "type": "string"
+              },
+              "constraint": {
+                "description": "numeric: numbers only; integral: integers only; absent: any type",
+                "type": "string",
+                "enum": [
+                  "numeric",
+                  "integral"
+                ]
+              },
+              "derivesFrom": {
+                "description": "path of a module the argument is or derives from",
+                "type": "string",
+                "pattern": "^([A-Za-z_][A-Za-z0-9_]*\\/)?[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$"
+              },
+              "default": {
+                "description": "argument when left out (the last parameters only)",
+                "$ref": "#/$defs/TypeRef"
+              }
+            },
+            "required": [
+              "name"
+            ]
+          }
+        },
         "bases": {
           "description": "paths of the modules it derives from, in order: of this project, or `Dependency/Module.Path` for a module of a dependency placed on the canvas",
           "type": "array",
           "items": {
             "type": "string",
-            "pattern": "^([A-Za-z_][A-Za-z0-9_]*\\/)?[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$"
+            "pattern": "^([A-Za-z_][A-Za-z0-9_]*\\/)?[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*(<.+>)?$"
           }
         },
         "final": {

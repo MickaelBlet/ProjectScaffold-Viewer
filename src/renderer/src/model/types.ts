@@ -53,7 +53,7 @@ export type TypeRefOf<R, M = number> =
   | { kind: 'vector' | 'list' | 'set'; of: TypeRefOf<R, M>; max?: M }
   | { kind: 'optional'; of: TypeRefOf<R, M> }
   | { kind: 'map'; key: TypeRefOf<R, M>; value: TypeRefOf<R, M>; max?: M }
-  | ({ kind: 'ref' } & R)
+  | ({ kind: 'ref'; args?: TypeRefOf<R, M>[] } & R)
 
 export type TypeRef = TypeRefOf<{ id: string }>
 
@@ -201,6 +201,21 @@ export interface PrimitiveDef extends Owned, Scoped {
   kind: 'primitive'
   name: string
   description: string
+  /** A type parameter of its module (`module`, private to it), standing for a type argument. */
+  typeParam?: TypeParam
+}
+
+/** What the arguments of a type parameter may be (absent: any type). */
+export const TYPE_CONSTRAINTS = ['numeric', 'integral'] as const
+export type TypeConstraint = (typeof TYPE_CONSTRAINTS)[number]
+
+/** Type parameter of a generic module: `T` in `Box<T>`. */
+export interface TypeParam {
+  constraint?: TypeConstraint
+  /** A module the argument is, or derives from. */
+  derivesFrom?: Id
+  /** Argument when left out (the last parameters only). */
+  default?: TypeRef
 }
 
 export type TypeDef = StructDef | EnumDef | BitmaskDef | UnionDef | ExceptionDef | AliasDef | PrimitiveDef
@@ -394,6 +409,8 @@ export interface Module {
   kind?: Exclude<ModuleKind, 'class'>
   /** Modules this one derives from, in order. */
   bases?: Id[]
+  /** Type arguments of its generic bases, by base. */
+  baseArgs?: Record<Id, TypeRef[]>
   /** No module may derive from it. */
   final?: boolean
   /** Absent: none declared (the implicit default constructor). */

@@ -236,7 +236,19 @@ export function pasteClip(d: Project, clip: Clip, options: PasteOptions): Id[] {
     else if (t.kind === 'union')
       d.types.push({ ...base, kind: 'union', discriminator: ref(t.discriminator), cases: t.cases.map(field) })
     else if (t.kind === 'alias') d.types.push({ ...base, kind: 'alias', type: ref(t.type) })
-    else d.types.push({ ...base, kind: 'primitive' })
+    else if (t.typeParam) {
+      const { constraint, derivesFrom, default: fallback } = t.typeParam
+      const from = derivesFrom && (moduleIds.get(derivesFrom) ?? derivesFrom)
+      d.types.push({
+        ...base,
+        kind: 'primitive',
+        typeParam: {
+          ...(constraint && { constraint }),
+          ...(from && { derivesFrom: from }),
+          ...(fallback && { default: ref(fallback) })
+        }
+      })
+    } else d.types.push({ ...base, kind: 'primitive' })
     if (selectedTypes.has(t.id)) pasted.push(base.id)
   }
   for (const c of clip.consts ?? []) {
@@ -320,9 +332,13 @@ export function pasteClip(d: Project, clip: Clip, options: PasteOptions): Id[] {
     if (newModules.has(m.id)) {
       for (const pt of m.ports) if (pt.interfaceId && !ifaceIds.has(pt.interfaceId)) pt.interfaceId = null
       if (m.bases) {
+        const args = m.baseArgs
+        delete m.baseArgs
         m.bases = m.bases.flatMap((b) => {
           const id = moduleIds.get(b) ?? b
-          return existing.has(id) ? [id] : []
+          if (!existing.has(id)) return []
+          if (args?.[b]) (m.baseArgs ??= {})[id] = args[b].map(ref)
+          return [id]
         })
         if (!m.bases.length) delete m.bases
       }

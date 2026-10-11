@@ -209,6 +209,35 @@ modules:
             default: 0
         returns: null
     ports: []
+  - name: Ring
+    description: Last values of a signal, oldest overwritten
+    typeParams:
+      - name: T
+        constraint: numeric
+    attributes:
+      - name: items
+        type:
+          kind: vector
+          of:
+            kind: ref
+            name: Ring.T
+      - name: capacity
+        const: true
+        type:
+          kind: primitive
+          name: uint32
+        default: 64
+        constraints:
+          min: 1
+    methods:
+      - name: push
+        params:
+          - name: value
+            type:
+              kind: ref
+              name: Ring.T
+        returns: null
+    ports: []
   - name: Source
     description: Reads the input device
     color: "#3b8fd1"
@@ -223,6 +252,14 @@ modules:
           kind: primitive
           name: uint16
         default: 256
+      - name: history
+        type:
+          kind: ref
+          name: Ring
+          args:
+            - kind: primitive
+              name: float32
+        description: Levels of the last blocks
     ports:
       - name: out
         role: out
@@ -601,6 +638,11 @@ editor:
       y: 224
       width: 200
       height: 232
+    Ring:
+      x: 336
+      y: 560
+      width: 200
+      height: 142
     Source:
       x: 20
       y: 526
