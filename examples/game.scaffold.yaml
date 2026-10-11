@@ -131,6 +131,8 @@ modules:
       - name: System
         description: Base of the systems, run once per frame in order
         kind: abstract
+        copy: delete
+        move: delete
         types:
           - kind: enum
             name: Phase
@@ -155,6 +157,18 @@ modules:
               kind: ref
               name: Engine.System.Phase
             default: Simulate
+        constructors:
+          - description: Runs in the given phase
+            access: protected
+            explicit: true
+            params:
+              - name: phase
+                type:
+                  kind: ref
+                  name: Engine.System.Phase
+                default: Simulate
+        destructor:
+          virtual: true
         methods:
           - name: update
             virtual: true

@@ -263,6 +263,40 @@ export interface Method extends Message {
   access?: StoredAccess
 }
 
+/** Constructor of a module: a parameter named like an attribute initializes it. */
+export interface Constructor {
+  id: Id
+  description: string
+  params: MethodParam[]
+  /** Who may construct: public (default), protected (derived modules) or private (the module). */
+  access?: StoredAccess
+  /** No implicit conversion from its parameters. */
+  explicit?: boolean
+  /** Written by the compiler (`= default`): no parameters. */
+  defaulted?: boolean
+  /** Not available (`= delete`). */
+  deleted?: boolean
+}
+
+/** How a module is copied or moved: by the compiler, not at all, or by hand; absent: implicit. */
+export const SPECIAL_MEMBERS = ['default', 'delete', 'custom'] as const
+export type SpecialMember = (typeof SPECIAL_MEMBERS)[number]
+
+/** Destructor of a module, when not the implicit one (virtual when the module has virtual methods). */
+export interface Destructor {
+  /** Who may destroy: public (default), protected (derived modules) or private (the module). */
+  access?: StoredAccess
+  /** Virtual (true) or not (false); absent: virtual when the module has virtual methods. */
+  virtual?: boolean
+}
+
+/**
+ * How a module is instantiated: `singleton` (one instance, private constructors, no copy), `utility`
+ * (static members only, never instantiated), `value` (copied freely, no virtual methods).
+ */
+export const INSTANTIATIONS = ['singleton', 'utility', 'value'] as const
+export type Instantiation = (typeof INSTANTIATIONS)[number]
+
 /**
  * C++-like kind of a module: `class` (default) is concrete, `abstract` may have pure methods,
  * `interface` has only pure methods and no attributes.
@@ -308,6 +342,12 @@ export interface Module {
   bases?: Id[]
   /** No module may derive from it. */
   final?: boolean
+  /** Absent: none declared (the implicit default constructor). */
+  constructors?: Constructor[]
+  copy?: SpecialMember
+  move?: SpecialMember
+  destructor?: Destructor
+  instantiation?: Instantiation
   metadata: Metadata
   /** Typed properties of the module, shown on the canvas apart from its ports. */
   attributes: Attribute[]

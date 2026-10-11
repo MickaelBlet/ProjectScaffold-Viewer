@@ -21,10 +21,14 @@ import { printTypeRef, walkTypeRef } from '@/model/typeExpr'
 import { formatValue } from '@/model/defaults'
 import {
   QUALIFIERS,
+  type Access,
   type Attribute,
+  type Constructor,
+  type Destructor,
   type Id,
   type LinkAnchor,
   type Method,
+  type MethodParam,
   type Port,
   type Side,
   type TypeRef
@@ -161,21 +165,73 @@ export function Attributes({ attributes, moduleId }: { attributes: Attribute[]; 
   )
 }
 
-/** Method compartment below the attributes: `virtual name(a: T, out b: U): R const = 0`. */
-export function Methods({ methods, moduleId }: { methods: Method[]; moduleId: Id }): ReactNode {
-  const nameOf = useShortNames(
-    moduleId,
-    methods.flatMap((m) => [...m.params.map((prm) => prm.type), ...(m.returns ? [m.returns] : [])])
-  )
+/** Constructors and destructor of a module, drawn first in its method compartment. */
+export interface Lifecycle {
+  name: string
+  constructors?: Constructor[]
+  destructor?: Destructor
+}
+
+/**
+ * Method compartment below the attributes: constructors (`explicit Name(a: T) = default`), the
+ * destructor (`virtual ~Name()`), then methods (`virtual name(a: T, out b: U): R const = 0`).
+ */
+export function Methods({
+  methods,
+  moduleId,
+  lifecycle
+}: {
+  methods: Method[]
+  moduleId: Id
+  lifecycle?: Lifecycle
+}): ReactNode {
+  const ctors = lifecycle?.constructors ?? []
+  const nameOf = useShortNames(moduleId, [
+    ...ctors.flatMap((c) => c.params.map((prm) => prm.type)),
+    ...methods.flatMap((m) => [...m.params.map((prm) => prm.type), ...(m.returns ? [m.returns] : [])])
+  ])
+  const paramsText = (params: MethodParam[]): string =>
+    params
+      .map(
+        (prm) =>
+          `${prm.direction === 'in' ? '' : `${prm.direction} `}${qualifierText(prm)}${prm.name}: ${printTypeRef(prm.type, nameOf)}${prm.default === undefined ? '' : ` = ${formatValue(prm.default)}`}`
+      )
+      .join(', ')
+  const special = (key: string, access: Access | undefined, before: string, name: string, after: string) => {
+    const sig = `${ACCESS_MARKS[access ?? 'public']} ${before}${name}${after}`
+    return (
+      <li key={key} title={sig}>
+        <span className="attr-access">
+          <AccessIcon access={access} />
+        </span>
+        {before && <span className="attr-qualifier">{before}</span>}
+        <span className="attr-name">{name}</span>
+        {after && <span className="attr-qualifier">{after}</span>}
+      </li>
+    )
+  }
+  const destructor = lifecycle?.destructor
   return (
     <ul className="module-attrs module-methods">
+      {ctors.map((c) =>
+        special(
+          c.id,
+          c.access,
+          c.explicit ? 'explicit ' : '',
+          `${lifecycle!.name}(${paramsText(c.params)})`,
+          c.deleted ? ' = delete' : c.defaulted ? ' = default' : ''
+        )
+      )}
+      {destructor &&
+        special(
+          'destructor',
+          destructor.access,
+          destructor.virtual ? 'virtual ' : '',
+          `~${lifecycle.name}()`,
+          ''
+        )}
       {methods.map((m) => {
-        const params = m.params
-          .map(
-            (prm) =>
-              `${prm.direction === 'in' ? '' : `${prm.direction} `}${qualifierText(prm)}${prm.name}: ${printTypeRef(prm.type, nameOf)}${prm.default === undefined ? '' : ` = ${formatValue(prm.default)}`}`
-          )
-          .join(', ')
+        const params = paramsText(m.params)
         const returns = m.returns ? `: ${printTypeRef(m.returns, nameOf)}` : ''
         const deleted = [...m.params.map((prm) => prm.type), ...(m.returns ? [m.returns] : [])].some((t) =>
           hasDeletedRef(t, nameOf)
@@ -298,7 +354,11 @@ export const ModuleNode = memo(function ModuleNode({
           <RenameInput id={id} name={mod.name} parentId={mod.parentId} />
         ) : (
           <span className={`module-name ${mod.kind ?? ''}`}>
-            {mod.kind && <span className="module-kind">«{mod.kind}» </span>}
+            {(mod.kind || mod.instantiation) && (
+              <span className="module-kind">
+                «{[mod.kind, mod.instantiation].filter(Boolean).join(', ')}»{' '}
+              </span>
+            )}
             {path ?? mod.name}
             {mod.final && <span className="module-kind"> {'{final}'}</span>}
             {bases && <span className="module-bases"> : {bases}</span>}
@@ -346,7 +406,13 @@ export const ModuleNode = memo(function ModuleNode({
         </button>
       </div>
       {mod.attributes.length > 0 && <Attributes attributes={mod.attributes} moduleId={id} />}
-      {mod.methods.length > 0 && <Methods methods={mod.methods} moduleId={id} />}
+      {(mod.methods.length > 0 || !!mod.constructors?.length || mod.destructor) && (
+        <Methods
+          methods={mod.methods}
+          moduleId={id}
+          lifecycle={{ name: mod.name, constructors: mod.constructors, destructor: mod.destructor }}
+        />
+      )}
       {rows > 0 && (
         // A container's side ports are centered on its frame, over its content.
         <div className={`module-ports ${hasChildren ? 'framed' : ''}`}>

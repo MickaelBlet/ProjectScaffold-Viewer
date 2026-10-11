@@ -89,7 +89,12 @@ const PORT_COL = 90
 /** Height of one line in a module's attribute or method compartment. */
 export const ATTR_ROW = 18
 
-type WithCompartments = { attributes?: readonly unknown[]; methods?: readonly unknown[] }
+type WithCompartments = {
+  attributes?: readonly unknown[]
+  methods?: readonly unknown[]
+  constructors?: readonly unknown[]
+  destructor?: unknown
+}
 type WithPorts = { ports: { role: string }[] } & WithCompartments
 
 /** Height of one compartment of `n` lines: none when empty. */
@@ -97,7 +102,9 @@ const compartmentHeight = (n = 0): number => (n ? n * ATTR_ROW + 8 : 0)
 
 /** Height of a module's attribute and method compartments, below its header. */
 export function compartmentsHeight(m: WithCompartments): number {
-  return compartmentHeight(m.attributes?.length) + compartmentHeight(m.methods?.length)
+  // Constructors and the destructor head the methods.
+  const methods = (m.methods?.length ?? 0) + (m.constructors?.length ?? 0) + (m.destructor ? 1 : 0)
+  return compartmentHeight(m.attributes?.length) + compartmentHeight(methods)
 }
 
 /**
@@ -535,16 +542,20 @@ export function canDerive(p: Project, id: Id, baseId: Id): boolean {
   return baseId !== id && !ancestorModules(p, baseId).some((m) => m.id === id)
 }
 
+/** A type reference as text naming user types by id: equal for the same type. */
+export const typeKey = (t: TypeRef): string =>
+  printTypeExpr(mapTypeRef(t, (r) => ({ kind: 'ref', name: r.id })))
+
 /** Parameters (direction, const, type), return type and const of a method, to compare overrides. */
 export function methodSignature(m: Method): string {
-  const type = (t: TypeRef): string => printTypeExpr(mapTypeRef(t, (r) => ({ kind: 'ref', name: r.id })))
+  const type = typeKey
   const params = m.params.map((prm) => `${prm.direction} ${prm.const ? 'const ' : ''}${type(prm.type)}`)
   return `(${params.join(', ')})${m.returns ? type(m.returns) : ''}${m.const ? ' const' : ''}`
 }
 
 /** Parameter types (with directions) and const of a method: overloads of a name differ by it. */
-export function overloadKey(m: Method): string {
-  const type = (t: TypeRef): string => printTypeExpr(mapTypeRef(t, (r) => ({ kind: 'ref', name: r.id })))
+export function overloadKey(m: Pick<Method, 'params' | 'const'>): string {
+  const type = typeKey
   const params = m.params.map(
     (prm) => `${prm.direction === 'in' ? '' : `${prm.direction} `}${type(prm.type)}`
   )

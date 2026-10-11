@@ -54,6 +54,7 @@ import {
 import { Icon } from '@/components/Icon'
 import { DefaultInput, FieldList, setDefault } from './TypeInspector'
 import { pickNewParent } from './moduleTree'
+import { LifecycleSection } from './LifecycleSection'
 import { addMessage, MessageList } from './MessageList'
 
 /** Method qualifiers in two rows: about derivation, then the others. */
@@ -283,6 +284,8 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
           )}
         />
       </Section>
+
+      <LifecycleSection mod={mod} types={project.types} withModule={(fn) => withModule(id, fn)} />
 
       <Section
         title={`Methods (${mod.methods.length})`}

@@ -2,11 +2,13 @@
 import { z } from 'zod'
 import {
   ACCESS_LEVELS,
+  INSTANTIATIONS,
   INT_PRIMITIVES,
   MODULE_KINDS,
   PARAM_DIRECTIONS,
   PERFORMANCE_CLASSES,
   PRIMITIVES,
+  SPECIAL_MEMBERS,
   UNSIGNED_PRIMITIVES,
   type TypeRefOf
 } from './types'
@@ -275,6 +277,31 @@ const Method = Message.extend({
   nodiscard: z.boolean().optional().describe('its result must be used (methods returning a value)')
 })
 
+const Constructor = z.object({
+  description: Description,
+  access: Access.describe(
+    'public (default): constructed by anyone; protected: by derived modules; private: by the module'
+  ),
+  explicit: z.boolean().optional().describe('no implicit conversion from its parameters'),
+  defaulted: z.boolean().optional().describe('written by the compiler (`= default`): no parameters'),
+  deleted: z.boolean().optional().describe('not available (`= delete`)'),
+  params: z
+    .array(MethodParam)
+    .describe('parameters, in order: one named like an attribute initializes it (same type)')
+})
+
+const Destructor = z.object({
+  access: Access.describe(
+    'public (default): destroyed by anyone; protected: through derived modules only; private: by the module'
+  ),
+  virtual: z
+    .boolean()
+    .optional()
+    .describe('virtual (true) or not (false); absent: virtual when the module has virtual methods')
+})
+
+const SpecialMemberSchema = z.enum(SPECIAL_MEMBERS).optional()
+
 const Interface = z
   .object({
     name: Identifier.describe('name of the interface'),
@@ -296,11 +323,16 @@ export interface FileModule {
   kind?: (typeof MODULE_KINDS)[number]
   bases?: string[]
   final?: boolean
+  instantiation?: (typeof INSTANTIATIONS)[number]
+  copy?: (typeof SPECIAL_MEMBERS)[number]
+  move?: (typeof SPECIAL_MEMBERS)[number]
   metadata?: Record<string, string>
   color?: string
   binary?: string
   types?: z.infer<typeof ModuleTypeDef>[]
   attributes?: z.infer<typeof Attribute>[]
+  constructors?: z.infer<typeof Constructor>[]
+  destructor?: z.infer<typeof Destructor>
   methods?: FileMethod[]
   ports: z.infer<typeof Port>[]
   modules?: FileModule[]
@@ -324,6 +356,18 @@ const Module: z.ZodType<FileModule> = z
           'paths of the modules it derives from, in order: of this project, or `Dependency/Module.Path` for a module of a dependency placed on the canvas'
         ),
       final: z.boolean().optional().describe('no module may derive from it (not abstract nor an interface)'),
+      instantiation: z
+        .enum(INSTANTIATIONS)
+        .optional()
+        .describe(
+          'absent: instances made freely; singleton: one instance (constructors not public, no copy nor move); utility: static members only, never instantiated; value: copied freely, no virtual methods'
+        ),
+      copy: SpecialMemberSchema.describe(
+        'copy constructor and assignment: default (by the compiler), delete (not copyable) or custom (written by hand); absent: implicit'
+      ),
+      move: SpecialMemberSchema.describe(
+        'move constructor and assignment: default (by the compiler), delete (not movable) or custom (written by hand); absent: implicit'
+      ),
       metadata: Metadata,
       color: z.string().optional().describe('accent color (CSS color)'),
       binary: Identifier.optional().describe(
@@ -336,6 +380,13 @@ const Module: z.ZodType<FileModule> = z
           'types of the module, like types nested in a class (or in an IDL module), named Module.Path.Name'
         ),
       attributes: z.array(Attribute).optional().describe('typed properties of the module'),
+      constructors: z
+        .array(Constructor)
+        .optional()
+        .describe('constructors of the module; absent: the implicit default constructor'),
+      destructor: Destructor.optional().describe(
+        'destructor of the module, when not the implicit one (virtual when the module has virtual methods)'
+      ),
       methods: z.array(Method).optional().describe('method prototypes of the module'),
       ports: z.array(Port).describe('ports of the module, which links connect'),
       modules: z.array(Module).optional().describe('modules inside this one')
@@ -677,6 +728,7 @@ export type FileModuleTypeDef = z.infer<typeof ModuleTypeDef>
 export type FileMessage = z.infer<typeof Message>
 export type FileInterface = z.infer<typeof Interface>
 export type FileMethod = z.infer<typeof Method>
+export type FileConstructor = z.infer<typeof Constructor>
 export type FileAttribute = z.infer<typeof Attribute>
 export type FileLink = z.infer<typeof Link>
 export type FileEditor = z.infer<typeof Editor>

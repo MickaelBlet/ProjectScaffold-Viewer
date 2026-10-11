@@ -1488,6 +1488,15 @@ button.qualifier.on {
   flex: 1;
   font-weight: 600;
 }
+/* Constructor signature, in place of a name input. */
+.card-title {
+  flex: 1;
+  align-self: center;
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .actions {
   display: flex;
   gap: 6px;

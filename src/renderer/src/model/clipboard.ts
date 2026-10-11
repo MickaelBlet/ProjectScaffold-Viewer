@@ -296,6 +296,9 @@ export function pasteClip(d: Project, clip: Clip, options: PasteOptions): Id[] {
       ),
       layout,
       attributes: m.attributes.map(field),
+      ...(m.constructors && {
+        constructors: m.constructors.map((c) => ({ ...c, id: newId(), params: c.params.map(field) }))
+      }),
       methods: m.methods.map(message),
       ports: m.ports.map((pt) => {
         const pid = newId()

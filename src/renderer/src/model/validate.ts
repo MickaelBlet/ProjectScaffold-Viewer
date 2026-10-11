@@ -22,6 +22,7 @@ import {
   linkRoles,
   methodSignature,
   overloadKey,
+  typeKey,
   overloadName,
   modulePath,
   unimplementedMethods
@@ -36,7 +37,10 @@ import {
   INT_RANGES,
   TRANSPORTS,
   type Id,
+  type Constructor,
   type Message,
+  type MethodParam,
+  type Module,
   type Project,
   type TypeDef,
   type TypeRef,
@@ -290,6 +294,106 @@ export function validate(p: Project): Problem[] {
   }
 
   /** Parameters and return type of an interface message or a module method. */
+  /** Qualifiers and defaults of the parameters of a method or constructor (`where`). */
+  const checkParams = (params: MethodParam[], target: ProblemTarget, where: string): void => {
+    let defaulted: string | null = null
+    for (const prm of params) {
+      const at = `${where}(${prm.name})`
+      if (prm.const && prm.direction !== 'in')
+        push('error', target, `${at}: an ${prm.direction} parameter cannot be const`)
+      if (prm.default !== undefined) {
+        if (prm.direction !== 'in')
+          push('error', target, `${at}: an ${prm.direction} parameter cannot have a default`)
+        else checkDefault(prm, target, at)
+        defaulted ??= prm.name
+      } else if (defaulted)
+        push('error', target, `${at}: needs a default or to move before ${defaulted}, which has one`)
+    }
+  }
+
+  /** Constructors, copy, move, destructor and instantiation of a module (`path`). */
+  const checkLifecycle = (
+    m: Module,
+    target: ProblemTarget,
+    path: string,
+    ancestors: ReturnType<typeof ancestorModules>
+  ): void => {
+    const ctors = m.constructors ?? []
+    const ctorWhere = (c: Constructor): string => `${path}(${c.params.map((prm) => prm.name).join(', ')})`
+    const attributes = new Map(m.attributes.map((a) => [a.name, a]))
+    const keys = new Set<string>()
+    for (const c of ctors) {
+      const where = ctorWhere(c)
+      const key = overloadKey(c)
+      if (keys.has(key)) push('error', target, `${where}: same parameters as another constructor`)
+      keys.add(key)
+      checkMessage({ ...c, name: m.name, returns: null }, target, where)
+      checkParams(c.params, target, path)
+      if (c.defaulted && c.deleted) push('error', target, `${where}: cannot be both defaulted and deleted`)
+      else if (c.defaulted && c.params.length)
+        push('error', target, `${where}: a defaulted constructor has no parameters`)
+      if (c.explicit && !c.params.length)
+        push('warning', target, `${where}: explicit has no effect without parameters`)
+      for (const prm of c.params) {
+        const a = attributes.get(prm.name)
+        if (!a) continue
+        if (a.static)
+          push('error', target, `${where}: ${prm.name} is a static attribute, constructors do not set it`)
+        else if (typeKey(a.type) !== typeKey(prm.type))
+          push('error', target, `${where}: ${prm.name} is not of the type of the attribute it sets`)
+        else if (prm.direction !== 'in')
+          push('error', target, `${where}: ${prm.name} sets the attribute: an in parameter`)
+      }
+    }
+    if (m.kind === 'interface' && ctors.length)
+      push('error', target, `${path}: an interface module has no constructors`)
+    // Const attributes get their value from their default, else from every constructor.
+    const live = ctors.filter((c) => !c.deleted)
+    for (const a of m.attributes)
+      if (a.const && !a.static && a.default === undefined) {
+        if (!ctors.length)
+          push(
+            'warning',
+            target,
+            `${path}.${a.name}: const, without a default value nor constructors setting it`
+          )
+        for (const c of live)
+          if (!c.params.some((prm) => prm.name === a.name))
+            push('error', target, `${ctorWhere(c)}: leaves const attribute ${a.name} unset`)
+      }
+    const virtuals =
+      m.methods.some((x) => x.virtual) || ancestors.some((b) => baseMethods(b).some((x) => x.virtual))
+    if (m.destructor?.virtual === false && virtuals && !m.destructor.access)
+      push('warning', target, `${path}: virtual methods, but a public destructor that is not virtual`)
+    const publicCtors = ctors.filter((c) => !c.deleted && !c.access)
+    switch (m.instantiation) {
+      case 'singleton':
+        for (const c of publicCtors)
+          push('error', target, `${ctorWhere(c)}: constructors of a singleton are not public`)
+        if (m.copy && m.copy !== 'delete')
+          push('error', target, `${path}: a singleton is not copied (copy: delete)`)
+        if (m.move && m.move !== 'delete')
+          push('error', target, `${path}: a singleton is not moved (move: delete)`)
+        break
+      case 'utility':
+        if (live.length)
+          push('error', target, `${path}: a utility module is not instantiated (no constructors)`)
+        for (const a of m.attributes)
+          if (!a.static) push('error', target, `${path}.${a.name}: members of a utility module are static`)
+        for (const x of m.methods)
+          if (!x.static) push('error', target, `${path}.${x.name}: members of a utility module are static`)
+        if (m.ports.length) push('error', target, `${path}: a utility module has no ports`)
+        break
+      case 'value':
+        if (m.kind) push('error', target, `${path}: a value module is a class (not ${m.kind})`)
+        for (const x of m.methods)
+          if (x.virtual) push('error', target, `${path}.${x.name}: a value module has no virtual methods`)
+        if (m.copy === 'delete') push('error', target, `${path}: a value module is copied (not copy: delete)`)
+        if (m.ports.length) push('warning', target, `${path}: a value module with ports`)
+        break
+    }
+  }
+
   const checkMessage = (m: Message, target: ProblemTarget, where: string): void => {
     for (const n of duplicates(m.params.map((prm) => prm.name)))
       push('error', target, `${where}: duplicate parameter '${n}'`)
@@ -423,20 +527,9 @@ export function validate(p: Project): Problem[] {
       if (attributes.has(x.name))
         push('error', target, `${path}: '${x.name}' is both an attribute and a method`)
       checkMessage(x, target, `${path}.${x.name}`)
-      let defaulted: string | null = null
-      for (const prm of x.params) {
-        const at = `${path}.${x.name}(${prm.name})`
-        if (prm.const && prm.direction !== 'in')
-          push('error', target, `${at}: an ${prm.direction} parameter cannot be const`)
-        if (prm.default !== undefined) {
-          if (prm.direction !== 'in')
-            push('error', target, `${at}: an ${prm.direction} parameter cannot have a default`)
-          else checkDefault(prm, target, at)
-          defaulted ??= prm.name
-        } else if (defaulted)
-          push('error', target, `${at}: needs a default or to move before ${defaulted}, which has one`)
-      }
+      checkParams(x.params, target, `${path}.${x.name}`)
     }
+    checkLifecycle(m, target, path, ancestors)
     if (m.kind === 'interface' && m.attributes.length)
       push('error', target, `${path}: an interface module cannot have attributes`)
     const bases = m.bases ?? []

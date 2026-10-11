@@ -1957,6 +1957,33 @@
           "description": "no module may derive from it (not abstract nor an interface)",
           "type": "boolean"
         },
+        "instantiation": {
+          "description": "absent: instances made freely; singleton: one instance (constructors not public, no copy nor move); utility: static members only, never instantiated; value: copied freely, no virtual methods",
+          "type": "string",
+          "enum": [
+            "singleton",
+            "utility",
+            "value"
+          ]
+        },
+        "copy": {
+          "description": "copy constructor and assignment: default (by the compiler), delete (not copyable) or custom (written by hand); absent: implicit",
+          "type": "string",
+          "enum": [
+            "default",
+            "delete",
+            "custom"
+          ]
+        },
+        "move": {
+          "description": "move constructor and assignment: default (by the compiler), delete (not movable) or custom (written by hand); absent: implicit",
+          "type": "string",
+          "enum": [
+            "default",
+            "delete",
+            "custom"
+          ]
+        },
         "metadata": {
           "description": "free key: value pairs, passed to generators",
           "type": "object",
@@ -2029,6 +2056,105 @@
               "name",
               "type"
             ]
+          }
+        },
+        "constructors": {
+          "description": "constructors of the module; absent: the implicit default constructor",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "description": {
+                "description": "free text documenting it",
+                "type": "string"
+              },
+              "access": {
+                "description": "public (default): constructed by anyone; protected: by derived modules; private: by the module",
+                "type": "string",
+                "enum": [
+                  "public",
+                  "protected",
+                  "private"
+                ]
+              },
+              "explicit": {
+                "description": "no implicit conversion from its parameters",
+                "type": "boolean"
+              },
+              "defaulted": {
+                "description": "written by the compiler (`= default`): no parameters",
+                "type": "boolean"
+              },
+              "deleted": {
+                "description": "not available (`= delete`)",
+                "type": "boolean"
+              },
+              "params": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                      "description": "name of the parameter"
+                    },
+                    "type": {
+                      "description": "type of the parameter",
+                      "$ref": "#/$defs/TypeRef"
+                    },
+                    "description": {
+                      "description": "free text documenting it",
+                      "type": "string"
+                    },
+                    "direction": {
+                      "description": "in (default): caller → callee; out: callee → caller; inout: both ways",
+                      "type": "string",
+                      "enum": [
+                        "in",
+                        "out",
+                        "inout"
+                      ]
+                    },
+                    "const": {
+                      "description": "not changed by the method (in parameters only)",
+                      "type": "boolean"
+                    },
+                    "default": {
+                      "description": "value when the caller leaves it out, as attribute defaults (in parameters only; the following parameters have one too)",
+                      "$ref": "#/$defs/__schema2"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "type"
+                  ]
+                },
+                "description": "parameters, in order: one named like an attribute initializes it (same type)"
+              }
+            },
+            "required": [
+              "params"
+            ]
+          }
+        },
+        "destructor": {
+          "description": "destructor of the module, when not the implicit one (virtual when the module has virtual methods)",
+          "type": "object",
+          "properties": {
+            "access": {
+              "description": "public (default): destroyed by anyone; protected: through derived modules only; private: by the module",
+              "type": "string",
+              "enum": [
+                "public",
+                "protected",
+                "private"
+              ]
+            },
+            "virtual": {
+              "description": "virtual (true) or not (false); absent: virtual when the module has virtual methods",
+              "type": "boolean"
+            }
           }
         },
         "methods": {

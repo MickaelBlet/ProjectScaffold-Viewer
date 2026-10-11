@@ -5,6 +5,7 @@ import {
   SCHEMA_VERSION,
   type FileAttribute,
   type FileConstant,
+  type FileConstructor,
   type FileEditor,
   type FileInterface,
   type FileMessage,
@@ -44,6 +45,8 @@ import {
   type Attribute,
   type Binary,
   type ConstDef,
+  type Constructor,
+  type Destructor,
   type Field,
   type Id,
   type Dependency,
@@ -197,15 +200,26 @@ export function toFile(p: Project, options: { editor: boolean }): FileProject {
     const { name, ...rest } = valueField(a)
     return { name, ...access(a), ...qualifiers(a), ...rest }
   }
+  const methodParams = (m: Pick<Method, 'params'>) =>
+    m.params.map((prm) => ({ ...param(prm), ...qualifiers(prm), default: prm.default }))
   const method = (m: Method) => ({
     name: m.name,
     description: opt(m.description),
     ...access(m),
     ...qualifiers(m),
-    params: m.params.map((prm) => ({ ...param(prm), ...qualifiers(prm), default: prm.default })),
+    params: methodParams(m),
     returns: m.returns ? ref(m.returns) : null,
     raises: raises(m)
   })
+  const constructor = (c: Constructor) => ({
+    description: opt(c.description),
+    ...access(c),
+    explicit: c.explicit || undefined,
+    defaulted: c.defaulted || undefined,
+    deleted: c.deleted || undefined,
+    params: methodParams(c)
+  })
+  const destructor = (d: Destructor) => ({ ...access(d), virtual: d.virtual })
 
   const typeDef = (t: TypeDef): FileTypeDef => {
     switch (t.kind) {
@@ -305,11 +319,16 @@ export function toFile(p: Project, options: { editor: boolean }): FileProject {
         kind: m.kind,
         bases: m.bases?.length ? m.bases.map((b) => modulePath(p, b)) : undefined,
         final: m.final || undefined,
+        instantiation: m.instantiation,
+        copy: m.copy,
+        move: m.move,
         metadata: optMeta(m.metadata),
         color: m.color,
         binary: m.binaryId ? binaryName.get(m.binaryId) : undefined,
         types: types.length ? types.map(moduleTypeDef) : undefined,
         attributes: m.attributes.length ? m.attributes.map(attribute) : undefined,
+        constructors: m.constructors?.length ? m.constructors.map(constructor) : undefined,
+        destructor: m.destructor && destructor(m.destructor),
         methods: m.methods.length ? m.methods.map(method) : undefined,
         ports: m.ports.map((pt) => ({
           name: pt.name,
@@ -758,6 +777,34 @@ export function fromFile(data: unknown, prev?: Project): Project {
       ...qualifiers(a)
     }))
   }
+  /** Constructors of a module (`path`, named `name`), at `at` in the file data: read as methods. */
+  const constructorsOf = (
+    list: readonly FileConstructor[],
+    path: string,
+    name: string,
+    before: readonly Constructor[] | undefined,
+    at: DataPath
+  ): Constructor[] => {
+    const asMethods = list.map((c): FileMethod => ({
+      name,
+      description: c.description,
+      params: c.params,
+      returns: null
+    }))
+    const was = before?.map((c): Method => ({ ...c, name, returns: null }))
+    return methodsOf(asMethods, path, was, at).map((x, j): Constructor => {
+      const fc = list[j]!
+      return {
+        id: x.id,
+        description: x.description,
+        params: x.params,
+        ...access(fc),
+        ...(fc.explicit && { explicit: true }),
+        ...(fc.defaulted && { defaulted: true }),
+        ...(fc.deleted && { deleted: true })
+      }
+    })
+  }
   /** Methods of a module (`path`) or placed module, at `at` in the file data. */
   const methodsOf = (
     list: readonly FileMethod[],
@@ -829,6 +876,22 @@ export function fromFile(data: unknown, prev?: Project): Project {
         parentId,
         ...(fm.kind && fm.kind !== 'class' && { kind: fm.kind }),
         ...(fm.final && { final: true }),
+        ...(fm.instantiation && { instantiation: fm.instantiation }),
+        ...(fm.copy && { copy: fm.copy }),
+        ...(fm.move && { move: fm.move }),
+        ...(fm.constructors && {
+          constructors: constructorsOf(fm.constructors, path, fm.name, was?.constructors, [
+            ...at,
+            i,
+            'constructors'
+          ])
+        }),
+        ...(fm.destructor && {
+          destructor: {
+            ...access(fm.destructor),
+            ...(fm.destructor.virtual !== undefined && { virtual: fm.destructor.virtual })
+          }
+        }),
         metadata: { ...(fm.metadata ?? {}) },
         attributes: attributesOf(fm.attributes ?? [], path, was?.attributes, [...at, i, 'attributes']),
         methods: methodsOf(fm.methods ?? [], path, was?.methods, [...at, i, 'methods']),
