@@ -108,8 +108,13 @@ export interface Api {
   onCommand?(cb: (id: string) => void): () => void
   /** The diagram selection changed: data path of the selected entity, for the text cursor. */
   selected?(path: (string | number)[]): void
-  /** Entities to show, by data path of the file and list item names (VS Code outline). */
-  onReveal?(cb: (path: (string | number)[], names: (string | undefined)[]) => void): () => void
+  /**
+   * Entities to show, by data path of the file and list item names (VS Code outline); `cursor`: following
+   * the text cursor, else selected in another page.
+   */
+  onReveal?(
+    cb: (path: (string | number)[], names: (string | undefined)[], cursor: boolean) => void
+  ): () => void
   /** Side panel: asks the diagram of the document for an action. */
   inDiagram?(action: DiagramAction): void
   /** Side panel: another project document is active (path empty: none). */

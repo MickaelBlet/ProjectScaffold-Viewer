@@ -24,7 +24,9 @@ function request<T>(make: (id: number) => ToHost): Promise<T> {
 
 const externalListeners = new Set<(text: string) => void>()
 const commandListeners = new Set<(id: string) => void>()
-const revealListeners = new Set<(path: (string | number)[], names: (string | undefined)[]) => void>()
+const revealListeners = new Set<
+  (path: (string | number)[], names: (string | undefined)[], cursor: boolean) => void
+>()
 const documentListeners = new Set<(file: OpenResult) => void>()
 const viewListeners = new Set<(view: ViewRef) => void>()
 const actionListeners = new Set<(action: DiagramAction) => void>()
@@ -54,13 +56,16 @@ function onMessage(e: MessageEvent<ToPage | null>): void {
       storageChanged(msg.key, msg.value)
       break
     case 'reveal':
-      revealListeners.forEach((cb) => cb(msg.path, msg.names))
+      revealListeners.forEach((cb) => cb(msg.path, msg.names, msg.cursor))
       break
-    case 'document':
-      current = { path: msg.path, uri: msg.uri, content: msg.text }
+    case 'document': {
+      // The listeners write pending changes to the previous document first (see showHostDocument).
+      const file = { path: msg.path, content: msg.text }
       unheard = null
-      documentListeners.forEach((cb) => cb(currentDoc()))
+      documentListeners.forEach((cb) => cb(file))
+      current = { path: msg.path, uri: msg.uri, content: msg.text }
       break
+    }
     case 'view':
       viewListeners.forEach((cb) => cb(msg.view))
       break

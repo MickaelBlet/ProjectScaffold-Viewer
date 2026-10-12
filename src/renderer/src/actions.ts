@@ -211,15 +211,24 @@ function isSelected(target: SourceTarget): boolean {
   return kind === target.kind && (s && 'id' in s ? s.id : null) === ('id' in target ? target.id : null)
 }
 
-/** Show the entity at a data path of the file, `names` naming its list items (see targetAt). */
-export function navigateToPath(path: (string | number)[], names: (string | undefined)[]): void {
+/**
+ * Show the entity at a data path of the file, `names` naming its list items (see targetAt): under the
+ * text cursor (`cursor`), the focused view stays as it is; selected in another page (the Explorer of the
+ * side bar), it is brought into view as there.
+ */
+export function navigateToPath(
+  path: (string | number)[],
+  names: (string | undefined)[],
+  cursor: boolean
+): void {
   const target = targetAt(getProject(), path, names)
-  // Already selected: the view stays where the user left it.
-  if (!target || isSelected(target)) return
+  // Already selected under the text cursor: the view stays where the user left it.
+  if (!target || (cursor && isSelected(target))) return
   revealing = true
   try {
-    if (target.kind === 'note') navigateToNote(target.id, { zoom: true, stay: true })
-    else navigate(target, { zoom: true, stay: true })
+    const options = cursor ? { zoom: true, stay: true } : {}
+    if (target.kind === 'note') navigateToNote(target.id, options)
+    else navigate(target, options)
   } finally {
     revealing = false
   }

@@ -98,8 +98,11 @@ export type ToPage =
   | { type: 'run'; command: string }
   /** A preference changed in another editor. */
   | { type: 'storage'; key: string; value: string | null }
-  /** Shows the entity at a data path of the file, with the name of the list item at each index. */
-  | { type: 'reveal'; path: DataPath; names: (string | undefined)[] }
+  /**
+   * Shows the entity at a data path of the file, with the name of the list item at each index. `cursor`:
+   * following the text cursor, the focused view stays as it is; else another page selected it.
+   */
+  | { type: 'reveal'; path: DataPath; names: (string | undefined)[]; cursor: boolean }
   /** Side panel: the view the diagram shows. */
   | { type: 'view'; view: ViewRef }
   /** Side bar view: shows a tab. */
