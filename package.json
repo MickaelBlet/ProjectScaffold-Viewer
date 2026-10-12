@@ -1,6 +1,6 @@
 {
   "name": "project-scaffold",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Browser editor for software architecture: modules, ports, typed interfaces and constrained links, saved as a language-agnostic YAML/JSON project file",
   "author": "Mickaël Blet",
   "license": "MIT",
