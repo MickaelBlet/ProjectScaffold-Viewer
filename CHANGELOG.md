@@ -39,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- _Help › About_: the repository link shows its full URL (`https://github.com/…`).
 - Inheritance arrows: drawn as double lines, in the link style (_Settings › Link style_: bezier, smooth step, step, straight) between the facing sides of the modules.
 - A file naming an unknown type, module, exception or port interface opens: the reference keeps its name and is reported as an error in _Problems_ (export blocked) until fixed; it was a load error.
 - Text editor: changes since the last save no longer have a _Revert_ button each (it showed on every edit); they stay highlighted.

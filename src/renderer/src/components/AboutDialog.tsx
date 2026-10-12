@@ -23,7 +23,7 @@ export function AboutDialog(): ReactNode {
         <p className="muted">© Mickaël Blet · MIT License</p>
         <p>
           <a href={REPO} target="_blank" rel="noreferrer">
-            {REPO.replace('https://', '')}
+            {REPO}
           </a>
         </p>
         <button type="button" autoFocus onClick={close}>
