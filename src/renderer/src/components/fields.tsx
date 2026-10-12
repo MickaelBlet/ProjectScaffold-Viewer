@@ -1,6 +1,13 @@
 import type { ReactNode } from 'react'
 import { PALETTE } from '@/model/project'
-import { ACCESS_LEVELS, DERIVES, type Access, type Derive, type Qualifier } from '@/model/types'
+import {
+  ACCESS_LEVELS,
+  DERIVE_LABELS,
+  DERIVES,
+  type Access,
+  type Derive,
+  type Qualifier
+} from '@/model/types'
 import { AccessIcon, Icon, type IconName } from './Icon'
 import { useDraft } from './useDraft'
 
@@ -303,14 +310,6 @@ export function ColorPicker(props: {
       />
     </div>
   )
-}
-
-/** Labels of the derived operations. */
-export const DERIVE_LABELS: Record<Derive, string> = {
-  equality: '==',
-  ordering: '<',
-  hash: 'hash',
-  string: 'string'
 }
 
 /** Toggles of the operations derived from fields or attributes. */

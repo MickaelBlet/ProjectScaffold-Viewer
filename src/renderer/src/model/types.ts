@@ -125,6 +125,13 @@ export interface Scoped {
  */
 export const DERIVES = ['equality', 'ordering', 'hash', 'string'] as const
 export type Derive = (typeof DERIVES)[number]
+/** Labels of the derived operations. */
+export const DERIVE_LABELS: Record<Derive, string> = {
+  equality: '==',
+  ordering: '<',
+  hash: 'hash',
+  string: 'string'
+}
 
 export interface StructDef extends Owned, Scoped {
   id: Id

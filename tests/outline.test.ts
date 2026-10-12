@@ -72,6 +72,31 @@ describe('outline', () => {
     expect(targetAt(p, link.path, link.names)).toEqual({ kind: 'link', id: p.links[0]!.id })
   })
 
+  it('outlines type parameters, lifecycle, state machines and placed modules of dependencies', () => {
+    const audio = outline(readFileSync('examples/audio.scaffold.yaml', 'utf8'))
+    const ring = find(audio, 'Ring')!
+    expect(ring.detail).toBe('<T>')
+    expect(ring.children.map((c) => `${c.kind} ${c.name} ${c.detail}`)).toContain('typeParam T numeric')
+    expect(find(audio, 'Display')?.detail).toBe('⊸ LevelSink')
+    expect(find(audio, 'Band')?.detail).toBe('struct {==, string}')
+    const machine = find(audio, 'State machine')!
+    expect(machine.detail).toBe('initial Closed')
+    expect(machine.children.map((c) => `${c.kind} ${c.name}`)).toContain('transition Closed → Opened')
+    expect(find(machine.children, 'Closed → Opened')?.detail).toBe('open [blockSize > 0]')
+
+    const game = outline(readFileSync('examples/game.scaffold.yaml', 'utf8'))
+    expect(
+      find(game, 'System')!
+        .children.filter((c) => c.kind === 'constructor')
+        .map((c) => `${c.name} ${c.detail}`)
+    ).toEqual(['System explicit', '~System virtual'])
+
+    const station = outline(readFileSync('examples/station.scaffold.yaml', 'utf8'))
+    const placed = station.find((n) => n.name === 'Dependencies')!.children.find((d) => d.name === 'Robot')!
+    const sensor = placed.children.filter((m) => m.name === 'Core.Sensor').at(-1)!
+    expect(sensor.children.map((c) => `${c.kind} ${c.name}`)).toContain('attribute rateHz')
+  })
+
   it('outlines JSON and incomplete text', () => {
     const json = JSON.stringify({ project: { name: 'J' }, modules: [{ name: 'A', ports: [] }] }, null, 2)
     expect(outline(json).map((n) => n.name)).toEqual(['J', 'Modules'])

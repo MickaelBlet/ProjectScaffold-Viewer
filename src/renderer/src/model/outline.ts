@@ -4,7 +4,7 @@ import YAML, { isMap, isScalar, isSeq, type Node as YamlNode, type YAMLMap } fro
 import type { FileTypeRef } from './schema'
 import { printTypeExpr } from './typeExpr'
 import { formatValue } from './defaults'
-import { ALL_QUALIFIERS, type Value } from './types'
+import { ALL_QUALIFIERS, DERIVE_LABELS, DERIVES, type Value } from './types'
 
 export type OutlineKind =
   | 'project'
@@ -22,8 +22,14 @@ export type OutlineKind =
   | 'constant'
   | 'message'
   | 'module'
+  | 'typeParam'
+  | 'lock'
   | 'attribute'
+  | 'constructor'
   | 'method'
+  | 'stateMachine'
+  | 'state'
+  | 'transition'
   | 'port'
   | 'dependency'
   | 'link'
@@ -116,6 +122,15 @@ const TYPE_KINDS = new Set<OutlineKind>([
   'primitive'
 ])
 
+/** Operations derived by a struct or module: `{==, <}`. */
+function derivesText(map: YAMLMap): string | undefined {
+  const seq = map.get('derives', true)
+  if (!isSeq(seq)) return undefined
+  const set = new Set(seq.items.map((d) => (isScalar(d) ? String(d.value) : '')))
+  const labels = DERIVES.filter((d) => set.has(d)).map((d) => DERIVE_LABELS[d])
+  return labels.length ? `{${labels.join(', ')}}` : undefined
+}
+
 /** Qualifiers set on an attribute, method or parameter (`static const`, `virtual pure`). */
 function qualifierText(map: YAMLMap): string[] {
   return ALL_QUALIFIERS.filter((q) => map.get(q) === true)
@@ -166,7 +181,7 @@ const type: Make = (item, path, names) => {
         ? `switch (${typeText(item, 'discriminator') ?? '?'})`
         : kind === 'enum' || kind === 'bitmask'
           ? text(item, 'underlying')
-          : kind
+          : [kind, derivesText(item)].filter(Boolean).join(' ')
   return entry(item, kind, path, names, { detail, children })
 }
 
@@ -192,32 +207,139 @@ const port: Make = (item, path, names) =>
     detail: [text(item, 'role'), text(item, 'interface')].filter(Boolean).join(' ')
   })
 
-/** Kind (unless a class) and bases of a module, else its description. */
+/** Texts of the scalars of the list at `map[key]`. */
+function strings(map: YAMLMap, key: string): string[] {
+  const seq = map.get(key, true)
+  return isSeq(seq) ? seq.items.map((b) => (isScalar(b) ? String(b.value) : '?')) : []
+}
+
+/**
+ * Kind (unless a class), type parameters, bases, implemented interfaces and derived operations of a
+ * module, else its description.
+ */
 function moduleText(map: YAMLMap): string | undefined {
   const kind = text(map, 'kind')
-  const bases = map.get('bases', true)
-  const names = isSeq(bases) ? bases.items.map((b) => (isScalar(b) ? String(b.value) : '?')) : []
+  const typeParams = map.get('typeParams', true)
+  const params = isSeq(typeParams) ? typeParams.items.map((p) => (isMap(p) && text(p, 'name')) || '?') : []
+  const bases = strings(map, 'bases')
+  const interfaces = strings(map, 'implements')
   const detail = [
     kind !== 'class' && kind,
     text(map, 'instantiation'),
     map.get('final') === true && 'final',
-    names.length && `: ${names.join(', ')}`
+    params.length && `<${params.join(', ')}>`,
+    bases.length && `: ${bases.join(', ')}`,
+    interfaces.length && `⊸ ${interfaces.join(', ')}`,
+    derivesText(map)
   ]
     .filter(Boolean)
     .join(' ')
   return detail || text(map, 'description')
 }
 
+const attribute: Make = (item, path, names) =>
+  entry(item, 'attribute', path, names, { detail: valueText(item) })
+
+/** Constraint, base and default of a type parameter: `numeric = float32`. */
+function typeParamText(map: YAMLMap): string | undefined {
+  const base = text(map, 'derivesFrom')
+  const fallback = typeText(map, 'default')
+  return (
+    [text(map, 'constraint'), base && `: ${base}`, fallback && `= ${fallback}`].filter(Boolean).join(' ') ||
+    undefined
+  )
+}
+
+/** Constructors and destructor of a module, named after it (`Name`, `~Name`). */
+function lifecycle(map: YAMLMap, path: DataPath, names: (string | undefined)[]): OutlineNode[] {
+  const name = text(map, 'name') ?? '?'
+  const ctors = list(map, 'constructors', path, names, (c, p, n) =>
+    entry(c, 'constructor', p, n, {
+      name,
+      detail:
+        [
+          c.get('explicit') === true && 'explicit',
+          c.get('defaulted') === true && '= default',
+          c.get('deleted') === true && '= delete'
+        ]
+          .filter(Boolean)
+          .join(' ') || undefined,
+      children: list(c, 'params', p, n, field)
+    })
+  )
+  const dtor = map.get('destructor', true)
+  if (!isMap(dtor)) return ctors
+  const virtual = dtor.get('virtual')
+  return [
+    ...ctors,
+    entry(dtor, 'constructor', [...path, 'destructor'], [...names, undefined], {
+      name: `~${name}`,
+      detail: virtual === true ? 'virtual' : virtual === false ? 'non-virtual' : undefined
+    })
+  ]
+}
+
+/** State machine of a module: its states, then its transitions. */
+function stateMachine(map: YAMLMap, path: DataPath, names: (string | undefined)[]): OutlineNode[] {
+  const pair = map.items.find((p) => isScalar(p.key) && p.key.value === 'stateMachine')
+  const machine = pair?.value
+  const keyRange = span(pair?.key as YamlNode | undefined)
+  if (!isMap(machine) || !keyRange) return []
+  const at: DataPath = [...path, 'stateMachine']
+  const named = [...names, undefined]
+  const initial = text(machine, 'initial')
+  return [
+    {
+      name: 'State machine',
+      kind: 'stateMachine',
+      detail: initial && `initial ${initial}`,
+      range: [keyRange[0], span(machine)?.[1] ?? keyRange[1]],
+      nameRange: keyRange,
+      path: at,
+      names: named,
+      children: [
+        ...list(machine, 'states', at, named, (st, p, n) =>
+          entry(st, 'state', p, n, {
+            detail:
+              [
+                st.get('final') === true && 'final',
+                text(st, 'entry') && `entry / ${text(st, 'entry')}`,
+                text(st, 'exit') && `exit / ${text(st, 'exit')}`
+              ]
+                .filter(Boolean)
+                .join(', ') || undefined
+          })
+        ),
+        ...list(machine, 'transitions', at, named, (t, p, n) => {
+          const guard = text(t, 'guard')
+          const action = text(t, 'action')
+          return entry(t, 'transition', p, n, {
+            name: `${text(t, 'from') ?? '?'} → ${text(t, 'to') ?? '?'}`,
+            detail:
+              [text(t, 'trigger'), guard && `[${guard}]`, action && `/ ${action}`]
+                .filter(Boolean)
+                .join(' ') || undefined
+          })
+        })
+      ]
+    }
+  ]
+}
+
 const module: Make = (item, path, names) =>
   entry(item, 'module', path, names, {
     detail: moduleText(item),
     children: [
-      ...list(item, 'types', path, names, type),
-      ...list(item, 'attributes', path, names, (a, p, n) =>
-        entry(a, 'attribute', p, n, { detail: valueText(a) })
+      ...list(item, 'typeParams', path, names, (p, at, n) =>
+        entry(p, 'typeParam', at, n, { detail: typeParamText(p) })
       ),
+      ...list(item, 'types', path, names, type),
+      ...list(item, 'locks', path, names, (l, p, n) => entry(l, 'lock', p, n, { detail: text(l, 'kind') })),
+      ...list(item, 'attributes', path, names, attribute),
+      ...lifecycle(item, path, names),
       ...list(item, 'methods', path, names, message('method')),
       ...list(item, 'ports', path, names, port),
+      ...stateMachine(item, path, names),
       ...list(item, 'modules', path, names, module)
     ]
   })
@@ -240,7 +362,14 @@ const dependency: Make = (item, path, names) =>
         entry(g, 'module', p, n, { name: text(g, 'module'), children: list(g, 'types', p, n, type) })
       ),
       ...list(item, 'modules', path, names, (m, p, n) =>
-        entry(m, 'module', p, n, { name: text(m, 'module'), children: list(m, 'ports', p, n, port) })
+        entry(m, 'module', p, n, {
+          name: text(m, 'module'),
+          children: [
+            ...list(m, 'attributes', p, n, attribute),
+            ...list(m, 'methods', p, n, message('method')),
+            ...list(m, 'ports', p, n, port)
+          ]
+        })
       )
     ]
   })

@@ -22,6 +22,7 @@ import { printTypeRef, walkTypeRef } from '@/model/typeExpr'
 import { formatValue } from '@/model/defaults'
 import {
   ATTRIBUTE_QUALIFIERS,
+  DERIVE_LABELS,
   type Access,
   type Attribute,
   type Constraints,
@@ -37,7 +38,6 @@ import {
   type TypeRef
 } from '@/model/types'
 import { AccessIcon, Icon } from '@/components/Icon'
-import { DERIVE_LABELS } from '@/components/fields'
 import { MODULE_HANDLE } from './constants'
 import type { PortNodeData } from './flowGraph'
 import { anchorStyle, inward, PortPoint } from './PortPoint'
