@@ -8,6 +8,7 @@ import { ContextMenu } from './components/ContextMenu'
 import { CommandPalette } from './components/CommandPalette'
 import { AboutDialog } from './components/AboutDialog'
 import { ShortcutsDialog } from './components/ShortcutsDialog'
+import { Tutorial } from './components/Tutorial'
 import {
   anyDirty,
   applyHostText,
@@ -277,6 +278,7 @@ export function App(): ReactNode {
       <CommandPalette />
       <ShortcutsDialog />
       <AboutDialog />
+      <Tutorial />
       <Dialog />
       <ResizeEdges />
     </div>

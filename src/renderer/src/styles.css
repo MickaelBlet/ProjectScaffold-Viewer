@@ -2813,6 +2813,75 @@ ul.plain {
   color: var(--muted);
 }
 
+/* Tutorial: a card above the status bar, beside the work */
+.tutorial {
+  position: fixed;
+  right: 16px;
+  bottom: 36px;
+  z-index: 90;
+  width: min(400px, calc(100vw - 32px));
+  max-height: calc(100vh - 96px);
+  overflow: auto;
+  padding: 12px 16px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+.tutorial header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--accent);
+}
+.tutorial h3 {
+  flex: 1;
+  margin: 0;
+  color: var(--text);
+}
+.tutorial p {
+  margin: 8px 0;
+  line-height: 1.45;
+}
+.tutorial-commands {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 12px 0;
+}
+.tutorial-commands button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.tutorial footer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.tutorial footer .muted {
+  color: var(--muted);
+  font-size: 12px;
+}
+.tutorial-dots {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+}
+.tutorial-dots button {
+  width: 8px;
+  height: 8px;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--border);
+}
+.tutorial-dots button.on {
+  background: var(--accent);
+}
+
 .hint {
   padding: 0 10px;
   font-size: 11px;

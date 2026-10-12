@@ -3,6 +3,7 @@ import { availableIds, commands, getCommand, keyLabel, runCommand } from '@/comm
 import { Icon } from '@/components/Icon'
 import { useSettings } from '@/store/settings'
 import { useDoc } from '@/store/documents'
+import { useUiStore } from '@/store/ui'
 import { useProjectStore } from '@/store/project'
 import { IN_VSCODE } from '@/host'
 import { commandIcon } from './toolbar'
@@ -36,6 +37,7 @@ export function CommandToolbar({ setting }: { setting: 'toolbar' | 'toolbarRight
   useSettings()
   useProjectStore((s) => s.project)
   useDoc((d) => d.selection)
+  useUiStore((s) => s.tutorialStep !== null)
   return ids.map((id, i) =>
     id === '-' ? <span key={i} className="sep" /> : <CommandButton key={i} id={id} />
   )

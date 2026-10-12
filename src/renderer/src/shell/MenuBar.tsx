@@ -134,7 +134,7 @@ const MENUS: [Category, string[]][] = [
       'window.fullLayout'
     ]
   ],
-  ['Help', ['help.shortcuts', 'view.palette', '-', 'help.resetData', '-', 'help.about']]
+  ['Help', ['help.tutorial', 'help.shortcuts', 'view.palette', '-', 'help.resetData', '-', 'help.about']]
 ]
 
 // Every listed command must exist (but those of the VS Code previews).

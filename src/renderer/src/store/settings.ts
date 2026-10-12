@@ -126,7 +126,7 @@ export const DEFAULT_SETTINGS: Settings = {
   explorerOrder: [],
   explorerHidden: [],
   toolbar: ['edit.undo', 'edit.redo', '-', 'view.back', 'view.forward'],
-  toolbarRight: []
+  toolbarRight: ['help.tutorial']
 }
 
 const SETTINGS_KEY = 'project-scaffold:settings'

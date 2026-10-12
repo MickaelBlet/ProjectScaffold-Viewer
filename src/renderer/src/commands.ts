@@ -711,6 +711,13 @@ const allCommands: Command[] = [
 
   // Help
   {
+    id: 'help.tutorial',
+    title: 'Tutorial',
+    category: 'Help',
+    checked: () => useUiStore.getState().tutorialStep !== null,
+    run: () => useUiStore.setState((s) => ({ tutorialStep: s.tutorialStep === null ? 0 : null }))
+  },
+  {
     id: 'help.shortcuts',
     title: 'Keyboard shortcuts',
     category: 'Help',

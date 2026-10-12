@@ -48,6 +48,8 @@ interface UiState {
   palette: { query: string; pick?: { placeholder: string; entries: PickEntry[] } } | null
   shortcutsOpen: boolean
   aboutOpen: boolean
+  /** Step of the tutorial shown, null when closed. */
+  tutorialStep: number | null
   /** Module whose name is being edited on the canvas. */
   renaming: Id | null
   /** Zoom of the focused canvas, for the status bar. */
@@ -62,6 +64,7 @@ export const useUiStore = create<UiState>(() => ({
   palette: null,
   shortcutsOpen: false,
   aboutOpen: false,
+  tutorialStep: null,
   renaming: null,
   zoom: 1
 }))

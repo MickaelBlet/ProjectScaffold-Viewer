@@ -82,6 +82,7 @@ const COMMAND_ICONS: Partial<Record<string, IconName>> = {
   'window.nextDoc': 'tab-next',
   'window.resetLayout': 'layout-reset',
   'window.fullLayout': 'layout-full',
+  'help.tutorial': 'book',
   'help.shortcuts': 'keyboard',
   'help.resetData': 'database-x',
   'help.about': 'help'
