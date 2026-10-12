@@ -3230,9 +3230,18 @@ mark {
 }
 
 /* Inheritance: UML generalization (solid) or realization of an interface (dashed), hollow triangle on the base. */
+/* A double line: a wide stroke whose middle is masked out (.inherit-gap). */
 .react-flow__edge-path.inherit-edge {
   stroke: var(--muted);
+  stroke-width: 4.5;
+  stroke-linecap: butt;
+  stroke-linejoin: round;
+}
+.inherit-gap {
+  fill: none;
+  stroke: black;
   stroke-width: 1.5;
+  stroke-linejoin: round;
 }
 .react-flow__edge-path.inherit-edge.realization {
   stroke-dasharray: 6 4;

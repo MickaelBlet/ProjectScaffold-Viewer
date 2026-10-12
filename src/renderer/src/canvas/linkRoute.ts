@@ -12,7 +12,8 @@ export interface RouteEnd extends Point {
   side: Side
 }
 
-const DIR: Record<Side, Point> = {
+/** Outward direction of each side. */
+export const DIR: Record<Side, Point> = {
   left: { x: -1, y: 0 },
   right: { x: 1, y: 0 },
   top: { x: 0, y: -1 },
