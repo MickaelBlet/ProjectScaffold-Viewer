@@ -78,12 +78,20 @@ function Check(props: {
   )
 }
 
-/** Buttons of the toolbar right of the menus, in order: commands and separators. */
-function ToolbarEditor(): ReactNode {
+/** Buttons of one side of the toolbar, in order: commands and separators. */
+function ToolbarEditor(props: {
+  setting: 'toolbar' | 'toolbarRight'
+  label: string
+  hint: string
+}): ReactNode {
   // Separators kept as placed (the toolbar drops those at its ends), not to lose one added last.
-  const ids = useSettings((s) => s.toolbar).filter((id) => id === '-' || commands.some((c) => c.id === id))
-  if (!useShown('Toolbar buttons', 'Commands and separators right of the menus')) return null
-  const set = (next: string[]): void => setSetting('toolbar', next)
+  const ids = useSettings((s) => s[props.setting]).filter(
+    (id) => id === '-' || commands.some((c) => c.id === id)
+  )
+  // Commands on the other side, not offered twice.
+  const other = useSettings((s) => s[props.setting === 'toolbar' ? 'toolbarRight' : 'toolbar'])
+  if (!useShown(props.label, props.hint)) return null
+  const set = (next: string[]): void => setSetting(props.setting, next)
   const move = (i: number, step: -1 | 1): void => {
     const next = [...ids]
     ;[next[i], next[i + step]] = [next[i + step]!, next[i]!]
@@ -91,7 +99,7 @@ function ToolbarEditor(): ReactNode {
   }
   /** Menu of the commands not in the toolbar yet, by category, below the button. */
   const addMenu = (button: HTMLElement): void => {
-    const addable = commands.filter((c) => !c.hidden && !ids.includes(c.id))
+    const addable = commands.filter((c) => !c.hidden && !ids.includes(c.id) && !other.includes(c.id))
     const categories = [...new Set(addable.map((c) => c.category))] as Category[]
     const r = button.getBoundingClientRect()
     openContextMenu({ clientX: r.left, clientY: r.bottom + 2 }, [
@@ -107,6 +115,9 @@ function ToolbarEditor(): ReactNode {
   }
   return (
     <div className="toolbar-editor">
+      <div className="toolbar-editor-title" title={props.hint}>
+        {props.label}
+      </div>
       <ul>
         {ids.map((id, i) => {
           const icon = id === '-' ? undefined : commandIcon(id)
@@ -132,7 +143,7 @@ function ToolbarEditor(): ReactNode {
           <Icon name="plus" />
           Add…
         </button>
-        <button type="button" onClick={() => set(DEFAULT_SETTINGS.toolbar)}>
+        <button type="button" onClick={() => set(DEFAULT_SETTINGS[props.setting])}>
           Reset
         </button>
       </div>
@@ -249,7 +260,12 @@ export function SettingsPanel(): ReactNode {
           />
         </SettingsSection>
         <SettingsSection title="Toolbar">
-          <ToolbarEditor />
+          <ToolbarEditor setting="toolbar" label="Left" hint="Buttons right of the menus" />
+          <ToolbarEditor
+            setting="toolbarRight"
+            label="Right"
+            hint="Buttons at the right end of the toolbar"
+          />
         </SettingsSection>
         <SettingsSection title="Text editor">
           <Field label="Font size">

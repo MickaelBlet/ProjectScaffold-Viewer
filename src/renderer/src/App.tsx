@@ -266,8 +266,9 @@ export function App(): ReactNode {
           <circle cx="22" cy="17" r="2" fill="#3b6fe0" stroke="#fff" strokeWidth="1.5" />
         </svg>
         <MenuBar />
-        <CommandToolbar />
+        <CommandToolbar setting="toolbar" />
         <span className="spacer" />
+        <CommandToolbar setting="toolbarRight" />
         <WindowControls />
       </header>
       <DockShell />

@@ -29,9 +29,9 @@ function CommandButton({ id }: { id: string }): ReactNode {
   )
 }
 
-/** The buttons chosen in the settings, right of the menus. */
-export function CommandToolbar(): ReactNode {
-  const ids = availableIds(useSettings((s) => s.toolbar))
+/** The buttons chosen in the settings: right of the menus (`toolbar`) or at the right end (`toolbarRight`). */
+export function CommandToolbar({ setting }: { setting: 'toolbar' | 'toolbarRight' }): ReactNode {
+  const ids = availableIds(useSettings((s) => s[setting]))
   // Toggles show their state, read from the settings, the project or the selection.
   useSettings()
   useProjectStore((s) => s.project)

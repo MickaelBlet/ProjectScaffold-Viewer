@@ -83,6 +83,8 @@ export interface Settings {
   explorerHidden: string[]
   /** Toolbar buttons right of the menus: command ids, '-' for a separator. */
   toolbar: string[]
+  /** Toolbar buttons at the right end, before the window controls: command ids, '-' for a separator. */
+  toolbarRight: string[]
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -123,7 +125,8 @@ export const DEFAULT_SETTINGS: Settings = {
   sourceChanges: true,
   explorerOrder: [],
   explorerHidden: [],
-  toolbar: ['edit.undo', 'edit.redo', '-', 'view.back', 'view.forward']
+  toolbar: ['edit.undo', 'edit.redo', '-', 'view.back', 'view.forward'],
+  toolbarRight: []
 }
 
 const SETTINGS_KEY = 'project-scaffold:settings'
