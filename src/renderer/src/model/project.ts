@@ -459,12 +459,16 @@ export function setQualifier(e: { [K in Qualifier]?: boolean }, q: Qualifier, on
   else delete e[q]
 }
 
-/** Set a qualifier of an attribute, keeping the others consistent: `mutable` excludes `static` and `const`. */
+/**
+ * Set a qualifier of an attribute, keeping the others consistent: `mutable` excludes `static` and `const`;
+ * `const` drops `accessors: read` (no setter already).
+ */
 export function setAttributeQualifier(a: Attribute, q: Qualifier, on: boolean): void {
   setQualifier(a, q, on)
   if (!on) return
   if (q === 'mutable') for (const k of ['static', 'const'] as const) setQualifier(a, k, false)
   else if (q === 'static' || q === 'const') setQualifier(a, 'mutable', false)
+  if (q === 'const' && a.accessors === 'read') delete a.accessors
 }
 
 /** Set the access level of a type, attribute or method; public is left out. */

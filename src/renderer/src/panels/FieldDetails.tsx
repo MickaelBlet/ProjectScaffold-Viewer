@@ -122,7 +122,11 @@ export function FieldDetails<F extends ValueField & Partial<Attribute>>(props: {
           value={f.accessors ?? ''}
           options={[
             { value: '', label: f.const ? 'getter' : 'getter and setter' },
-            ...ACCESSORS.map((a) => ({ value: a, label: a === 'read' ? 'getter' : 'none' }))
+            // A const attribute has no setter: `read` would be a second "getter"
+            ...ACCESSORS.filter((a) => a !== 'read' || !f.const || f.accessors === 'read').map((a) => ({
+              value: a,
+              label: a === 'read' ? 'getter' : 'none'
+            }))
           ]}
           onChange={(v) =>
             change((x) => {

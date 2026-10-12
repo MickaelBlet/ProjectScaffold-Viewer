@@ -87,6 +87,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Renames and definitions reach only the open documents depending on the edited file itself, compared by full path: a file of the same name in another folder took them too.
 - Pasting a clip of another version missing some of its parts does nothing, instead of failing with an error.
 - _Save all_ skips a document closed while a save dialog was open; it saved the active document again.
+- Inspector: the _Accessors_ of a `const` attribute offer _getter_ once (it was offered twice, as the default and as `read`); making an attribute `const` drops its redundant `accessors: read`.
 - Faster Explorer on large projects (its tree is no longer rebuilt on every selection change) and faster renames carried to dependent documents.
 
 ### Security

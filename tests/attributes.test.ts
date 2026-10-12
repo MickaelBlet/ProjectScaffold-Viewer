@@ -171,6 +171,9 @@ describe('attribute details', () => {
     expect(a).toEqual({ mutable: true })
     setAttributeQualifier(a, 'const', true)
     expect(a).toEqual({ const: true })
+    const b = { accessors: 'read' } as Attribute
+    setAttributeQualifier(b, 'const', true)
+    expect(b).toEqual({ const: true })
   })
 
   it('draws associations to referenced modules', () => {
