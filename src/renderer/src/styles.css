@@ -444,17 +444,6 @@ button.link-button:hover {
 .statusbar .spacer {
   flex: 1;
 }
-.palette-button {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 220px;
-  color: var(--muted);
-  background: var(--bg);
-}
-.palette-button kbd {
-  margin-left: auto;
-}
 .dock {
   min-height: 0;
   min-width: 0;

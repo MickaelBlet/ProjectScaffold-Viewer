@@ -58,6 +58,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- The _Go to…_ button of the title bar: Ctrl+P and _View › Go to…_ remain.
 - _Insert › Link to another project…_ and its canvas menu entry: modules are placed from the dependencies (Explorer, the dependency's right-click menu); add the project with _Add dependency…_ first.
 - The eye button of the modules in the Explorer: _Hide in view_ / _Show in view_ stay in their right-click menu (and H / Shift+H).
 - Code generation, split into [ProjectScaffold-Generator](https://github.com/MickaelBlet/ProjectScaffold-Generator) (command line, standalone `scaffold-gen`, template sets): _File › Generate code_ (Ctrl+Alt+G), _Generate code into…_, _Code templates…_, the _Code generation_ panel, templates and generated files in editor tabs, the search and the command palette, Liquid, C++, Python and CMake highlighting.

@@ -268,15 +268,6 @@ export function App(): ReactNode {
         <MenuBar />
         <CommandToolbar />
         <span className="spacer" />
-        <button
-          type="button"
-          className="palette-button"
-          title="Command palette (Ctrl+Shift+P)"
-          onClick={() => runCommand('view.goto')}
-        >
-          Go to… <kbd>Ctrl+P</kbd>
-        </button>
-        <span className="spacer" />
         <WindowControls />
       </header>
       <DockShell />
