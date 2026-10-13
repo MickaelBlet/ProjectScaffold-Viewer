@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- VS Code: the pages heard no message from the extension since 1.1.0 (VS Code sets `window.parent` to the page itself): the diagram followed neither the text (cursor, edits) nor the side bar, the side bar not the active file, and commands and dialogs got no answer. Messages are now told by their origin.
 - VS Code: an entity selected in the side bar's Explorer is brought into view in the preview as in the app (opening the _Project_ view when the focused view does not draw it); following the text cursor still leaves the view as it is. The `reveal` message says which (`cursor`).
 - VS Code: switching the side bar to another project file wrote its changes not written yet to the new file.
 

@@ -40,8 +40,9 @@ function listen<T>(set: Set<T>, cb: T): () => void {
 }
 
 function onMessage(e: MessageEvent<ToPage | null>): void {
-  // VS Code's frame around the page relays the extension's messages: no other window is heard.
-  if (e.source !== window.parent) return
+  // VS Code's frame around the page relays the extension's messages, from the page's origin: no other
+  // window is heard. Not by `window.parent`: VS Code sets it to the page's own window.
+  if (e.origin !== window.location.origin || e.source === window) return
   const msg = e.data
   if (!msg || typeof msg !== 'object') return
   switch (msg.type) {
