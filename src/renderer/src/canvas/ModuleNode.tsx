@@ -40,7 +40,6 @@ import {
   type TypeRef
 } from '@/model/types'
 import { AccessIcon, Icon } from '@/components/Icon'
-import { DERIVE_LABELS } from '@/components/fields'
 import { typeColorClass } from '@/components/typeColor'
 import { MODULE_HANDLE } from './constants'
 import type { PortNodeData } from './flowGraph'
