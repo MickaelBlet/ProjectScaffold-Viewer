@@ -71,6 +71,7 @@ import { AccessIcon, Icon } from '@/components/Icon'
 import { TYPE_KIND_BADGE, TYPE_KINDS } from '@/components/fields'
 import { FoldSection, placed, sectionOrder, StackedSections } from '@/components/FoldSection'
 import { onListKeyDown, tabStop } from '@/components/listKeys'
+import { kindClass } from '@/components/typeColor'
 
 const KIND_BADGE = TYPE_KIND_BADGE
 
@@ -784,7 +785,7 @@ export function ExplorerPanel(): ReactNode {
             key={r.key}
             tabStop={stop}
             selected={isSelected(e.id)}
-            className={isSelected(e.id) ? 'active' : ''}
+            className={`${isSelected(e.id) ? 'active' : ''} ${kindClass(r.kind === 'type' ? r.e.kind : 'interface')}`}
             style={indent(2 + (r.kind === 'type' ? r.depth : 0))}
             onClick={(ev) => clickItem(ev, e.id, dependencyIds)}
             onDoubleClick={() => openEditor(kind, e.id)}

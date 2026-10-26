@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { fromFile, reloadText, saveText, toFile } from '@/model/serialize'
 import { validate } from '@/model/validate'
 import { copyItems, pasteClip } from '@/model/clipboard'
-import { compartmentsHeight } from '@/model/project'
+import { compartmentsHeight, DESTRUCTOR_MEMBER, hasMember, removeMember } from '@/model/project'
 import type { Project } from '@/model/types'
 
 const source = `
@@ -166,5 +166,23 @@ describe('lifecycle', () => {
     ])
     mod(p, 'Sensor').destructor = { virtual: false, access: 'protected' }
     expect(messages(p, 'warning')).toEqual([])
+  })
+
+  it('finds and removes attributes, methods, constructors and the destructor as members', () => {
+    const sensor = mod(load(), 'Sensor')
+    const members = [
+      sensor.attributes[0]!.id,
+      sensor.methods[0]!.id,
+      ...sensor.constructors!.map((c) => c.id),
+      DESTRUCTOR_MEMBER
+    ]
+    expect(members.every((m) => hasMember(sensor, m))).toBe(true)
+    expect(hasMember(sensor, 'unknown')).toBe(false)
+    for (const m of members) removeMember(sensor, m)
+    expect(members.some((m) => hasMember(sensor, m))).toBe(false)
+    expect(sensor.attributes.map((a) => a.name)).toEqual(['rate'])
+    expect(sensor.methods).toEqual([])
+    expect(sensor).not.toHaveProperty('constructors')
+    expect(sensor).not.toHaveProperty('destructor')
   })
 })

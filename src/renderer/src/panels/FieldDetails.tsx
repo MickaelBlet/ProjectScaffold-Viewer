@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import { constrainedScalar, moduleRefs, patternError } from '@/model/constraints'
 import { isModuleRef, setAttributeQualifier } from '@/model/project'
 import { useProjectStore } from '@/store/project'
+import { useSettings } from '@/store/settings'
 import {
   ACCESSORS,
   INT_PRIMITIVES,
@@ -45,6 +46,8 @@ export function FieldDetails<F extends ValueField & Partial<Attribute>>(props: {
   const { field: f, change } = props
   const types = useProjectStore((s) => s.project.types)
   const modules = useProjectStore((s) => s.project.modules)
+  const constraintsOn = useSettings((s) => s.featureValueConstraints)
+  const concurrencyOn = useSettings((s) => s.featureConcurrency)
   const scalar = constrainedScalar(f.type, types)
   const numeric = (INT_PRIMITIVES as readonly string[]).includes(scalar) || scalar.startsWith('float')
   const integer = (INT_PRIMITIVES as readonly string[]).includes(scalar)
@@ -52,7 +55,7 @@ export function FieldDetails<F extends ValueField & Partial<Attribute>>(props: {
   const c = f.constraints ?? {}
   const refs = moduleRefs(f.type, (id) => isModuleRef({ modules }, id))
   const rows: ReactNode[] = []
-  if (numeric || c.min !== undefined || c.max !== undefined || c.unit)
+  if ((constraintsOn && numeric) || c.min !== undefined || c.max !== undefined || c.unit)
     rows.push(
       <label key="range" className="detail">
         <span>Range</span>
@@ -76,7 +79,7 @@ export function FieldDetails<F extends ValueField & Partial<Attribute>>(props: {
         />
       </label>
     )
-  if (text || c.pattern !== undefined)
+  if ((constraintsOn && text) || c.pattern !== undefined)
     rows.push(
       <label key="pattern" className="detail">
         <span>Pattern</span>
@@ -109,7 +112,7 @@ export function FieldDetails<F extends ValueField & Partial<Attribute>>(props: {
       <div key="qualifiers" className="detail">
         <span>Qualifiers</span>
         <QualifierToggles
-          qualifiers={DETAIL_QUALIFIERS}
+          qualifiers={DETAIL_QUALIFIERS.filter((q) => q !== 'atomic' || concurrencyOn || f.atomic)}
           value={f}
           onChange={(q, on) => change((x) => setAttributeQualifier(x, q, on))}
         />

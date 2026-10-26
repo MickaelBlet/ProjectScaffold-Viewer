@@ -112,6 +112,7 @@ Ctrl+C / X / V / D copy, cut, paste and duplicate several items at once: modules
 - **Methods** are prototypes listed as `static name(const a: T, out b: U): R const` in a compartment below the attributes. Edit them in the module's inspector like interface messages: parameters with their direction, an optional return type, `const` on `in` parameters.
 - Both can be `static` and `const` (checkboxes in the inspector), shown before their name on the canvas.
 - Both have an access level, `public` (default), `protected` or `private`, chosen with the `+ # -` buttons of the inspector and shown before their name on the canvas as in UML (`+ name`, `# name`, `- name`).
+- Click one on the canvas (constructors and the destructor too) to edit it: the inspector scrolls to it and highlights it. Delete then removes only it.
 
 ### Types of modules
 
@@ -171,7 +172,7 @@ The diagram exports as PNG or SVG from the _File_ menu.
 
 ## Model panels
 
-- **Explorer**: types (struct / exception / enum / bitmask / union / alias / custom primitive), constants (edited in the project inspector) and interfaces (messages with typed `in` / `out` / `inout` parameters and optional return). Type fields accept expressions with completion (`map<string, vector<uint16>>`), or the structured editor (⋮). Inspectors list where a type or interface is used. A type in use is not deleted unless forced (_Delete anyway_, in its inspector or in the dialog listing its uses): the places using it keep its name, reported as errors in _Problems_ until changed or until a type of that name exists again.
+- **Explorer**: types (struct / exception / enum / bitmask / union / alias / custom primitive), constants (edited in the project inspector) and interfaces (messages with typed `in` / `out` / `inout` parameters and optional return). Type fields accept expressions with completion (`map<string, vector<uint16>>`), or the structured editor (⋮). Fields, lone types (union discriminator, aliased type, message return), attributes on the canvas and the members of dependencies are tinted after the kind of what their type names, in the colors of the Explorer's badges (containers in cyan, built-in primitives in gray; an optional takes the color of its item), completions and the options of the structured editor after what they name, with its badge (`P` built-in primitive, `<>` container, `M` module, in its color when it has one); Explorer rows, enum values and bitmask flags after their own kind. Inspectors list where a type or interface is used. A type in use is not deleted unless forced (_Delete anyway_, in its inspector or in the dialog listing its uses): the places using it keep its name, reported as errors in _Problems_ until changed or until a type of that name exists again.
 - **Problems**: validates live (filter by severity or text). Errors block export, warnings do not.
 - **Output** (Ctrl+Shift+U): logs every status message and dialog, with their time; filter by level or text.
 
@@ -183,6 +184,7 @@ The diagram exports as PNG or SVG from the _File_ menu.
   - theme: system, light, dark or a color theme (black, red, orange, yellow, green, pink, violet);
   - link style and badges, port style (dots, arrows, hollow, shapes) to tell `in` from `out`;
   - grid, guides, select before moving, Inspector shown on selection, minimap, arrange on open;
+  - features: derives, lifecycle, contracts, state machine, concurrency, generics, value constraints, link quality of service; one turned off hides its editing from the Inspector (and the _State machine_ command) unless the project already uses it;
   - text editor: font, tab size, whitespace, indentation guides, word wrap, minimap, line numbers, folding, brackets, suggestions…
   - toolbar: the buttons right of the menus (_Left_) and at the right end of the toolbar (_Right_): any command, separators, added, moved and removed in _Toolbar_; _Reset_ restores undo, redo, previous / next selection on the left, the tutorial on the right.
 - _File › Export settings…_ / _Import settings…_ carry the settings to another browser, app or VS Code as a JSON file.

@@ -29,6 +29,7 @@ import {
   contentTop,
   modulePath,
   newId,
+  removeMember,
   subtreeIds,
   uniqueName,
   viewNotes,
@@ -401,6 +402,15 @@ export function deleteSelection(): void {
   if (sel?.kind === 'link' && !activeDoc().selectedIds.length) {
     deleteLink(sel.id)
     return select(null)
+  }
+  // An attribute or method selected on the canvas: only it goes.
+  if (sel?.kind === 'module' && sel.member && ids.length === 1 && ids[0] === sel.id) {
+    const { id, member } = sel
+    update((d) => {
+      const m = d.modules.find((m) => m.id === id)
+      if (m) removeMember(m, member)
+    })
+    return select({ kind: 'module', id })
   }
   const blocked: string[] = []
   /** Types kept only by their usages: they can be deleted anyway. */

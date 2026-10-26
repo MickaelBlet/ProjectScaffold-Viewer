@@ -85,6 +85,21 @@ export interface Settings {
   toolbar: string[]
   /** Toolbar buttons at the right end, before the window controls: command ids, '-' for a separator. */
   toolbarRight: string[]
+  // Optional modeling features in the Inspector. Off: their editing hides while the project holds none.
+  featureDerives: boolean
+  /** Instances, copy and move, destructor, constructors of modules. */
+  featureLifecycle: boolean
+  /** Invariants of modules, preconditions and postconditions of methods. */
+  featureContracts: boolean
+  featureStateMachine: boolean
+  /** Locks, atomic attributes, thread-safe methods. */
+  featureConcurrency: boolean
+  /** Type parameters of modules. */
+  featureGenerics: boolean
+  /** Range, unit and pattern of fields and attributes. */
+  featureValueConstraints: boolean
+  /** Acknowledgement and performance of links. */
+  featureLinkQos: boolean
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -126,7 +141,15 @@ export const DEFAULT_SETTINGS: Settings = {
   explorerOrder: [],
   explorerHidden: [],
   toolbar: ['edit.undo', 'edit.redo', '-', 'view.back', 'view.forward'],
-  toolbarRight: ['help.tutorial']
+  toolbarRight: ['help.tutorial'],
+  featureDerives: true,
+  featureLifecycle: true,
+  featureContracts: true,
+  featureStateMachine: true,
+  featureConcurrency: true,
+  featureGenerics: true,
+  featureValueConstraints: true,
+  featureLinkQos: true
 }
 
 const SETTINGS_KEY = 'project-scaffold:settings'

@@ -14,6 +14,8 @@ import {
   type TypeRef
 } from '@/model/types'
 import { Icon } from './Icon'
+import { kindClass, refKinds, typeColorClass } from './typeColor'
+import { KindBadge, TypeSelect, type TypeOption, type TypeOptionGroup } from './TypeSelect'
 import { useDraft } from './useDraft'
 
 const DEFAULT: TypeRef = { kind: 'primitive', name: 'uint8' }
@@ -80,6 +82,27 @@ function refIds(t: TypeRef, out: string[] = []): string[] {
   return out
 }
 
+/** Kinds of what ids name in the project (`refKinds`). */
+function useRefKinds(): (id: Id) => string | undefined {
+  const { types, modules, dependencies } = useProjectStore((s) => s.project)
+  return useMemo(() => refKinds({ types, modules, dependencies }), [types, modules, dependencies])
+}
+
+/** Colors of the modules of the project, by id (those of dependencies have none). */
+function useModuleColors(): Map<Id, string> {
+  const modules = useProjectStore((s) => s.project.modules)
+  return useMemo(
+    () => new Map(modules.flatMap((m) => (m.color ? [[m.id, m.color] as const] : []))),
+    [modules]
+  )
+}
+
+/** Classes coloring an entry after the kind of what a type reference names (`typeColorClass`). */
+export function useTypeColor(): (t: TypeRef) => string {
+  const kindOf = useRefKinds()
+  return (t) => typeColorClass(t, kindOf)
+}
+
 /**
  * Type reference editor: a text expression with completion, plus an optional structured tree.
  * When `onToggleTree` is given the tree toggle is controlled and the caller renders `TypeTree`
@@ -103,6 +126,15 @@ export function TypeEditor(props: {
   const [suggest, setSuggest] = useState<{ items: string[]; index: number } | null>(null)
   const input = useRef<HTMLInputElement>(null)
   const targetOf = useRefTarget()
+  const kindOf = useRefKinds()
+  const moduleColors = useModuleColors()
+  // Kind of what a completion names: a primitive, a container, a type or a module.
+  const suggestionKind = (s: string): string | undefined => {
+    if ((PRIMITIVES as readonly string[]).includes(s)) return 'builtin'
+    if (s.endsWith('<')) return 'container'
+    const id = idOf(s)
+    return id === undefined ? undefined : kindOf(id)
+  }
   const refs = refIds(props.value).flatMap((id) => {
     const target = nameOf(id) === undefined ? null : targetOf(id)
     return target ? [{ id, target }] : []
@@ -202,12 +234,13 @@ export function TypeEditor(props: {
               {suggest.items.map((s, i) => (
                 <li
                   key={s}
-                  className={i === suggest.index ? 'active' : ''}
+                  className={`${i === suggest.index ? 'active' : ''} ${kindClass(suggestionKind(s))}`}
                   onMouseDown={(e) => {
                     e.preventDefault()
                     apply(s)
                   }}
                 >
+                  <KindBadge kind={suggestionKind(s)} color={moduleColors.get(idOf(s) ?? '')} />
                   {s}
                 </li>
               ))}
@@ -248,6 +281,16 @@ export function TypeEditor(props: {
   )
 }
 
+/** A type editor alone on its line (a return, an aliased type): an entry tinted after its type. */
+export function TypeEntry(props: { value: TypeRef; onChange: (t: TypeRef) => void }): ReactNode {
+  const colorOf = useTypeColor()
+  return (
+    <div className={`type-entry ${colorOf(props.value)}`}>
+      <TypeEditor value={props.value} onChange={props.onChange} />
+    </div>
+  )
+}
+
 export function TypeTree(props: {
   value: TypeRef
   onChange: (t: TypeRef) => void
@@ -255,6 +298,7 @@ export function TypeTree(props: {
 }): ReactNode {
   const { nameOf, usable, modules } = useTypeScope()
   const types = useProjectStore((s) => s.project.types)
+  const moduleColors = useModuleColors()
   const t = props.value
   const selected = t.kind === 'primitive' ? t.name : t.kind === 'ref' ? `ref:${t.id}` : t.kind
 
@@ -309,72 +353,47 @@ export function TypeTree(props: {
     else if (max > 0) props.onChange({ ...rest, max })
   }
 
+  // Exceptions are only raised; the current type stays listed even when out of reach.
+  const current = t.kind === 'ref' ? types.find((ut) => ut.id === t.id) : undefined
+  const userTypes = (ofModules: boolean): TypeOption[] => {
+    const list = usable.filter((u) => u.type.kind !== 'exception' && !!isModuleType(u.type) === ofModules)
+    if (current && !!isModuleType(current) === ofModules && !list.some((u) => u.type.id === current.id))
+      list.push({ type: current, name: nameOf(current.id)! })
+    return list.map((u) => ({ value: `ref:${u.type.id}`, label: u.name, kind: u.type.kind }))
+  }
+  // The current module stays listed even when hidden by a type of the same name.
+  const moduleList = [...modules]
+  if (t.kind === 'ref' && !current && !moduleList.some((m) => m.id === t.id)) {
+    const name = nameOf(t.id)
+    if (name !== undefined) moduleList.push({ id: t.id, name })
+  }
+  const groups: TypeOptionGroup[] = [
+    { label: 'Primitives', options: PRIMITIVES.map((p) => ({ value: p, label: p, kind: 'builtin' })) },
+    { label: 'User types', options: userTypes(false) },
+    { label: 'Types of modules', options: userTypes(true) },
+    {
+      label: 'Modules',
+      options: moduleList.map((m) => ({
+        value: `ref:${m.id}`,
+        label: m.name,
+        kind: 'mod',
+        color: moduleColors.get(m.id)
+      }))
+    },
+    {
+      label: 'Containers',
+      options: CONTAINERS.map((c) => ({ value: c, label: `${c}<…>`, kind: 'container' }))
+    },
+    {
+      options: t.kind === 'ref' && nameOf(t.id) === undefined ? [{ value: selected, label: '<deleted>' }] : []
+    }
+  ].filter((g) => g.options.length > 0)
+
   return (
     <div className="type-tree">
       <div className="type-tree-node">
         {props.label && <span className="type-tree-label">{props.label}</span>}
-        <select value={selected} onChange={(e) => change(e.target.value)}>
-          <optgroup label="Primitives">
-            {PRIMITIVES.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </optgroup>
-          {[false, true].map((ofModules) => {
-            // Exceptions are only raised; the current type stays listed even when out of reach.
-            const list = usable.filter(
-              (u) => u.type.kind !== 'exception' && !!isModuleType(u.type) === ofModules
-            )
-            const current = t.kind === 'ref' && types.find((ut) => ut.id === t.id)
-            if (
-              current &&
-              !!isModuleType(current) === ofModules &&
-              !list.some((u) => u.type.id === current.id)
-            )
-              list.push({ type: current, name: nameOf(current.id)! })
-            return (
-              list.length > 0 && (
-                <optgroup key={String(ofModules)} label={ofModules ? 'Types of modules' : 'User types'}>
-                  {list.map((u) => (
-                    <option key={u.type.id} value={`ref:${u.type.id}`}>
-                      {u.name}
-                    </option>
-                  ))}
-                </optgroup>
-              )
-            )
-          })}
-          {(() => {
-            // The current module stays listed even when hidden by a type of the same name.
-            const list = [...modules]
-            if (t.kind === 'ref' && !types.some((ut) => ut.id === t.id) && !list.some((m) => m.id === t.id)) {
-              const name = nameOf(t.id)
-              if (name !== undefined) list.push({ id: t.id, name })
-            }
-            return (
-              list.length > 0 && (
-                <optgroup label="Modules">
-                  {list.map((m) => (
-                    <option key={m.id} value={`ref:${m.id}`}>
-                      {m.name}
-                    </option>
-                  ))}
-                </optgroup>
-              )
-            )
-          })()}
-          <optgroup label="Containers">
-            {CONTAINERS.map((c) => (
-              <option key={c} value={c}>
-                {c}&lt;…&gt;
-              </option>
-            ))}
-          </optgroup>
-          {t.kind === 'ref' && nameOf(t.id) === undefined && (
-            <option value={selected}>&lt;deleted&gt;</option>
-          )}
-        </select>
+        <TypeSelect value={selected} groups={groups} onChange={change} />
         {t.kind === 'array' && (
           <input
             className="number"

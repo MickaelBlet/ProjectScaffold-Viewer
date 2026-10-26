@@ -3,7 +3,7 @@ import YAML from 'yaml'
 import { describe, expect, it } from 'vitest'
 import { fromFile } from '@/model/serialize'
 import { arrange } from '@/model/autoLayout'
-import { childModules } from '@/model/project'
+import { boundsOf, childModules, contentBottom, contentTop, LAYOUT_PAD } from '@/model/project'
 import type { Project, Rect } from '@/model/types'
 
 const example = fromFile(YAML.parse(readFileSync('examples/robot.scaffold.yaml', 'utf8')))
@@ -46,6 +46,36 @@ describe('autoLayout', () => {
     checkChildrenInside(p)
     for (const m of p.modules.filter((m) => !m.parentId && m.id !== core.id))
       expect(m.layout).toEqual(example.modules.find((x) => x.id === m.id)!.layout)
+  })
+
+  it('fits each container to its content', async () => {
+    const drone = fromFile(YAML.parse(readFileSync('examples/fleet/drone.scaffold.yaml', 'utf8')))
+    for (const o of ['horizontal', 'vertical'] as const) {
+      const p = await arrange(drone, null, { orientation: o, spacing: 70 })
+      for (const m of p.modules) {
+        const content = childModules(p, m.id)
+        if (!content.length) continue
+        const b = boundsOf(content.map((c) => c.layout))
+        expect(b.y, m.name).toBe(contentTop(o, m) + LAYOUT_PAD / 2)
+        expect(m.layout.height - b.y - b.height, m.name).toBe(contentBottom(o))
+        if (o === 'vertical') expect(m.layout.width - b.width, m.name).toBe(2 * LAYOUT_PAD)
+      }
+    }
+  })
+
+  it('fits the arranged container to its new content', async () => {
+    const core = example.modules.find((m) => m.name === 'Core')!
+    const big = {
+      ...example,
+      modules: example.modules.map((m) =>
+        m.id === core.id ? { ...m, layout: { ...m.layout, width: 3000, height: 3000 } } : m
+      )
+    }
+    const p = await arrange(big, core.id)
+    const layout = p.modules.find((m) => m.id === core.id)!.layout
+    expect(layout.width).toBeLessThan(3000)
+    expect(layout.height).toBeLessThan(3000)
+    checkChildrenInside(p)
   })
 
   it('handles an empty project', async () => {

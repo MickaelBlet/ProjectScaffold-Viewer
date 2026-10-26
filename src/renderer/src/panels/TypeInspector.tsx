@@ -14,6 +14,7 @@ import { deleteType, setTypeModule, update, useProjectStore } from '@/store/proj
 import { dependencyOf } from '@/model/dependencies'
 import { DependencyBanner } from './DependencyBanner'
 import { openContextMenu, select } from '@/store/ui'
+import { useSettings } from '@/store/settings'
 import { navigate } from '@/actions'
 import {
   AccessToggles,
@@ -26,7 +27,7 @@ import {
   Select,
   TextArea
 } from '@/components/fields'
-import { TypeEditor, TypeScopeContext, TypeTree } from '@/components/TypeEditor'
+import { TypeEditor, TypeEntry, TypeScopeContext, TypeTree, useTypeColor } from '@/components/TypeEditor'
 import {
   INT_PRIMITIVES,
   UNSIGNED_PRIMITIVES,
@@ -47,6 +48,7 @@ import {
   valueFlags
 } from '@/model/defaults'
 import { Icon } from '@/components/Icon'
+import { kindClass } from '@/components/typeColor'
 import { FieldDetails, hasDetails } from './FieldDetails'
 
 function withType<K extends TypeDef['kind']>(
@@ -222,8 +224,11 @@ export function FieldList<F extends Field = Field>(props: {
   /** Details of a field, shown below its row with a toggle; `detailed` marks those with some set. */
   details?: (f: F, i: number) => ReactNode
   detailed?: (f: F) => boolean
+  /** Field selected on the canvas, highlighted. */
+  focused?: string
 }): ReactNode {
   const { fields, onChange } = props
+  const colorOf = useTypeColor()
   const [trees, setTrees] = useState<ReadonlySet<string>>(new Set())
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set())
   const toggleOpen = (id: string): void =>
@@ -243,7 +248,10 @@ export function FieldList<F extends Field = Field>(props: {
       <div className={`field-list${props.value ? ' has-value' : ''}`}>
         {fields.map((f, i) => (
           <Fragment key={f.id}>
-            <div className="field-row">
+            <div
+              className={`field-row ${colorOf(f.type)} ${props.focused === f.id ? 'focused' : ''}`}
+              data-member={f.id}
+            >
               <div className="name">
                 <CommitInput
                   value={f.name}
@@ -328,6 +336,7 @@ export function FieldList<F extends Field = Field>(props: {
 export function TypeInspector({ id }: { id: string }): ReactNode {
   const project = useProjectStore((s) => s.project)
   const [blocked, setBlocked] = useState<string[]>([])
+  const derivesOn = useSettings((s) => s.featureDerives)
   const t = project.types.find((t) => t.id === id)
   if (!t) return <p className="muted">Type deleted.</p>
   const usages = typeUsageTargets(project, id)
@@ -366,14 +375,14 @@ export function TypeInspector({ id }: { id: string }): ReactNode {
           )}
         </Row>
         {(t.module || t.modulePath) && (
-          <Row label="Access">
+          <Row label="Access" group>
             <AccessToggles value={t.access} onChange={(a) => withType(id, (x) => setAccess(x, a))} />
           </Row>
         )}
         <TextArea value={t.description} onChange={(v) => withType(id, (x) => void (x.description = v))} />
 
-        {t.kind === 'struct' && (
-          <Row label="Derives">
+        {t.kind === 'struct' && (derivesOn || !!t.derives?.length) && (
+          <Row label="Derives" group>
             <DeriveToggles
               value={t.derives}
               onChange={(v) =>
@@ -415,7 +424,7 @@ export function TypeInspector({ id }: { id: string }): ReactNode {
         {t.kind === 'union' && (
           <Section title={`Cases (${t.cases.length})`}>
             <Row label="Discriminator">
-              <TypeEditor
+              <TypeEntry
                 value={t.discriminator}
                 onChange={(d) => withType<'union'>(id, (x) => void (x.discriminator = d))}
               />
@@ -455,7 +464,7 @@ export function TypeInspector({ id }: { id: string }): ReactNode {
             <table className="grid">
               <tbody>
                 {t.values.map((v, i) => (
-                  <tr key={v.id}>
+                  <tr key={v.id} className={kindClass('enum')}>
                     <td>
                       <CommitInput
                         value={v.name}
@@ -518,7 +527,7 @@ export function TypeInspector({ id }: { id: string }): ReactNode {
             <table className="grid">
               <tbody>
                 {t.flags.map((v, i) => (
-                  <tr key={v.id}>
+                  <tr key={v.id} className={kindClass('bitmask')}>
                     <td>
                       <CommitInput
                         value={v.name}
@@ -574,7 +583,7 @@ export function TypeInspector({ id }: { id: string }): ReactNode {
 
         {t.kind === 'alias' && (
           <Section title="Aliased type">
-            <TypeEditor value={t.type} onChange={(nt) => withType<'alias'>(id, (x) => void (x.type = nt))} />
+            <TypeEntry value={t.type} onChange={(nt) => withType<'alias'>(id, (x) => void (x.type = nt))} />
           </Section>
         )}
       </fieldset>

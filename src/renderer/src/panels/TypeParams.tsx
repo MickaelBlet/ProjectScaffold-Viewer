@@ -11,8 +11,9 @@ import {
   type TypeRef
 } from '@/model/types'
 import { update } from '@/store/project'
+import { useSettings } from '@/store/settings'
 import { CommitInput, IconButton, Section, Select } from '@/components/fields'
-import { TypeEditor, useTypeScope } from '@/components/TypeEditor'
+import { TypeEntry, useTypeScope } from '@/components/TypeEditor'
 import { Icon } from '@/components/Icon'
 
 const withParam = (pid: Id, fn: (t: PrimitiveDef) => void): void =>
@@ -24,6 +25,8 @@ const withParam = (pid: Id, fn: (t: PrimitiveDef) => void): void =>
 export function TypeParamsSection(props: { mod: Module; project: Project }): ReactNode {
   const { mod, project } = props
   const params = typeParamsOf(project, mod.id)
+  const on = useSettings((s) => s.featureGenerics)
+  if (!on && !params.length) return null
   const modules = project.modules.filter((m) => m.id !== mod.id)
   return (
     <Section
@@ -111,7 +114,7 @@ export function TypeParamsSection(props: { mod: Module; project: Project }): Rea
               Default
             </label>
             {tp.default && (
-              <TypeEditor
+              <TypeEntry
                 value={tp.default}
                 onChange={(v) => withParam(t.id, (x) => void (x.typeParam!.default = v))}
               />

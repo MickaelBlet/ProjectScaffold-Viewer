@@ -5,6 +5,7 @@ import type { Id, Module, Project, State, StateMachine, Transition } from '@/mod
 import { CommitInput, IconButton, Section, Select } from '@/components/fields'
 import { Icon } from '@/components/Icon'
 import { showTool } from '@/shell/controllers'
+import { useSettings } from '@/store/settings'
 
 type WithModule = (fn: (m: Module, d: Project) => void) => void
 
@@ -21,6 +22,8 @@ function setMethod<K extends 'entry' | 'exit' | 'trigger' | 'action'>(
 export function StateMachineSection(props: { mod: Module; withModule: WithModule }): ReactNode {
   const { mod, withModule } = props
   const sm = mod.stateMachine
+  const on = useSettings((s) => s.featureStateMachine)
+  if (!on && !sm) return null
   const withMachine = (fn: (sm: StateMachine, m: Module) => void): void =>
     withModule((m) => {
       if (m.stateMachine) fn(m.stateMachine, m)

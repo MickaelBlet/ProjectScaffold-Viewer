@@ -1,12 +1,13 @@
 // Open documents (tabs). Each one has its own project store, undo history and editor state.
 import { create } from 'zustand'
-import { emptyProject, newId } from '@/model/project'
+import { emptyProject, hasMember, newId } from '@/model/project'
 import { GLOBAL_VIEW, type Id, type Project } from '@/model/types'
 import { createProjectStore, type ProjectStore } from './projectStore'
 
 export type Selection =
   | { kind: 'project' }
-  | { kind: 'module'; id: Id }
+  /** With `member`, one of its attributes, methods, constructors or its destructor (see `hasMember`). */
+  | { kind: 'module'; id: Id; member?: Id }
   | { kind: 'link'; id: Id }
   | { kind: 'type'; id: Id }
   | { kind: 'interface'; id: Id }
@@ -71,8 +72,15 @@ export function createDoc(project: Project = emptyProject(), filePath: string | 
       p.links.some((l) => l.id === x) ||
       p.dependencies.some((d) => d.id === x || d.modules.some((m) => m.id === x))
     const selectedIds = doc.selectedIds.filter(exists)
+    const sel = doc.selection
     const selection =
-      doc.selection && 'id' in doc.selection && !exists(doc.selection.id) ? null : doc.selection
+      sel && 'id' in sel && !exists(sel.id)
+        ? null
+        : sel?.kind === 'module' &&
+            sel.member &&
+            !p.modules.some((m) => m.id === sel.id && hasMember(m, sel.member!))
+          ? { kind: 'module' as const, id: sel.id }
+          : sel
     if (selectedIds.length !== doc.selectedIds.length || selection !== doc.selection)
       patchDoc({ selectedIds, selection }, id)
   })
@@ -111,8 +119,12 @@ export function findDoc(id: Id): DocState | undefined {
 const HISTORY_MAX = 100
 let travelling = false
 
+const memberOf = (s: Selection): Id | undefined => (s?.kind === 'module' ? s.member : undefined)
+
 const sameSelection = (a: Selection, b: Selection): boolean =>
-  a?.kind === b?.kind && (a && 'id' in a ? a.id : null) === (b && 'id' in b ? b.id : null)
+  a?.kind === b?.kind &&
+  (a && 'id' in a ? a.id : null) === (b && 'id' in b ? b.id : null) &&
+  memberOf(a) === memberOf(b)
 
 /** Record a single selection (not a clear or a multi-selection being built) in the history. */
 function recordSelection(d: DocState): DocState {

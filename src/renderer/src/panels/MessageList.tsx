@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { IDENTIFIER_RE, newId, uniqueName } from '@/model/project'
 import { CommitInput, IconButton, Select, TextArea } from '@/components/fields'
-import { TypeEditor, useTypeScope } from '@/components/TypeEditor'
+import { TypeEntry, useTypeScope } from '@/components/TypeEditor'
 import { PARAM_DIRECTIONS, type Id, type Message } from '@/model/types'
 import { FieldList } from './TypeInspector'
 
@@ -41,6 +41,8 @@ export function MessageList<M extends Message>(props: {
     prm: M['params'][number],
     change: (fn: (prm: M['params'][number]) => void) => void
   ) => ReactNode
+  /** Entry selected on the canvas, highlighted. */
+  focused?: string
 }): ReactNode {
   const { messages, onChange, paramExtra, paramValue } = props
   const withMessage = (mid: string, fn: (m: M) => void): void =>
@@ -49,7 +51,7 @@ export function MessageList<M extends Message>(props: {
       if (m) fn(m)
     })
   return messages.map((m) => (
-    <div className="card" key={m.id}>
+    <div className={`card ${props.focused === m.id ? 'focused' : ''}`} key={m.id} data-member={m.id}>
       <div className="card-header">
         <CommitInput
           value={m.name}
@@ -111,7 +113,7 @@ export function MessageList<M extends Message>(props: {
         </label>
       </h4>
       {m.returns && (
-        <TypeEditor value={m.returns} onChange={(t) => withMessage(m.id, (x) => void (x.returns = t))} />
+        <TypeEntry value={m.returns} onChange={(t) => withMessage(m.id, (x) => void (x.returns = t))} />
       )}
       <Raises
         value={m.raises ?? []}

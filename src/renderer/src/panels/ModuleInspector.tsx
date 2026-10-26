@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import {
   absolutePosition,
   allImported,
@@ -28,7 +28,8 @@ import {
   update,
   useProjectStore
 } from '@/store/project'
-import { select } from '@/store/ui'
+import { select, useSelection } from '@/store/ui'
+import { useSettings } from '@/store/settings'
 import { assignBinary } from '@/model/binaries'
 import { navigate } from '@/actions'
 import {
@@ -88,6 +89,22 @@ function withModule(id: string, fn: (m: Module, d: Project) => void): void {
 
 export function ModuleInspector({ id }: { id: string }): ReactNode {
   const project = useProjectStore((s) => s.project)
+  const sel = useSelection()
+  const member = sel?.kind === 'module' ? sel.member : undefined
+  const title = useRef<HTMLHeadingElement>(null)
+  const derivesOn = useSettings((s) => s.featureDerives)
+  const contractsOn = useSettings((s) => s.featureContracts)
+  const concurrencyOn = useSettings((s) => s.featureConcurrency)
+  // A member selected on the canvas (again) is scrolled into view.
+  useEffect(() => {
+    if (!member) return
+    const frame = requestAnimationFrame(() =>
+      title.current?.parentElement
+        ?.querySelector(`[data-member="${CSS.escape(member)}"]`)
+        ?.scrollIntoView({ block: 'nearest' })
+    )
+    return () => cancelAnimationFrame(frame)
+  }, [sel, member])
   const mod = project.modules.find((m) => m.id === id)
   if (!mod) return <p className="muted">Module deleted.</p>
   const links = project.links.filter((l) => l.from.moduleId === id || l.to.moduleId === id)
@@ -124,7 +141,7 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
   return (
     // Its attributes and methods name types as it does.
     <TypeScopeContext.Provider value={id}>
-      <h2>
+      <h2 ref={title}>
         Module <small className="muted">{modulePath(project, id)}</small>
       </h2>
       <Row label="Name">
@@ -134,7 +151,7 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
           onCommit={(n) => withModule(id, (m) => void (m.name = n))}
         />
       </Row>
-      <Row label="Parent">
+      <Row label="Parent" group>
         {parent ? (
           <span className="row-inline">
             <button
@@ -187,8 +204,8 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
           </label>
         </span>
       </Row>
-      {!mod.kind && (
-        <Row label="Derives">
+      {!mod.kind && (derivesOn || !!mod.derives?.length) && (
+        <Row label="Derives" group>
           <DeriveToggles
             value={mod.derives}
             onChange={(v) =>
@@ -326,25 +343,27 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
       <Section
         title={`Attributes (${mod.attributes.length})`}
         actions={
-          <button
-            type="button"
-            title="A lock guarding attributes"
-            onClick={() =>
-              withModule(id, (m) => {
-                const locks = (m.locks ??= [])
-                locks.push({
-                  id: newId(),
-                  name: uniqueName(
-                    'mutex',
-                    locks.map((l) => l.name)
-                  ),
-                  kind: 'mutex'
+          concurrencyOn && (
+            <button
+              type="button"
+              title="A lock guarding attributes"
+              onClick={() =>
+                withModule(id, (m) => {
+                  const locks = (m.locks ??= [])
+                  locks.push({
+                    id: newId(),
+                    name: uniqueName(
+                      'mutex',
+                      locks.map((l) => l.name)
+                    ),
+                    kind: 'mutex'
+                  })
                 })
-              })
-            }
-          >
-            <Icon name="plus" /> lock
-          </button>
+              }
+            >
+              <Icon name="plus" /> lock
+            </button>
+          )
         }
       >
         <FieldList
@@ -382,30 +401,38 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
             />
           )}
           detailed={hasDetails}
+          focused={member}
         />
         <Locks mod={mod} withModule={(fn) => withModule(id, fn)} />
       </Section>
 
-      <LifecycleSection mod={mod} types={project.types} withModule={(fn) => withModule(id, fn)} />
+      <LifecycleSection
+        mod={mod}
+        types={project.types}
+        withModule={(fn) => withModule(id, fn)}
+        focused={member}
+      />
 
-      <Section
-        title={`Invariants (${mod.invariants?.length ?? 0})`}
-        actions={
-          <button
-            type="button"
-            title="A condition on the attributes holding between calls of public methods"
-            onClick={() => withModule(id, (m) => void (m.invariants = withCondition(m.invariants)))}
-          >
-            <Icon name="plus" /> invariant
-          </button>
-        }
-      >
-        <ConditionList
-          label=""
-          values={mod.invariants ?? []}
-          onChange={(v) => withModule(id, (m) => setConditions(m, 'invariants', v))}
-        />
-      </Section>
+      {(contractsOn || !!mod.invariants?.length) && (
+        <Section
+          title={`Invariants (${mod.invariants?.length ?? 0})`}
+          actions={
+            <button
+              type="button"
+              title="A condition on the attributes holding between calls of public methods"
+              onClick={() => withModule(id, (m) => void (m.invariants = withCondition(m.invariants)))}
+            >
+              <Icon name="plus" /> invariant
+            </button>
+          }
+        >
+          <ConditionList
+            label=""
+            values={mod.invariants ?? []}
+            onChange={(v) => withModule(id, (m) => setConditions(m, 'invariants', v))}
+          />
+        </Section>
+      )}
 
       <Section
         title={`Methods (${mod.methods.length})`}
@@ -451,6 +478,7 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
         <MessageList
           messages={mod.methods}
           noun="method"
+          focused={member}
           onChange={(fn) => withModule(id, (m) => fn(m.methods))}
           headerExtra={(x, change) => (
             <AccessToggles value={x.access} onChange={(v) => change((y) => setAccess(y, v))} />
@@ -463,7 +491,9 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
                 onChange={(q, on) => change((y) => setMethodQualifier(y, q, on))}
               />
               <QualifierToggles
-                qualifiers={OTHER_QUALIFIERS}
+                qualifiers={OTHER_QUALIFIERS.filter(
+                  (q) => q !== 'threadSafe' || concurrencyOn || x.threadSafe
+                )}
                 value={x}
                 onChange={(q, on) => change((y) => setMethodQualifier(y, q, on))}
               />
@@ -477,12 +507,17 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
                 values={x.post ?? []}
                 onChange={(v) => change((y) => setConditions(y, 'post', v))}
               />
-              <AddConditions
-                lists={[
-                  { label: 'precondition', add: () => change((y) => void (y.pre = withCondition(y.pre))) },
-                  { label: 'postcondition', add: () => change((y) => void (y.post = withCondition(y.post))) }
-                ]}
-              />
+              {contractsOn && (
+                <AddConditions
+                  lists={[
+                    { label: 'precondition', add: () => change((y) => void (y.pre = withCondition(y.pre))) },
+                    {
+                      label: 'postcondition',
+                      add: () => change((y) => void (y.post = withCondition(y.post)))
+                    }
+                  ]}
+                />
+              )}
             </>
           )}
           paramValue={(prm, change) =>

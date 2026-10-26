@@ -664,6 +664,7 @@ const allCommands: Command[] = [
     id: 'window.stateMachine',
     title: 'State machine',
     category: 'Window',
+    enabled: () => useSettings.getState().featureStateMachine,
     run: tool('stateMachine')
   },
   { id: 'window.clearOutput', title: 'Clear output', category: 'Window', run: clearOutput },

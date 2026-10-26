@@ -18,6 +18,7 @@ import { OutputPanel } from '@/panels/OutputPanel'
 import { EditorArea } from './EditorArea'
 import {
   EDITOR_AREA,
+  keepMinWidths,
   keepSizes,
   loadOuterLayout,
   lockEditorArea,
@@ -123,6 +124,7 @@ export function DockShell(): ReactNode {
     loadOuterLayout(e.api)
     e.api.onDidLayoutChange(saveOuterLayout)
     keepSizes(e.api)
+    keepMinWidths(e.api)
     // The editor area cannot go away.
     e.api.onDidRemovePanel((p) => {
       if (p.id !== EDITOR_AREA) return

@@ -2,6 +2,7 @@ import { Fragment, useState, type ReactNode } from 'react'
 import { findPort, IDENTIFIER_RE, isImportedId, modulePath, transportError } from '@/model/project'
 import { deleteLink, reverseLink, update, useProjectStore } from '@/store/project'
 import { select } from '@/store/ui'
+import { useSettings } from '@/store/settings'
 import { navigate } from '@/actions'
 import {
   CommitInput,
@@ -235,9 +236,14 @@ function TransportField({ id, value }: { id: string; value: string | undefined }
 
 export function LinkInspector({ id }: { id: string }): ReactNode {
   const project = useProjectStore((s) => s.project)
+  const qosOn = useSettings((s) => s.featureLinkQos)
   const link = project.links.find((l) => l.id === id)
   if (!link) return <p className="muted">Link deleted.</p>
   const c = link.constraints
+  const { performance: perf } = c
+  const showAck = qosOn || c.ack.required
+  const showPerformance =
+    qosOn || perf.class !== 'normal' || perf.maxLatencyMs !== undefined || perf.rateHz !== undefined
   const fromPort = findPort(project, link.from.moduleId, link.from.portId)
   const toPort = findPort(project, link.to.moduleId, link.to.portId)
   const iface = project.interfaces.find((i) => i.id === fromPort?.interfaceId)
@@ -279,8 +285,12 @@ export function LinkInspector({ id }: { id: string }): ReactNode {
           onCommit={(n) => withLink(id, (l) => void (l.name = n))}
         />
       </Row>
-      <Row label="From">{endpoint(link.from)}</Row>
-      <Row label="To">{endpoint(link.to)}</Row>
+      <Row label="From" group>
+        {endpoint(link.from)}
+      </Row>
+      <Row label="To" group>
+        {endpoint(link.to)}
+      </Row>
       <Row label="Interface">
         <Select
           value={fromPort?.interfaceId ?? ''}
@@ -322,61 +332,65 @@ export function LinkInspector({ id }: { id: string }): ReactNode {
         />
       </Section>
 
-      <Section title="Acknowledgement">
-        <label className="check">
-          <input
-            type="checkbox"
-            checked={c.ack.required}
-            disabled={c.direction === 'unidirectional'}
-            onChange={(e) =>
-              withLink(id, (l) => {
-                l.constraints.ack.required = e.target.checked
-                if (!e.target.checked) delete l.constraints.ack.timeoutMs
-              })
-            }
-          />
-          Ack required{' '}
-          {c.direction === 'unidirectional' && (
-            <small className="muted">(requires a bidirectional link)</small>
+      {showAck && (
+        <Section title="Acknowledgement">
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={c.ack.required}
+              disabled={c.direction === 'unidirectional'}
+              onChange={(e) =>
+                withLink(id, (l) => {
+                  l.constraints.ack.required = e.target.checked
+                  if (!e.target.checked) delete l.constraints.ack.timeoutMs
+                })
+              }
+            />
+            Ack required{' '}
+            {c.direction === 'unidirectional' && (
+              <small className="muted">(requires a bidirectional link)</small>
+            )}
+          </label>
+          {c.ack.required && (
+            <Row label="Timeout (ms)">
+              <NumberInput
+                value={c.ack.timeoutMs}
+                min={0}
+                placeholder="none"
+                onChange={(v) => withLink(id, (l) => void (l.constraints.ack.timeoutMs = v))}
+              />
+            </Row>
           )}
-        </label>
-        {c.ack.required && (
-          <Row label="Timeout (ms)">
-            <NumberInput
-              value={c.ack.timeoutMs}
-              min={0}
-              placeholder="none"
-              onChange={(v) => withLink(id, (l) => void (l.constraints.ack.timeoutMs = v))}
+        </Section>
+      )}
+
+      {showPerformance && (
+        <Section title="Performance">
+          <Row label="Class">
+            <Select
+              value={c.performance.class}
+              options={PERFORMANCE_CLASSES}
+              onChange={(v) => withLink(id, (l) => void (l.constraints.performance.class = v))}
             />
           </Row>
-        )}
-      </Section>
-
-      <Section title="Performance">
-        <Row label="Class">
-          <Select
-            value={c.performance.class}
-            options={PERFORMANCE_CLASSES}
-            onChange={(v) => withLink(id, (l) => void (l.constraints.performance.class = v))}
-          />
-        </Row>
-        <Row label="Max latency (ms)">
-          <NumberInput
-            value={c.performance.maxLatencyMs}
-            min={0}
-            placeholder="—"
-            onChange={(v) => withLink(id, (l) => void (l.constraints.performance.maxLatencyMs = v))}
-          />
-        </Row>
-        <Row label="Rate (Hz)">
-          <NumberInput
-            value={c.performance.rateHz}
-            min={0}
-            placeholder="—"
-            onChange={(v) => withLink(id, (l) => void (l.constraints.performance.rateHz = v))}
-          />
-        </Row>
-      </Section>
+          <Row label="Max latency (ms)">
+            <NumberInput
+              value={c.performance.maxLatencyMs}
+              min={0}
+              placeholder="—"
+              onChange={(v) => withLink(id, (l) => void (l.constraints.performance.maxLatencyMs = v))}
+            />
+          </Row>
+          <Row label="Rate (Hz)">
+            <NumberInput
+              value={c.performance.rateHz}
+              min={0}
+              placeholder="—"
+              onChange={(v) => withLink(id, (l) => void (l.constraints.performance.rateHz = v))}
+            />
+          </Row>
+        </Section>
+      )}
 
       <Section title="Remote">
         <label className="check">

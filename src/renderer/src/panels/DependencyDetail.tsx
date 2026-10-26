@@ -22,6 +22,7 @@ import {
 import { openEditor } from '@/shell/controllers'
 import { Icon } from '@/components/Icon'
 import { onListKeyDown, tabStop } from '@/components/listKeys'
+import { refKinds, typeColorClass } from '@/components/typeColor'
 
 type Entity = TypeDef | Interface
 
@@ -97,12 +98,21 @@ function signature(m: Message, print: (t: TypeRef) => string): ReactNode {
   )
 }
 
-function Members({ e, print }: { e: Entity; print: (t: TypeRef) => string }): ReactNode {
-  const rows: { key: string; code: ReactNode; description?: string }[] = isInterface(e)
+function Members({
+  e,
+  print,
+  color
+}: {
+  e: Entity
+  print: (t: TypeRef) => string
+  color: (t: TypeRef) => string
+}): ReactNode {
+  const rows: { key: string; code: ReactNode; description?: string; className?: string }[] = isInterface(e)
     ? e.messages.map((m) => ({ key: m.id, code: signature(m, print), description: m.description }))
     : e.kind === 'struct' || e.kind === 'exception'
       ? e.fields.map((f) => ({
           key: f.id,
+          className: color(f.type),
           code: (
             <>
               <span className="lib-member-name">{f.name}</span>:{' '}
@@ -115,6 +125,7 @@ function Members({ e, print }: { e: Entity; print: (t: TypeRef) => string }): Re
       : e.kind === 'union'
         ? e.cases.map((c) => ({
             key: c.id,
+            className: color(c.type),
             code: (
               <>
                 <span className="lib-member-name">{c.name}</span>:{' '}
@@ -153,7 +164,7 @@ function Members({ e, print }: { e: Entity; print: (t: TypeRef) => string }): Re
   return (
     <ul className="lib-members">
       {rows.map((r) => (
-        <li key={r.key}>
+        <li key={r.key} className={r.className}>
           <code>{r.code}</code>
           {r.description && <small>{r.description}</small>}
         </li>
@@ -234,6 +245,10 @@ export function DependencyDetail({ lib }: { lib: Dependency }): ReactNode {
     const refName = refNamer(project)
     return (t: TypeRef): string => printTypeRef(t, (id) => names.get(id) ?? refName(id))
   }, [project])
+  const color = useMemo(() => {
+    const kindOf = refKinds(project)
+    return (t: TypeRef): string => typeColorClass(t, kindOf)
+  }, [project])
   const usages = useMemo(() => {
     const inside = new Set(all.map((e) => e.id))
     return new Map(all.map((e) => [e.id, usageCount(project, e, inside)]))
@@ -309,7 +324,7 @@ export function DependencyDetail({ lib }: { lib: Dependency }): ReactNode {
         {open && (
           <div className="lib-entity-body">
             {e.description && <p className="lib-description">{e.description}</p>}
-            <Members e={e} print={print} />
+            <Members e={e} print={print} color={color} />
           </div>
         )}
       </li>

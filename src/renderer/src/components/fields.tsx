@@ -186,11 +186,29 @@ export function AccessToggles(props: {
   )
 }
 
-export function Row(props: { label: string; children: ReactNode }): ReactNode {
-  return (
-    <label className="row">
+export function Row(props: {
+  label: string
+  /** Attribute, method... the row edits, for `focusMember`. */
+  member?: string
+  focused?: boolean
+  /** Buttons rather than one field: not a <label>, whose hover and clicks would go to the first button. */
+  group?: boolean
+  children: ReactNode
+}): ReactNode {
+  const className = `row ${props.focused ? 'focused' : ''}`
+  const content = (
+    <>
       <span className="row-label">{props.label}</span>
       <span className="row-value">{props.children}</span>
+    </>
+  )
+  return props.group ? (
+    <div className={className} data-member={props.member} role="group" aria-label={props.label}>
+      {content}
+    </div>
+  ) : (
+    <label className={className} data-member={props.member}>
+      {content}
     </label>
   )
 }

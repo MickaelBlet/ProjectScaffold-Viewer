@@ -926,9 +926,13 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
           onNodeClick={(e, n) => {
             revealInspector()
             if (e.shiftKey || e.ctrlKey || e.metaKey) return
+            // A click on an attribute or method row shows it in the inspector.
+            const member = (e.target as Element).closest<HTMLElement>('[data-member]')?.dataset.member
+            if (member) return patchDoc({ selection: { kind: 'module', id: n.id, member } })
             // A click on an already selected node keeps the group but shows that node.
             const doc = activeDoc()
-            if (!doc.selection || !('id' in doc.selection) || doc.selection.id !== n.id)
+            const sel = doc.selection
+            if (!sel || !('id' in sel) || sel.id !== n.id || (sel.kind === 'module' && sel.member))
               patchDoc({ selection: selectionOf(getProject(), n.id) })
           }}
           onNodeDoubleClick={(_, n) => {

@@ -16,6 +16,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - VS Code: the pages heard no message from the extension since 1.1.0 (VS Code sets `window.parent` to the page itself): the diagram followed neither the text (cursor, edits) nor the side bar, the side bar not the active file, and commands and dialogs got no answer. Messages are now told by their origin.
 - VS Code: an entity selected in the side bar's Explorer is brought into view in the preview as in the app (opening the _Project_ view when the focused view does not draw it); following the text cursor still leaves the view as it is. The `reveal` message says which (`cursor`).
 - VS Code: switching the side bar to another project file wrote its changes not written yet to the new file.
+- Kind-colored backgrounds, in the colors of the Explorer's badges: field rows, lone types (union discriminator, aliased type, message return, type parameter default), attributes on the canvas, the fields and cases of a dependency and the attributes of a linked module after the kind of what their type names (struct, enum, bitmask, union, alias, custom primitive, module, container — an optional takes its item's —, built-in primitive); type completions and the options of the structured type editor after what they name, with its badge (`P` built-in primitive, `<>` container, `M` module, in its color when it has one; the structured editor's type choice is now a list of its own, a native select showing no badges); Explorer types and interfaces, enum values and bitmask flags after their own kind.
+- Canvas: click an attribute, method, constructor or destructor of a module to edit it in the inspector, which scrolls to it and highlights it (as the canvas does); Delete then removes only it.
+- _Settings › Features_: turn off derives, lifecycle, contracts (invariants, preconditions, postconditions), state machine, concurrency (locks, `atomic`, `threadSafe`), generics (type parameters), value constraints (range, unit, pattern) and link quality of service (acknowledgement, performance) to hide their editing from the Inspector; a feature the project already uses still shows. All on by default.
+
+### Fixed
+
+- Arrange: containers fit their arranged content (padding, port labels and header kept) instead of keeping the extra room ELK leaves for links to their own ports; arranging a selected module also shrinks it to its new content.
+- Inspector: a select with controls beside it (destructor, module kind) fills its row like the others. The inspector can no longer be made narrower than 200px, and its content rearranges down to that width instead of overflowing or overlapping: field rows wrap (name and actions, then access, qualifiers or direction, type, value), field details put their labels above their controls, section actions, qualifier toggles, condition buttons, type parameters, states and transitions wrap, long names break, and dependency details stack their actions.
+- Inspector: hovering or clicking the label of a row of buttons (_Access_, _Derives_, _Parent_, link _From_ / _To_) no longer hovers or presses its first button.
 
 ## [1.1.0] - 2026-10-12
 

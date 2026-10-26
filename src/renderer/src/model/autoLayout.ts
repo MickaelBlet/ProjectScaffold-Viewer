@@ -44,13 +44,19 @@ function labelWidth(p: Project, pt: Port): number {
   return 34 + pt.name.length * 7 + iface.length * 6
 }
 
+interface Padding {
+  top: number
+  left: number
+  bottom: number
+  right: number
+}
+
 /**
- * Center each layer (row when `vertical`, column otherwise) of every container on the axis of its
+ * Center each layer (row when `vertical`, column otherwise) of a container on the axis of its
  * content: ELK aligns modules to straighten links, which leaves narrow layers on one side.
  */
 function centerLayers(n: ElkNode, vertical: boolean): void {
   const children = n.children ?? []
-  for (const c of children) centerLayers(c, vertical)
   if (children.length < 2) return
   // Along the flow, cross-axis otherwise.
   const flow = (c: ElkNode): [number, number] =>
@@ -77,6 +83,33 @@ function centerLayers(n: ElkNode, vertical: boolean): void {
   }
 }
 
+/**
+ * Bottom-up: center the layers of each container, then fit it to its content and padding (never
+ * below its minimum size). ELK leaves room for links to the container's own ports.
+ */
+function settle(
+  n: ElkNode,
+  vertical: boolean,
+  frame: (id: string) => { padding: Padding; min: { width: number; height: number } } | undefined
+): void {
+  const children = n.children ?? []
+  for (const c of children) settle(c, vertical, frame)
+  centerLayers(n, vertical)
+  const f = frame(n.id)
+  if (!f || !children.length) return
+  const b = boundsOf(
+    children.map((c) => ({ x: c.x ?? 0, y: c.y ?? 0, width: c.width ?? 0, height: c.height ?? 0 }))
+  )
+  const dx = f.padding.left - b.x
+  const dy = f.padding.top - b.y
+  for (const c of children) {
+    c.x = (c.x ?? 0) + dx
+    c.y = (c.y ?? 0) + dy
+  }
+  n.width = Math.max(f.min.width, f.padding.left + b.width + f.padding.right)
+  n.height = Math.max(f.min.height, f.padding.top + b.height + f.padding.bottom)
+}
+
 /** New rects (parent-relative) for the modules inside `scopeId` (or all modules). */
 export async function computeArrangement(
   p: Project,
@@ -96,9 +129,16 @@ export async function computeArrangement(
   // Horizontal: a container's side port labels sit inside its frame (see ModuleNode), clear of its content.
   const labels = (m: Pick<Module, 'ports'>, role: PortRole): number =>
     vertical ? 0 : Math.max(0, ...m.ports.filter((pt) => pt.role === role).map((pt) => labelWidth(p, pt)))
-  const padding = (m: Pick<Module, 'ports' | 'attributes' | 'methods'>): string =>
-    `[top=${contentTop(o, m) + LAYOUT_PAD / 2},left=${Math.max(LAYOUT_PAD, labels(m, 'in'))},` +
-    `bottom=${contentBottom(o)},right=${Math.max(LAYOUT_PAD, labels(m, 'out'))}]`
+  const paddingOf = (m: Pick<Module, 'ports' | 'attributes' | 'methods'>): Padding => ({
+    top: contentTop(o, m) + LAYOUT_PAD / 2,
+    left: Math.max(LAYOUT_PAD, labels(m, 'in')),
+    bottom: contentBottom(o),
+    right: Math.max(LAYOUT_PAD, labels(m, 'out'))
+  })
+  const padding = (m: Pick<Module, 'ports' | 'attributes' | 'methods'>): string => {
+    const { top, left, bottom, right } = paddingOf(m)
+    return `[top=${top},left=${left},bottom=${bottom},right=${right}]`
+  }
 
   // Spacing applies to each container's own content.
   const spacing = {
@@ -215,7 +255,11 @@ export async function computeArrangement(
 
   elk ??= new ELK()
   const result = await elk.layout(graph)
-  centerLayers(result, vertical)
+  const byId = new Map(p.modules.map((m) => [m.id, m]))
+  settle(result, vertical, (id) => {
+    const m = id === '__root__' ? scope : byId.get(id)
+    return m && { padding: paddingOf(m), min: minSize(m, o) }
+  })
   const rects = new Map<Id, Rect>()
   const collect = (n: ElkNode): void => {
     for (const c of n.children ?? []) {
@@ -225,6 +269,8 @@ export async function computeArrangement(
     }
   }
   collect(result)
+  // The arranged container fits its new content.
+  if (scope) rects.set(scope.id, { ...scope.layout, width: result.width ?? 0, height: result.height ?? 0 })
 
   // Top level: keep the arrangement where the modules were.
   if (!scopeId) {

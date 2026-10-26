@@ -1,6 +1,6 @@
 // Inspector section of a module's lifecycle: instantiation, copy and move, destructor, constructors.
 import type { ReactNode } from 'react'
-import { newId, setAccess } from '@/model/project'
+import { DESTRUCTOR_MEMBER, newId, setAccess } from '@/model/project'
 import {
   INSTANTIATIONS,
   PARAM_DIRECTIONS,
@@ -20,6 +20,7 @@ import {
   TextArea
 } from '@/components/fields'
 import { Icon } from '@/components/Icon'
+import { useSettings } from '@/store/settings'
 import { DefaultInput, FieldList, setDefault } from './TypeInspector'
 
 type WithModule = (fn: (m: Module, d: Project) => void) => void
@@ -44,8 +45,13 @@ export function LifecycleSection(props: {
   mod: Module
   types: Project['types']
   withModule: WithModule
+  /** Constructor or destructor selected on the canvas, highlighted. */
+  focused?: string
 }): ReactNode {
-  const { mod, types, withModule } = props
+  const { mod, types, withModule, focused } = props
+  const on = useSettings((s) => s.featureLifecycle)
+  if (!on && !mod.instantiation && !mod.copy && !mod.move && !mod.destructor && !mod.constructors?.length)
+    return null
   const ctors = mod.constructors ?? []
   const d = mod.destructor
   const destructor: DestructorChoice = !d
@@ -109,7 +115,7 @@ export function LifecycleSection(props: {
           onChange={(v) => setSpecial('move', v as SpecialMember | '')}
         />
       </Row>
-      <Row label="Destructor">
+      <Row label="Destructor" member={DESTRUCTOR_MEMBER} focused={focused === DESTRUCTOR_MEMBER}>
         <span className="row-inline">
           <Select
             value={destructor}
@@ -134,7 +140,7 @@ export function LifecycleSection(props: {
         </span>
       </Row>
       {ctors.map((c) => (
-        <div className="card" key={c.id}>
+        <div className={`card ${focused === c.id ? 'focused' : ''}`} key={c.id} data-member={c.id}>
           <div className="card-header">
             <span className="card-title">
               {mod.name}({c.params.map((prm) => prm.name).join(', ')})

@@ -195,8 +195,29 @@ export function loadOuterLayout(api: DockviewApi): void {
 type GridNode = SerializedDockview['grid']['root']
 type GroupState = Extract<GridNode['data'], { id: string }>
 
+const isTool = (id: string): id is ToolId => id in TOOL_TITLES
+
 /** Dockview's default minimum group width and height. */
 const MIN_GROUP_SIZE = 100
+/** Tools whose content needs more width than that (the inspector's forms rearrange down to it). */
+const TOOL_MIN_WIDTHS: Partial<Record<ToolId, number>> = { inspector: 200 }
+
+/** Minimum width of a group: the largest one of the tools it holds, active or not. */
+const minWidthOf = (group: IDockviewGroupPanel): number =>
+  Math.max(MIN_GROUP_SIZE, ...group.panels.map((p) => (isTool(p.id) && TOOL_MIN_WIDTHS[p.id]) || 0))
+
+/** Keeps each group at least as wide as the tools it holds need, as tools are added, moved and closed. */
+export function keepMinWidths(api: DockviewApi): void {
+  const apply = (): void => {
+    for (const g of api.groups)
+      if (g.minimumWidth !== minWidthOf(g)) g.api.setConstraints({ minimumWidth: minWidthOf(g) })
+  }
+  apply()
+  api.onDidAddPanel(apply)
+  api.onDidRemovePanel(apply)
+  api.onDidMovePanel(apply)
+  api.onDidLayoutFromJSON(apply)
+}
 
 const leafIds = (node: GridNode): string[] =>
   node.type === 'leaf' ? [(node.data as GroupState).id] : (node.data as GridNode[]).flatMap(leafIds)
@@ -225,8 +246,6 @@ type Size = { width: number; height: number }
 const lastToolSizes = new Map<ToolId, Size>()
 /** Size asked by `showTool` for the group it is adding. */
 let requestedSize: Partial<Size> | null = null
-
-const isTool = (id: string): id is ToolId => id in TOOL_TITLES
 
 /**
  * Dockview shares the space of an added or removed group equally between its siblings, which
@@ -297,7 +316,8 @@ export function keepSizes(api: DockviewApi): void {
           : { minimumHeight: min, maximumHeight: max }
       )
     for (const [group, size] of pins) constrain(group, size, size)
-    for (const [group] of pins) constrain(group, MIN_GROUP_SIZE, Number.MAX_SAFE_INTEGER)
+    for (const [group] of pins)
+      constrain(group, axis === 'width' ? minWidthOf(group) : MIN_GROUP_SIZE, Number.MAX_SAFE_INTEGER)
   })
 }
 

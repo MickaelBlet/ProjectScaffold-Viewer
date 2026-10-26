@@ -1384,6 +1384,8 @@ editor:
       locked: true
     Motors:
       locked: true
+      labels:
+        throttle: left
   links:
     imu_to_estimator:
       points:

@@ -23,6 +23,20 @@
   --syn-type: var(--accent);
   --syn-string: #2b7a3f;
   --syn-literal: #b0480b;
+  /* Kinds of entities: Explorer badges, field rows. */
+  --kind-struct: #3b6fe0;
+  --kind-enum: #8a4fd1;
+  --kind-bitmask: #c0567a;
+  --kind-union: #3f8f3a;
+  --kind-const: #9a6b2f;
+  --kind-exception: #c0392b;
+  --kind-alias: #2e9e8f;
+  --kind-primitive: #7a7f2a;
+  --kind-interface: #d98b00;
+  --kind-mod: #5a6b85;
+  --kind-dependency: #6b5a3b;
+  --kind-binary: #3b6b5a;
+  --kind-container: #1f8fb3;
   --scrollbar-thumb: color-mix(in srgb, var(--text) 16%, transparent);
   --scrollbar-thumb-hover: color-mix(in srgb, var(--text) 32%, transparent);
   color-scheme: light;
@@ -397,6 +411,9 @@ button.link-button {
   border: none;
   padding: 0;
   color: var(--accent);
+  text-align: start;
+  /* Long qualified names break rather than overflow. */
+  overflow-wrap: anywhere;
 }
 button.link-button:hover {
   text-decoration: underline;
@@ -902,34 +919,34 @@ kbd {
   background: var(--perf-normal);
 }
 .kind-badge.struct {
-  background: #3b6fe0;
+  background: var(--kind-struct);
 }
 .kind-badge.enum {
-  background: #8a4fd1;
+  background: var(--kind-enum);
 }
 .kind-badge.bitmask {
-  background: #c0567a;
+  background: var(--kind-bitmask);
 }
 .kind-badge.union {
-  background: #3f8f3a;
+  background: var(--kind-union);
 }
 .kind-badge.const {
-  background: #9a6b2f;
+  background: var(--kind-const);
 }
 .kind-badge.exception {
-  background: #c0392b;
+  background: var(--kind-exception);
 }
 .kind-badge.alias {
-  background: #2e9e8f;
+  background: var(--kind-alias);
 }
 .kind-badge.primitive {
-  background: #7a7f2a;
+  background: var(--kind-primitive);
 }
 .kind-badge.interface {
-  background: #d98b00;
+  background: var(--kind-interface);
 }
 .kind-badge.mod {
-  background: #5a6b85;
+  background: var(--kind-mod);
 }
 .kind-badge.link {
   background: var(--perf-bulk);
@@ -941,10 +958,18 @@ kbd {
   background: var(--ok);
 }
 .kind-badge.dependency {
-  background: #6b5a3b;
+  background: var(--kind-dependency);
 }
 .kind-badge.binary {
-  background: #3b6b5a;
+  background: var(--kind-binary);
+}
+.kind-badge.container {
+  background: var(--kind-container);
+  font-size: 9px;
+}
+/* What names no known kind (a deleted type): the room of a badge, for alignment. */
+.kind-badge.none {
+  visibility: hidden;
 }
 /* Explorer modules: hidden in the focused view (eye), drop target of a dragged module. */
 .entity-list li.is-hidden .tree-name {
@@ -1100,6 +1125,7 @@ button.lib-chip {
     'SF Mono',
     Consolas,
     monospace;
+  overflow-wrap: anywhere;
 }
 .lib-members small {
   color: var(--muted);
@@ -1130,6 +1156,7 @@ fieldset.readonly {
   font-size: 15px;
   margin: 0 30px 10px 0;
   text-transform: capitalize;
+  overflow-wrap: anywhere;
 }
 .inspector h2 small {
   text-transform: none;
@@ -1164,6 +1191,15 @@ fieldset.readonly {
   display: flex;
   align-items: center;
   gap: 4px;
+}
+/* A row's value with controls beside its select: the select fills the row like a lone one. */
+.row-value > .row-inline {
+  flex: 1;
+  min-width: 0;
+}
+.row-value > .row-inline > select {
+  flex: 1;
+  min-width: 0;
 }
 .section {
   margin-top: 14px;
@@ -1241,6 +1277,8 @@ input.number {
   vertical-align: top;
   border-block: 1px solid var(--border);
   background: var(--row);
+  /* Long names and types break rather than widen the table past the inspector. */
+  overflow-wrap: anywhere;
 }
 .grid tr:nth-child(even) > td {
   background: var(--row);
@@ -1257,6 +1295,70 @@ input.number {
 }
 .grid td:only-child {
   border-radius: 6px;
+}
+/*
+ * Entries tinted after a kind (`typed of-<kind>`): fields, attributes and lone types after the kind of what
+ * their type names, Explorer rows after their own kind, enum values and bitmask flags after theirs. Over the
+ * shading of every other entry; Explorer rows keep the hover and selection backgrounds.
+ */
+.typed.of-struct {
+  --type-color: var(--kind-struct);
+}
+.typed.of-enum {
+  --type-color: var(--kind-enum);
+}
+.typed.of-bitmask {
+  --type-color: var(--kind-bitmask);
+}
+.typed.of-union {
+  --type-color: var(--kind-union);
+}
+.typed.of-exception {
+  --type-color: var(--kind-exception);
+}
+.typed.of-alias {
+  --type-color: var(--kind-alias);
+}
+.typed.of-primitive {
+  --type-color: var(--kind-primitive);
+}
+.typed.of-interface {
+  --type-color: var(--kind-interface);
+}
+.typed.of-mod {
+  --type-color: var(--kind-mod);
+}
+.typed.of-container {
+  --type-color: var(--kind-container);
+}
+.typed.of-builtin {
+  --type-color: var(--perf-normal);
+}
+.type-entry.typed {
+  background: color-mix(in srgb, var(--type-color) 12%, var(--row));
+}
+.grid tr.typed > td {
+  background: color-mix(in srgb, var(--type-color) 12%, var(--row));
+}
+.entity-list li.typed:not(.active, :hover) {
+  background: color-mix(in srgb, var(--type-color) 10%, transparent);
+}
+.lib-members li.typed {
+  padding-inline: 4px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--type-color) 12%, transparent);
+}
+.module-attrs li.typed {
+  background: color-mix(in srgb, var(--type-color) 14%, transparent);
+}
+/* A type editor alone on its line: an entry like a field row. */
+.type-entry {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: calc(var(--entry-pad) - var(--cell-pad));
+  background: var(--row);
 }
 /* Columns of buttons and numbers as wide as their content; the others share the rest. */
 .grid td:is(:empty, :has(> button.icon, input.number)) {
@@ -1319,6 +1421,10 @@ ul.plain > li:nth-child(even) {
 }
 ul.plain > li + li {
   margin-top: 4px;
+}
+/* Fields tinted after the kind of what their type names (see `.typed` above), over the shading above. */
+.field-list > .field-row.typed {
+  background: color-mix(in srgb, var(--type-color) 12%, var(--row));
 }
 .field-row > * {
   min-width: 0;
@@ -1395,6 +1501,35 @@ ul.plain > li + li {
   }
   .field-list.has-value > .field-row > .value {
     grid-row: 3;
+  }
+}
+/*
+ * Very narrow: the subgrid's control columns no longer fit beside each other. Each row wraps on its own:
+ * the name with the actions, then the column and before cells, the type and the value on lines below.
+ */
+@container (max-width: 300px) {
+  .field-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .field-row > .name {
+    flex: 1 1 0;
+  }
+  .field-row > .actions-cell {
+    flex: none;
+  }
+  /* Line break after the actions. */
+  .field-row::after {
+    content: '';
+    order: 1;
+    flex-basis: 100%;
+  }
+  .field-row > :is(.column, .before, .type, .value) {
+    order: 2;
+  }
+  .field-row > :is(.type, .value) {
+    flex-basis: 100%;
   }
 }
 .grid select {
@@ -1487,6 +1622,16 @@ button.qualifier.on {
   margin-bottom: 8px;
   background: var(--panel-2);
 }
+/* Member selected on the canvas. */
+.field-row.focused,
+.card.focused,
+.row.focused {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+.row.focused {
+  border-radius: 4px;
+}
 .card-header {
   display: flex;
   gap: 4px;
@@ -1517,10 +1662,137 @@ button.qualifier.on {
   display: flex;
   gap: 12px;
 }
+/* Qualifier toggles of methods: wrapped before they overflow. */
+@container (max-width: 340px) {
+  .qualifiers {
+    display: flex;
+    flex-wrap: wrap;
+  }
+}
+/* Narrow inspector (down to its 200px minimum): what does not fit on one line wraps. */
+@container (max-width: 300px) {
+  .section header {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .section-actions {
+    flex-wrap: wrap;
+    margin-left: auto;
+  }
+  .card-header {
+    flex-wrap: wrap;
+  }
+  .card-header .qualifiers {
+    height: auto;
+  }
+  .add-conditions {
+    flex-wrap: wrap;
+    row-gap: 2px;
+  }
+  /* Details: the label above its controls. */
+  .field-details .detail {
+    flex-wrap: wrap;
+  }
+  .field-details .detail > span:first-child {
+    width: 100%;
+  }
+  .field-details .detail > :is(select, input:not(.number)) {
+    flex: 1;
+    min-width: 0;
+  }
+  /* Type parameter: name and delete button, then the constraints. */
+  .type-param > .row-inline {
+    flex-wrap: wrap;
+  }
+  .type-param > .row-inline > .field {
+    flex: 1 1 0;
+  }
+  .type-param > .row-inline > button.icon {
+    order: 1;
+  }
+  .type-param > .row-inline::after {
+    content: '';
+    order: 2;
+    flex-basis: 100%;
+  }
+  .type-param > .row-inline > select {
+    order: 3;
+    flex: 1 1 0;
+  }
+  /* State: name and delete button, then the initial and final checks. */
+  .card.state > .row-inline:first-child {
+    flex-wrap: wrap;
+  }
+  .card.state > .row-inline:first-child > .field {
+    flex: 1 1 0;
+  }
+  .card.state > .row-inline:first-child > button.icon {
+    order: 1;
+  }
+  .card.state > .row-inline:first-child::after {
+    content: '';
+    order: 2;
+    flex-basis: 100%;
+  }
+  .card.state > .row-inline:first-child > .check {
+    order: 3;
+  }
+  /* Transition: source state and delete button, then the arrow and the target state. */
+  .card.transition > .row-inline:first-child {
+    flex-wrap: wrap;
+  }
+  .card.transition > .row-inline:first-child > button.icon {
+    order: 1;
+  }
+  .card.transition > .row-inline:first-child::after {
+    content: '';
+    order: 2;
+    flex-basis: 100%;
+  }
+  .card.transition > .row-inline:first-child > :is(svg, select:last-of-type) {
+    order: 3;
+  }
+  /* Entry, exit, trigger and action: each label beside its select, one per line. */
+  .row-inline.state-methods {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  /* Dependency: actions on a line of their own; entities' summaries shrink, their usage wraps. */
+  .lib-header {
+    flex-wrap: wrap;
+  }
+  .lib-header h3 {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .lib-header .explorer-actions {
+    flex-basis: 100%;
+    justify-content: flex-end;
+  }
+  .lib-entity-head {
+    flex-wrap: wrap;
+  }
+  .lib-entity-head > small:first-of-type {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .lib-entity-head > small:last-child {
+    margin-left: auto;
+  }
+  .lib-entity-body {
+    padding-left: 24px;
+  }
+}
+/* Selects of a card's line (transitions) share its width. */
+.card > .row-inline > select {
+  flex: 1 1 0;
+  min-width: 0;
+}
 /* State machine: inspector cards and the State machine panel. */
 .card.state,
 .card.transition {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 4px;
   padding: 6px;
 }
@@ -1660,12 +1932,582 @@ ul.plain {
   font-size: 12px;
 }
 .suggestions li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   padding: 2px 6px;
   border-radius: 3px;
   cursor: pointer;
 }
 .suggestions li.active {
   background: var(--accent-soft);
+}
+.suggestions li.typed:not(.active) {
+  background: color-mix(in srgb, var(--type-color) 14%, var(--panel));
+}
+/* Drop-down list of the structured type editor (components/TypeSelect.tsx): a button like a select, a list
+   of options with the badges of their kinds drawn over the page. */
+.type-select {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: calc(1lh + 8px);
+  padding: 3px var(--input-pad-x);
+  background: var(--panel);
+  text-align: left;
+}
+.type-select:focus-visible,
+.type-select[aria-expanded='true'] {
+  outline: 2px solid var(--accent-soft);
+  border-color: var(--accent);
+}
+/* Read-only content: as legible as its other fields. */
+.type-select:disabled {
+  opacity: 1;
+}
+.type-select .kind-badge,
+.type-select-list .kind-badge {
+  width: 16px;
+  height: 16px;
+  font-size: 10px;
+}
+.type-select .kind-badge.container,
+.type-select-list .kind-badge.container {
+  font-size: 8px;
+}
+.type-select-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.type-select-list {
+  position: fixed;
+  z-index: 1000;
+  overflow: auto;
+  padding: 2px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+.type-select-group {
+  padding: 4px 6px 2px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+.type-select-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.type-select-option.typed {
+  background: color-mix(in srgb, var(--type-color) 14%, var(--panel));
+}
+.type-select-option.active {
+  background: var(--accent-soft);
+}
+/* The current choice, outlined (inset: no shift of the layout). */
+.type-select-option[aria-selected='true'] {
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.type-tree {
+  margin: 0 0 4px 4px;
+}
+/* Constraints, ownership, accessors and lock of a field, below its row. */
+.field-details {
+  display: grid;
+  gap: 4px;
+  margin: 0 0 6px 4px;
+}
+.field-details .detail {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.field-details .detail > span:first-child {
+  flex: none;
+  width: 80px;
+  color: var(--muted);
+}
+.field-details .detail input.number {
+  width: 72px;
+}
+@container (max-width: 560px) {
+  .field-list.has-value {
+    grid-template-columns: minmax(0, 1fr) auto auto minmax(0, 2fr) 0 auto;
+  }
+  .field-list.has-value > .field-row > .value {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
+@container (max-width: 380px) {
+  .field-list,
+  .field-list.has-value {
+    grid-template-columns: minmax(0, 1fr) auto auto 0 0 auto;
+  }
+  .field-row > .type {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  .field-list.has-value > .field-row > .value {
+    grid-row: 3;
+  }
+}
+/*
+ * Very narrow: the subgrid's control columns no longer fit beside each other. Each row wraps on its own:
+ * the name with the actions, then the column and before cells, the type and the value on lines below.
+ */
+@container (max-width: 300px) {
+  .field-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .field-row > .name {
+    flex: 1 1 0;
+  }
+  .field-row > .actions-cell {
+    flex: none;
+  }
+  /* Line break after the actions. */
+  .field-row::after {
+    content: '';
+    order: 1;
+    flex-basis: 100%;
+  }
+  .field-row > :is(.column, .before, .type, .value) {
+    order: 2;
+  }
+  .field-row > :is(.type, .value) {
+    flex-basis: 100%;
+  }
+}
+.grid select {
+  width: 100%;
+}
+.check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0;
+}
+.qualifiers {
+  /* Columns of equal width, sized to the longest label. */
+  display: inline-grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 4px;
+  margin: 4px 0;
+}
+/* Qualifier toggle: muted when off, accent when on. */
+button.qualifier {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--muted);
+  background: none;
+}
+button.qualifier.on {
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+/* In a field row, a module's type row or a card header: single-letter square toggles, centered on the inputs. */
+.field-row .qualifiers,
+.type-row .qualifiers,
+.card-header .qualifiers {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  margin: 0;
+  /* Height of an input: line height plus padding and border. */
+  height: calc(1.4em + 8px);
+}
+/* Access level beside qualifiers: set apart. */
+.qualifiers.access + .qualifiers {
+  margin-left: 6px;
+}
+.field-row > .column .qualifiers.access + .qualifiers {
+  margin-left: 2px;
+}
+.field-row button.qualifier,
+.type-row button.qualifier,
+.card-header button.qualifier {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border-radius: 4px;
+}
+.metadata .kv {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+/* Narrow inspector: labels above their value, metadata values below their key. */
+@container (max-width: 300px) {
+  .row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+  .metadata .kv {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .metadata .kv > :nth-child(2) {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
+.card {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px;
+  margin-bottom: 8px;
+  background: var(--panel-2);
+}
+/* Member selected on the canvas. */
+.field-row.focused,
+.card.focused,
+.row.focused {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+.row.focused {
+  border-radius: 4px;
+}
+.card-header {
+  display: flex;
+  gap: 4px;
+  align-items: flex-start;
+}
+.card-header .field {
+  flex: 1;
+  font-weight: 600;
+}
+/* Preconditions, postconditions and invariants: expressions. */
+.conditions {
+  display: grid;
+  gap: 2px;
+  margin: 4px 0;
+}
+.conditions-label {
+  font-size: 11px;
+  color: var(--muted);
+}
+.condition .field {
+  flex: 1;
+}
+.condition input,
+.field.code input {
+  font-family: ui-monospace, 'SF Mono', Consolas, monospace;
+}
+.add-conditions {
+  display: flex;
+  gap: 12px;
+}
+/* Qualifier toggles of methods: wrapped before they overflow. */
+@container (max-width: 340px) {
+  .qualifiers {
+    display: flex;
+    flex-wrap: wrap;
+  }
+}
+/* Narrow inspector (down to its 200px minimum): what does not fit on one line wraps. */
+@container (max-width: 300px) {
+  .section header {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .section-actions {
+    flex-wrap: wrap;
+    margin-left: auto;
+  }
+  .card-header {
+    flex-wrap: wrap;
+  }
+  .card-header .qualifiers {
+    height: auto;
+  }
+  .add-conditions {
+    flex-wrap: wrap;
+    row-gap: 2px;
+  }
+  /* Details: the label above its controls. */
+  .field-details .detail {
+    flex-wrap: wrap;
+  }
+  .field-details .detail > span:first-child {
+    width: 100%;
+  }
+  .field-details .detail > :is(select, input:not(.number)) {
+    flex: 1;
+    min-width: 0;
+  }
+  /* Type parameter: name and delete button, then the constraints. */
+  .type-param > .row-inline {
+    flex-wrap: wrap;
+  }
+  .type-param > .row-inline > .field {
+    flex: 1 1 0;
+  }
+  .type-param > .row-inline > button.icon {
+    order: 1;
+  }
+  .type-param > .row-inline::after {
+    content: '';
+    order: 2;
+    flex-basis: 100%;
+  }
+  .type-param > .row-inline > select {
+    order: 3;
+    flex: 1 1 0;
+  }
+  /* State: name and delete button, then the initial and final checks. */
+  .card.state > .row-inline:first-child {
+    flex-wrap: wrap;
+  }
+  .card.state > .row-inline:first-child > .field {
+    flex: 1 1 0;
+  }
+  .card.state > .row-inline:first-child > button.icon {
+    order: 1;
+  }
+  .card.state > .row-inline:first-child::after {
+    content: '';
+    order: 2;
+    flex-basis: 100%;
+  }
+  .card.state > .row-inline:first-child > .check {
+    order: 3;
+  }
+  /* Transition: source state and delete button, then the arrow and the target state. */
+  .card.transition > .row-inline:first-child {
+    flex-wrap: wrap;
+  }
+  .card.transition > .row-inline:first-child > button.icon {
+    order: 1;
+  }
+  .card.transition > .row-inline:first-child::after {
+    content: '';
+    order: 2;
+    flex-basis: 100%;
+  }
+  .card.transition > .row-inline:first-child > :is(svg, select:last-of-type) {
+    order: 3;
+  }
+  /* Entry, exit, trigger and action: each label beside its select, one per line. */
+  .row-inline.state-methods {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  /* Dependency: actions on a line of their own; entities' summaries shrink, their usage wraps. */
+  .lib-header {
+    flex-wrap: wrap;
+  }
+  .lib-header h3 {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .lib-header .explorer-actions {
+    flex-basis: 100%;
+    justify-content: flex-end;
+  }
+  .lib-entity-head {
+    flex-wrap: wrap;
+  }
+  .lib-entity-head > small:first-of-type {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .lib-entity-head > small:last-child {
+    margin-left: auto;
+  }
+  .lib-entity-body {
+    padding-left: 24px;
+  }
+}
+/* Selects of a card's line (transitions) share its width. */
+.card > .row-inline > select {
+  flex: 1 1 0;
+  min-width: 0;
+}
+/* State machine: inspector cards and the State machine panel. */
+.card.state,
+.card.transition {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 4px;
+  padding: 6px;
+}
+.state-methods select {
+  flex: 1;
+  min-width: 0;
+}
+.state-machine-panel {
+  position: relative;
+  height: 100%;
+}
+.state-machine-title {
+  position: absolute;
+  z-index: 5;
+  top: 6px;
+  left: 10px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.panel-message {
+  padding: 10px;
+}
+.state-node {
+  height: 100%;
+  border: 1.5px solid var(--text);
+  border-radius: 10px;
+  background: var(--node-bg);
+  color: var(--text);
+  font-size: 12px;
+}
+.state-node.final {
+  outline: 1.5px solid var(--text);
+  outline-offset: 2px;
+}
+.state-name {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+}
+.state-line {
+  padding: 0 10px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.react-flow .state-handle {
+  visibility: hidden;
+}
+.state-initial {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: var(--text);
+}
+.react-flow .transition-edge {
+  stroke: var(--text);
+  stroke-width: 1.2;
+}
+.transition-arrow {
+  fill: var(--text);
+  stroke: none;
+}
+.transition-label {
+  position: absolute;
+  padding: 0 4px;
+  color: var(--text);
+  font-size: 11px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+/* Constructor signature, in place of a name input. */
+.card-title {
+  flex: 1;
+  align-self: center;
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+ul.plain {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.callout.error {
+  margin-top: 8px;
+  padding: 8px;
+  border: 1px solid var(--danger);
+  border-radius: 4px;
+  color: var(--danger);
+}
+.callout.dependency {
+  margin-bottom: 10px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel-2);
+}
+.callout.dependency .actions {
+  margin-top: 8px;
+}
+
+/* Type editor */
+.type-editor-line {
+  display: flex;
+  gap: 2px;
+}
+.type-editor-line .field {
+  flex: 1;
+}
+.type-input {
+  font-family: ui-monospace, 'SF Mono', Consolas, monospace;
+  font-size: 12px;
+}
+.suggestions {
+  position: absolute;
+  z-index: 20;
+  top: 100%;
+  left: 0;
+  right: 0;
+  list-style: none;
+  margin: 2px 0 0;
+  padding: 2px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  font-family: ui-monospace, 'SF Mono', Consolas, monospace;
+  font-size: 12px;
+}
+.suggestions li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.suggestions li.active {
+  background: var(--accent-soft);
+}
+.suggestions li.typed:not(.active) {
+  background: color-mix(in srgb, var(--type-color) 14%, var(--panel));
+}
+/* Options of the structured type editor, colored after their kind (Chromium draws them; macOS keeps its own
+   menu). */
+option.typed {
+  background-color: color-mix(in srgb, var(--type-color) 18%, var(--panel));
+  color: var(--text);
 }
 .type-tree {
   padding-left: 10px;
@@ -1677,7 +2519,7 @@ ul.plain {
   gap: 4px;
   align-items: center;
 }
-.type-tree-node select {
+.type-tree-node .type-select {
   flex: 1;
   min-width: 0;
 }
@@ -1768,9 +2610,25 @@ ul.plain {
   border-bottom-color: color-mix(in srgb, var(--module-color) 50%, transparent);
 }
 .module-attrs li {
+  padding-inline: 3px;
+  border-radius: 3px;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+/* Members shown in the inspector on a click; an outline keeps their type color. */
+.module-attrs li[data-member] {
+  cursor: pointer;
+}
+.module-attrs li[data-member]:hover {
+  outline: 1px solid var(--border);
+  outline-offset: -1px;
+}
+.module-attrs li.selected,
+.module-attrs li.selected:hover {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+  background-color: var(--accent-soft);
 }
 .attr-type {
   color: var(--muted);
@@ -2960,6 +3818,9 @@ mark {
 }
 .settings .check {
   margin: 6px 0;
+}
+.settings-note {
+  margin: 4px 0;
 }
 /* Settings the filter leaves out render nothing: hide sections left empty. */
 .settings .section:not(:has(.row, .check, .toolbar-editor)) {

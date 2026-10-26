@@ -6,6 +6,7 @@ import { select } from '@/store/ui'
 import { navigate, openImportSource, refreshDependencies, showDependency } from '@/actions'
 import { CommitInput, Row, Section } from '@/components/fields'
 import { AccessIcon } from '@/components/Icon'
+import { refKinds, typeColorClass } from '@/components/typeColor'
 
 /** A module of a dependency placed on the canvas: read-only, refreshed from that project. */
 export function ImportedInspector({ id }: { id: string }): ReactNode {
@@ -18,6 +19,7 @@ export function ImportedInspector({ id }: { id: string }): ReactNode {
   const links = project.links.filter((l) => l.from.moduleId === id || l.to.moduleId === id)
   const nameOf = refNamer(project)
   const type = (t: Parameters<typeof printTypeRef>[0]): string => printTypeRef(t, nameOf)
+  const kindOf = refKinds(project)
   const attributes = module.attributes ?? []
   const methods = module.methods ?? []
 
@@ -53,7 +55,7 @@ export function ImportedInspector({ id }: { id: string }): ReactNode {
           <table className="grid">
             <tbody>
               {attributes.map((a) => (
-                <tr key={a.id} title={a.description}>
+                <tr key={a.id} className={typeColorClass(a.type, kindOf)} title={a.description}>
                   <td>
                     <span className="attr-access">
                       <AccessIcon access={a.access} />

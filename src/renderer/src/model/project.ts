@@ -524,6 +524,25 @@ export function methodQualifierText(m: Method): { before: string; after: string 
   }
 }
 
+/** Member id of a module's destructor (attributes, methods and constructors have ids of their own). */
+export const DESTRUCTOR_MEMBER = 'destructor'
+
+/** Whether `member` is an attribute, method, constructor or the destructor of `m`. */
+export function hasMember(m: Module, member: Id): boolean {
+  if (member === DESTRUCTOR_MEMBER) return !!m.destructor
+  return [...m.attributes, ...m.methods, ...(m.constructors ?? [])].some((x) => x.id === member)
+}
+
+/** Remove member `member` (see `hasMember`) from `m`. */
+export function removeMember(m: Module, member: Id): void {
+  if (member === DESTRUCTOR_MEMBER) return void delete m.destructor
+  for (const list of [m.attributes, m.methods, m.constructors ?? []]) {
+    const i = list.findIndex((x) => x.id === member)
+    if (i >= 0) list.splice(i, 1)
+  }
+  if (m.constructors && !m.constructors.length) delete m.constructors
+}
+
 /**
  * A base of a module: one of this project, or a placed module of a dependency (whose own bases are
  * not known here).

@@ -2,6 +2,7 @@ import { memo, useMemo, type CSSProperties, type ReactNode } from 'react'
 import { Handle, NodeResizer, Position, type Node, type NodeProps } from '@xyflow/react'
 import {
   ACCESS_MARKS,
+  DESTRUCTOR_MEMBER,
   findImported,
   indexById,
   isModuleType,
@@ -17,6 +18,7 @@ import {
 } from '@/model/project'
 import { getProject, setLocked, setModuleLayout, update, useProjectStore } from '@/store/project'
 import { useUiStore } from '@/store/ui'
+import { useDoc } from '@/store/documents'
 import { openModuleView } from '@/actions'
 import { printTypeRef, walkTypeRef } from '@/model/typeExpr'
 import { formatValue } from '@/model/defaults'
@@ -38,6 +40,8 @@ import {
   type TypeRef
 } from '@/model/types'
 import { AccessIcon, Icon } from '@/components/Icon'
+import { DERIVE_LABELS } from '@/components/fields'
+import { typeColorClass } from '@/components/typeColor'
 import { MODULE_HANDLE } from './constants'
 import type { PortNodeData } from './flowGraph'
 import { anchorStyle, inward, PortPoint } from './PortPoint'
@@ -100,10 +104,13 @@ function hasDeletedRef(t: TypeRef, nameOf: (id: string) => string | undefined): 
 /**
  * Names of the types and modules `refs` use, as the canvas shows them in module `moduleId`: types
  * as its type expressions name them (its own and its bases' by name, the others by path), modules
- * by their name, the last part of the path of a module of a dependency.
+ * by their name, the last part of the path of a module of a dependency; and their kinds (`typeColorKind`).
  */
-function useShortNames(moduleId: Id, refs: TypeRef[]): (id: string) => string | undefined {
-  // Stable string: re-renders only when a type or module used is added, removed or renamed.
+function useShortNames(
+  moduleId: Id,
+  refs: TypeRef[]
+): { nameOf: (id: string) => string | undefined; kindOf: (id: string) => string | undefined } {
+  // Stable string: re-renders only when a type or module used is added, removed, renamed or changes kind.
   const entries = useProjectStore((s) => {
     const types = indexById(s.project.types)
     // Only for types of other modules: the others are named by their own name.
@@ -123,13 +130,15 @@ function useShortNames(moduleId: Id, refs: TypeRef[]): (id: string) => string | 
               ? of.path.split('.').pop()
               : undefined
             : indexById(s.project.modules).get(n.id)?.name
-        if (name !== undefined) out.push(`${n.id}\t${name}`)
+        if (name !== undefined) out.push(`${n.id}\t${name}\t${type ? type.kind : 'mod'}`)
       })
     return out.join('\n')
   })
   return useMemo(() => {
-    const names = new Map(entries ? entries.split('\n').map((e) => e.split('\t') as [string, string]) : [])
-    return (id) => names.get(id)
+    const rows = entries ? entries.split('\n').map((e) => e.split('\t') as [string, string, string]) : []
+    const names = new Map(rows.map(([id, name]) => [id, name]))
+    const kinds = new Map(rows.map(([id, , kind]) => [id, kind]))
+    return { nameOf: (id) => names.get(id), kindOf: (id) => kinds.get(id) }
   }, [entries])
 }
 
@@ -155,8 +164,25 @@ function constraintText(c: Constraints | undefined): string {
   return `${range}${c.pattern ? ` /${c.pattern}/` : ''}`
 }
 
-export function Attributes({ attributes, moduleId }: { attributes: Attribute[]; moduleId: Id }): ReactNode {
-  const nameOf = useShortNames(
+/**
+ * Props of the row of member `id`: `member` is the selected member of its module, or null;
+ * undefined where members cannot be selected (imported modules).
+ */
+const memberProps = (id: Id, member: Id | null | undefined, className = '') =>
+  member === undefined
+    ? { className }
+    : { 'data-member': id, className: `${className} ${member === id ? 'selected' : ''}` }
+
+export function Attributes({
+  attributes,
+  moduleId,
+  member
+}: {
+  attributes: Attribute[]
+  moduleId: Id
+  member?: Id | null
+}): ReactNode {
+  const { nameOf, kindOf } = useShortNames(
     moduleId,
     attributes.map((a) => a.type)
   )
@@ -171,7 +197,11 @@ export function Attributes({ attributes, moduleId }: { attributes: Attribute[]; 
         const mark = ACCESS_MARKS[a.access ?? 'public']
         const sig = `${mark} ${qualifiers}${a.name}: ${type}${limits}${value}`
         return (
-          <li key={a.id} title={a.description ? `${sig}\n${a.description}` : sig}>
+          <li
+            key={a.id}
+            {...memberProps(a.id, member, typeColorClass(a.type, kindOf))}
+            title={a.description ? `${sig}\n${a.description}` : sig}
+          >
             <span className="attr-access">
               <AccessIcon access={a.access} />
             </span>
@@ -201,14 +231,16 @@ export interface Lifecycle {
 export function Methods({
   methods,
   moduleId,
-  lifecycle
+  lifecycle,
+  member
 }: {
   methods: Method[]
   moduleId: Id
   lifecycle?: Lifecycle
+  member?: Id | null
 }): ReactNode {
   const ctors = lifecycle?.constructors ?? []
-  const nameOf = useShortNames(moduleId, [
+  const { nameOf } = useShortNames(moduleId, [
     ...ctors.flatMap((c) => c.params.map((prm) => prm.type)),
     ...methods.flatMap((m) => [...m.params.map((prm) => prm.type), ...(m.returns ? [m.returns] : [])])
   ])
@@ -222,7 +254,7 @@ export function Methods({
   const special = (key: string, access: Access | undefined, before: string, name: string, after: string) => {
     const sig = `${ACCESS_MARKS[access ?? 'public']} ${before}${name}${after}`
     return (
-      <li key={key} title={sig}>
+      <li key={key} {...memberProps(key, member)} title={sig}>
         <span className="attr-access">
           <AccessIcon access={access} />
         </span>
@@ -246,7 +278,7 @@ export function Methods({
       )}
       {destructor &&
         special(
-          'destructor',
+          DESTRUCTOR_MEMBER,
           destructor.access,
           destructor.virtual ? 'virtual ' : '',
           `~${lifecycle.name}()`,
@@ -270,7 +302,7 @@ export function Methods({
         ]
         const title = [sig, m.description, ...contract].filter(Boolean).join('\n')
         return (
-          <li key={m.id} title={title}>
+          <li key={m.id} {...memberProps(m.id, member)} title={title}>
             <span className="attr-access">
               <AccessIcon access={m.access} />
             </span>
@@ -306,6 +338,9 @@ export const ModuleNode = memo(function ModuleNode({
     return m?.binaryId ? indexById(s.project.binaries).get(m.binaryId) : undefined
   })
   const renaming = useUiStore((s) => s.renaming === id)
+  const member = useDoc((d) =>
+    d.selection?.kind === 'module' && d.selection.id === id ? (d.selection.member ?? null) : null
+  )
   // Stable string: re-renders only when a base is added, removed or renamed.
   const bases = useProjectStore((s) => {
     const modules = indexById(s.project.modules)
@@ -460,12 +495,13 @@ export const ModuleNode = memo(function ModuleNode({
           <Icon name="expand" />
         </button>
       </div>
-      {mod.attributes.length > 0 && <Attributes attributes={mod.attributes} moduleId={id} />}
+      {mod.attributes.length > 0 && <Attributes attributes={mod.attributes} moduleId={id} member={member} />}
       {(mod.methods.length > 0 || !!mod.constructors?.length || mod.destructor) && (
         <Methods
           methods={mod.methods}
           moduleId={id}
           lifecycle={{ name: mod.name, constructors: mod.constructors, destructor: mod.destructor }}
+          member={member}
         />
       )}
       {rows > 0 && (

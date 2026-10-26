@@ -259,6 +259,59 @@ export function SettingsPanel(): ReactNode {
             onChange={(v) => setSetting('autoLayoutOnOpen', v)}
           />
         </SettingsSection>
+        <SettingsSection title="Features">
+          <p className="muted settings-note">
+            The Inspector hides a feature turned off, unless the project already uses it.
+          </p>
+          <Check
+            label="Derives"
+            hint="Equality, ordering, hash and string of modules and structs"
+            value={s.featureDerives}
+            onChange={(v) => setSetting('featureDerives', v)}
+          />
+          <Check
+            label="Lifecycle"
+            hint="Instances, copy and move, destructor and constructors of modules"
+            value={s.featureLifecycle}
+            onChange={(v) => setSetting('featureLifecycle', v)}
+          />
+          <Check
+            label="Contracts"
+            hint="Invariants of modules, preconditions and postconditions of methods"
+            value={s.featureContracts}
+            onChange={(v) => setSetting('featureContracts', v)}
+          />
+          <Check
+            label="State machine"
+            hint="States and transitions of modules"
+            value={s.featureStateMachine}
+            onChange={(v) => setSetting('featureStateMachine', v)}
+          />
+          <Check
+            label="Concurrency"
+            hint="Locks, atomic attributes and thread-safe methods"
+            value={s.featureConcurrency}
+            onChange={(v) => setSetting('featureConcurrency', v)}
+          />
+          <Check
+            label="Generics"
+            hint="Type parameters of modules"
+            value={s.featureGenerics}
+            onChange={(v) => setSetting('featureGenerics', v)}
+          />
+          <Check
+            label="Value constraints"
+            hint="Range, unit and pattern of fields and attributes"
+            value={s.featureValueConstraints}
+            onChange={(v) => setSetting('featureValueConstraints', v)}
+          />
+          <Check
+            label="Link quality of service"
+            hint="Acknowledgement and performance of links"
+            value={s.featureLinkQos}
+            onChange={(v) => setSetting('featureLinkQos', v)}
+          />
+        </SettingsSection>
         <SettingsSection title="Toolbar">
           <ToolbarEditor setting="toolbar" label="Left" hint="Buttons right of the menus" />
           <ToolbarEditor
