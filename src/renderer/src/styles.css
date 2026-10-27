@@ -1343,6 +1343,13 @@ input.number {
 .entity-list li.typed:not(.active, :hover) {
   background: color-mix(in srgb, var(--type-color) 10%, transparent);
 }
+/* Kind-colored entries stay square: their backgrounds join into a band. */
+.entity-list li.typed,
+.module-attrs li.typed,
+.suggestions li.typed,
+.type-select-option.typed {
+  border-radius: 0;
+}
 .lib-members li.typed {
   padding-inline: 4px;
   border-radius: 3px;
