@@ -30,6 +30,7 @@ import {
   isImportedId,
   minSize,
   orderLinkEnds,
+  removeBase,
   subtreeIds
 } from '@/model/project'
 import { NOTE_MIN, snapRect, snapValue } from '@/model/grid'
@@ -43,6 +44,7 @@ import {
   getProject,
   reparentModule,
   reverseLink,
+  setBaseRoute,
   setLayouts,
   lineUpOutside,
   setLinkRoute,
@@ -73,6 +75,7 @@ import { fileName } from '@/fileOps'
 import { openView, registerCanvas, revealInspector } from '@/shell/controllers'
 import { endOf, linkEnds, placedPortEnds, toEdges, toNodes, type ConnectEnd } from './flowGraph'
 import { INHERIT } from './inheritEdges'
+import { attachItems } from './anchorMenu'
 import { ASSOCIATION } from './associationEdges'
 import { reuseUnchanged } from './reuseUnchanged'
 import { floatingPortSides } from './portSides'
@@ -808,11 +811,16 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
           run: () =>
             update((d) => {
               const m = d.modules.find((m) => m.id === edge.source)
-              if (!m?.bases) return
-              m.bases = m.bases.filter((b) => b !== edge.target)
-              if (!m.bases.length) delete m.bases
+              if (m) removeBase(m, edge.target)
             })
-        }
+        },
+        'separator',
+        ...attachItems(
+          drawn.modules.find((m) => m.id === edge.source)?.baseRoutes?.[edge.target],
+          ['Attach module end', 'Attach base end'],
+          'Automatic',
+          (r) => setBaseRoute(edge.source, edge.target, r)
+        )
       ])
       return
     }
@@ -845,9 +853,13 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
         checked: getProject().links.find((l) => l.id === edge.id)?.constraints.ack.required,
         run: toggle((l) => void (l.constraints.ack.required = !l.constraints.ack.required))
       },
-      ...(drawn.links.find((l) => l.id === edge.id)?.route
-        ? [{ label: 'Reset shape', run: () => setLinkRoute(edge.id, undefined) }]
-        : []),
+      'separator',
+      ...attachItems(
+        drawn.links.find((l) => l.id === edge.id)?.route,
+        ['Attach source', 'Attach target'],
+        'At the port',
+        (r) => setLinkRoute(edge.id, r)
+      ),
       'separator',
       { label: 'Delete link', danger: true, keys: 'Delete', run: () => (deleteLink(edge.id), select(null)) }
     ])

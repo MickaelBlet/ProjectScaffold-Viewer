@@ -705,11 +705,12 @@ const PortLabels = z
   .optional()
   .describe("direction from each port's handle where its name is drawn, by port name")
 
+const BendPoints = z.array(z.object({ x: z.number().describe('x'), y: z.number().describe('y') }))
+
 const EditorLink = z.object({
-  points: z
-    .array(z.object({ x: z.number().describe('x'), y: z.number().describe('y') }))
-    .optional()
-    .describe('bend points, relative to the innermost module holding both ends (absolute at the top level)'),
+  points: BendPoints.optional().describe(
+    'bend points, relative to the innermost module holding both ends (absolute at the top level)'
+  ),
   from: Anchor.optional().describe('attachment of the source end on its module'),
   to: Anchor.optional().describe('attachment of the target end on its module'),
   label: z
@@ -721,6 +722,7 @@ const EditorLink = z.object({
 })
 
 const ModuleRect = Rect.describe('position and size of the module')
+const InheritShape = EditorLink.omit({ label: true }).describe('shape of the inheritance line')
 const LinkShape = EditorLink.describe('shape of the link')
 
 const EditorView = z.object({
@@ -780,7 +782,13 @@ const Editor = z
           .object({
             color: z.string().optional().describe('deprecated: use the module `color`'),
             locked: Locked,
-            labels: PortLabels
+            labels: PortLabels,
+            bases: z
+              .record(ModulePath, InheritShape)
+              .optional()
+              .describe(
+                'hand-set shapes of the inheritance lines to its bases, by base path (bend points relative to the innermost module holding both, absolute at the top level)'
+              )
           })
           .describe('look of the module on the canvas')
       )

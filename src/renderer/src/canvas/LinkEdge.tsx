@@ -35,6 +35,7 @@ import {
 } from './linkRoute'
 import { Icon } from '@/components/Icon'
 import { useDrawn } from './viewContext'
+import { anchorItems } from './anchorMenu'
 
 type Lookup = (id: string) => InternalNode | undefined
 
@@ -140,7 +141,7 @@ function portEnds(
 }
 
 /** Screen pixels within which a dragged point lines up with its neighbours. */
-const ALIGN_PX = 6
+export const ALIGN_PX = 6
 
 /** Swallow the click a drag ends with: released off the handle, it would land on the pane (deselecting). */
 function swallowClick(): void {
@@ -153,7 +154,7 @@ function swallowClick(): void {
  * Follows the pointer from a pointer down on a handle until it is released. Pointer downs are
  * cancelled on the canvas, so no `dblclick` follows: double clicks are clicks with `detail` 2.
  */
-function follow(e: React.PointerEvent, move: (ev: PointerEvent) => void, end: () => void): void {
+export function follow(e: React.PointerEvent, move: (ev: PointerEvent) => void, end: () => void): void {
   e.preventDefault()
   e.stopPropagation()
   // Grabbing cursor wherever the pointer goes until released.
@@ -377,9 +378,14 @@ export const LinkEdge = memo(function LinkEdge(props: EdgeProps): ReactNode {
               }
               onPointerDown={(e) => dragEnd(e, which)}
               onClick={(e) => e.detail === 2 && base[which] && detach(which)}
-              onContextMenu={(e) =>
-                base[which] ? handleMenu(e, 'Attach at the port', () => detach(which)) : e.preventDefault()
-              }
+              onContextMenu={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                openContextMenu(
+                  e,
+                  anchorItems(base[which], 'At the port', (a) => commit({ ...base, [which]: a }))
+                )
+              }}
             />
           ))}
         {props.selected &&

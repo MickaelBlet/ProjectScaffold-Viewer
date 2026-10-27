@@ -8,6 +8,7 @@ import {
   moduleTypes,
   nameError,
   newId,
+  removeBase,
   setAccess,
   setAttributeQualifier,
   setMethodQualifier,
@@ -285,12 +286,7 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
                 title="Remove base"
                 danger
                 onClick={() =>
-                  withModule(id, (m) => {
-                    m.bases = m.bases?.filter((x) => x !== b)
-                    if (!m.bases?.length) delete m.bases
-                    if (m.baseArgs) delete m.baseArgs[b]
-                    if (m.baseArgs && !Object.keys(m.baseArgs).length) delete m.baseArgs
-                  })
+                  withModule(id, (m) => removeBase(m, b))
                 }
               />
             </li>

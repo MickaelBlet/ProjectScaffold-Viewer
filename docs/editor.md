@@ -98,9 +98,9 @@ Ctrl+Shift+F searches names, descriptions and metadata of the project.
 Like draw.io; saved in `editor.links` (a module's own view: `editor.views[].links`, see [Views](#views)).
 
 - Select a link, then drag its line to add a bend, drag a bend to move it (snaps to the grid and in line with its neighbours; Alt: free), double-click a bend to remove it.
-- Drag an end square along its module's border to attach the link there; double-click it to attach at the port again.
+- Drag an end square along its module's border to attach the link there (in line with its neighbour or the module's center; Alt: free); double-click it to attach at the port again. Right-click an end square, or the link (_Attach source_, _Attach target_), to attach it at the middle of a side or at the port; _Reset attachments_ puts both back at their ports.
 - Drag a link's badges along the link to move them anywhere between its ends; double-click them to put them back in the middle.
-- _Reset shape_ in the link's menu. _Arrange_ clears the bends.
+- _Reset shape_ in the link's menu. _Arrange_ clears the bends, and the attachments when it changes the orientation.
 - Bends move with the module holding both ends, and with both ends when they are moved together.
 
 ### Copy and paste
@@ -132,7 +132,7 @@ Any type expression may name a module by its path, `Core.Sensor` (`Robot/Drivers
 Modules work as C++-like classes:
 
 - _Kind_: `class` (concrete, default), `abstract` or `interface` (only pure methods, no attributes), shown as `«interface» Name` in italics.
-- _Bases_: modules it derives from (of this project, or placed modules of dependencies, see [Dependencies](dependencies.md#linking-to-a-dependencys-modules)), shown as `Name : Base` and as UML arrows from the module to each base (double line in the link style, hollow triangle, dashed to an interface). Clicking an arrow selects the module; right click goes to or removes the base. _View › Inheritance arrows_ hides them.
+- _Bases_: modules it derives from (of this project, or placed modules of dependencies, see [Dependencies](dependencies.md#linking-to-a-dependencys-modules)), shown as `Name : Base` and as UML arrows from the module to each base (double line in the link style, hollow triangle, dashed to an interface). Clicking an arrow selects the module; right click goes to or removes the base, or resets its shape. With the module selected, its arrows are drawn in the accent color and shaped as links are: drag one to add a bend, drag a bend to move it (Alt: free), double-click a bend to remove it; drag an end square along its module to attach it there, double-click it to attach it automatically again; right-click an end square, or the arrow (_Attach module end_, _Attach base end_, _Reset attachments_, _Reset shape_), to attach it at the middle of a side. Saved in the module's `editor.style` entry (`bases`, by base path). A drill-down view draws the bends only when it draws the module holding both ends. _View › Inheritance arrows_ hides them.
 - _Final_ (beside _Kind_): no module may derive from it, shown as `Name {final}`.
 - Methods can be `virtual`, `pure` (`= 0`), `override` and `final` (first row of toggles), `static`, `const`, `noexcept` and `nodiscard` (second row), shown as `nodiscard virtual name(): R const noexcept override = 0`.
 - Attributes: the gear button of a field or attribute opens its details: range (min, max, unit) and pattern, ownership of the modules it references, and for attributes `mutable` / `atomic`, accessors and the lock guarding it (_+ lock_ adds one to the module). Shown on the canvas as `speed: float32 [0..1000 px/s]`, `borrowed world: World`. _Settings › Association arrows_ draws an arrow from a module to each module its attributes reference, labelled with the attribute and its multiplicity, with a diamond on the owner (filled when `owned`, hollow when `shared`).

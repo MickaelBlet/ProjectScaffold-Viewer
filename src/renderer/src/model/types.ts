@@ -489,6 +489,8 @@ export interface Module {
   binaryId?: Id
   /** Editor-only: position and size are fixed on the canvas. */
   locked?: boolean
+  /** Editor-only: shapes of the inheritance lines to its bases, by base. */
+  baseRoutes?: Record<Id, BaseRoute>
 }
 
 /** An executable of the project: top-level modules run in one each, links between two are remote. */
@@ -592,6 +594,9 @@ export interface LinkRoute {
   /** Where the badges sit along the link, 0 (source) to 1 (target); unset: in the middle. */
   label?: number
 }
+
+/** Editor-only shape of an inheritance line (from the derived module to its base), set by hand. */
+export type BaseRoute = Omit<LinkRoute, 'label'>
 
 export interface Link {
   id: Id

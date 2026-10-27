@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Canvas: inheritance arrows shaped by hand, as links are: with the derived module selected, drag an arrow to add a bend, drag a bend to move it, double-click it to remove it; drag an end along its module to attach it there. Saved in the module's `editor.style` entry (`bases`, by base path: `points`, `from`, `to`).
+- Canvas: attach the ends of links and inheritance arrows at the middle of a side from their menu (_Attach source_ / _Attach target_, _Attach module end_ / _Attach base end_) or the end square's, and put both back with _Reset attachments_; end squares and bends are easier to grab and light up on hover.
 - Links: a color (link inspector), drawn instead of the color of its performance class and on its badge in the Explorer; saved as the link's `color`.
 - Settings: _Sticky Explorer section headers_ turns off the stacking of the Explorer's section headers at the top and bottom of the list.
 - Outline (text editor, VS Code Outline view and breadcrumbs): modules show their type parameters, constructors and destructor, locks and state machine (states, then transitions `From → To` with trigger, guard and action), their implemented interfaces (`⊸ LevelSink`) and derived operations (`{==, <}`), as structs do; placed modules of dependencies their attributes and methods.
@@ -20,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Canvas: _Remove base_ in an inheritance arrow's menu also drops the type arguments of that base, as the inspector does.
 - VS Code: the pages heard no message from the extension since 1.1.0 (VS Code sets `window.parent` to the page itself): the diagram followed neither the text (cursor, edits) nor the side bar, the side bar not the active file, and commands and dialogs got no answer. Messages are now told by their origin.
 - VS Code: an entity selected in the side bar's Explorer is brought into view in the preview as in the app (opening the _Project_ view when the focused view does not draw it); following the text cursor still leaves the view as it is. The `reveal` message says which (`cursor`).
 - VS Code: switching the side bar to another project file wrote its changes not written yet to the new file.

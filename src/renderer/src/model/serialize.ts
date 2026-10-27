@@ -469,6 +469,13 @@ export function toFile(p: Project, options: { editor: boolean }): FileProject {
         }))
       : undefined
   }
+  /** Shapes of the inheritance lines of a module, by base path. */
+  const baseRoutes = (m: Module) => {
+    const set = (m.bases ?? []).filter((b) => m.baseRoutes?.[b])
+    return set.length
+      ? Object.fromEntries(set.map((b) => [modulePath(p, b), routeEntry(m.baseRoutes![b]!)]))
+      : undefined
+  }
   if (options.editor) {
     const editor: FileEditor = {
       layout: Object.fromEntries(p.modules.map((m) => [modulePath(p, m.id), { ...m.layout }]))
@@ -484,12 +491,12 @@ export function toFile(p: Project, options: { editor: boolean }): FileProject {
         outside: viewStandIns(p, v),
         notes: v.rootModuleId && viewNotes(p, v).length ? viewNotes(p, v).map(noteEntry) : undefined
       }))
-    const styled = p.modules.filter((m) => m.locked || portLabels(m.ports))
+    const styled = p.modules.filter((m) => m.locked || portLabels(m.ports) || baseRoutes(m))
     if (styled.length)
       editor.style = Object.fromEntries(
         styled.map((m) => [
           modulePath(p, m.id),
-          { locked: m.locked || undefined, labels: portLabels(m.ports) }
+          { locked: m.locked || undefined, labels: portLabels(m.ports), bases: baseRoutes(m) }
         ])
       )
     if (p.dependencies.some((x) => x.modules.length))
@@ -995,7 +1002,16 @@ export function fromFile(data: unknown, prev?: Project): Project {
   const moduleByPath = new Map<string, Module>()
   const prevPaths = prev ? modulePaths(prev) : new Map<Id, string>()
   /** Modules with bases, resolved once all modules are known. */
-  const derived: { mod: Module; path: string; bases: string[]; at: DataPath }[] = []
+  const derived: {
+    mod: Module
+    path: string
+    bases: string[]
+    at: DataPath
+    /** Shapes of its inheritance lines in the file, by base path; unset: no style for the module. */
+    shapes?: NonNullable<NonNullable<FileEditor['style']>[string]['bases']>
+    /** Those of the module renamed since the previous state, by base. */
+    prevShapes?: Module['baseRoutes']
+  }[] = []
 
   // Auto layout (modules without editor data): rows of siblings, parents grown to fit children.
   const PAD = 20
@@ -1113,10 +1129,18 @@ export function fromFile(data: unknown, prev?: Project): Project {
         ])
       modules.push(mod)
       moduleByPath.set(path, mod)
-      if (fm.bases?.length) derived.push({ mod, path, bases: fm.bases, at: [...at, i, 'bases'] })
+      const style = f.editor?.style?.[path]
+      if (fm.bases?.length)
+        derived.push({
+          mod,
+          path,
+          bases: fm.bases,
+          at: [...at, i, 'bases'],
+          shapes: style ? (style.bases ?? {}) : undefined,
+          prevShapes: renamed ? was.baseRoutes : undefined
+        })
 
       const inner = addModules(fm.modules ?? [], mod.id, path, height, [...at, i, 'modules'])
-      const style = f.editor?.style?.[path]
       const color = fm.color ?? style?.color
       if (color) mod.color = color
       if (style ? style.locked : renamed && was.locked) mod.locked = true
@@ -1264,7 +1288,7 @@ export function fromFile(data: unknown, prev?: Project): Project {
   })
 
   // Bases: modules of this project, or placed modules of dependencies (`Dependency/Module.Path`).
-  for (const [k, { mod, path, bases, at }] of derived.entries())
+  for (const [k, { mod, path, bases, at, shapes, prevShapes }] of derived.entries())
     mod.bases = bases.flatMap((full, j) => {
       const b = full.includes('<') ? full.slice(0, full.indexOf('<')) : full
       const slash = b.indexOf('/')
@@ -1283,6 +1307,9 @@ export function fromFile(data: unknown, prev?: Project): Project {
         )
       const args = baseArgs[k]![j]
       if (base && args) (mod.baseArgs ??= {})[base.id] = args
+      const shape = base && (shapes ? shapes[b] : prevShapes?.[base.id])
+      if (base && shape)
+        (mod.baseRoutes ??= {})[base.id] = clean({ ...structuredClone(shape), points: shape.points ?? [] })
       return base ? [base.id] : []
     })
 

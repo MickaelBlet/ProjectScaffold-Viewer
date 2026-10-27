@@ -554,6 +554,18 @@ export function baseModule(p: Pick<Project, 'modules' | 'dependencies'>, id: Id)
   return isImportedId(id) ? findImported(p, id)?.module : p.modules.find((m) => m.id === id)
 }
 
+/** Remove a base of a module (in a draft), with its type arguments and the shape of its line. */
+export function removeBase(m: Module, base: Id): void {
+  m.bases = m.bases?.filter((b) => b !== base)
+  if (!m.bases?.length) delete m.bases
+  for (const key of ['baseArgs', 'baseRoutes'] as const) {
+    const own = m[key]
+    if (!own) continue
+    delete own[base]
+    if (!Object.keys(own).length) delete m[key]
+  }
+}
+
 /** Methods of a base (as last read for a placed module of a dependency). */
 export const baseMethods = (b: BaseModule): Method[] => b.methods ?? []
 

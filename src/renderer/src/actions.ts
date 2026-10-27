@@ -1303,6 +1303,15 @@ export async function arrangeLayout(
         else if (l.route.from || l.route.to || l.route.label !== undefined) l.route.points = []
         else delete l.route
       }
+      for (const m of d.modules) {
+        if (!m.baseRoutes) continue
+        for (const [b, r] of Object.entries(m.baseRoutes)) {
+          if (moved && !moved.has(m.id) && !moved.has(b)) continue
+          if (target === p.orientation && (r.from || r.to)) r.points = []
+          else delete m.baseRoutes[b]
+        }
+        if (!Object.keys(m.baseRoutes).length) delete m.baseRoutes
+      }
     }, viewId)
     setStatus('info', `Arranged ${scopeId ? modulePath(p, scopeId) : 'all modules'} ${target}ly`)
     // After React Flow has measured the new sizes.

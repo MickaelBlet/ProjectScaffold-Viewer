@@ -2874,6 +2874,15 @@ option.typed {
   user-select: none;
   touch-action: none;
 }
+/* Easier to grab than it looks. */
+.route-handle::before {
+  content: '';
+  position: absolute;
+  inset: -6px;
+}
+.route-handle:hover {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent);
+}
 .route-handle.bend {
   border-radius: 50%;
   background: var(--accent);
@@ -4187,6 +4196,11 @@ mark {
 }
 .react-flow__edge-path.inherit-edge.realization {
   stroke-dasharray: 6 4;
+}
+/* Its module selected: its bends and attachments can be edited. */
+.react-flow__edge-path.inherit-edge.active,
+.inherit-arrow.active {
+  stroke: var(--accent);
 }
 .inherit-arrow {
   fill: var(--bg);

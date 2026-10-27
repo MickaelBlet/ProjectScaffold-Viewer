@@ -1045,6 +1045,93 @@
                       ],
                       "description": "direction from the port's handle where its name is drawn"
                     }
+                  },
+                  "bases": {
+                    "description": "hand-set shapes of the inheritance lines to its bases, by base path (bend points relative to the innermost module holding both, absolute at the top level)",
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string",
+                      "pattern": "^([A-Za-z_][A-Za-z0-9_]*\\/)?[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$"
+                    },
+                    "additionalProperties": {
+                      "type": "object",
+                      "properties": {
+                        "points": {
+                          "description": "bend points, relative to the innermost module holding both ends (absolute at the top level)",
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "x": {
+                                "type": "number",
+                                "description": "x"
+                              },
+                              "y": {
+                                "type": "number",
+                                "description": "y"
+                              }
+                            },
+                            "required": [
+                              "x",
+                              "y"
+                            ]
+                          }
+                        },
+                        "from": {
+                          "description": "attachment of the source end on its module",
+                          "type": "object",
+                          "properties": {
+                            "side": {
+                              "type": "string",
+                              "enum": [
+                                "left",
+                                "right",
+                                "top",
+                                "bottom"
+                              ],
+                              "description": "side of the module"
+                            },
+                            "at": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1,
+                              "description": "position along the side: 0 left / top, 1 right / bottom"
+                            }
+                          },
+                          "required": [
+                            "side",
+                            "at"
+                          ]
+                        },
+                        "to": {
+                          "description": "attachment of the target end on its module",
+                          "type": "object",
+                          "properties": {
+                            "side": {
+                              "type": "string",
+                              "enum": [
+                                "left",
+                                "right",
+                                "top",
+                                "bottom"
+                              ],
+                              "description": "side of the module"
+                            },
+                            "at": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1,
+                              "description": "position along the side: 0 left / top, 1 right / bottom"
+                            }
+                          },
+                          "required": [
+                            "side",
+                            "at"
+                          ]
+                        }
+                      },
+                      "description": "shape of the inheritance line"
+                    }
                   }
                 },
                 "description": "look of the module on the canvas"

@@ -369,6 +369,8 @@ export function pasteClip(d: Project, clip: Clip, options: PasteOptions): Id[] {
     if (newModules.has(m.id)) {
       for (const pt of m.ports) if (pt.interfaceId && !ifaceIds.has(pt.interfaceId)) pt.interfaceId = null
       if (m.implements) m.implements = m.implements.map(rebind)
+      // Shapes of inheritance lines are relative to modules that may not have come along.
+      delete m.baseRoutes
       if (m.bases) {
         const args = m.baseArgs
         delete m.baseArgs

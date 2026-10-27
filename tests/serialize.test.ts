@@ -86,6 +86,18 @@ describe('serialize', () => {
     expect(again.notes.at(-1)?.locked).toBe(true)
   })
 
+  it('round-trips the shapes of inheritance lines', () => {
+    const p = fromFile(example)
+    const [, a, b] = p.modules
+    a!.bases = [b!.id]
+    const shape = { points: [{ x: 10, y: 20 }], to: { side: 'top' as const, at: 0.5 } }
+    a!.baseRoutes = { [b!.id]: shape, gone: { points: [{ x: 1, y: 2 }] } }
+    const file = toFile(p, { editor: true })
+    expect(file.editor?.style?.['Core.Sensor']?.bases).toEqual({ 'Core.Controller': shape })
+    const again = fromFile(file)
+    expect(again.modules[1]!.baseRoutes).toEqual({ [again.modules[2]!.id]: shape })
+  })
+
   it('round-trips locked placed modules of dependencies', () => {
     const ground = fromFile(YAML.parse(readFileSync('examples/fleet/ground.scaffold.yaml', 'utf8')))
     const radio = ground.dependencies.flatMap((x) => x.modules).find((m) => m.path === 'Radio')!

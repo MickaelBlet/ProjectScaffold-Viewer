@@ -48,6 +48,7 @@ import type {
   Endpoint,
   Id,
   ImportedModule,
+  BaseRoute,
   LinkRoute,
   PortRole,
   Project,
@@ -197,7 +198,10 @@ function setImportedRect(im: ImportedModule, r: Partial<Rect>): void {
     im.size = { width: r.width ?? im.size?.width ?? 0, height: r.height ?? im.size?.height ?? 0 }
 }
 
-/** Bend points of the links whose both ends move by the same offset, outside a moving module, move with them. */
+/**
+ * Bend points of the links and inheritance lines whose both ends move by the same offset, outside
+ * a moving module, move with them.
+ */
 function shiftBends(d: Project, layouts: Map<Id, Partial<Rect>>): void {
   const offset = new Map<Id, { x: number; y: number }>()
   for (const [id, r] of layouts) {
@@ -222,6 +226,18 @@ function shiftBends(d: Project, layouts: Map<Id, Partial<Rect>>): void {
       pt.y += a.y
     }
   }
+  // The same for the inheritance lines.
+  for (const m of d.modules)
+    for (const [b, { points }] of Object.entries(m.baseRoutes ?? {})) {
+      if (moved(linkOrigin(d, { from: { moduleId: m.id }, to: { moduleId: b } }))) continue
+      const a = moved(m.id)
+      const c = moved(b)
+      if (!a || !c || a.x !== c.x || a.y !== c.y) continue
+      for (const pt of points) {
+        pt.x += a.x
+        pt.y += a.y
+      }
+    }
 }
 
 /** Set a module rect of the focused view. */
@@ -684,6 +700,19 @@ export function setPortLabel(moduleId: Id, portId: Id, label: Side | undefined):
     if (!pt) return
     if (label) pt.label = label
     else delete pt.label
+  })
+}
+
+/** Set or clear (undefined, or nothing left) the hand-set shape of the inheritance line from a module to one of its bases. */
+export function setBaseRoute(moduleId: Id, baseId: Id, route: BaseRoute | undefined): void {
+  updateLayout((d) => {
+    const m = d.modules.find((m) => m.id === moduleId)
+    if (!m) return
+    if (route && (route.points.length || route.from || route.to)) (m.baseRoutes ??= {})[baseId] = clean(route)
+    else if (m.baseRoutes) {
+      delete m.baseRoutes[baseId]
+      if (!Object.keys(m.baseRoutes).length) delete m.baseRoutes
+    }
   })
 }
 
