@@ -881,8 +881,9 @@ kbd {
 .entity-list {
   list-style: none;
   margin: 0;
-  /* 1px above and below: the 1px background around the sticky section headers covers no item's border. */
-  padding: 1px 4px;
+  /* 2px above and below: the 1px background around the sticky section headers, anti-aliased past its edge
+     when zoomed, covers no item's border. */
+  padding: 2px 4px;
 }
 .entity-list li {
   display: flex;
@@ -901,7 +902,9 @@ kbd {
 }
 .entity-list li.active {
   background: var(--accent-soft);
-  box-shadow: inset 0 0 0 1px var(--accent);
+  /* An outline, not an inset shadow: it snaps to device pixels under fractional scaling, so it stays sharp. */
+  outline: 1px solid color-mix(in srgb, var(--accent) 75%, var(--text));
+  outline-offset: -1px;
 }
 .entity-list li.current {
   font-weight: 600;

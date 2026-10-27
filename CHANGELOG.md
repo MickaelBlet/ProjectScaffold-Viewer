@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Explorer: the selected entries have a rounded border in the accent color.
+- Explorer: the selected entries have a rounded border in the accent color, whole and sharp at any zoom.
 
 ### Fixed
 
