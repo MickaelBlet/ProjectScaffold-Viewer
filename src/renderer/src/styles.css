@@ -879,7 +879,8 @@ kbd {
 .entity-list {
   list-style: none;
   margin: 0;
-  padding: 0 4px;
+  /* 1px above and below: the 1px background around the sticky section headers covers no item's border. */
+  padding: 1px 4px;
 }
 .entity-list li {
   display: flex;
@@ -898,6 +899,7 @@ kbd {
 }
 .entity-list li.active {
   background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent);
 }
 .entity-list li.current {
   font-weight: 600;
@@ -1349,6 +1351,10 @@ input.number {
 .suggestions li.typed,
 .type-select-option.typed {
   border-radius: 0;
+}
+/* The selection border stays rounded. */
+.entity-list li.active {
+  border-radius: 4px;
 }
 .lib-members li.typed {
   padding-inline: 4px;

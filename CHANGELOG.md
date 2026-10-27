@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Outline (text editor, VS Code Outline view and breadcrumbs): modules show their type parameters, constructors and destructor, locks and state machine (states, then transitions `From → To` with trigger, guard and action), their implemented interfaces (`⊸ LevelSink`) and derived operations (`{==, <}`), as structs do; placed modules of dependencies their attributes and methods.
 
+### Changed
+
+- Explorer: the selected entries have a rounded border in the accent color, kind-colored ones too.
+
 ### Fixed
 
 - VS Code: the pages heard no message from the extension since 1.1.0 (VS Code sets `window.parent` to the page itself): the diagram followed neither the text (cursor, edits) nor the side bar, the side bar not the active file, and commands and dialogs got no answer. Messages are now told by their origin.
