@@ -561,7 +561,7 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
       >
         <div className="field-list">
           {mod.ports.map((pt) => (
-            <div key={pt.id} className="field-row">
+            <div key={pt.id} className={`field-row port-${pt.role}`}>
               <div className="name">
                 <CommitInput
                   value={pt.name}

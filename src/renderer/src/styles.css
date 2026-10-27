@@ -1435,6 +1435,13 @@ ul.plain > li + li {
 .field-list > .field-row.typed {
   background: color-mix(in srgb, var(--type-color) 12%, var(--row));
 }
+/* Ports tinted after their role, in the colors of their handles on the canvas. */
+.field-list > .field-row.port-in {
+  background: color-mix(in srgb, var(--ok) 12%, var(--row));
+}
+.field-list > .field-row.port-out {
+  background: color-mix(in srgb, var(--accent) 12%, var(--row));
+}
 .field-row > * {
   min-width: 0;
   padding: var(--cell-pad);

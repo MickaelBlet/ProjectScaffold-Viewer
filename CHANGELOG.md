@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Module inspector: ports are tinted after their role, in the colors of their dots on the canvas (`in` green, `out` accent).
 - Explorer: the selected entries have a rounded border in the accent color, whole and sharp at any zoom.
 
 ### Fixed

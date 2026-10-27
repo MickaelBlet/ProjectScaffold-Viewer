@@ -87,6 +87,7 @@ Ctrl+Shift+F searches names, descriptions and metadata of the project.
 ### Ports and links
 
 - `in` ports on the left, `out` ports on the right — or `in` on top, `out` at the bottom in vertical orientation.
+- The module inspector lists its ports tinted after their role, in the colors of their dots (`in` green, `out` accent).
 - Drag between an `out` port and an `in` port to create a link. A container's `in` port links to an `in` port inside it; an `out` port inside links to the container's `out` port.
 - Or link modules directly: drag the → in a module's header onto another module (or one of its `in` ports), or drag a port onto a module. The missing `out` / `in` ports are added, typed with the other end's interface.
 - A new link is bidirectional when its interface has a message returning a value or with `out` / `inout` parameters (IDL operations with results), unidirectional otherwise.
