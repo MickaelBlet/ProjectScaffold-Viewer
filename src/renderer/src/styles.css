@@ -1302,8 +1302,7 @@ input.number {
 }
 /*
  * Entries tinted after a kind (`typed of-<kind>`): fields, attributes and lone types after the kind of what
- * their type names, Explorer rows after their own kind, enum values and bitmask flags after theirs. Over the
- * shading of every other entry; Explorer rows keep the hover and selection backgrounds.
+ * their type names, enum values and bitmask flags after theirs. Over the shading of every other entry.
  */
 .typed.of-struct {
   --type-color: var(--kind-struct);
@@ -1344,19 +1343,11 @@ input.number {
 .grid tr.typed > td {
   background: color-mix(in srgb, var(--type-color) 12%, var(--row));
 }
-.entity-list li.typed:not(.active, :hover) {
-  background: color-mix(in srgb, var(--type-color) 10%, transparent);
-}
 /* Kind-colored entries stay square: their backgrounds join into a band. */
-.entity-list li.typed,
 .module-attrs li.typed,
 .suggestions li.typed,
 .type-select-option.typed {
   border-radius: 0;
-}
-/* The selection border stays rounded. */
-.entity-list li.active {
-  border-radius: 4px;
 }
 .lib-members li.typed {
   padding-inline: 4px;
