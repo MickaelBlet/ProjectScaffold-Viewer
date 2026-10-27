@@ -218,6 +218,12 @@ export function SettingsPanel(): ReactNode {
           />
           <Check label="Minimap" value={s.minimap} onChange={(v) => setSetting('minimap', v)} />
           <Check
+            label="Sticky Explorer section headers"
+            hint="Section headers of the Explorer stay in view, stacked at the top or bottom of the list"
+            value={s.explorerSticky}
+            onChange={(v) => setSetting('explorerSticky', v)}
+          />
+          <Check
             label="Force animations"
             hint="Keep animations even when the system asks for reduced motion"
             value={s.forceAnimations}

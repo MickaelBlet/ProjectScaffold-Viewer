@@ -81,6 +81,8 @@ export interface Settings {
   explorerOrder: string[]
   /** Explorer sections not shown. */
   explorerHidden: string[]
+  /** Explorer section headers stay in view, stacked at the top or bottom of the list. */
+  explorerSticky: boolean
   /** Toolbar buttons right of the menus: command ids, '-' for a separator. */
   toolbar: string[]
   /** Toolbar buttons at the right end, before the window controls: command ids, '-' for a separator. */
@@ -140,6 +142,7 @@ export const DEFAULT_SETTINGS: Settings = {
   sourceChanges: true,
   explorerOrder: [],
   explorerHidden: [],
+  explorerSticky: true,
   toolbar: ['edit.undo', 'edit.redo', '-', 'view.back', 'view.forward'],
   toolbarRight: ['help.tutorial'],
   featureDerives: true,

@@ -54,13 +54,13 @@ function revealBody(header: HTMLElement, body: HTMLElement): boolean {
   return true
 }
 
-/** Scrolling list of fold sections whose headers all stay in view: each sticks below the headers before it
- * and above the headers after it, offsets measured as headers wrap or sections move. */
-export function StackedSections({ children }: { children: ReactNode }): ReactNode {
+/** Scrolling list of fold sections whose headers all stay in view when `sticky`: each sticks below the
+ * headers before it and above the headers after it, offsets measured as headers wrap or sections move. */
+export function StackedSections({ sticky, children }: { sticky: boolean; children: ReactNode }): ReactNode {
   const list = useRef<HTMLDivElement>(null)
   useLayoutEffect(() => {
     const el = list.current
-    if (!el) return
+    if (!el || !sticky) return
     const headers = (): HTMLElement[] => [...el.querySelectorAll<HTMLElement>(':scope > section > header')]
     // Exact heights (fractional when zoomed), offsets rounded down: neighbors overlap by less than a pixel
     // rather than leave a gap showing the list behind.
@@ -89,10 +89,14 @@ export function StackedSections({ children }: { children: ReactNode }): ReactNod
     return () => {
       resized.disconnect()
       moved.disconnect()
+      headers().forEach((h) => {
+        h.style.top = ''
+        h.style.bottom = ''
+      })
     }
-  }, [])
+  }, [sticky])
   return (
-    <div ref={list} className="stacked-sections">
+    <div ref={list} className={`stacked-sections ${sticky ? 'sticky' : ''}`}>
       {children}
     </div>
   )

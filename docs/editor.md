@@ -21,7 +21,7 @@ Several projects open at once, in tabs, each with its own undo history.
 Explorer, Inspector, Problems, Output, Search, Settings and State machine are dockable panels.
 
 - Drag a tab to dock it on any side, stack it with others or float it. The layout is kept; _Window › Reset panel layout_ restores the default one.
-- The Explorer's sections are reordered by dragging their header (or Alt+↑ / Alt+↓) and hidden from their right-click menu (_Reset sections_ restores them).
+- The Explorer's sections are reordered by dragging their header (or Alt+↑ / Alt+↓) and hidden from their right-click menu (_Reset sections_ restores them). Their headers stay in view, stacked at the top or bottom of the list, unless _Sticky Explorer section headers_ is turned off in the settings.
 - In the Explorer's _Modules_, dragging a module onto another (or onto the list) moves it inside (or to the top level); without dragging, _Move to…_ (right-click menu, or the folder button of _Parent_ in the inspector) picks where from a list. The modules of dependencies placed on the canvas follow the project's own, nested like in their project, each with its public types.
 
 ### Views

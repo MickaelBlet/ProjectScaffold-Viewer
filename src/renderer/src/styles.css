@@ -658,7 +658,7 @@ button.link-button:hover {
 }
 /* Explorer: the filter stays on top, the sections scroll under it. Sections there have no box of their
    own, so every header sticks in the whole list: always in view, stacked at its top or bottom (top /
-   bottom offsets set by StackedSections). */
+   bottom offsets set by StackedSections), unless turned off in the settings. */
 .explorer {
   display: flex;
   flex-direction: column;
@@ -681,10 +681,12 @@ button.link-button:hover {
 /* 1px of background around: stuck at fractional offsets (zoomed), header edges are anti-aliased and the
    list would show through the seams between headers and at the edges of the list. */
 .stacked-sections > .explorer-section > header {
-  position: sticky;
   z-index: 1;
   background: var(--section-header-bg);
   box-shadow: 0 0 0 1px var(--section-header-bg);
+}
+.stacked-sections.sticky > .explorer-section > header {
+  position: sticky;
 }
 .stacked-sections > .explorer-section.drop-before > header {
   box-shadow:

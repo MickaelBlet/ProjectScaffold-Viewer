@@ -458,6 +458,7 @@ export function ExplorerPanel(): ReactNode {
   const hiddenIds = findView({ views, modules, dependencies }, activeViewId).hidden
   const savedOrder = useSettings((s) => s.explorerOrder)
   const savedHidden = useSettings((s) => s.explorerHidden)
+  const sticky = useSettings((s) => s.explorerSticky)
   const order = useMemo(() => sectionOrder(savedOrder, SECTIONS), [savedOrder])
   const hidden = order.filter((id) => savedHidden.includes(id))
   const f = filter.trim().toLowerCase()
@@ -1328,7 +1329,7 @@ export function ExplorerPanel(): ReactNode {
           </button>
         )}
       </div>
-      <StackedSections>
+      <StackedSections sticky={sticky}>
         {shownSections.map((id) => (
           <Fragment key={id}>{sections[id]}</Fragment>
         ))}
