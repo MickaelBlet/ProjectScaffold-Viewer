@@ -600,6 +600,8 @@ export interface Link {
   from: Endpoint
   to: Endpoint
   constraints: LinkConstraints
+  /** Color (CSS color); unset: the color of its performance class. */
+  color?: string
   route?: LinkRoute
 }
 

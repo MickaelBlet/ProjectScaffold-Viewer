@@ -167,7 +167,7 @@ export function toEdges(
     const source = l.from.moduleId
     const target = l.to.moduleId
     if (!shown.has(source) || !shown.has(target)) return []
-    const color = PERF_COLORS[l.constraints.performance.class]
+    const color = l.color ?? PERF_COLORS[l.constraints.performance.class]
     const marker = { type: MarkerType.ArrowClosed, color, width: 16, height: 16 }
     return [
       {

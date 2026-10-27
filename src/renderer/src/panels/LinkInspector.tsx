@@ -5,6 +5,7 @@ import { select } from '@/store/ui'
 import { useSettings } from '@/store/settings'
 import { navigate } from '@/actions'
 import {
+  ColorPicker,
   CommitInput,
   IconButton,
   MetadataEditor,
@@ -315,6 +316,13 @@ export function LinkInspector({ id }: { id: string }): ReactNode {
         </p>
       )}
       <TextArea value={link.description} onChange={(v) => withLink(id, (l) => void (l.description = v))} />
+
+      <Section title="Color">
+        <ColorPicker
+          value={link.color}
+          onChange={(v) => withLink(id, (l) => (v ? void (l.color = v) : void delete l.color))}
+        />
+      </Section>
 
       <Section title="Direction">
         <Select

@@ -440,7 +440,8 @@ export function toFile(p: Project, options: { editor: boolean }): FileProject {
       description: opt(l.description),
       from: endpoint(l.from),
       to: endpoint(l.to),
-      constraints: l.constraints
+      constraints: l.constraints,
+      color: l.color
     })),
     dependencies: p.dependencies.length
       ? p.dependencies.map((x) => ({
@@ -1316,6 +1317,7 @@ export function fromFile(data: unknown, prev?: Project): Project {
       from: endpoint(l.from, `Link '${l.name}' from`, ['links', i, 'from']),
       to: endpoint(l.to, `Link '${l.name}' to`, ['links', i, 'to']),
       constraints: clean(l.constraints),
+      ...(l.color ? { color: l.color } : {}),
       ...(route ? { route: clean({ ...route, points: route.points ?? [] }) } : {})
     }
   })

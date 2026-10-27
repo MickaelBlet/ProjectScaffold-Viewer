@@ -669,7 +669,8 @@ const Link = z.object({
   to: Endpoint.describe(
     "receiver side (an `in` port; an inner `in` port from its container, the container's `out` port from its content)"
   ),
-  constraints: LinkConstraints.describe('how messages travel along the link')
+  constraints: LinkConstraints.describe('how messages travel along the link'),
+  color: z.string().optional().describe('color (CSS color); absent: the color of its performance class')
 })
 
 const X = z.number().describe('left edge')

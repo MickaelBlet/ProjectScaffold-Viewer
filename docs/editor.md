@@ -164,7 +164,7 @@ Generated code for links between binaries: [ProjectScaffold-Generator › Links 
 
 ### Notes, frames, colors
 
-Module colors, sticky notes and titled frames (right click the canvas) help organize the diagram; dragging a frame moves what lies fully inside it. They are editor data only. A module's own view has its own notes and frames.
+Module and link colors, sticky notes and titled frames (right click the canvas) help organize the diagram; dragging a frame moves what lies fully inside it. They are editor data only. A module's own view has its own notes and frames.
 
 ### Export
 

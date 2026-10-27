@@ -220,6 +220,7 @@ links:
       ack: { required: bool, timeoutMs? }
       performance: { class: realtime | low | normal | bulk, maxLatencyMs?, rateHz? }
       remote: { enabled: bool, transport?, settings? } # e.g. ipc, shm, tcp, udp, grpc, mqtt, can
+    color: "#d14f4f" # optional; absent: the color of its performance class
 ```
 
 Links to modules of other projects: [Dependencies › File format](dependencies.md#file-format).

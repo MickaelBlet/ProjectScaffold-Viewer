@@ -285,6 +285,10 @@
                   "remote"
                 ],
                 "description": "how messages travel along the link"
+              },
+              "color": {
+                "description": "color (CSS color); absent: the color of its performance class",
+                "type": "string"
               }
             },
             "required": [
@@ -2233,93 +2237,6 @@
             "type": "string"
           }
         },
-        "stateMachine": {
-          "type": "object",
-          "properties": {
-            "initial": {
-              "description": "name of the state the module starts in",
-              "type": "string",
-              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
-            },
-            "states": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": "string",
-                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
-                    "description": "name of the state, unique in the machine"
-                  },
-                  "description": {
-                    "description": "free text documenting it",
-                    "type": "string"
-                  },
-                  "entry": {
-                    "description": "method run on entering the state",
-                    "type": "string",
-                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
-                  },
-                  "exit": {
-                    "description": "method run on leaving the state",
-                    "type": "string",
-                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
-                  },
-                  "final": {
-                    "description": "the machine stops there: no transition leaves it",
-                    "type": "boolean"
-                  }
-                },
-                "required": [
-                  "name"
-                ]
-              },
-              "description": "states of the module"
-            },
-            "transitions": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "from": {
-                    "type": "string",
-                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
-                    "description": "name of the state it leaves"
-                  },
-                  "to": {
-                    "type": "string",
-                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
-                    "description": "name of the state it enters"
-                  },
-                  "trigger": {
-                    "description": "method whose call takes it; absent: taken as soon as `from` is entered",
-                    "type": "string",
-                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
-                  },
-                  "guard": {
-                    "description": "condition taking it (expression on the attributes and the parameters of the trigger)",
-                    "type": "string"
-                  },
-                  "action": {
-                    "description": "method run on the way",
-                    "type": "string",
-                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
-                  }
-                },
-                "required": [
-                  "from",
-                  "to"
-                ]
-              },
-              "description": "transitions between the states"
-            }
-          },
-          "required": [
-            "states",
-            "transitions"
-          ],
-          "description": "behavior of the module: the states it goes through as its methods are called"
-        },
         "metadata": {
           "description": "free key: value pairs, passed to generators",
           "type": "object",
@@ -2689,6 +2606,93 @@
               "returns"
             ]
           }
+        },
+        "stateMachine": {
+          "type": "object",
+          "properties": {
+            "initial": {
+              "description": "name of the state the module starts in",
+              "type": "string",
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+            },
+            "states": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                    "description": "name of the state, unique in the machine"
+                  },
+                  "description": {
+                    "description": "free text documenting it",
+                    "type": "string"
+                  },
+                  "entry": {
+                    "description": "method run on entering the state",
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                  },
+                  "exit": {
+                    "description": "method run on leaving the state",
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                  },
+                  "final": {
+                    "description": "the machine stops there: no transition leaves it",
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              },
+              "description": "states of the module"
+            },
+            "transitions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "from": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                    "description": "name of the state it leaves"
+                  },
+                  "to": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                    "description": "name of the state it enters"
+                  },
+                  "trigger": {
+                    "description": "method whose call takes it; absent: taken as soon as `from` is entered",
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                  },
+                  "guard": {
+                    "description": "condition taking it (expression on the attributes and the parameters of the trigger)",
+                    "type": "string"
+                  },
+                  "action": {
+                    "description": "method run on the way",
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                  }
+                },
+                "required": [
+                  "from",
+                  "to"
+                ]
+              },
+              "description": "transitions between the states"
+            }
+          },
+          "required": [
+            "states",
+            "transitions"
+          ],
+          "description": "behavior of the module: the states it goes through as its methods are called"
         },
         "ports": {
           "type": "array",

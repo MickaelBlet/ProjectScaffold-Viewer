@@ -224,7 +224,8 @@ export const LinkEdge = memo(function LinkEdge(props: EdgeProps): ReactNode {
   const label = route?.label !== undefined ? pointAlong(pathPoints(path), route.label) : { x: midX, y: midY }
   if (!link) return null
   const c = link.constraints
-  const color = PERF_COLORS[c.performance.class]
+  const perfColor = PERF_COLORS[c.performance.class]
+  const color = link.color ?? perfColor
 
   const base: LinkRoute = route ?? { points: [] }
   const commit = (r: LinkRoute): void => {
@@ -419,7 +420,7 @@ export const LinkEdge = memo(function LinkEdge(props: EdgeProps): ReactNode {
                 <span className="badge ack">ACK{c.ack.timeoutMs ? ` ${c.ack.timeoutMs}ms` : ''}</span>
               )}
               {c.performance.class !== 'normal' && (
-                <span className="badge perf" style={{ borderColor: color, background: color }}>
+                <span className="badge perf" style={{ borderColor: perfColor, background: perfColor }}>
                   {c.performance.class}
                 </span>
               )}
