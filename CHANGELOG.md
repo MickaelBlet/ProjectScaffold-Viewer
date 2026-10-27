@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Links: a color (link inspector), drawn instead of the color of its performance class; saved as the link's `color`.
+- Links: a color (link inspector), drawn instead of the color of its performance class and on its badge in the Explorer; saved as the link's `color`.
 - Settings: _Sticky Explorer section headers_ turns off the stacking of the Explorer's section headers at the top and bottom of the list.
 - Outline (text editor, VS Code Outline view and breadcrumbs): modules show their type parameters, constructors and destructor, locks and state machine (states, then transitions `From → To` with trigger, guard and action), their implemented interfaces (`⊸ LevelSink`) and derived operations (`{==, <}`), as structs do; placed modules of dependencies their attributes and methods.
 

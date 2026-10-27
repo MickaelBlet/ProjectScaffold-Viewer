@@ -1289,7 +1289,9 @@ export function ExplorerPanel(): ReactNode {
               onDoubleClick={() => openEditor('link', l.id)}
               onContextMenu={(e) => entityMenu(e, 'link', l.id)}
             >
-              <span className="kind-badge link">L</span>
+              <span className="kind-badge link" style={l.color ? { background: l.color } : undefined}>
+                L
+              </span>
               {l.name}
               <small>
                 <Icon
