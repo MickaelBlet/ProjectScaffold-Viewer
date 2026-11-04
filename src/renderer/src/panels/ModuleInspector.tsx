@@ -40,6 +40,7 @@ import {
   IconButton,
   MetadataEditor,
   DeriveToggles,
+  NumberInput,
   QualifierToggles,
   Row,
   Section,
@@ -50,6 +51,9 @@ import {
 } from '@/components/fields'
 import { TypeScopeContext } from '@/components/TypeEditor'
 import {
+  ACTIVE_OVERFLOWS,
+  DEFAULT_ACTIVE_QUEUE,
+  DEFAULT_ACTIVE_TIMEOUT_MS,
   METHOD_QUALIFIERS,
   MODULE_KINDS,
   QUALIFIERS,
@@ -217,6 +221,57 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
             }
           />
         </Row>
+      )}
+      {!mod.kind && (concurrencyOn || !!mod.active) && (
+        <Row label="Active">
+          <label className="check" title="Its own thread runs the calls reaching its in ports, queued in order">
+            <input
+              type="checkbox"
+              checked={!!mod.active}
+              onChange={(e) =>
+                withModule(id, (m) => {
+                  if (e.target.checked) m.active = {}
+                  else delete m.active
+                })
+              }
+            />
+            own thread
+          </label>
+        </Row>
+      )}
+      {mod.active && (
+        <>
+          <Row label="Queue">
+            <NumberInput
+              value={mod.active.queue}
+              integer
+              min={1}
+              placeholder={String(DEFAULT_ACTIVE_QUEUE)}
+              onChange={(v) => withModule(id, (m) => void (m.active!.queue = v))}
+            />
+          </Row>
+          <Row label="Timeout (ms)">
+            <NumberInput
+              value={mod.active.timeoutMs}
+              integer
+              min={0}
+              placeholder={String(DEFAULT_ACTIVE_TIMEOUT_MS)}
+              onChange={(v) => withModule(id, (m) => void (m.active!.timeoutMs = v))}
+            />
+          </Row>
+          <Row label="Queue full">
+            <Select
+              value={mod.active.overflow ?? 'block'}
+              options={ACTIVE_OVERFLOWS}
+              onChange={(o) =>
+                withModule(id, (m) => {
+                  if (o === 'block') delete m.active!.overflow
+                  else m.active!.overflow = o
+                })
+              }
+            />
+          </Row>
+        </>
       )}
       {!mod.parentId && (project.binaries.length > 0 || mod.binaryId) && (
         <Row label="Binary">

@@ -381,6 +381,23 @@ export interface Destructor {
 export const INSTANTIATIONS = ['singleton', 'utility', 'value'] as const
 export type Instantiation = (typeof INSTANTIATIONS)[number]
 
+/** What a call to an active module does when its queue is full: wait, be dropped, or fail. */
+export const ACTIVE_OVERFLOWS = ['block', 'drop', 'error'] as const
+export type ActiveOverflow = (typeof ACTIVE_OVERFLOWS)[number]
+export const DEFAULT_ACTIVE_QUEUE = 64
+export const DEFAULT_ACTIVE_TIMEOUT_MS = 5000
+
+/**
+ * Active module: its own thread runs the calls reaching its `in` ports, queued in order. Calls with a result
+ * (or through a link requiring an acknowledgement) wait for it; the others return at once. Absent fields:
+ * defaults (`queue` 64 calls, `timeoutMs` 5000, `overflow` block).
+ */
+export interface Active {
+  queue?: number
+  timeoutMs?: number
+  overflow?: ActiveOverflow
+}
+
 /** State of a module's state machine; `entry` / `exit`: methods of the module run on entering / leaving it. */
 export interface State {
   id: Id
@@ -472,6 +489,8 @@ export interface Module {
   instantiation?: Instantiation
   /** Locks guarding its attributes. */
   locks?: Lock[]
+  /** Its own thread runs the calls reaching its `in` ports. */
+  active?: Active
   /** Conditions on its attributes holding between calls of its public methods. */
   invariants?: string[]
   stateMachine?: StateMachine

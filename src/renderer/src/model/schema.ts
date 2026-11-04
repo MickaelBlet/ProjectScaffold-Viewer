@@ -7,6 +7,7 @@ import {
   INSTANTIATIONS,
   INT_PRIMITIVES,
   LOCK_KINDS,
+  ACTIVE_OVERFLOWS,
   MODULE_KINDS,
   OWNERSHIPS,
   PARAM_DIRECTIONS,
@@ -379,6 +380,26 @@ const Lock = z.object({
     .describe('mutex; shared: readers-writer lock; recursive: may be taken again by its holder')
 })
 
+const Active = z
+  .union([
+    z.boolean(),
+    z.object({
+      queue: z.int().min(1).optional().describe('calls waiting at most (default 64)'),
+      timeoutMs: z
+        .int()
+        .min(0)
+        .optional()
+        .describe('how long a call waiting for its result waits, in milliseconds (default 5000)'),
+      overflow: z
+        .enum(ACTIVE_OVERFLOWS)
+        .optional()
+        .describe('a call reaching a full queue: block (default) waits, drop is lost, error fails')
+    })
+  ])
+  .describe(
+    'its own thread runs the calls reaching its `in` ports, queued in order: calls with a result wait for it, the others return at once; true: the defaults'
+  )
+
 const MethodName = Identifier.describe('name of a method of the module (not overloaded)')
 
 const StateMachine = z
@@ -442,6 +463,7 @@ export interface FileModule {
   copy?: (typeof SPECIAL_MEMBERS)[number]
   move?: (typeof SPECIAL_MEMBERS)[number]
   locks?: z.infer<typeof Lock>[]
+  active?: z.infer<typeof Active>
   invariants?: string[]
   metadata?: Record<string, string>
   color?: string
@@ -498,6 +520,7 @@ const Module: z.ZodType<FileModule> = z
         'move constructor and assignment: default (by the compiler), delete (not movable) or custom (written by hand); absent: implicit'
       ),
       locks: z.array(Lock).optional().describe('locks guarding its attributes (`guardedBy`)'),
+      active: Active.optional(),
       invariants: Conditions.describe(
         'conditions on its attributes holding between calls of its public methods (expressions)'
       ),

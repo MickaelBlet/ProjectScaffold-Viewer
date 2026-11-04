@@ -5,6 +5,12 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Modules: `active` (module inspector, _Active_, with the concurrency features on): the module's own thread runs the calls reaching its `in` ports, queued in order, with the size of its queue, the timeout of calls waiting for a result and what a call reaching a full queue does (`block`, `drop`, `error`). An active module is a `class`, not `utility`; one without `in` ports is a warning.
+
 ## [1.1.1] - 2026-10-27
 
 ### Added

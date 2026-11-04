@@ -43,6 +43,7 @@ import {
 import {
   ALL_QUALIFIERS,
   type Access,
+  type Active,
   type Attribute,
   type Binary,
   type ConstDef,
@@ -79,6 +80,12 @@ import {
   type View
 } from './types'
 import type { FileTypeRef } from './schema'
+
+/** An active module's settings as written: `true` when all are defaults. */
+const activeOf = (a: Active): FileModule['active'] => {
+  const out = Object.fromEntries(Object.entries(a).filter(([, v]) => v !== undefined))
+  return Object.keys(out).length ? out : true
+}
 
 export type Format = 'yaml' | 'json'
 
@@ -388,6 +395,7 @@ export function toFile(p: Project, options: { editor: boolean }): FileProject {
         copy: m.copy,
         move: m.move,
         locks: m.locks?.length ? m.locks.map((l) => ({ name: l.name, kind: l.kind })) : undefined,
+        active: m.active && activeOf(m.active),
         invariants: m.invariants?.length ? [...m.invariants] : undefined,
         metadata: optMeta(m.metadata),
         color: m.color,
@@ -1071,6 +1079,7 @@ export function fromFile(data: unknown, prev?: Project): Project {
         ...(fm.copy && { copy: fm.copy }),
         ...(fm.move && { move: fm.move }),
         ...(locks?.length && { locks }),
+        ...(fm.active && { active: fm.active === true ? {} : { ...fm.active } }),
         ...(fm.invariants?.length && { invariants: [...fm.invariants] }),
         ...(fm.constructors && {
           constructors: constructorsOf(fm.constructors, path, fm.name, was?.constructors, [

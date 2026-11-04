@@ -720,6 +720,12 @@ export function validate(p: Project): Problem[] {
         if (m.ports.length) push('warning', target, `${path}: a value module with ports`)
         break
     }
+    if (m.active) {
+      if (m.kind) push('error', target, `${path}: an active module is a class (not ${m.kind})`)
+      if (m.instantiation === 'utility') push('error', target, `${path}: a utility module is not active`)
+      if (!m.ports.some((x) => x.role === 'in'))
+        push('warning', target, `${path}: active, without in ports to run calls of`)
+    }
   }
 
   const checkMessage = (m: Message, target: ProblemTarget, where: string): void => {

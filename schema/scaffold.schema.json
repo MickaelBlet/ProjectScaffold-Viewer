@@ -2317,6 +2317,40 @@
             ]
           }
         },
+        "active": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "queue": {
+                  "description": "calls waiting at most (default 64)",
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "timeoutMs": {
+                  "description": "how long a call waiting for its result waits, in milliseconds (default 5000)",
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "overflow": {
+                  "description": "a call reaching a full queue: block (default) waits, drop is lost, error fails",
+                  "type": "string",
+                  "enum": [
+                    "block",
+                    "drop",
+                    "error"
+                  ]
+                }
+              }
+            }
+          ],
+          "description": "its own thread runs the calls reaching its `in` ports, queued in order: calls with a result wait for it, the others return at once; true: the defaults"
+        },
         "invariants": {
           "description": "conditions on its attributes holding between calls of its public methods (expressions)",
           "type": "array",
