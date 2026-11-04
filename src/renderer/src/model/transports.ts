@@ -7,6 +7,7 @@ export type TransportField = Exclude<keyof TransportSettings, 'options'>
 export const TRANSPORT_FIELDS: Record<Transport, readonly TransportField[]> = {
   ipc: ['socket'],
   shm: ['name', 'capacity'],
+  mq: ['name', 'maxMessages', 'messageSize'],
   tcp: ['client', 'server'],
   udp: ['client', 'server'],
   http: ['client', 'server', 'path'],
@@ -20,8 +21,11 @@ export const TRANSPORT_FIELDS: Record<Transport, readonly TransportField[]> = {
 export const DEFAULT_HOST = '127.0.0.1'
 export const DEFAULT_BASE_PORT = 47000
 export const DEFAULT_SHM_CAPACITY = 1 << 20
+/** Defaults of the message queues (mq): those of Linux (`/proc/sys/fs/mqueue/{msg_max,msgsize_max}`). */
+export const DEFAULT_MQ_MAX_MESSAGES = 10
+export const DEFAULT_MQ_MESSAGE_SIZE = 8192
 
-/** Default shared memory name of a link, as the generator names it: `<project>_<link>` in snake_case. */
+/** Default shared memory (shm) or message queue (mq) name of a link, as the generator names it: `<project>_<link>` in snake_case. */
 export const defaultShmName = (project: string, link: string): string =>
   `${project}_${link}`
     .replace(/([a-z0-9])([A-Z])/g, '$1 $2')

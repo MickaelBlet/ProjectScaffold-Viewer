@@ -318,6 +318,14 @@ describe('validate', () => {
     ])
     core.settings = { name: 'a/b' }
     expect(messages(p)).toEqual(["Link 'operator_to_core': shared memory name 'a/b' is not valid"])
+    Object.assign(core, { transport: 'mq', settings: { name: 'seg', maxMessages: 4, messageSize: 1024 } })
+    expect(messages(p, 'warning')).toEqual([])
+    other.transport = 'mq'
+    expect(messages(p, 'warning')).toEqual([
+      "Link 'operator_to_core' uses the message queue 'seg' of link 'sensor_to_controller'"
+    ])
+    core.settings = { name: 'a/b' }
+    expect(messages(p)).toEqual(["Link 'operator_to_core': message queue name 'a/b' is not valid"])
   })
 
   it('accepts custom primitives as map keys', () => {

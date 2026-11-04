@@ -19,6 +19,8 @@ import { dependencyName } from '@/model/dependencies'
 import {
   DEFAULT_BASE_PORT,
   DEFAULT_HOST,
+  DEFAULT_MQ_MAX_MESSAGES,
+  DEFAULT_MQ_MESSAGE_SIZE,
   DEFAULT_SHM_CAPACITY,
   defaultShmName,
   pruneSettings,
@@ -71,7 +73,7 @@ function withSettings(id: string, fn: (s: TransportSettings) => void): void {
 
 type End = 'client' | 'server' | 'broker'
 type Text = 'path' | 'name' | 'socket' | 'topic' | 'interface' | 'device'
-type Count = 'capacity' | 'id' | 'baud'
+type Count = 'capacity' | 'maxMessages' | 'messageSize' | 'id' | 'baud'
 
 const LABELS: Record<End | Text | Count, string> = {
   client: 'Client',
@@ -84,6 +86,8 @@ const LABELS: Record<End | Text | Count, string> = {
   interface: 'Interface',
   device: 'Device',
   capacity: 'Capacity (bytes)',
+  maxMessages: 'Messages',
+  messageSize: 'Message size (bytes)',
   id: 'Frame id',
   baud: 'Baud rate'
 }
@@ -127,10 +131,12 @@ function TransportSettingsFields({ project, link }: { project: Project; link: Li
   const placeholders: Partial<Record<Text | Count, string>> = {
     path: `/${name}`,
     name: defaultShmName(dependencyName(project.name), name),
-    capacity: String(DEFAULT_SHM_CAPACITY)
+    capacity: String(DEFAULT_SHM_CAPACITY),
+    maxMessages: String(DEFAULT_MQ_MAX_MESSAGES),
+    messageSize: String(DEFAULT_MQ_MESSAGE_SIZE)
   }
   const text = (f: Text): ReactNode => (
-    <Row key={f} label={LABELS[f]}>
+    <Row key={f} label={f === 'name' && remote.transport === 'mq' ? 'Queues' : LABELS[f]}>
       <CommitInput
         value={s[f] ?? ''}
         placeholder={placeholders[f]}
@@ -154,7 +160,7 @@ function TransportSettingsFields({ project, link }: { project: Project; link: Li
       {transportFields(remote.transport).map((f) =>
         f === 'client' || f === 'server' || f === 'broker'
           ? end(f)
-          : f === 'capacity' || f === 'id' || f === 'baud'
+          : f === 'capacity' || f === 'maxMessages' || f === 'messageSize' || f === 'id' || f === 'baud'
             ? count(f)
             : text(f)
       )}

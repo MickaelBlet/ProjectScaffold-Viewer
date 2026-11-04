@@ -1117,14 +1117,15 @@ export function validate(p: Project): Problem[] {
         !settings.path.startsWith('/')
       )
         push('error', target, `Link '${l.name}': path '${settings.path}' must start with '/'`)
-      if (transport === 'shm' && settings.name !== undefined) {
-        if (!/^\/?[^/]+$/.test(settings.name) || settings.name.length > 255)
-          push('error', target, `Link '${l.name}': shared memory name '${settings.name}' is not valid`)
+      if ((transport === 'shm' || transport === 'mq') && settings.name !== undefined) {
+        const what = transport === 'shm' ? 'shared memory' : 'message queue'
+        if (!/^\/?[^/]+$/.test(settings.name) || settings.name.length > (transport === 'shm' ? 255 : 249))
+          push('error', target, `Link '${l.name}': ${what} name '${settings.name}' is not valid`)
         const segment = settings.name.replace(/^\//, '')
-        const other = segments.get(segment)
+        const other = segments.get(`${transport}:${segment}`)
         if (other)
-          push('warning', target, `Link '${l.name}' uses the shared memory '${segment}' of link '${other}'`)
-        else segments.set(segment, l.name)
+          push('warning', target, `Link '${l.name}' uses the ${what} '${segment}' of link '${other}'`)
+        else segments.set(`${transport}:${segment}`, l.name)
       }
       const port = settings.server?.port
       const family =

@@ -264,7 +264,7 @@
                         "description": "the link crosses processes or machines through a transport"
                       },
                       "transport": {
-                        "description": "transport carrying it: ipc, shm, tcp, udp, http, websocket, grpc, mqtt, can, serial, or one of `transports`",
+                        "description": "transport carrying it: ipc, shm, mq, tcp, udp, http, websocket, grpc, mqtt, can, serial, or one of `transports`",
                         "type": "string"
                       },
                       "settings": {
@@ -3452,12 +3452,24 @@
           "minLength": 1
         },
         "name": {
-          "description": "shared memory segment (shm; default <project>_<link>)",
+          "description": "shared memory segment (shm), base name of the message queues (mq: <name>.call, <name>.reply); default <project>_<link>",
           "type": "string",
           "minLength": 1
         },
         "capacity": {
           "description": "bytes of each ring (shm; default 1048576)",
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "maxMessages": {
+          "description": "messages each queue holds at most (mq; default 10)",
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "messageSize": {
+          "description": "bytes of a message (a frame) at most (mq; default 8192)",
           "type": "integer",
           "exclusiveMinimum": 0,
           "maximum": 9007199254740991

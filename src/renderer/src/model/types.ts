@@ -526,6 +526,7 @@ export type PerformanceClass = (typeof PERFORMANCE_CLASSES)[number]
 export const TRANSPORTS = [
   'ipc',
   'shm',
+  'mq',
   'tcp',
   'udp',
   'http',
@@ -551,10 +552,14 @@ export interface TransportSettings {
   server?: HostPort
   /** Request path (http, websocket). */
   path?: string
-  /** Shared memory segment (shm). */
+  /** Shared memory segment (shm), base name of the message queues (mq). */
   name?: string
   /** Bytes of each ring (shm). */
   capacity?: number
+  /** Messages each queue holds at most (mq). */
+  maxMessages?: number
+  /** Bytes of a message at most: of a frame (mq). */
+  messageSize?: number
   /** Unix socket path (ipc). */
   socket?: string
   /** Broker (mqtt). */

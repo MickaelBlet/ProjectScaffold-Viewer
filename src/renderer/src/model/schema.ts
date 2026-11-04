@@ -622,8 +622,20 @@ const TransportSettings = z
     client: HostPort.optional().describe('where the caller connects (tcp, udp, http, websocket, grpc)'),
     server: HostPort.optional().describe('where the callee listens (tcp, udp, http, websocket, grpc)'),
     path: z.string().min(1).optional().describe('request path (http, websocket; default /<link>)'),
-    name: z.string().min(1).optional().describe('shared memory segment (shm; default <project>_<link>)'),
+    name: z
+      .string()
+      .min(1)
+      .optional()
+      .describe(
+        'shared memory segment (shm), base name of the message queues (mq: <name>.call, <name>.reply); default <project>_<link>'
+      ),
     capacity: z.int().positive().optional().describe('bytes of each ring (shm; default 1048576)'),
+    maxMessages: z.int().positive().optional().describe('messages each queue holds at most (mq; default 10)'),
+    messageSize: z
+      .int()
+      .positive()
+      .optional()
+      .describe('bytes of a message (a frame) at most (mq; default 8192)'),
     socket: z.string().min(1).optional().describe('unix socket path (ipc)'),
     broker: HostPort.optional().describe('broker (mqtt)'),
     topic: z.string().min(1).optional().describe('topic (mqtt)'),
@@ -674,7 +686,7 @@ const LinkConstraints = z.object({
         .string()
         .optional()
         .describe(
-          'transport carrying it: ipc, shm, tcp, udp, http, websocket, grpc, mqtt, can, serial, or one of `transports`'
+          'transport carrying it: ipc, shm, mq, tcp, udp, http, websocket, grpc, mqtt, can, serial, or one of `transports`'
         ),
       settings: TransportSettings.optional().describe(
         'settings of the transport; the fields that apply depend on it'

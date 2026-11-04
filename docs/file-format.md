@@ -220,8 +220,8 @@ links:
       direction: unidirectional | bidirectional # messages returning a value need bidirectional
       ack: { required: bool, timeoutMs? }
       performance: { class: realtime | low | normal | bulk, maxLatencyMs?, rateHz? }
-      remote: { enabled: bool, transport?, settings? } # e.g. ipc, shm, tcp, udp, grpc, mqtt, can
-    color: "#d14f4f" # optional; absent: the color of its performance class
+      remote: { enabled: bool, transport?, settings? } # e.g. ipc, shm, mq, tcp, udp, grpc, mqtt, can
+    color: '#d14f4f' # optional; absent: the color of its performance class
 ```
 
 Links to modules of other projects: [Dependencies › File format](dependencies.md#file-format).
@@ -245,19 +245,20 @@ remoteDefaults: { client?: { host? }, server?: { host? }, basePort? } # optional
 
 `remote.settings` (optional), by transport:
 
-| Transport            | Settings                                                                                       |
-| -------------------- | ---------------------------------------------------------------------------------------------- |
-| tcp, udp, grpc       | `client`, `server`: `{ host?, port? }` — where the caller connects, where the callee listens   |
-| http, websocket      | the same, plus `path` (default `/<link>`)                                                      |
-| shm                  | `name` (segment, default `<project>_<link>`), `capacity` (bytes of each ring, default 1048576) |
-| ipc                  | `socket`                                                                                       |
-| mqtt                 | `broker` (`{ host?, port? }`), `topic`                                                         |
-| can                  | `interface`, `id`                                                                              |
-| serial               | `device`, `baud`                                                                               |
-| any, custom included | `options` (string map), for the templates                                                      |
+| Transport            | Settings                                                                                                                                                                       |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| tcp, udp, grpc       | `client`, `server`: `{ host?, port? }` — where the caller connects, where the callee listens                                                                                   |
+| http, websocket      | the same, plus `path` (default `/<link>`)                                                                                                                                      |
+| shm                  | `name` (segment, default `<project>_<link>`), `capacity` (bytes of each ring, default 1048576)                                                                                 |
+| mq                   | `name` (POSIX message queues `<name>.call` and `<name>.reply`, default `<project>_<link>`), `maxMessages` (default 10), `messageSize` (bytes of a frame at most, default 8192) |
+| ipc                  | `socket`                                                                                                                                                                       |
+| mqtt                 | `broker` (`{ host?, port? }`), `topic`                                                                                                                                         |
+| can                  | `interface`, `id`                                                                                                                                                              |
+| serial               | `device`, `baud`                                                                                                                                                               |
+| any, custom included | `options` (string map), for the templates                                                                                                                                      |
 
 - A field not applying to the transport is a warning.
-- An http path not starting with `/` and an invalid shared memory name are errors.
-- Two links listening on the same port, or sharing a segment, are warnings.
+- An http path not starting with `/` and an invalid shared memory or message queue name are errors.
+- Two links listening on the same port, or sharing a segment or queues, are warnings.
 
 What the generated code does with them: [ProjectScaffold-Generator › Links between binaries](https://github.com/MickaelBlet/ProjectScaffold-Generator/blob/master/docs/remote.md).
