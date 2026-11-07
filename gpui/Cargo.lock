@@ -5628,6 +5628,7 @@ dependencies = [
  "anyhow",
  "env_logger",
  "gpui-kit",
+ "indexmap",
  "scaffold-layout",
  "scaffold-model",
  "serde_json",

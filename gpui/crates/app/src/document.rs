@@ -19,11 +19,6 @@ pub struct Grid {
     pub size: f64,
 }
 
-pub const GRID: Grid = Grid {
-    snap: true,
-    size: 20.,
-};
-
 pub struct Document {
     pub project: Project,
     pub path: Option<PathBuf>,
@@ -181,6 +176,14 @@ impl Document {
         self.last_edit = None;
     }
 
+    pub fn can_undo(&self) -> bool {
+        !self.undo.is_empty()
+    }
+
+    pub fn can_redo(&self) -> bool {
+        !self.redo.is_empty()
+    }
+
     pub fn undo(&mut self) {
         if let Some(p) = self.undo.pop() {
             self.redo.push(std::mem::replace(&mut self.project, p));
@@ -251,7 +254,7 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("a.scaffold.yaml");
         let mut d = Document::new(Project::default(), None);
-        d.edit(GRID, |p| p.name = "a".into());
+        d.edit(crate::settings::grid(), |p| p.name = "a".into());
         d.save_to(&path).unwrap();
         assert_eq!(d.check_disk(), DiskChange::None);
         // Another program renames the project.

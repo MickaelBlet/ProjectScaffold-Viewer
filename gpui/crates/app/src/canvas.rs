@@ -4,6 +4,7 @@ use std::cell::Cell;
 use std::collections::HashSet;
 use std::rc::Rc;
 
+use gpui_kit::component::menu::ContextMenuExt;
 use gpui_kit::*;
 use scaffold_layout::scene::{
     InheritPath, LinkPath, NodeBox, NodeKind, Pt, Scene, perf_color, project_scene,
@@ -16,8 +17,9 @@ use scaffold_model::project::{
 };
 use scaffold_model::types::{Id, NoteKind, Orientation, PortRole, Project, Rect, Side, Size as Size2};
 
-use crate::document::{Document, GRID};
+use crate::document::Document;
 use crate::node::{self, Run, RunStyle};
+use crate::settings::{self, grid};
 use crate::theme::{Theme, alpha, hex, light};
 
 /// What a pointer drag does.
@@ -120,6 +122,9 @@ pub struct Canvas {
     bounds: Rc<Cell<Option<Bounds<Pixels>>>>,
     /// Size the view was fitted to; None once the user moved the view.
     fitted: Option<Option<Size<Pixels>>>,
+    /// Items the next fit frames (None: everything).
+    fit_ids: Option<Vec<Id>>,
+    focus: FocusHandle,
 }
 
 impl Canvas {
@@ -145,6 +150,43 @@ impl Canvas {
             guides: Vec::new(),
             bounds: Rc::new(Cell::new(None)),
             fitted: Some(None),
+            fit_ids: None,
+            focus: cx.focus_handle(),
+        }
+    }
+
+    pub fn focus_handle(&self) -> FocusHandle {
+        self.focus.clone()
+    }
+
+    pub fn zoom(&self) -> f64 {
+        self.zoom
+    }
+
+    /// Zoom by a factor around the middle of the view.
+    pub fn zoom_by(&mut self, factor: f64, cx: &mut Context<Self>) {
+        self.zoom_to(self.zoom * factor, cx);
+    }
+
+    pub fn zoom_to(&mut self, zoom: f64, cx: &mut Context<Self>) {
+        let c = self.center();
+        self.zoom = zoom.clamp(0.05, 4.);
+        if let Some(b) = self.bounds.get() {
+            self.origin = Pt {
+                x: c.x - f64::from(b.size.width) / 2. / self.zoom,
+                y: c.y - f64::from(b.size.height) / 2. / self.zoom,
+            };
+        }
+        self.fitted = None;
+        cx.notify();
+    }
+
+    /// Canvas point at the middle of the view (where new items go).
+    pub fn center(&self) -> Pt {
+        let size = self.bounds.get().map_or(size(px(800.), px(600.)), |b| b.size);
+        Pt {
+            x: self.origin.x + f64::from(size.width) / 2. / self.zoom,
+            y: self.origin.y + f64::from(size.height) / 2. / self.zoom,
         }
     }
 
@@ -187,13 +229,25 @@ impl Canvas {
         }
     }
 
-    pub fn fit_view(&mut self, cx: &mut Context<Self>) {
+    /// Frame some items (or everything when none is drawn).
+    pub fn fit_items(&mut self, ids: Option<Vec<Id>>, cx: &mut Context<Self>) {
+        self.fit_ids = ids.filter(|ids| !ids.is_empty());
         self.fitted = Some(None);
         cx.notify();
     }
 
     fn fit(&mut self, size: Size<Pixels>) {
-        let b = self.scene.bounds();
+        let rects: Vec<Rect> = self
+            .fit_ids
+            .iter()
+            .flatten()
+            .filter_map(|id| self.drawn_rect(id))
+            .collect();
+        let b = if rects.is_empty() {
+            self.scene.bounds()
+        } else {
+            scaffold_model::project::bounds_of(&rects)
+        };
         let (w, h) = (f64::from(size.width), f64::from(size.height));
         if b.width <= 0. || w <= 0. {
             return;
@@ -403,8 +457,24 @@ impl Canvas {
         })
     }
 
+    /// A right click selects the item under the pointer (keeping a selection holding it), then
+    /// opens the context menu.
+    fn on_right_down(&mut self, ev: &MouseDownEvent, window: &mut Window, cx: &mut Context<Self>) {
+        window.focus(&self.focus, cx);
+        let at = self.to_canvas(ev.position);
+        let hit = self.hit(at);
+        self.doc.update(cx, |d, cx| {
+            match hit {
+                Some(id) if !d.selected.contains(&id) => d.select(vec![id]),
+                Some(_) => {}
+                None => d.select(Vec::new()),
+            }
+            cx.notify();
+        });
+    }
+
     fn on_down(&mut self, ev: &MouseDownEvent, window: &mut Window, cx: &mut Context<Self>) {
-        let _ = window;
+        window.focus(&self.focus, cx);
         let at = self.to_canvas(ev.position);
         let reach = (HANDLE_PX / 2. + 4.) / self.zoom;
         if let Some((id, start)) = self
@@ -530,8 +600,8 @@ impl Canvas {
                 let doc = self.doc.read(cx);
                 let mut preview = doc.project.clone();
                 resized_to(&mut preview, id, *handle, *rect, d);
-                if GRID.snap {
-                    snap_changes(&doc.project, &mut preview, GRID.size);
+                if grid().snap {
+                    snap_changes(&doc.project, &mut preview, grid().size);
                 }
                 self.scene = project_scene(&preview);
                 self.project = preview;
@@ -552,7 +622,7 @@ impl Canvas {
                     return;
                 }
                 self.guides.clear();
-                if let Some((r, siblings)) = guide {
+                if let Some((r, siblings)) = guide.as_ref().filter(|_| settings::get().guides) {
                     let (snapped, guides) = align(*r, siblings, o, GUIDE_PX / self.zoom);
                     o = snapped;
                     self.guides = guides;
@@ -564,8 +634,8 @@ impl Canvas {
                 let doc = self.doc.read(cx);
                 let mut preview = doc.project.clone();
                 moved(&mut preview, ids, o);
-                if GRID.snap {
-                    snap_changes(&doc.project, &mut preview, GRID.size);
+                if grid().snap {
+                    snap_changes(&doc.project, &mut preview, grid().size);
                 }
                 self.scene = project_scene(&preview);
                 self.project = preview;
@@ -595,7 +665,7 @@ impl Canvas {
                 let preview = self.project.clone();
                 self.doc.update(cx, |d, cx| {
                     d.seal();
-                    d.edit(GRID, |p| {
+                    d.edit(grid(), |p| {
                         if let Some(r) = r {
                             set_rect(p, &id, r);
                         } else {
@@ -616,7 +686,7 @@ impl Canvas {
                 self.doc.update(cx, |d, cx| {
                     d.seal();
                     let mut link = None;
-                    d.edit(GRID, |p| link = connect(p, &a, &b));
+                    d.edit(grid(), |p| link = connect(p, &a, &b));
                     d.seal();
                     if let Some(l) = link {
                         d.select(vec![l]);
@@ -680,7 +750,7 @@ impl Canvas {
                 let preview = self.project.clone();
                 self.doc.update(cx, |d, cx| {
                     d.seal();
-                    d.edit(GRID, |p| match target {
+                    d.edit(grid(), |p| match target {
                         Some((parent, x, y)) => reparent_module(p, &ids[0], parent.as_deref(), x, y),
                         None => moved(p, &ids, offset),
                     });
@@ -988,11 +1058,12 @@ fn align(r: Rect, siblings: &[Rect], o: Pt, reach: f64) -> (Pt, Vec<Guide>) {
         x: r.x + o.x,
         y: r.y + o.y,
     };
-    if GRID.snap {
-        pos.x = snap_value(pos.x, GRID.size);
-        pos.y = snap_value(pos.y, GRID.size);
+    if grid().snap {
+        pos.x = snap_value(pos.x, grid().size);
+        pos.y = snap_value(pos.y, grid().size);
     }
-    let off_grid = |delta: f64| GRID.snap && (delta / GRID.size - (delta / GRID.size).round()).abs() > 1e-6;
+    let off_grid =
+        |delta: f64| grid().snap && (delta / grid().size - (delta / grid().size).round()).abs() > 1e-6;
     let axis = |at: f64, size: f64, theirs: &dyn Fn(&Rect) -> (f64, f64)| -> (f64, Option<f64>) {
         let mine = [at, at + size / 2., at + size];
         let mut best: Option<(f64, f64)> = None;
@@ -1100,8 +1171,8 @@ fn resized_to(p: &mut Project, id: &str, handle: (i8, i8), r: Rect, d: Pt) {
     let (x, width) = side(r.x, r.width, handle.0, d.x, min.width);
     let (y, height) = side(r.y, r.height, handle.1, d.y, min.height);
     let mut next = Rect { x, y, width, height };
-    if GRID.snap {
-        next = snap_rect(next, GRID.size, min, handle.0 < 0, handle.1 < 0);
+    if grid().snap {
+        next = snap_rect(next, grid().size, min, handle.0 < 0, handle.1 < 0);
     }
     set_rect(p, id, next);
 }
@@ -1553,12 +1624,19 @@ impl Render for Canvas {
         };
         let size = self.bounds.clone();
         let entity = cx.entity();
+        let menu_doc = self.doc.clone();
         div()
             .id("canvas")
+            .key_context("Canvas")
+            .track_focus(&self.focus)
             .size_full()
             .relative()
             .overflow_hidden()
             .bg(t.bg)
+            .on_mouse_down(
+                MouseButton::Right,
+                cx.listener(|this, ev: &MouseDownEvent, window, cx| this.on_right_down(ev, window, cx)),
+            )
             .on_scroll(cx.listener(|this, ev: &ScrollEvent, _, cx| this.on_scroll(ev, cx)))
             .on_mouse_down(
                 MouseButton::Left,
@@ -1601,6 +1679,7 @@ impl Render for Canvas {
             .child(handles)
             .children(guide_lines)
             .children(marquee)
+            .context_menu(move |menu, _, cx| crate::commands::canvas_menu(menu, &menu_doc, cx))
     }
 }
 

@@ -59,3 +59,12 @@ pub fn remove_recent(path: &Path) {
         let _ = std::fs::write(f, text);
     }
 }
+
+/// Forget everything stored between runs.
+pub fn clear() {
+    if let Some(f) = recent_file()
+        && let Some(dir) = f.parent()
+    {
+        let _ = std::fs::remove_dir_all(dir);
+    }
+}

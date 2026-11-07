@@ -5,11 +5,15 @@ use std::collections::{HashMap, HashSet};
 
 use crate::binaries::{binary_snapshot, settle_binaries};
 use crate::project::{
-    Compartments, LinkEnd, child_modules, default_constraints, find_imported, find_module, find_port,
-    grow_ancestors, grow_imported_ancestors, imported_index, imported_parent, is_imported_id, link_origin,
-    link_roles, min_size, module_roles, new_id, order_link_ends, prune_views, subtree_ids, unique_name,
+    Compartments, LAYOUT_PAD, LinkEnd, absolute_position, absolute_rect, below_content, bounds_of,
+    child_modules, content_bottom, content_top, default_constraints, default_size, find_imported,
+    find_module, find_port, grow_ancestors, grow_imported_ancestors, imported_index, imported_parent,
+    is_imported_id, link_origin, link_roles, min_size, module_roles, new_id, next_module_color,
+    order_link_ends, prune_views, subtree_ids, unique_name,
 };
-use crate::types::{Endpoint, Id, Link, Point, Port, PortRole, Project, Size};
+use indexmap::IndexMap;
+
+use crate::types::{Endpoint, Id, Link, Module, Note, NoteKind, Point, Port, PortRole, Project, Rect, Size};
 
 /// Part of a rect to set: unset fields keep their value.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -419,6 +423,216 @@ pub fn connect(d: &mut Project, from: &ConnectEnd, to: &ConnectEnd) -> Option<Id
     Some(id)
 }
 
+/// A module with nothing in it.
+pub fn blank_module(id: Id, name: String, parent_id: Option<Id>, layout: Rect) -> Module {
+    Module {
+        id,
+        name,
+        description: String::new(),
+        parent_id,
+        kind: None,
+        bases: None,
+        base_args: None,
+        implements: None,
+        r#final: false,
+        derives: None,
+        constructors: None,
+        copy: None,
+        r#move: None,
+        destructor: None,
+        instantiation: None,
+        locks: None,
+        active: None,
+        invariants: None,
+        state_machine: None,
+        metadata: Default::default(),
+        attributes: Vec::new(),
+        methods: Vec::new(),
+        ports: Vec::new(),
+        layout,
+        color: None,
+        binary_id: None,
+        locked: false,
+        base_routes: None,
+    }
+}
+
+/// New module at a parent-relative place; returns its id. Port of `addModule`.
+pub fn add_module(d: &mut Project, parent_id: Option<&str>, x: f64, y: f64) -> Id {
+    let id = new_id();
+    let name = unique_name("Module", child_modules(d, parent_id).map(|m| m.name.as_str()));
+    let size = default_size(&[], Compartments::default(), d.orientation);
+    let mut m = blank_module(
+        id.clone(),
+        name,
+        parent_id.map(str::to_string),
+        Rect {
+            x,
+            y,
+            width: size.width,
+            height: size.height,
+        },
+    );
+    m.color = Some(next_module_color(d));
+    d.modules.push(m);
+    grow_ancestors(d, &id);
+    id
+}
+
+/// New module inside another, below its ports and existing children. Port of `addSubmodule`.
+pub fn add_submodule(d: &mut Project, parent_id: &str) -> Id {
+    let y = below_content(d, parent_id, None);
+    add_module(d, Some(parent_id), LAYOUT_PAD, y)
+}
+
+/// New port on a module, which grows to fit it.
+pub fn add_port(d: &mut Project, module_id: &str, role: PortRole) -> Option<Id> {
+    push_port(d, module_id, role, None)
+}
+
+/// New note or frame at an absolute place; returns its id. Port of `addNote`.
+pub fn add_note(d: &mut Project, kind: NoteKind, x: f64, y: f64, view_id: Option<Id>) -> Id {
+    let id = new_id();
+    let (text, width, height) = match kind {
+        NoteKind::Note => ("Note", 180., 100.),
+        NoteKind::Frame => ("Group", 420., 280.),
+    };
+    d.notes.push(Note {
+        id: id.clone(),
+        kind,
+        text: text.into(),
+        layout: Rect { x, y, width, height },
+        color: None,
+        locked: false,
+        view_id,
+    });
+    id
+}
+
+/// Whether an item (module, note, placed module) is locked; None when there is no such item.
+pub fn locked_of(p: &Project, id: &str) -> Option<bool> {
+    find_module(p, id)
+        .map(|m| m.locked)
+        .or_else(|| p.notes.iter().find(|n| n.id == id).map(|n| n.locked))
+        .or_else(|| find_imported(p, id).map(|(_, m)| m.locked))
+}
+
+/// Lock or unlock the position and size of modules, notes and placed modules.
+pub fn set_locked(d: &mut Project, ids: &[Id], locked: bool) {
+    for m in &mut d.modules {
+        if ids.contains(&m.id) {
+            m.locked = locked;
+        }
+    }
+    for n in &mut d.notes {
+        if ids.contains(&n.id) {
+            n.locked = locked;
+        }
+    }
+    for m in d.dependencies.iter_mut().flat_map(|x| x.modules.iter_mut()) {
+        if ids.contains(&m.id) {
+            m.locked = locked;
+        }
+    }
+}
+
+/// Absolute rects of the selected modules and notes.
+pub fn selected_rects(p: &Project, ids: &[Id]) -> IndexMap<Id, Rect> {
+    let mut out = IndexMap::new();
+    for id in ids {
+        if find_module(p, id).is_some() {
+            out.insert(id.clone(), absolute_rect(p, id));
+        } else if let Some(n) = p.notes.iter().find(|n| &n.id == id) {
+            out.insert(id.clone(), n.layout);
+        }
+    }
+    out
+}
+
+/// Apply absolute rects to modules (parent-relative) and notes; locked items stay put.
+pub fn apply_absolute(d: &mut Project, rects: &IndexMap<Id, Rect>) {
+    let mut layouts = Vec::new();
+    for (id, r) in rects {
+        if locked_of(d, id) == Some(true) {
+            continue;
+        }
+        let origin = find_module(d, id)
+            .and_then(|m| m.parent_id.as_deref())
+            .map_or(Point { x: 0., y: 0. }, |pid| absolute_position(d, pid));
+        layouts.push((
+            id.clone(),
+            RectPatch {
+                x: Some((r.x - origin.x).round()),
+                y: Some((r.y - origin.y).round()),
+                width: Some(r.width),
+                height: Some(r.height),
+            },
+        ));
+    }
+    set_layouts(d, &layouts);
+}
+
+/// Group sibling modules into a new parent module; returns its id, or an error message.
+/// Port of `groupSelection`.
+pub fn group_modules(d: &mut Project, ids: &[Id]) -> Result<Option<Id>, &'static str> {
+    let mods: Vec<Module> = ids.iter().filter_map(|id| find_module(d, id).cloned()).collect();
+    let Some(first) = mods.first() else {
+        return Ok(None);
+    };
+    let parent_id = first.parent_id.clone();
+    if mods.iter().any(|m| m.parent_id != parent_id) {
+        return Err("Only modules with the same parent can be grouped.");
+    }
+    let rects: Vec<Rect> = mods.iter().map(|m| m.layout).collect();
+    let b = bounds_of(&rects);
+    let o = d.orientation;
+    let top = content_top(o, Compartments::default()) + LAYOUT_PAD / 2.;
+    let before = binary_snapshot(d);
+    let group_id = new_id();
+    let name = unique_name(
+        "Group",
+        child_modules(d, parent_id.as_deref()).map(|m| m.name.as_str()),
+    );
+    d.modules.push(blank_module(
+        group_id.clone(),
+        name,
+        parent_id,
+        Rect {
+            x: b.x - LAYOUT_PAD,
+            y: b.y - top,
+            width: b.width + 2. * LAYOUT_PAD,
+            height: b.height + top + content_bottom(o),
+        },
+    ));
+    let chosen: HashSet<&Id> = mods.iter().map(|m| &m.id).collect();
+    for i in 0..d.modules.len() {
+        if !chosen.contains(&d.modules[i].id) {
+            continue;
+        }
+        let taken: Vec<String> = d
+            .modules
+            .iter()
+            .filter(|s| s.parent_id.as_deref() == Some(group_id.as_str()) && s.id != d.modules[i].id)
+            .map(|s| s.name.clone())
+            .collect();
+        let m = &mut d.modules[i];
+        m.parent_id = Some(group_id.clone());
+        m.name = unique_name(&m.name, taken.iter().map(String::as_str));
+        m.layout.x += LAYOUT_PAD - b.x;
+        m.layout.y += top - b.y;
+    }
+    // Parents must precede children for the canvas.
+    let moved: HashSet<Id> = mods.iter().flat_map(|m| subtree_ids(d, &m.id)).collect();
+    let (inside, outside): (Vec<_>, Vec<_>) = std::mem::take(&mut d.modules)
+        .into_iter()
+        .partition(|m| moved.contains(&m.id));
+    d.modules = outside;
+    d.modules.extend(inside);
+    grow_ancestors(d, &group_id);
+    settle_binaries(d, &before);
+    Ok(Some(group_id))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -471,6 +685,27 @@ mod tests {
             )
             .is_none()
         );
+    }
+
+    #[test]
+    fn groups_siblings_into_a_new_module() {
+        let mut p = example("robot.scaffold.yaml");
+        let id = |p: &Project, n: &str| p.modules.iter().find(|m| m.name == n).unwrap().id.clone();
+        let (a, b) = (id(&p, "Controller"), id(&p, "Logger"));
+        let gap = |p: &Project| {
+            let (ra, rb) = (absolute_rect(p, &a), absolute_rect(p, &b));
+            (rb.x - ra.x, rb.y - ra.y)
+        };
+        let before = gap(&p);
+        let g = group_modules(&mut p, &[a.clone(), b.clone()]).unwrap().unwrap();
+        let ga = p.modules.iter().position(|m| m.id == g).unwrap();
+        let ia = p.modules.iter().position(|m| m.id == a).unwrap();
+        assert!(ga < ia);
+        assert_eq!(p.modules[ia].parent_id.as_deref(), Some(g.as_str()));
+        // Grouped modules keep their arrangement.
+        assert_eq!(gap(&p), before);
+        let op = id(&p, "Operator");
+        assert!(group_modules(&mut p, &[op, b]).is_err());
     }
 
     #[test]

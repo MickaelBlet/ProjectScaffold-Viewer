@@ -26,7 +26,8 @@ struct Open {
 fn open(cx: &mut TestAppContext, file: &str) -> Open {
     cx.update(|cx| {
         gpui_kit::init(cx);
-        cx.bind_keys(crate::key_bindings());
+        let bindings = crate::commands::key_bindings(cx);
+        cx.bind_keys(bindings);
     });
     let path = example(file);
     let (window, ws) = cx.update(|cx| {
@@ -45,7 +46,8 @@ fn open(cx: &mut TestAppContext, file: &str) -> Open {
                     w.open_path(path, cx);
                     w
                 });
-                window.focus(&ws.read(cx).focus.clone(), cx);
+                let focus = ws.read(cx).canvas().unwrap().read(cx).focus_handle();
+                window.focus(&focus, cx);
                 ws
             },
         )
@@ -62,11 +64,11 @@ fn open(cx: &mut TestAppContext, file: &str) -> Open {
 
 impl Open {
     fn doc(&self, cx: &mut TestAppContext) -> Entity<Document> {
-        cx.read(|cx| self.ws.read(cx).doc.clone().unwrap())
+        cx.read(|cx| self.ws.read(cx).doc().unwrap())
     }
 
     fn canvas(&self, cx: &mut TestAppContext) -> Entity<Canvas> {
-        cx.read(|cx| self.ws.read(cx).canvas.clone().unwrap())
+        cx.read(|cx| self.ws.read(cx).canvas().unwrap())
     }
 
     fn id(&self, cx: &mut TestAppContext, name: &str) -> Id {
@@ -385,4 +387,86 @@ fn dragging_from_a_port_to_a_module_links_them_through_a_new_port(cx: &mut TestA
     assert_eq!(sel.len(), 1);
     o.press(cx, "ctrl-z");
     assert_eq!(cx.read(|cx| doc.read(cx).project.links.len()), links);
+}
+
+impl Open {
+    fn select(&self, cx: &mut TestAppContext, ids: Vec<Id>) {
+        let doc = self.doc(cx);
+        cx.update(|cx| {
+            doc.update(cx, |d, cx| {
+                d.select(ids);
+                cx.notify();
+            })
+        });
+    }
+
+    fn modules(&self, cx: &mut TestAppContext) -> usize {
+        let doc = self.doc(cx);
+        cx.read(|cx| doc.read(cx).project.modules.len())
+    }
+}
+
+#[gpui_kit::test]
+fn duplicate_copy_paste_group_and_lock_from_the_keyboard(cx: &mut TestAppContext) {
+    let o = open(cx, "robot.scaffold.yaml");
+    let logger = o.id(cx, "Logger");
+    let controller = o.id(cx, "Controller");
+    let n = o.modules(cx);
+    o.select(cx, vec![logger.clone()]);
+    o.press(cx, "ctrl-d");
+    assert_eq!(o.modules(cx), n + 1);
+    let copy = o.selected(cx);
+    assert_eq!(copy.len(), 1);
+    assert_ne!(copy[0], logger);
+    o.press(cx, "ctrl-z");
+    assert_eq!(o.modules(cx), n);
+    // Through the system clipboard.
+    o.select(cx, vec![logger.clone()]);
+    o.press(cx, "ctrl-c");
+    o.press(cx, "escape");
+    o.press(cx, "ctrl-v");
+    assert_eq!(o.modules(cx), n + 1);
+    o.press(cx, "ctrl-z");
+    // Group two siblings, then lock the group.
+    o.select(cx, vec![logger.clone(), controller.clone()]);
+    o.press(cx, "ctrl-g");
+    assert_eq!(o.modules(cx), n + 1);
+    let group = o.selected(cx);
+    let doc = o.doc(cx);
+    let parent = cx.read(|cx| {
+        doc.read(cx)
+            .project
+            .modules
+            .iter()
+            .find(|m| m.id == logger)
+            .unwrap()
+            .parent_id
+            .clone()
+    });
+    assert_eq!(parent, group.first().cloned());
+    o.press(cx, "ctrl-l");
+    let locked = cx.read(|cx| {
+        let p = &doc.read(cx).project;
+        p.modules
+            .iter()
+            .find(|m| Some(&m.id) == group.first())
+            .unwrap()
+            .locked
+    });
+    assert!(locked);
+}
+
+#[gpui_kit::test]
+fn new_documents_open_in_tabs(cx: &mut TestAppContext) {
+    let o = open(cx, "robot.scaffold.yaml");
+    let first = o.doc(cx);
+    o.press(cx, "alt-n");
+    let second = o.doc(cx);
+    assert_ne!(first, second);
+    o.press(cx, "ctrl-m");
+    assert_eq!(cx.read(|cx| second.read(cx).project.modules.len()), 1);
+    o.press(cx, "alt-1");
+    assert_eq!(o.doc(cx), first);
+    o.press(cx, "alt-pagedown");
+    assert_eq!(o.doc(cx), second);
 }

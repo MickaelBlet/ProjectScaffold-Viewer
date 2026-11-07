@@ -3,6 +3,7 @@
 
 pub mod align;
 pub mod binaries;
+pub mod clipboard;
 pub mod constraints;
 pub mod contracts;
 pub mod defaults;
