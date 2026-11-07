@@ -57,11 +57,12 @@ Not ported: the diff of the Source panel against the saved file, the text minima
 ```sh
 scripts/build_gpui.sh            # -> gpui/target/release/project-scaffold
 scripts/build_gpui.sh --check    # rustfmt, clippy and tests first
-scripts/build_gpui.sh --package  # also gpui/target/package/project-scaffold-<version>-<os>-<arch>.tar.gz
+scripts/build_gpui.sh --package  # also gpui/target/package/project-scaffold-<version>-linux-<arch>.tar.gz
+scripts/build_gpui.sh --windows --no-linux --package   # Windows exe (and .zip), cross-compiled
 gpui/target/release/project-scaffold examples/robot.scaffold.yaml
 ```
 
-It needs the Rust toolchain pinned in `gpui/rust-toolchain.toml` (installed by rustup), and on Linux `libxkbcommon-x11-dev` and Vulkan or OpenGL drivers (`mesa-vulkan-drivers`). Under WSL it renders in software.
+It needs the Rust toolchain pinned in `gpui/rust-toolchain.toml` (installed by rustup), and on Linux `libxkbcommon-x11-dev` and Vulkan or OpenGL drivers (`mesa-vulkan-drivers`). Under WSL it renders in software. The Windows build is cross-compiled from Linux with [cargo-xwin](https://github.com/rust-cross/cargo-xwin) (`cargo install cargo-xwin`, plus clang and lld; it downloads the MSVC SDK on first use) into `gpui/target/x86_64-pc-windows-msvc/release/project-scaffold.exe`.
 
 ## Checks
 

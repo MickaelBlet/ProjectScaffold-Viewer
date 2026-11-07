@@ -1452,13 +1452,14 @@ impl Render for Canvas {
         let mut badges = div().absolute().inset_0();
         for l in &self.scene.links {
             let (bx, by) = self.screen(l.label);
+            // On the text color the badge reads in the background color; on a color, in white.
             let badge = |text: String, bg: Hsla| {
                 div()
                     .px(px(5. * z))
                     .rounded(px(8. * z))
                     .text_size(px(10. * z))
                     .bg(bg)
-                    .text_color(hex("#ffffff"))
+                    .text_color(if bg == t.text { t.bg } else { hex("#ffffff") })
                     .child(text)
             };
             let mut row = div().flex().gap(px(3. * z));
