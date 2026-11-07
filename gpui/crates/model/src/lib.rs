@@ -9,6 +9,7 @@ pub mod contracts;
 pub mod defaults;
 pub mod edit;
 pub mod emit;
+pub mod entities;
 pub mod fuzzy;
 pub mod grid;
 pub mod locate;

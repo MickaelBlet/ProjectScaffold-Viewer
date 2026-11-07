@@ -68,3 +68,44 @@ pub fn clear() {
         let _ = std::fs::remove_dir_all(dir);
     }
 }
+
+fn config_file(name: &str) -> Option<PathBuf> {
+    if cfg!(test) {
+        return None;
+    }
+    config_dir().map(|d| d.join(name))
+}
+
+/// Settings kept between runs (defaults for missing ones).
+pub fn load_settings() -> crate::settings::Settings {
+    config_file("settings.json")
+        .and_then(|f| std::fs::read_to_string(f).ok())
+        .and_then(|t| serde_json::from_str(&t).ok())
+        .unwrap_or_default()
+}
+
+pub fn save_settings(s: &crate::settings::Settings) {
+    write_json("settings.json", s);
+}
+
+/// Panel layout kept between runs.
+pub fn load_dock() -> crate::panels::Dock {
+    config_file("layout.json")
+        .and_then(|f| std::fs::read_to_string(f).ok())
+        .and_then(|t| serde_json::from_str(&t).ok())
+        .unwrap_or_default()
+}
+
+pub fn save_dock(d: &crate::panels::Dock) {
+    write_json("layout.json", d);
+}
+
+fn write_json(name: &str, value: &impl serde::Serialize) {
+    let Some(f) = config_file(name) else { return };
+    if let Some(dir) = f.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    if let Ok(text) = serde_json::to_string_pretty(value) {
+        let _ = std::fs::write(f, text);
+    }
+}

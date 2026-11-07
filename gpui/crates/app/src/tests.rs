@@ -289,6 +289,8 @@ fn handles_resize_on_the_grid_keeping_the_opposite_side(cx: &mut TestAppContext)
 
 #[gpui_kit::test]
 fn a_dragged_frame_carries_what_lies_inside(cx: &mut TestAppContext) {
+    // Guides would align the frame with its neighbours instead of moving it by the drag.
+    crate::settings::update(|s| s.guides = false);
     let o = open(cx, "shop.scaffold.yaml");
     let doc = o.doc(cx);
     // Unlock the frame (locked in the example).

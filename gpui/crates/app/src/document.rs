@@ -4,7 +4,9 @@
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant, SystemTime};
 
+use scaffold_model::edit::follow_interface_renames;
 use scaffold_model::grid::snap_changes;
+use scaffold_model::project::{has_missing_refs, resolve_missing_refs};
 use scaffold_model::serialize::{Format, format_from_path, load_text, reload_text, same_content, save_text};
 use scaffold_model::types::{Id, Project};
 
@@ -29,12 +31,80 @@ pub struct Document {
     redo: Vec<Project>,
     last_edit: Option<Instant>,
     pub selected: Vec<Id>,
+    /// What the inspector shows (None: several items, or nothing).
+    pub selection: Option<Selection>,
     /// Bumped on each change, for views to know when to redraw.
     pub version: u64,
     /// Modification time of the file as last read or written.
     disk_time: Option<SystemTime>,
     /// Text of the file changed on disk while the document had unsaved changes.
     pub conflict: Option<String>,
+}
+
+/// What the inspector shows: the project, or one entity. Port of `Selection` (`store/documents.ts`).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Selection {
+    Project,
+    /// With `member`, one of its attributes, methods, constructors or its destructor.
+    Module {
+        id: Id,
+        member: Option<Id>,
+    },
+    Link(Id),
+    Type(Id),
+    Interface(Id),
+    Note(Id),
+    Imported(Id),
+    Dependency(Id),
+}
+
+impl Selection {
+    pub fn id(&self) -> Option<&Id> {
+        match self {
+            Selection::Project => None,
+            Selection::Module { id, .. }
+            | Selection::Link(id)
+            | Selection::Type(id)
+            | Selection::Interface(id)
+            | Selection::Note(id)
+            | Selection::Imported(id)
+            | Selection::Dependency(id) => Some(id),
+        }
+    }
+
+    /// The selection of an entity of the project, by id.
+    pub fn of(p: &Project, id: &str) -> Option<Selection> {
+        let id = id.to_string();
+        if p.modules.iter().any(|m| m.id == id) {
+            Some(Selection::Module { id, member: None })
+        } else if p.links.iter().any(|l| l.id == id) {
+            Some(Selection::Link(id))
+        } else if p.types.iter().any(|t| t.id == id) {
+            Some(Selection::Type(id))
+        } else if p.interfaces.iter().any(|i| i.id == id) {
+            Some(Selection::Interface(id))
+        } else if p.notes.iter().any(|n| n.id == id) {
+            Some(Selection::Note(id))
+        } else if p
+            .dependencies
+            .iter()
+            .any(|d| d.modules.iter().any(|m| m.id == id))
+        {
+            Some(Selection::Imported(id))
+        } else if p.dependencies.iter().any(|d| d.id == id) {
+            Some(Selection::Dependency(id))
+        } else {
+            None
+        }
+    }
+
+    /// Whether it is drawn on the canvas (selected there too).
+    pub fn on_canvas(&self) -> bool {
+        matches!(
+            self,
+            Selection::Module { .. } | Selection::Link(_) | Selection::Note(_) | Selection::Imported(_)
+        )
+    }
 }
 
 /// What a check of the file on disk found.
@@ -67,6 +137,7 @@ impl Document {
             redo: Vec::new(),
             last_edit: None,
             selected: Vec::new(),
+            selection: None,
             version: 0,
             disk_time: None,
             conflict: None,
@@ -149,6 +220,12 @@ impl Document {
     pub fn edit(&mut self, grid: Grid, f: impl FnOnce(&mut Project)) -> bool {
         let mut next = self.project.clone();
         f(&mut next);
+        // As the web build's `update`: placed ports follow interface renames, references left
+        // missing by a forced deletion follow what is named like them again.
+        follow_interface_renames(&self.project, &mut next);
+        if has_missing_refs(&next) {
+            resolve_missing_refs(&mut next);
+        }
         if grid.snap {
             snap_changes(&self.project, &mut next, grid.size);
         }
@@ -206,6 +283,11 @@ impl Document {
 
     /// Drop selected ids no longer in the project.
     fn retain_selection(&mut self) {
+        if let Some(id) = self.selection.as_ref().and_then(Selection::id)
+            && Selection::of(&self.project, id).is_none()
+        {
+            self.selection = None;
+        }
         let p = &self.project;
         self.selected.retain(|id| {
             p.modules.iter().any(|m| &m.id == id)
@@ -222,11 +304,27 @@ impl Document {
         self.version += 1;
     }
 
+    /// Select canvas items; one of them is also what the inspector shows.
     pub fn select(&mut self, ids: Vec<Id>) {
-        if ids != self.selected {
+        let selection = match ids.as_slice() {
+            [one] => Selection::of(&self.project, one),
+            _ => None,
+        };
+        if ids != self.selected || selection != self.selection {
             self.selected = ids;
+            self.selection = selection;
             self.version += 1;
         }
+    }
+
+    /// Show an entity in the inspector, selecting it on the canvas when drawn there.
+    pub fn select_entity(&mut self, sel: Option<Selection>) {
+        self.selected = match &sel {
+            Some(s) if s.on_canvas() => s.id().cloned().into_iter().collect(),
+            _ => Vec::new(),
+        };
+        self.selection = sel;
+        self.version += 1;
     }
 
     pub fn save_to(&mut self, path: &Path) -> Result<(), String> {

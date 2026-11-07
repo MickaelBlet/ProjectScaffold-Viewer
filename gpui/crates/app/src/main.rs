@@ -3,7 +3,9 @@
 mod canvas;
 mod commands;
 mod document;
+mod form;
 mod node;
+mod panels;
 mod prefs;
 mod settings;
 mod theme;

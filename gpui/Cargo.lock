@@ -5631,6 +5631,7 @@ dependencies = [
  "indexmap",
  "scaffold-layout",
  "scaffold-model",
+ "serde",
  "serde_json",
 ]
 

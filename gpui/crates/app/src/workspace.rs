@@ -26,7 +26,13 @@ use scaffold_model::validate::{Severity, validate};
 
 use crate::canvas::Canvas;
 use crate::commands::{self, CmdState, OpenRecent};
-use crate::document::{DiskChange, Document};
+use crate::document::{DiskChange, Document, Selection};
+use crate::panels::explorer::ExplorerPanel;
+use crate::panels::inspector::InspectorPanel;
+use crate::panels::lists::{OutputPanel, ProblemsPanel, SearchPanel};
+use crate::panels::settings_panel::SettingsPanel;
+use crate::panels::state_machine::StateMachinePanel;
+use crate::panels::{self, Dock, PanelId, Region};
 use crate::{prefs, settings, theme};
 
 struct Tab {
@@ -48,6 +54,16 @@ pub struct Workspace {
     problems: (usize, usize, Option<(usize, u64)>),
     /// Set once the user agreed to lose unsaved changes, to let the window close.
     closing: bool,
+    pub dock: Dock,
+    /// Messages of the Output panel.
+    pub output: Vec<String>,
+    explorer: Entity<ExplorerPanel>,
+    inspector: Entity<InspectorPanel>,
+    problems_panel: Entity<ProblemsPanel>,
+    output_panel: Entity<OutputPanel>,
+    search: Entity<SearchPanel>,
+    settings_panel: Entity<SettingsPanel>,
+    state_machine: Entity<StateMachinePanel>,
 }
 
 /// Arrow keys move by a grid cell (five when far) on the grid, else by 2px (20px).
@@ -88,15 +104,6 @@ const LATER: &[&str] = &[
     "arrange.all",
     "arrange.horizontal",
     "arrange.vertical",
-    "window.explorer",
-    "window.inspector",
-    "window.problems",
-    "window.output",
-    "window.stateMachine",
-    "window.clearOutput",
-    "window.search",
-    "window.settings",
-    "window.resetLayout",
     "help.tutorial",
 ];
 
@@ -172,7 +179,19 @@ impl Workspace {
             this.update(cx, |w, cx| w.may_close(window, cx, false))
                 .unwrap_or(true)
         });
+        let ws = cx.entity().downgrade();
+        let explorer = cx.new(|cx| ExplorerPanel::new(ws.clone(), window, cx));
+        let search = cx.new(|cx| SearchPanel::new(ws.clone(), window, cx));
         Workspace {
+            dock: prefs::load_dock(),
+            output: Vec::new(),
+            explorer,
+            inspector: cx.new(|_| InspectorPanel::new(ws.clone())),
+            problems_panel: cx.new(|_| ProblemsPanel { ws: ws.clone() }),
+            output_panel: cx.new(|_| OutputPanel { ws: ws.clone() }),
+            search,
+            settings_panel: cx.new(|_| SettingsPanel::new()),
+            state_machine: cx.new(|_| StateMachinePanel::new(ws.clone())),
             tabs: Vec::new(),
             active: 0,
             error: None,
@@ -393,7 +412,7 @@ impl Workspace {
             Ok(()) => {
                 prefs::add_recent(path);
                 self.recent = prefs::recent();
-                self.status = Some(format!("Saved {}", path.display()));
+                self.log(format!("Saved {}", path.display()));
                 cx.notify();
                 true
             }
@@ -495,7 +514,17 @@ impl Workspace {
     pub fn command_state(&self, id: &str, cx: &App) -> CmdState {
         let doc = self.doc();
         let d = doc.as_ref().map(|d| d.read(cx));
+        if let Some(panel) = PanelId::from_command(id) {
+            return CmdState {
+                enabled: panel != PanelId::StateMachine || settings::get().feature_state_machine,
+                checked: self.dock.is_shown(panel),
+            };
+        }
         match id {
+            "window.resetLayout" | "window.clearOutput" => CmdState {
+                enabled: true,
+                checked: false,
+            },
             "window.nextDoc" | "window.prevDoc" => CmdState {
                 enabled: self.tabs.len() > 1,
                 checked: false,
@@ -637,6 +666,7 @@ impl Workspace {
                 });
                 if let Some(e) = failed {
                     self.error = Some(format!("Cannot group: {e}"));
+                    self.output.push(format!("Cannot group: {e}"));
                 }
             }
             "arrange.lock" => {
@@ -657,6 +687,29 @@ impl Workspace {
             "arrange.sameSize" => self.arrange(cx, |r| same_size(r, SizeDim::Both)),
             "arrange.snap" => settings::update(|s| s.snap_to_grid = !s.snap_to_grid),
             "arrange.guides" => settings::update(|s| s.guides = !s.guides),
+            "window.settings" => {
+                self.dock.toggle(PanelId::Settings);
+                prefs::save_dock(&self.dock);
+            }
+            "window.explorer"
+            | "window.inspector"
+            | "window.problems"
+            | "window.output"
+            | "window.search"
+            | "window.stateMachine" => {
+                if let Some(panel) = PanelId::from_command(id) {
+                    self.dock.show(panel);
+                    prefs::save_dock(&self.dock);
+                    if panel == PanelId::Search {
+                        SearchPanel::focus(&self.search.clone(), window, cx);
+                    }
+                }
+            }
+            "window.resetLayout" => {
+                self.dock = Dock::default();
+                prefs::save_dock(&self.dock);
+            }
+            "window.clearOutput" => self.output.clear(),
             "window.nextDoc" => self.cycle(1),
             "window.prevDoc" => self.cycle(-1),
             "help.shortcuts" => self.open_shortcuts(window, cx),
@@ -683,6 +736,44 @@ impl Workspace {
             window.focus(&c.read(cx).focus_handle(), cx);
         }
         cx.notify();
+    }
+
+    /// Show a message in the status bar and the Output panel.
+    pub fn log(&mut self, message: String) {
+        let time = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        let (h, m, s) = ((time / 3600) % 24, (time / 60) % 60, time % 60);
+        self.output.push(format!("[{h:02}:{m:02}:{s:02} UTC] {message}"));
+        self.status = Some(message);
+    }
+
+    /// Show an entity in the inspector, and on the canvas when drawn there.
+    pub fn reveal(&mut self, sel: Option<Selection>, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(doc) = self.doc() else { return };
+        let on_canvas = sel
+            .as_ref()
+            .filter(|s| s.on_canvas())
+            .and_then(|s| s.id().cloned());
+        doc.update(cx, |d, cx| {
+            d.select_entity(sel);
+            cx.notify();
+        });
+        if let Some(id) = on_canvas {
+            self.with_canvas(cx, |c, cx| c.fit_items(Some(vec![id]), cx));
+        }
+        if settings::get().reveal_inspector {
+            self.dock.show(PanelId::Inspector);
+        }
+        let _ = window;
+        cx.notify();
+    }
+
+    /// Reveal an entity by id.
+    pub fn reveal_id(&mut self, id: Id, window: &mut Window, cx: &mut Context<Self>) {
+        let sel = self.doc().and_then(|d| Selection::of(&d.read(cx).project, &id));
+        self.reveal(sel, window, cx);
     }
 
     fn cycle(&mut self, delta: isize) {
@@ -742,7 +833,7 @@ impl Workspace {
             return;
         };
         let Some(clip) = parse_clip(&text) else {
-            self.status = Some("The clipboard holds no project content".into());
+            self.log("The clipboard holds no project content".into());
             return;
         };
         // Into the selected module, else where it was copied from.
@@ -1192,6 +1283,84 @@ impl Workspace {
         bar
     }
 
+    fn panel_view(&self, p: PanelId) -> AnyView {
+        match p {
+            PanelId::Explorer => self.explorer.clone().into(),
+            PanelId::Search => self.search.clone().into(),
+            PanelId::Inspector => self.inspector.clone().into(),
+            PanelId::Settings => self.settings_panel.clone().into(),
+            PanelId::Problems => self.problems_panel.clone().into(),
+            PanelId::Output => self.output_panel.clone().into(),
+            PanelId::StateMachine => self.state_machine.clone().into(),
+        }
+    }
+
+    /// The canvas with the panel regions around it.
+    fn docked(&mut self, center: Div, cx: &mut Context<Self>) -> impl IntoElement {
+        use gpui_kit::component::resizable::{h_resizable, resizable_panel, v_resizable};
+        let (errors, warnings) = self.problem_counts(cx);
+        let ws = cx.entity().downgrade();
+        let area = |w: &Self, r: Region| {
+            let a = w.dock.area(r);
+            let content = a.active.map_or_else(
+                || div().into_any_element(),
+                |p| w.panel_view(p).into_any_element(),
+            );
+            let (ws1, ws2) = (ws.clone(), ws.clone());
+            panels::region(
+                r,
+                a,
+                content,
+                move |p| {
+                    (p == PanelId::Problems && errors + warnings > 0).then(|| (errors + warnings).to_string())
+                },
+                move |p, _, cx| {
+                    ws1.update(cx, |w, cx| {
+                        w.dock.show(p);
+                        prefs::save_dock(&w.dock);
+                        cx.notify();
+                    })
+                    .ok();
+                },
+                move |p, _, cx| {
+                    ws2.update(cx, |w, cx| {
+                        w.dock.close(p);
+                        prefs::save_dock(&w.dock);
+                        cx.notify();
+                    })
+                    .ok();
+                },
+            )
+        };
+        let (left, right, bottom) = (
+            self.dock.left.clone(),
+            self.dock.right.clone(),
+            self.dock.bottom.clone(),
+        );
+        let middle = h_resizable("dock-h")
+            .child(
+                resizable_panel()
+                    .size(px(left.size))
+                    .visible(left.open && left.active.is_some())
+                    .child(area(self, Region::Left)),
+            )
+            .child(resizable_panel().child(center))
+            .child(
+                resizable_panel()
+                    .size(px(right.size))
+                    .visible(right.open && right.active.is_some())
+                    .child(area(self, Region::Right)),
+            );
+        v_resizable("dock-v")
+            .child(resizable_panel().child(middle))
+            .child(
+                resizable_panel()
+                    .size(px(bottom.size))
+                    .visible(bottom.open && bottom.active.is_some())
+                    .child(area(self, Region::Bottom)),
+            )
+    }
+
     fn start_screen(&self, cx: &mut Context<Self>) -> Div {
         let t = theme::light();
         div()
@@ -1250,10 +1419,11 @@ impl Render for Workspace {
         }
         self.refresh_menus(cx);
         let t = theme::light();
-        let body = match self.canvas() {
-            Some(c) => div().flex_1().min_h_0().child(c),
-            None => div().flex_1().min_h_0().child(self.start_screen(cx)),
+        let center = match self.canvas() {
+            Some(c) => div().size_full().child(c),
+            None => div().size_full().child(self.start_screen(cx)),
         };
+        let body = div().flex_1().min_h_0().child(self.docked(center, cx));
         // The file changed on disk while there are unsaved changes.
         let conflict = self.doc().filter(|d| d.read(cx).conflict.is_some()).map(|_| {
             let button = |id: &'static str, label: &'static str| {

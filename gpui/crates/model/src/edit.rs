@@ -633,6 +633,44 @@ pub fn group_modules(d: &mut Project, ids: &[Id]) -> Result<Option<Id>, &'static
     Ok(Some(group_id))
 }
 
+/// Make the placed ports of dependencies whose interface was renamed follow (`renames`: old name
+/// to new). Port of `followPortInterfaces`.
+pub fn follow_port_interfaces(d: &mut Project, renames: &HashMap<String, String>) {
+    if renames.is_empty() {
+        return;
+    }
+    let names: HashSet<String> = d.interfaces.iter().map(|i| i.name.clone()).collect();
+    for m in d.dependencies.iter_mut().flat_map(|x| x.modules.iter_mut()) {
+        for pt in &mut m.ports {
+            if let Some(to) = pt
+                .interface
+                .as_ref()
+                .filter(|i| !names.contains(*i))
+                .and_then(|i| renames.get(i))
+            {
+                pt.interface = Some(to.clone());
+            }
+        }
+    }
+}
+
+/// In a project whose own interfaces were renamed (compared with `prev`), make its placed ports
+/// follow. Port of `followInterfaceRenames`.
+pub fn follow_interface_renames(prev: &Project, d: &mut Project) {
+    if !d.dependencies.iter().any(|x| !x.modules.is_empty()) {
+        return;
+    }
+    let renames: HashMap<String, String> = d
+        .interfaces
+        .iter()
+        .filter_map(|i| {
+            let was = prev.interfaces.iter().find(|x| x.id == i.id)?;
+            (was.name != i.name).then(|| (was.name.clone(), i.name.clone()))
+        })
+        .collect();
+    follow_port_interfaces(d, &renames);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
