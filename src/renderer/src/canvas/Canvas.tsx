@@ -980,6 +980,8 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
           snapGrid={[settings.gridSize, settings.gridSize]}
           colorMode={themeScheme(settings.theme)}
           minZoom={0.1}
+          // Double-click zoom is handled by useTrackpad (Ctrl zooms out).
+          zoomOnDoubleClick={false}
           defaultViewport={savedViewport}
           fitView={!savedViewport}
           proOptions={{ hideAttribution: true }}

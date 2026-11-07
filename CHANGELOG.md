@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Transport `mq` (POSIX message queues) for links between binaries, with settings `name` (the queues `<name>.call` and `<name>.reply`, default `<project>_<link>`), `maxMessages` and `messageSize` (link inspector: _Queues_, _Messages_, _Message size_). An invalid queue name is an error; two links sharing queues, a warning.
 - Modules: `active` (module inspector, _Active_, with the concurrency features on): the module's own thread runs the calls reaching its `in` ports, queued in order, with the size of its queue, the timeout of calls waiting for a result and what a call reaching a full queue does (`block`, `drop`, `error`). An active module is a `class`, not `utility`; one without `in` ports is a warning.
 
+### Changed
+
+- Canvas: the mouse wheel scrolls instead of zooming (Ctrl+wheel zooms); Ctrl+double-click zooms out, as Shift+double-click.
+
 ## [1.1.1] - 2026-10-27
 
 ### Added

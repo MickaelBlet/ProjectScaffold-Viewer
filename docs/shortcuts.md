@@ -77,11 +77,12 @@
 
 ## Panels and text editor
 
-| Shortcut                          | Where       | Action                   |
-| --------------------------------- | ----------- | ------------------------ |
-| Alt+↑ / Alt+↓                     | Explorer    | Move the focused section |
-| Ctrl+F / Ctrl+H                   | Text editor | Find / replace           |
-| Ctrl+Space                        | Text editor | Completion               |
-| Ctrl+S                            | IDL tab     | Save the file            |
-| Double-click / Shift+double-click | Canvas      | Zoom in / out            |
-| Alt while dragging a bend         | Canvas      | No snapping              |
+| Shortcut                         | Where       | Action                   |
+| -------------------------------- | ----------- | ------------------------ |
+| Alt+↑ / Alt+↓                    | Explorer    | Move the focused section |
+| Ctrl+F / Ctrl+H                  | Text editor | Find / replace           |
+| Ctrl+Space                       | Text editor | Completion               |
+| Ctrl+S                           | IDL tab     | Save the file            |
+| Double-click / Ctrl+double-click | Canvas      | Zoom in / out            |
+| Wheel / Ctrl+wheel               | Canvas      | Scroll / zoom            |
+| Alt while dragging a bend        | Canvas      | No snapping              |

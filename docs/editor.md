@@ -73,8 +73,8 @@ Ctrl+Shift+F searches names, descriptions and metadata of the project.
 ### Canvas
 
 - Right click the canvas for its menu; right click anything for its actions.
-- Double-click the canvas to zoom in, Shift+double-click to zoom out.
-- Mouse wheel zooms. Trackpad: pinch to zoom, scroll with two fingers to pan (in Chromium and WebKit any scroll; elsewhere a scroll starting sideways, or Shift+wheel).
+- Double-click the canvas to zoom in, Ctrl+double-click (or Shift+double-click) to zoom out.
+- Mouse wheel scrolls (Shift+wheel sideways), Ctrl+wheel zooms. Trackpad: scroll with two fingers to pan, pinch to zoom.
 - **+ Module** (Ctrl+M) adds a module. Drop a module onto another to nest it; drag it out to move it up.
 - F2 or double-click a module name to rename it in place.
 
