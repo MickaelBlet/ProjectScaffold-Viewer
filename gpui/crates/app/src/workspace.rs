@@ -31,6 +31,7 @@ use crate::panels::explorer::ExplorerPanel;
 use crate::panels::inspector::InspectorPanel;
 use crate::panels::lists::{OutputPanel, ProblemsPanel, SearchPanel};
 use crate::panels::settings_panel::SettingsPanel;
+use crate::panels::source::SourcePanel;
 use crate::panels::state_machine::StateMachinePanel;
 use crate::panels::{self, Dock, PanelId, Region};
 use crate::{prefs, settings, theme};
@@ -64,6 +65,7 @@ pub struct Workspace {
     search: Entity<SearchPanel>,
     settings_panel: Entity<SettingsPanel>,
     state_machine: Entity<StateMachinePanel>,
+    pub source: Entity<SourcePanel>,
 }
 
 /// Arrow keys move by a grid cell (five when far) on the grid, else by 2px (20px).
@@ -95,11 +97,9 @@ const LATER: &[&str] = &[
     "view.openModuleSplit",
     "view.keep",
     "view.new",
-    "view.source",
     "view.hide",
     "view.resetLayout",
     "view.showAll",
-    "view.wordWrap",
     "arrange.auto",
     "arrange.all",
     "arrange.horizontal",
@@ -128,6 +128,12 @@ pub fn doc_command_state(id: &str, doc: Option<&Document>) -> CmdState {
             return CmdState {
                 enabled: true,
                 checked: s.guides,
+            };
+        }
+        "view.wordWrap" => {
+            return CmdState {
+                enabled: true,
+                checked: s.editor_word_wrap,
             };
         }
         _ => {}
@@ -192,6 +198,7 @@ impl Workspace {
             search,
             settings_panel: cx.new(|_| SettingsPanel::new()),
             state_machine: cx.new(|_| StateMachinePanel::new(ws.clone())),
+            source: cx.new(|cx| SourcePanel::new(ws.clone(), window, cx)),
             tabs: Vec::new(),
             active: 0,
             error: None,
@@ -521,6 +528,10 @@ impl Workspace {
             };
         }
         match id {
+            "view.source" => CmdState {
+                enabled: doc.is_some(),
+                checked: self.dock.source,
+            },
             "window.resetLayout" | "window.clearOutput" => CmdState {
                 enabled: true,
                 checked: false,
@@ -642,6 +653,15 @@ impl Workspace {
             }
             "view.palette" => self.open_palette(true, window, cx),
             "view.goto" => self.open_palette(false, window, cx),
+            "view.source" => {
+                self.dock.source = !self.dock.source;
+                prefs::save_dock(&self.dock);
+                if self.dock.source {
+                    let editor = self.source.read(cx).editor.clone();
+                    editor.update(cx, |e, cx| e.focus(window, cx));
+                }
+            }
+            "view.wordWrap" => settings::update(|s| s.editor_word_wrap = !s.editor_word_wrap),
             "view.fit" => {
                 let ids = self.doc().map(|d| d.read(cx).selected.clone());
                 self.with_canvas(cx, |c, cx| c.fit_items(ids, cx));
@@ -1420,6 +1440,15 @@ impl Render for Workspace {
         self.refresh_menus(cx);
         let t = theme::light();
         let center = match self.canvas() {
+            Some(c) if self.dock.source => div().size_full().child(
+                gpui_kit::component::resizable::h_resizable("center")
+                    .child(gpui_kit::component::resizable::resizable_panel().child(c))
+                    .child(
+                        gpui_kit::component::resizable::resizable_panel()
+                            .size(px(520.))
+                            .child(self.source.clone()),
+                    ),
+            ),
             Some(c) => div().size_full().child(c),
             None => div().size_full().child(self.start_screen(cx)),
         };

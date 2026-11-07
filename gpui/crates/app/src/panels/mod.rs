@@ -5,6 +5,7 @@ pub mod explorer;
 pub mod inspector;
 pub mod lists;
 pub mod settings_panel;
+pub mod source;
 pub mod state_machine;
 
 use gpui_kit::prelude::FluentBuilder;
@@ -84,6 +85,9 @@ pub struct Dock {
     pub left: Area,
     pub right: Area,
     pub bottom: Area,
+    /// The Source panel beside the canvas.
+    #[serde(default)]
+    pub source: bool,
 }
 
 impl Default for Dock {
@@ -107,6 +111,7 @@ impl Default for Dock {
                 open: true,
                 size: 170.,
             },
+            source: false,
         }
     }
 }

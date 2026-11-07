@@ -472,3 +472,37 @@ fn new_documents_open_in_tabs(cx: &mut TestAppContext) {
     o.press(cx, "alt-pagedown");
     assert_eq!(o.doc(cx), second);
 }
+
+#[gpui_kit::test]
+fn the_source_panel_edits_the_project_as_text(cx: &mut TestAppContext) {
+    let o = open(cx, "robot.scaffold.yaml");
+    let doc = o.doc(cx);
+    o.press(cx, "alt-u");
+    cx.update_window(o.window, |_, w, cx| w.render_frame(cx)).unwrap();
+    let source = cx.read(|cx| o.ws.read(cx).source.clone());
+    let editor = cx.read(|cx| source.read(cx).editor.clone());
+    let text = cx.read(|cx| editor.read(cx).value().to_string());
+    assert!(text.contains("name: Robot"), "{text}");
+    // A valid edit replaces the project.
+    let renamed = text.replacen("name: Robot", "name: Rover", 1);
+    cx.update_window(o.window, |_, w, cx| {
+        editor.update(cx, |e, cx| e.replace_all(renamed.clone(), w, cx));
+    })
+    .unwrap();
+    cx.update_window(o.window, |_, w, cx| source.update(cx, |s, cx| s.flush(w, cx)))
+        .unwrap();
+    assert_eq!(cx.read(|cx| doc.read(cx).project.name.clone()), "Rover");
+    // Undo elsewhere rewrites the text.
+    cx.update(|cx| doc.update(cx, |d, _| d.undo()));
+    cx.update_window(o.window, |_, w, cx| w.render_frame(cx)).unwrap();
+    let text = cx.read(|cx| editor.read(cx).value().to_string());
+    assert!(text.contains("name: Robot"), "{text}");
+    // Text that does not load is not applied.
+    cx.update_window(o.window, |_, w, cx| {
+        editor.update(cx, |e, cx| e.replace_all("project: [", w, cx));
+    })
+    .unwrap();
+    cx.update_window(o.window, |_, w, cx| source.update(cx, |s, cx| s.flush(w, cx)))
+        .unwrap();
+    assert_eq!(cx.read(|cx| doc.read(cx).project.name.clone()), "Robot");
+}

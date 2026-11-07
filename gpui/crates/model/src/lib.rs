@@ -4,6 +4,7 @@
 pub mod align;
 pub mod binaries;
 pub mod clipboard;
+pub mod completion;
 pub mod constraints;
 pub mod contracts;
 pub mod defaults;
@@ -18,6 +19,7 @@ pub mod reuse;
 pub mod schema;
 pub mod search;
 pub mod serialize;
+pub mod source_target;
 pub mod sync;
 pub mod transports;
 pub mod typeexpr;

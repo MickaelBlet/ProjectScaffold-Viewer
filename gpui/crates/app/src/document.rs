@@ -248,6 +248,26 @@ impl Document {
         true
     }
 
+    /// Replace the project with one read from its text (the Source panel), as an undo step merged
+    /// with the previous one when close in time.
+    pub fn set_from_text(&mut self, next: Project) {
+        if next == self.project {
+            return;
+        }
+        let now = Instant::now();
+        if self.last_edit.is_some_and(|t| now - t < MERGE) {
+            self.project = next;
+        } else {
+            self.undo.push(std::mem::replace(&mut self.project, next));
+            if self.undo.len() > HISTORY {
+                self.undo.remove(0);
+            }
+        }
+        self.last_edit = Some(now);
+        self.redo.clear();
+        self.changed();
+    }
+
     /// Close the current undo step: the next edit starts a new one.
     pub fn seal(&mut self) {
         self.last_edit = None;
