@@ -1,0 +1,144 @@
+{
+  "schemaVersion": 1,
+  "project": {
+    "name": "Untitled"
+  },
+  "types": [
+    {
+      "kind": "alias",
+      "name": "Route",
+      "type": {
+        "kind": "vector",
+        "of": {
+          "kind": "ref",
+          "name": "Pose"
+        }
+      }
+    },
+    {
+      "kind": "enum",
+      "name": "GoalStatus",
+      "underlying": "int32",
+      "values": [
+        {
+          "name": "PENDING",
+          "value": 0
+        },
+        {
+          "name": "ACTIVE",
+          "value": 1
+        },
+        {
+          "name": "REACHED",
+          "value": 2
+        },
+        {
+          "name": "ABORTED",
+          "value": 3
+        }
+      ]
+    },
+    {
+      "kind": "primitive",
+      "name": "Pose",
+      "description": "Not defined in the IDL files"
+    },
+    {
+      "kind": "primitive",
+      "name": "Vec3",
+      "description": "Not defined in the IDL files"
+    }
+  ],
+  "interfaces": [
+    {
+      "name": "Planner",
+      "description": "Sends the robot to places.",
+      "messages": [
+        {
+          "name": "plan",
+          "description": "Plans a route; empty when the goal cannot be reached.",
+          "params": [
+            {
+              "name": "from",
+              "type": {
+                "kind": "ref",
+                "name": "Pose"
+              }
+            },
+            {
+              "name": "to",
+              "type": {
+                "kind": "ref",
+                "name": "Pose"
+              }
+            }
+          ],
+          "returns": {
+            "kind": "ref",
+            "name": "Route"
+          }
+        },
+        {
+          "name": "goTo",
+          "params": [
+            {
+              "name": "goal",
+              "type": {
+                "kind": "ref",
+                "name": "Pose"
+              }
+            }
+          ],
+          "returns": {
+            "kind": "ref",
+            "name": "GoalStatus"
+          }
+        },
+        {
+          "name": "cancel",
+          "params": [],
+          "returns": null
+        }
+      ]
+    },
+    {
+      "name": "Localizer",
+      "description": "Where the robot believes it is.",
+      "messages": [
+        {
+          "name": "get_pose",
+          "params": [],
+          "returns": {
+            "kind": "ref",
+            "name": "Pose"
+          }
+        },
+        {
+          "name": "setInitialPose",
+          "params": [
+            {
+              "name": "pose",
+              "type": {
+                "kind": "ref",
+                "name": "Pose"
+              }
+            },
+            {
+              "name": "covariance",
+              "type": {
+                "kind": "ref",
+                "name": "Vec3"
+              }
+            }
+          ],
+          "returns": null
+        }
+      ]
+    }
+  ],
+  "modules": [],
+  "links": [],
+  "editor": {
+    "layout": {}
+  }
+}

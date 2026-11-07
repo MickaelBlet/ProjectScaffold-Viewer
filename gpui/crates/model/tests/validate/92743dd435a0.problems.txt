@@ -1,0 +1,2 @@
+error type: Union 'U': case 'b' has no label
+error type: Union 'U' contains itself by value (use vector, list, map or set to break the cycle)

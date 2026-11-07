@@ -1,0 +1,1 @@
+warning module: Sensor.id: const, without a default value nor constructors setting it

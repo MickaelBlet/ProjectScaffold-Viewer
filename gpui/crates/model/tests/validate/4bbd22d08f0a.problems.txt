@@ -1,0 +1,1 @@
+error module: Base.Circle derives from Base more than once

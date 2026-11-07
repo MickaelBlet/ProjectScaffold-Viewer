@@ -1,0 +1,1 @@
+error module: Square does not implement pure method Lib/Core.IShape.area (implement it or make the module abstract)

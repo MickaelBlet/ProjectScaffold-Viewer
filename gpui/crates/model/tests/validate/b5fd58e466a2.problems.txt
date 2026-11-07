@@ -1,0 +1,2 @@
+error type: Vec3.y default: Expected a number, got text up
+error module: Core.Controller.mode default: Expected a value of Mode (Idle, Run, Fault), got text Nope

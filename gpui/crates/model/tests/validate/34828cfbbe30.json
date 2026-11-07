@@ -1,0 +1,136 @@
+{
+  "schemaVersion": 1,
+  "project": {
+    "name": "Lifecycle"
+  },
+  "types": [],
+  "interfaces": [],
+  "modules": [
+    {
+      "name": "Sensor",
+      "copy": "delete",
+      "move": "default",
+      "attributes": [
+        {
+          "name": "id",
+          "const": true,
+          "type": {
+            "kind": "primitive",
+            "name": "uint32"
+          }
+        },
+        {
+          "name": "rate",
+          "type": {
+            "kind": "primitive",
+            "name": "float32"
+          },
+          "default": 10
+        }
+      ],
+      "constructors": [
+        {
+          "explicit": true,
+          "params": [
+            {
+              "name": "id",
+              "type": {
+                "kind": "primitive",
+                "name": "uint32"
+              }
+            },
+            {
+              "name": "rate",
+              "type": {
+                "kind": "primitive",
+                "name": "float32"
+              },
+              "default": 10
+            }
+          ]
+        },
+        {
+          "access": "private",
+          "deleted": true,
+          "params": []
+        }
+      ],
+      "destructor": {
+        "virtual": false
+      },
+      "methods": [
+        {
+          "name": "read",
+          "virtual": true,
+          "params": [],
+          "returns": {
+            "kind": "primitive",
+            "name": "float32"
+          }
+        }
+      ],
+      "ports": []
+    },
+    {
+      "name": "Registry",
+      "instantiation": "singleton",
+      "copy": "delete",
+      "move": "delete",
+      "constructors": [
+        {
+          "access": "private",
+          "defaulted": true,
+          "params": []
+        }
+      ],
+      "ports": []
+    },
+    {
+      "name": "Units",
+      "instantiation": "utility",
+      "methods": [
+        {
+          "name": "toCelsius",
+          "static": true,
+          "params": [
+            {
+              "name": "kelvin",
+              "type": {
+                "kind": "primitive",
+                "name": "float64"
+              }
+            }
+          ],
+          "returns": {
+            "kind": "primitive",
+            "name": "float64"
+          }
+        }
+      ],
+      "ports": []
+    }
+  ],
+  "links": [],
+  "editor": {
+    "layout": {
+      "Sensor": {
+        "x": 20,
+        "y": 20,
+        "width": 200,
+        "height": 196
+      },
+      "Registry": {
+        "x": 300,
+        "y": 20,
+        "width": 200,
+        "height": 98
+      },
+      "Units": {
+        "x": 580,
+        "y": 20,
+        "width": 200,
+        "height": 98
+      }
+    }
+  }
+}

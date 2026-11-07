@@ -1,0 +1,1 @@
+warning link: Link 'operator_to_core' uses the message queue 'seg' of link 'sensor_to_controller'

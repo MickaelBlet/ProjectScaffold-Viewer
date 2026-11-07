@@ -4,6 +4,7 @@ ProjectScaffold is one React web build that runs in the browser, in two desktop 
 
 - [Web app](#web-app)
 - [Desktop apps](#desktop-apps)
+- [Native app (GPUI, preview)](#native-app-gpui-preview)
 - [Checks](#checks)
 
 ## Web app
@@ -40,6 +41,18 @@ Local development windows:
 npm run tauri dev           # needs Rust + webkit2gtk-4.1
 npm run electron            # from the web build
 ```
+
+## Native app (GPUI, preview)
+
+`gpui/` is a native Rust port of the editor built on [GPUI](https://www.gpui.rs/), in progress. It reads and writes the same project files (saved byte for byte as the web build saves them) and reports the same problems. So far it draws the project view and edits its layout: select (click, Shift/Ctrl+click, Shift+drag a box), move modules and notes (dropping a module into another makes it a submodule), arrow keys, delete, undo/redo, open and save.
+
+```sh
+scripts/build_gpui.sh            # -> gpui/target/release/project-scaffold
+scripts/build_gpui.sh --check    # rustfmt, clippy and tests first
+gpui/target/release/project-scaffold examples/robot.scaffold.yaml
+```
+
+It needs the Rust toolchain pinned in `gpui/rust-toolchain.toml` (installed by rustup), and on Linux `libxkbcommon-x11-dev` and Vulkan or OpenGL drivers (`mesa-vulkan-drivers`). Under WSL it renders in software.
 
 ## Checks
 

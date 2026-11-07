@@ -1,0 +1,2 @@
+error type: Struct 'Vec3': duplicate field 'x'
+error project: Duplicate link name 'sensor_to_controller'

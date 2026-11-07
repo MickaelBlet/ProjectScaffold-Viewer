@@ -1,0 +1,2 @@
+error module: Base.Circle.perimeter: overrides no virtual method of a base
+error module: Base.Circle does not implement pure method IShape.area (implement it or make the module abstract)

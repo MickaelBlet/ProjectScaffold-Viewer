@@ -1,0 +1,3 @@
+error module: Console.write: signature differs from Writer.write it overrides
+error module: Console does not implement pure method Writer.write (implement it or make the module abstract)
+error module: Console does not implement pure method Writer.write (implement it or make the module abstract)

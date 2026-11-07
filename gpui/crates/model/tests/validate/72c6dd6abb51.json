@@ -1,0 +1,227 @@
+{
+  "schemaVersion": 1,
+  "project": {
+    "name": "main"
+  },
+  "types": [
+    {
+      "kind": "struct",
+      "name": "Top",
+      "fields": [
+        {
+          "name": "t",
+          "type": {
+            "kind": "primitive",
+            "name": "int32"
+          }
+        }
+      ]
+    }
+  ],
+  "interfaces": [
+    {
+      "name": "Arm",
+      "messages": [
+        {
+          "name": "get",
+          "params": [],
+          "returns": {
+            "kind": "ref",
+            "name": "A.Status"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Mixed",
+      "messages": [
+        {
+          "name": "a",
+          "params": [],
+          "returns": {
+            "kind": "ref",
+            "name": "A.Status"
+          }
+        },
+        {
+          "name": "b",
+          "params": [],
+          "returns": {
+            "kind": "ref",
+            "name": "B.Status"
+          }
+        },
+        {
+          "name": "k",
+          "params": [],
+          "returns": {
+            "kind": "ref",
+            "name": "inc/Common.Kind"
+          }
+        }
+      ]
+    }
+  ],
+  "constants": [
+    {
+      "name": "MAX",
+      "type": {
+        "kind": "primitive",
+        "name": "int32"
+      },
+      "value": 3
+    }
+  ],
+  "modules": [
+    {
+      "name": "A",
+      "description": "Serves the interfaces of IDL module A.",
+      "types": [
+        {
+          "kind": "struct",
+          "name": "Status",
+          "fields": [
+            {
+              "name": "a",
+              "type": {
+                "kind": "primitive",
+                "name": "int32"
+              }
+            }
+          ]
+        }
+      ],
+      "ports": [
+        {
+          "name": "arm",
+          "role": "in",
+          "interface": "Arm"
+        }
+      ]
+    },
+    {
+      "name": "B",
+      "description": "IDL module B.",
+      "types": [
+        {
+          "kind": "struct",
+          "name": "Status",
+          "fields": [
+            {
+              "name": "b",
+              "type": {
+                "kind": "primitive",
+                "name": "int32"
+              }
+            }
+          ]
+        }
+      ],
+      "ports": [],
+      "modules": [
+        {
+          "name": "Deep",
+          "description": "IDL module B::Deep.",
+          "types": [
+            {
+              "kind": "enum",
+              "name": "Mode",
+              "underlying": "int32",
+              "values": [
+                {
+                  "name": "ON",
+                  "value": 0
+                },
+                {
+                  "name": "OFF",
+                  "value": 1
+                }
+              ]
+            }
+          ],
+          "ports": []
+        }
+      ]
+    },
+    {
+      "name": "main",
+      "description": "Serves the interfaces of the file.",
+      "ports": [
+        {
+          "name": "mixed",
+          "role": "in",
+          "interface": "Mixed"
+        }
+      ]
+    }
+  ],
+  "links": [],
+  "dependencies": [
+    {
+      "name": "inc",
+      "file": "inc.idl",
+      "types": [],
+      "interfaces": [],
+      "constants": [
+        {
+          "name": "N",
+          "type": {
+            "kind": "primitive",
+            "name": "int16"
+          },
+          "value": 2
+        }
+      ],
+      "moduleTypes": [
+        {
+          "module": "Common",
+          "types": [
+            {
+              "kind": "enum",
+              "name": "Kind",
+              "underlying": "int32",
+              "values": [
+                {
+                  "name": "X",
+                  "value": 0
+                },
+                {
+                  "name": "Y",
+                  "value": 1
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "editor": {
+    "layout": {
+      "A": {
+        "x": 0,
+        "y": 0,
+        "width": 200,
+        "height": 72
+      },
+      "B": {
+        "x": 260,
+        "y": 0,
+        "width": 230,
+        "height": 128
+      },
+      "B.Deep": {
+        "x": 10,
+        "y": 36,
+        "width": 200,
+        "height": 72
+      },
+      "main": {
+        "x": 550,
+        "y": 0,
+        "width": 200,
+        "height": 72
+      }
+    }
+  }
+}

@@ -1,0 +1,1 @@
+warning module: Core.Sensor.last: public member uses protected type 'Core.Sensor.Sample'

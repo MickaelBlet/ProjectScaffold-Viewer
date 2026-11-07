@@ -1,0 +1,2 @@
+error module: Sensor.bus: owned modules are not copied (copy: default)
+warning module: Probe.bus: weak, but nothing holds Bus as shared

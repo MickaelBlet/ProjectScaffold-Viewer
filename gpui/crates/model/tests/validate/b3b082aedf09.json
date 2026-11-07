@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "project": {
+    "name": "Final"
+  },
+  "types": [],
+  "interfaces": [],
+  "modules": [
+    {
+      "name": "Base",
+      "kind": "abstract",
+      "methods": [
+        {
+          "name": "run",
+          "virtual": true,
+          "noexcept": true,
+          "nodiscard": true,
+          "params": [],
+          "returns": null
+        },
+        {
+          "name": "size",
+          "const": true,
+          "virtual": true,
+          "final": true,
+          "nodiscard": true,
+          "params": [],
+          "returns": {
+            "kind": "primitive",
+            "name": "uint32"
+          }
+        }
+      ],
+      "ports": []
+    },
+    {
+      "name": "Leaf",
+      "bases": [
+        "Base"
+      ],
+      "final": true,
+      "methods": [
+        {
+          "name": "run",
+          "virtual": true,
+          "override": true,
+          "params": [],
+          "returns": null
+        }
+      ],
+      "ports": []
+    }
+  ],
+  "links": [],
+  "editor": {
+    "layout": {
+      "Base": {
+        "x": 20,
+        "y": 20,
+        "width": 200,
+        "height": 116
+      },
+      "Leaf": {
+        "x": 300,
+        "y": 20,
+        "width": 200,
+        "height": 98
+      }
+    }
+  }
+}

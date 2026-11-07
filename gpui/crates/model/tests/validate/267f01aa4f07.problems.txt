@@ -1,0 +1,1 @@
+warning module: Probe.bus: weak, but nothing holds Bus as shared

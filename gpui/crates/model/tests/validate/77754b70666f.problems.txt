@@ -1,0 +1,4 @@
+error type: Struct 'Tags'.names: a map, no hash
+error module: Marker: derives ordering, which needs equality
+error module: Marker: derives hash, which needs equality
+error module: Marker.count: struct 'Tags' does not derive ordering, no ordering

@@ -1,0 +1,1 @@
+error type: Enum 'Mode': Idle = 256 does not fit in uint8

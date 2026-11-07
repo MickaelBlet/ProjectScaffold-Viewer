@@ -1,0 +1,1 @@
+error module: Core.Controller: duplicate attribute 'mode'

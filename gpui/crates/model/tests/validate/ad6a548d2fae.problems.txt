@@ -1,0 +1,2 @@
+error link: Link 'camera_to_planner' joins binaries Onboard and Ground: it needs a transport
+error link: Link 'planner_to_station' joins binaries Ground and Onboard: it needs a transport

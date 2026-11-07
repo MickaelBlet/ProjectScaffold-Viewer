@@ -1,0 +1,2 @@
+error module: Registry(): constructors of a singleton are not public
+error module: Registry: a singleton is not copied (copy: delete)

@@ -1,0 +1,1 @@
+error module: Sensor(id, rate): id is not of the type of the attribute it sets

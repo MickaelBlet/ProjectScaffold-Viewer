@@ -1,0 +1,3 @@
+warning link: Link 'sensor_to_controller': ack timeout set but ack not required
+warning link: Link 'sensor_to_controller': transport set but link is not remote
+warning link: Link 'operator_to_core' is remote but has no transport

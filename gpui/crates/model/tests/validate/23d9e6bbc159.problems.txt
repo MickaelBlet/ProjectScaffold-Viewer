@@ -1,0 +1,5 @@
+warning module: Operator:pi has no interface
+warning module: Operator:po has no interface
+warning module: Operator.child:ci has no interface
+warning module: Operator.child:co has no interface
+error link: Link 'wrong': source port 'po' must be an 'in' port

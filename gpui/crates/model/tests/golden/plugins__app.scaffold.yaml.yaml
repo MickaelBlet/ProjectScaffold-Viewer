@@ -1,0 +1,394 @@
+schemaVersion: 1
+project:
+  name: App
+  description: Image editor using the plugins of the Filters project (placed on the canvas) and one of its own, deriving from the SDK's Plugin
+types: []
+interfaces: []
+modules:
+  - name: Editor
+    description: Runs the plugins the user picks on the open image
+    color: "#2e9e8f"
+    attributes:
+      - name: enabled
+        type:
+          kind: vector
+          of:
+            kind: primitive
+            name: string
+        default:
+          - Blur
+          - Watermark
+    ports:
+      - name: filter
+        role: out
+        interface: ImageFilter
+      - name: log
+        role: in
+        interface: Log
+  - name: Watermark
+    description: Built-in plugin
+    bases:
+      - Sdk/Plugin
+    color: "#d6c21f"
+    attributes:
+      - name: text
+        type:
+          kind: primitive
+          name: string
+        default: © Example
+      - name: opacity
+        type:
+          kind: primitive
+          name: float32
+        default: 0.3
+    methods:
+      - name: info
+        const: true
+        virtual: true
+        override: true
+        params: []
+        returns:
+          kind: ref
+          name: Sdk/Plugin.Info
+      - name: load
+        virtual: true
+        override: true
+        params:
+          - name: settings
+            type:
+              kind: ref
+              name: Sdk/Plugin.Settings
+            const: true
+        returns:
+          kind: primitive
+          name: bool
+    ports:
+      - name: apply
+        role: in
+        interface: ImageFilter
+links:
+  - name: editor_blur
+    from:
+      module: Editor
+      port: filter
+    to:
+      project: Filters
+      module: Blur
+      port: apply
+    constraints:
+      direction: bidirectional
+      ack:
+        required: false
+      performance:
+        class: normal
+      remote:
+        enabled: false
+  - name: editor_sharpen
+    from:
+      module: Editor
+      port: filter
+    to:
+      project: Filters
+      module: Sharpen
+      port: apply
+    constraints:
+      direction: bidirectional
+      ack:
+        required: false
+      performance:
+        class: normal
+      remote:
+        enabled: false
+  - name: editor_watermark
+    from:
+      module: Editor
+      port: filter
+    to:
+      module: Watermark
+      port: apply
+    constraints:
+      direction: bidirectional
+      ack:
+        required: false
+      performance:
+        class: normal
+      remote:
+        enabled: false
+  - name: blur_log
+    from:
+      project: Filters
+      module: Blur
+      port: log
+    to:
+      module: Editor
+      port: log
+    constraints:
+      direction: unidirectional
+      ack:
+        required: false
+      performance:
+        class: low
+      remote:
+        enabled: false
+  - name: sharpen_log
+    from:
+      project: Filters
+      module: Sharpen
+      port: log
+    to:
+      module: Editor
+      port: log
+    constraints:
+      direction: unidirectional
+      ack:
+        required: false
+      performance:
+        class: low
+      remote:
+        enabled: false
+dependencies:
+  - name: Sdk
+    file: sdk.scaffold.yaml
+    types:
+      - kind: struct
+        name: Image
+        fields:
+          - name: width
+            type:
+              kind: primitive
+              name: uint16
+          - name: height
+            type:
+              kind: primitive
+              name: uint16
+          - name: rgba
+            type:
+              kind: primitive
+              name: bytes
+      - kind: struct
+        name: Version
+        fields:
+          - name: major
+            type:
+              kind: primitive
+              name: uint16
+          - name: minor
+            type:
+              kind: primitive
+              name: uint16
+          - name: patch
+            type:
+              kind: primitive
+              name: uint16
+            default: 0
+      - kind: enum
+        name: Level
+        underlying: uint8
+        values:
+          - name: Debug
+            value: 0
+          - name: Info
+            value: 1
+          - name: Warning
+            value: 2
+          - name: Error
+            value: 3
+    interfaces:
+      - name: Log
+        messages:
+          - name: write
+            params:
+              - name: level
+                type:
+                  kind: ref
+                  name: Level
+              - name: text
+                type:
+                  kind: primitive
+                  name: string
+            returns: null
+      - name: ImageFilter
+        messages:
+          - name: apply
+            params:
+              - name: image
+                type:
+                  kind: ref
+                  name: Image
+                direction: inout
+            returns: null
+    constants:
+      - name: ApiVersion
+        type:
+          kind: ref
+          name: Version
+        value:
+          major: 3
+          minor: 1
+    moduleTypes:
+      - module: Plugin
+        types:
+          - kind: struct
+            name: Info
+            fields:
+              - name: name
+                type:
+                  kind: primitive
+                  name: string
+                  max: 32
+              - name: version
+                type:
+                  kind: ref
+                  name: Version
+              - name: author
+                type:
+                  kind: optional
+                  of:
+                    kind: primitive
+                    name: string
+                default: null
+          - kind: alias
+            name: Settings
+            type:
+              kind: map
+              key:
+                kind: primitive
+                name: string
+              value:
+                kind: primitive
+                name: string
+    modules:
+      - module: Plugin
+        methods:
+          - name: info
+            const: true
+            virtual: true
+            pure: true
+            params: []
+            returns:
+              kind: ref
+              name: Sdk/Plugin.Info
+          - name: load
+            virtual: true
+            pure: true
+            params:
+              - name: settings
+                type:
+                  kind: ref
+                  name: Sdk/Plugin.Settings
+                const: true
+            returns:
+              kind: primitive
+              name: bool
+          - name: unload
+            description: Does nothing unless overridden
+            virtual: true
+            params: []
+            returns: null
+        ports: []
+  - name: Filters
+    file: filters.scaffold.yaml
+    uses:
+      - Sdk
+    types: []
+    interfaces: []
+    modules:
+      - module: Blur
+        attributes:
+          - name: radius
+            type:
+              kind: primitive
+              name: float32
+            default: 2
+        methods:
+          - name: info
+            const: true
+            virtual: true
+            override: true
+            params: []
+            returns:
+              kind: ref
+              name: Sdk/Plugin.Info
+          - name: load
+            virtual: true
+            override: true
+            params:
+              - name: settings
+                type:
+                  kind: ref
+                  name: Sdk/Plugin.Settings
+                const: true
+            returns:
+              kind: primitive
+              name: bool
+        ports:
+          - name: apply
+            role: in
+            interface: ImageFilter
+          - name: log
+            role: out
+            interface: Log
+      - module: Sharpen
+        attributes:
+          - name: amount
+            type:
+              kind: primitive
+              name: float32
+            default: 0.5
+        methods:
+          - name: info
+            const: true
+            virtual: true
+            override: true
+            params: []
+            returns:
+              kind: ref
+              name: Sdk/Plugin.Info
+          - name: load
+            virtual: true
+            override: true
+            params:
+              - name: settings
+                type:
+                  kind: ref
+                  name: Sdk/Plugin.Settings
+                const: true
+            returns:
+              kind: primitive
+              name: bool
+          - name: unload
+            virtual: true
+            override: true
+            params: []
+            returns: null
+        ports:
+          - name: apply
+            role: in
+            interface: ImageFilter
+          - name: log
+            role: out
+            interface: Log
+editor:
+  layout:
+    Editor:
+      x: 20
+      y: 378
+      width: 200
+      height: 98
+    Watermark:
+      x: 336
+      y: 250
+      width: 200
+      height: 160
+  dependencies:
+    Sdk:
+      Plugin:
+        x: 20
+        y: 166
+    Filters:
+      Blur:
+        x: 336
+        y: 480
+      Sharpen:
+        x: 336
+        y: 20

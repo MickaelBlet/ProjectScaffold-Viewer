@@ -1,0 +1,2 @@
+error module: Samples.ints: Buffer needs a type argument for T
+error module: Samples.shapes: Circle takes no type arguments

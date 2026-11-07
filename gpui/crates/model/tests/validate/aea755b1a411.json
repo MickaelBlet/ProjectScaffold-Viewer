@@ -1,0 +1,157 @@
+{
+  "schemaVersion": 1,
+  "project": {
+    "name": "main"
+  },
+  "types": [],
+  "interfaces": [
+    {
+      "name": "Top",
+      "messages": [
+        {
+          "name": "t",
+          "params": [],
+          "returns": null
+        }
+      ]
+    },
+    {
+      "name": "Arm",
+      "messages": [
+        {
+          "name": "go",
+          "params": [],
+          "returns": null
+        }
+      ]
+    },
+    {
+      "name": "gripper",
+      "messages": [
+        {
+          "name": "go",
+          "params": [],
+          "returns": null
+        }
+      ]
+    },
+    {
+      "name": "Lamp",
+      "messages": [
+        {
+          "name": "on",
+          "params": [],
+          "returns": null
+        }
+      ]
+    }
+  ],
+  "modules": [
+    {
+      "name": "main",
+      "description": "Serves the interfaces of the file.",
+      "ports": [
+        {
+          "name": "top",
+          "role": "in",
+          "interface": "Top"
+        }
+      ]
+    },
+    {
+      "name": "A",
+      "description": "IDL module A.",
+      "ports": [],
+      "modules": [
+        {
+          "name": "Ctl",
+          "description": "Serves the interfaces of IDL module A::Ctl.",
+          "ports": [
+            {
+              "name": "arm",
+              "role": "in",
+              "interface": "Arm"
+            },
+            {
+              "name": "gripper",
+              "role": "in",
+              "interface": "gripper"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "B",
+      "description": "IDL module B.",
+      "ports": [],
+      "modules": [
+        {
+          "name": "Ctl",
+          "description": "Serves the interfaces of IDL module B::Ctl.",
+          "ports": [
+            {
+              "name": "lamp",
+              "role": "in",
+              "interface": "Lamp"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "links": [],
+  "dependencies": [
+    {
+      "name": "a",
+      "file": "a.idl",
+      "types": [],
+      "interfaces": [
+        {
+          "name": "Far",
+          "messages": [
+            {
+              "name": "f",
+              "params": [],
+              "returns": null
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "editor": {
+    "layout": {
+      "main": {
+        "x": 0,
+        "y": 0,
+        "width": 200,
+        "height": 72
+      },
+      "A": {
+        "x": 260,
+        "y": 0,
+        "width": 230,
+        "height": 152
+      },
+      "A.Ctl": {
+        "x": 10,
+        "y": 36,
+        "width": 200,
+        "height": 96
+      },
+      "B": {
+        "x": 550,
+        "y": 0,
+        "width": 230,
+        "height": 128
+      },
+      "B.Ctl": {
+        "x": 10,
+        "y": 36,
+        "width": 200,
+        "height": 72
+      }
+    }
+  }
+}

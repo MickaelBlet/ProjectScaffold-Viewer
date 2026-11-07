@@ -1,0 +1,1 @@
+warning link: Link 'planner_to_station' is remote but both ends run in binary Onboard

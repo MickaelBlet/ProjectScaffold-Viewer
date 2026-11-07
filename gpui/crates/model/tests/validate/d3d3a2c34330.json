@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "project": {
+    "name": "Station"
+  },
+  "types": [],
+  "interfaces": [],
+  "modules": [
+    {
+      "name": "Monitor",
+      "attributes": [
+        {
+          "name": "imu",
+          "type": {
+            "kind": "ref",
+            "name": "Lib/Drivers.Imu"
+          }
+        }
+      ],
+      "ports": []
+    }
+  ],
+  "links": [],
+  "dependencies": [
+    {
+      "name": "Lib",
+      "file": "lib.scaffold.yaml",
+      "types": [
+        {
+          "kind": "struct",
+          "name": "Reading",
+          "fields": [
+            {
+              "name": "source",
+              "type": {
+                "kind": "ref",
+                "name": "Lib/Drivers.Imu"
+              }
+            }
+          ]
+        }
+      ],
+      "interfaces": []
+    }
+  ],
+  "editor": {
+    "layout": {
+      "Monitor": {
+        "x": 20,
+        "y": 20,
+        "width": 200,
+        "height": 72
+      }
+    }
+  }
+}

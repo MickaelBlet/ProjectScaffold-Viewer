@@ -1,0 +1,2 @@
+error type: Struct 'Vec3' contains itself by value (use vector, list, map or set to break the cycle)
+error type: Struct 'Pose' contains itself by value (use vector, list, map or set to break the cycle)

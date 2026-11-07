@@ -1,0 +1,2 @@
+error link: Link 'sensor_to_monitor': ports use different interfaces
+error link: Link 'sensor_to_monitor' joins two imported modules: one end must be in this project

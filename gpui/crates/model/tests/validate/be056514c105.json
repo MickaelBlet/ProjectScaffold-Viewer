@@ -1,0 +1,180 @@
+{
+  "schemaVersion": 1,
+  "project": {
+    "name": "main"
+  },
+  "types": [
+    {
+      "kind": "struct",
+      "name": "Top",
+      "fields": [
+        {
+          "name": "t",
+          "type": {
+            "kind": "primitive",
+            "name": "int32"
+          }
+        }
+      ]
+    }
+  ],
+  "interfaces": [
+    {
+      "name": "I",
+      "messages": [
+        {
+          "name": "go",
+          "params": [],
+          "returns": null
+        }
+      ]
+    },
+    {
+      "name": "J",
+      "messages": [
+        {
+          "name": "j",
+          "params": [],
+          "returns": null
+        }
+      ]
+    }
+  ],
+  "constants": [
+    {
+      "name": "MAX",
+      "type": {
+        "kind": "primitive",
+        "name": "int32"
+      },
+      "value": 2
+    }
+  ],
+  "modules": [
+    {
+      "name": "Main",
+      "ports": []
+    },
+    {
+      "name": "B",
+      "description": "IDL module B.",
+      "types": [
+        {
+          "kind": "struct",
+          "name": "S",
+          "fields": [
+            {
+              "name": "x",
+              "type": {
+                "kind": "primitive",
+                "name": "int32"
+              }
+            }
+          ]
+        }
+      ],
+      "ports": [],
+      "modules": [
+        {
+          "name": "Tank",
+          "attributes": [
+            {
+              "name": "s",
+              "type": {
+                "kind": "ref",
+                "name": "B.S"
+              }
+            }
+          ],
+          "ports": []
+        }
+      ]
+    },
+    {
+      "name": "C",
+      "description": "IDL module C.",
+      "ports": []
+    },
+    {
+      "name": "A",
+      "description": "IDL module A.",
+      "ports": [],
+      "modules": [
+        {
+          "name": "Tank",
+          "ports": [
+            {
+              "name": "i",
+              "role": "in",
+              "interface": "I"
+            }
+          ]
+        },
+        {
+          "name": "Deep",
+          "description": "IDL module A::Deep.",
+          "ports": [],
+          "modules": [
+            {
+              "name": "Pump",
+              "ports": []
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "links": [],
+  "editor": {
+    "layout": {
+      "Main": {
+        "x": 0,
+        "y": 0,
+        "width": 200,
+        "height": 72
+      },
+      "A.Tank": {
+        "x": 300,
+        "y": 36,
+        "width": 200,
+        "height": 72
+      },
+      "A.Deep.Pump": {
+        "x": 10,
+        "y": 36,
+        "width": 200,
+        "height": 72
+      },
+      "B.Tank": {
+        "x": 10,
+        "y": 36,
+        "width": 200,
+        "height": 98
+      },
+      "B": {
+        "x": 0,
+        "y": 0,
+        "width": 230,
+        "height": 154
+      },
+      "C": {
+        "x": 290,
+        "y": 0,
+        "width": 200,
+        "height": 72
+      },
+      "A": {
+        "x": 550,
+        "y": 0,
+        "width": 520,
+        "height": 184
+      },
+      "A.Deep": {
+        "x": 10,
+        "y": 36,
+        "width": 230,
+        "height": 128
+      }
+    }
+  }
+}

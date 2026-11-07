@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "project": {
+    "name": "Active"
+  },
+  "types": [],
+  "interfaces": [
+    {
+      "name": "Sink",
+      "messages": [
+        {
+          "name": "push",
+          "params": [],
+          "returns": null
+        }
+      ]
+    }
+  ],
+  "modules": [
+    {
+      "name": "Worker",
+      "kind": "abstract",
+      "active": true,
+      "ports": [
+        {
+          "name": "in",
+          "role": "in",
+          "interface": "Sink"
+        }
+      ]
+    },
+    {
+      "name": "Logger",
+      "instantiation": "utility",
+      "active": {
+        "queue": 8,
+        "timeoutMs": 100,
+        "overflow": "drop"
+      },
+      "ports": [
+        {
+          "name": "in",
+          "role": "in",
+          "interface": "Sink"
+        }
+      ]
+    }
+  ],
+  "links": [],
+  "editor": {
+    "layout": {
+      "Worker": {
+        "x": 20,
+        "y": 20,
+        "width": 200,
+        "height": 72
+      },
+      "Logger": {
+        "x": 300,
+        "y": 20,
+        "width": 200,
+        "height": 72
+      }
+    }
+  }
+}

@@ -1,0 +1,1 @@
+warning module: A.B:x has no interface

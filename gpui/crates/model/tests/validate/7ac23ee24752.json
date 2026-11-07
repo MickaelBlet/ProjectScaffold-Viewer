@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 1,
+  "project": {
+    "name": "Station"
+  },
+  "types": [],
+  "interfaces": [],
+  "modules": [
+    {
+      "name": "Monitor",
+      "ports": [
+        {
+          "name": "telemetry",
+          "role": "in",
+          "interface": "Telemetry"
+        }
+      ]
+    }
+  ],
+  "links": [],
+  "dependencies": [
+    {
+      "name": "Common",
+      "file": "lib/common.scaffold.yaml",
+      "types": [
+        {
+          "kind": "struct",
+          "name": "Vec3",
+          "fields": [
+            {
+              "name": "x",
+              "type": {
+                "kind": "ref",
+                "name": "Meters"
+              }
+            }
+          ]
+        }
+      ],
+      "interfaces": [
+        {
+          "name": "Telemetry",
+          "messages": [
+            {
+              "name": "publish",
+              "params": [
+                {
+                  "name": "at",
+                  "type": {
+                    "kind": "ref",
+                    "name": "Vec3"
+                  }
+                }
+              ],
+              "returns": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Units",
+      "file": "lib/units.scaffold.yaml",
+      "indirect": true,
+      "types": [
+        {
+          "kind": "alias",
+          "name": "Meters",
+          "type": {
+            "kind": "primitive",
+            "name": "float32"
+          }
+        }
+      ],
+      "interfaces": []
+    }
+  ],
+  "editor": {
+    "layout": {
+      "Monitor": {
+        "x": 20,
+        "y": 20,
+        "width": 200,
+        "height": 72
+      }
+    }
+  }
+}

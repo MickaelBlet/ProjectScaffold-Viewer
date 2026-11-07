@@ -1,0 +1,2 @@
+error type: Union 'U': label of case 'b': Expected a value of Mode (Idle, Run, Fault), got text Nope
+error type: Union 'U': label Idle used by several cases

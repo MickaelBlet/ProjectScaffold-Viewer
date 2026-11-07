@@ -1,0 +1,2 @@
+error type: Alias 'A' is cyclic
+error type: Alias 'B' is cyclic

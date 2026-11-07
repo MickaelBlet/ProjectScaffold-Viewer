@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Transport `mq` (POSIX message queues) for links between binaries, with settings `name` (the queues `<name>.call` and `<name>.reply`, default `<project>_<link>`), `maxMessages` and `messageSize` (link inspector: _Queues_, _Messages_, _Message size_). An invalid queue name is an error; two links sharing queues, a warning.
+- Native app (preview, `gpui/`, built by `scripts/build_gpui.sh`): a Rust port of the editor on GPUI. It loads, validates and saves project files as the web build does, draws the project view (modules, ports, links, inheritance, notes and frames, pan and zoom) and edits its layout: selection (click, Shift/Ctrl+click, Shift+drag a box), moving modules, notes and placed modules on the grid (a module dropped into another becomes its submodule), arrow keys, delete, undo/redo, open, save and save as, with a prompt about unsaved changes on close.
 - Modules: `active` (module inspector, _Active_, with the concurrency features on): the module's own thread runs the calls reaching its `in` ports, queued in order, with the size of its queue, the timeout of calls waiting for a result and what a call reaching a full queue does (`block`, `drop`, `error`). An active module is a `class`, not `utility`; one without `in` ports is a warning.
 
 ## [1.1.1] - 2026-10-27

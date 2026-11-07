@@ -1,0 +1,3 @@
+error module: Registry(): constructors of a singleton are not public
+error module: Registry: a singleton is not copied (copy: delete)
+error module: Units.toCelsius: members of a utility module are static

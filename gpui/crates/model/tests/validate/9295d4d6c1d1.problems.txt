@@ -1,0 +1,1 @@
+error module: Sensor.rate default: 0 Hz is below min 1 Hz

@@ -1,0 +1,148 @@
+{
+  "schemaVersion": 1,
+  "project": {
+    "name": "Attributes"
+  },
+  "types": [
+    {
+      "kind": "struct",
+      "name": "Reading",
+      "fields": [
+        {
+          "name": "celsius",
+          "type": {
+            "kind": "primitive",
+            "name": "float32"
+          },
+          "default": 20,
+          "constraints": {
+            "min": -40,
+            "max": 125,
+            "unit": "°C"
+          }
+        },
+        {
+          "name": "tag",
+          "type": {
+            "kind": "primitive",
+            "name": "string"
+          },
+          "default": "t1",
+          "constraints": {
+            "pattern": "[a-z][0-9]+"
+          }
+        }
+      ]
+    }
+  ],
+  "interfaces": [],
+  "modules": [
+    {
+      "name": "Bus",
+      "ports": []
+    },
+    {
+      "name": "Sensor",
+      "locks": [
+        {
+          "name": "mutex",
+          "kind": "shared"
+        }
+      ],
+      "attributes": [
+        {
+          "name": "bus",
+          "type": {
+            "kind": "ref",
+            "name": "Bus"
+          },
+          "ownership": "shared"
+        },
+        {
+          "name": "rate",
+          "atomic": true,
+          "type": {
+            "kind": "primitive",
+            "name": "uint16"
+          },
+          "default": 10,
+          "constraints": {
+            "min": 1,
+            "max": 1000,
+            "unit": "Hz"
+          }
+        },
+        {
+          "name": "last",
+          "type": {
+            "kind": "ref",
+            "name": "Reading"
+          },
+          "guardedBy": "mutex"
+        },
+        {
+          "name": "cache",
+          "mutable": true,
+          "type": {
+            "kind": "primitive",
+            "name": "bytes"
+          },
+          "accessors": "none"
+        }
+      ],
+      "methods": [
+        {
+          "name": "read",
+          "const": true,
+          "threadSafe": true,
+          "params": [],
+          "returns": {
+            "kind": "ref",
+            "name": "Reading"
+          }
+        }
+      ],
+      "ports": []
+    },
+    {
+      "name": "Probe",
+      "attributes": [
+        {
+          "name": "bus",
+          "type": {
+            "kind": "optional",
+            "of": {
+              "kind": "ref",
+              "name": "Bus"
+            }
+          },
+          "ownership": "weak"
+        }
+      ],
+      "ports": []
+    }
+  ],
+  "links": [],
+  "editor": {
+    "layout": {
+      "Bus": {
+        "x": 20,
+        "y": 20,
+        "width": 200,
+        "height": 72
+      },
+      "Sensor": {
+        "x": 300,
+        "y": 20,
+        "width": 200,
+        "height": 178
+      },
+      "Probe": {
+        "x": 580,
+        "y": 20,
+        "width": 200,
+        "height": 98
+      }
+    }
+  }
+}

@@ -1,0 +1,3 @@
+error module: Worker: an active module is a class (not abstract)
+error module: Logger: a utility module has no ports
+error module: Logger: a utility module is not active

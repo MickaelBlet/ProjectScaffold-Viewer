@@ -1,0 +1,100 @@
+{
+  "schemaVersion": 1,
+  "project": {
+    "name": "Shapes"
+  },
+  "types": [],
+  "interfaces": [],
+  "modules": [
+    {
+      "name": "IShape",
+      "kind": "interface",
+      "methods": [
+        {
+          "name": "area",
+          "const": true,
+          "virtual": true,
+          "pure": true,
+          "params": [],
+          "returns": {
+            "kind": "primitive",
+            "name": "float64"
+          }
+        }
+      ],
+      "ports": []
+    },
+    {
+      "name": "Base",
+      "kind": "abstract",
+      "bases": [
+        "IShape"
+      ],
+      "methods": [
+        {
+          "name": "name",
+          "virtual": true,
+          "params": [],
+          "returns": {
+            "kind": "primitive",
+            "name": "string"
+          }
+        }
+      ],
+      "ports": [],
+      "modules": [
+        {
+          "name": "Circle",
+          "bases": [
+            "Base"
+          ],
+          "attributes": [
+            {
+              "name": "radius",
+              "type": {
+                "kind": "primitive",
+                "name": "float64"
+              }
+            }
+          ],
+          "methods": [
+            {
+              "name": "area",
+              "const": true,
+              "virtual": true,
+              "params": [],
+              "returns": {
+                "kind": "primitive",
+                "name": "float64"
+              }
+            }
+          ],
+          "ports": []
+        }
+      ]
+    }
+  ],
+  "links": [],
+  "editor": {
+    "layout": {
+      "IShape": {
+        "x": 20,
+        "y": 20,
+        "width": 200,
+        "height": 98
+      },
+      "Base": {
+        "x": 300,
+        "y": 20,
+        "width": 240,
+        "height": 262
+      },
+      "Base.Circle": {
+        "x": 20,
+        "y": 118,
+        "width": 200,
+        "height": 124
+      }
+    }
+  }
+}

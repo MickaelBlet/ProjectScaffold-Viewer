@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "project": {
+    "name": "Untitled"
+  },
+  "types": [
+    {
+      "kind": "primitive",
+      "name": "NodeRef",
+      "description": "Reference to a Node object"
+    },
+    {
+      "kind": "primitive",
+      "name": "Any",
+      "description": "Value of any IDL type"
+    },
+    {
+      "kind": "primitive",
+      "name": "Object",
+      "description": "Reference to any CORBA object"
+    },
+    {
+      "kind": "primitive",
+      "name": "TreeRef",
+      "description": "Reference to a Tree object"
+    }
+  ],
+  "interfaces": [
+    {
+      "name": "Tree",
+      "messages": [
+        {
+          "name": "root",
+          "params": [],
+          "returns": {
+            "kind": "ref",
+            "name": "NodeRef"
+          }
+        },
+        {
+          "name": "value",
+          "params": [],
+          "returns": {
+            "kind": "ref",
+            "name": "Any"
+          }
+        },
+        {
+          "name": "raw",
+          "params": [],
+          "returns": {
+            "kind": "ref",
+            "name": "Object"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Node",
+      "messages": [
+        {
+          "name": "owner",
+          "params": [],
+          "returns": {
+            "kind": "ref",
+            "name": "TreeRef"
+          }
+        }
+      ]
+    }
+  ],
+  "modules": [],
+  "links": [],
+  "editor": {
+    "layout": {}
+  }
+}

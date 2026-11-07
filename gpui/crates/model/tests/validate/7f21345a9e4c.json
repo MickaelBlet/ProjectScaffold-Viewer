@@ -1,0 +1,142 @@
+{
+  "schemaVersion": 1,
+  "project": {
+    "name": "Generics"
+  },
+  "types": [],
+  "interfaces": [],
+  "modules": [
+    {
+      "name": "Shape",
+      "kind": "abstract",
+      "ports": []
+    },
+    {
+      "name": "Circle",
+      "bases": [
+        "Shape"
+      ],
+      "ports": []
+    },
+    {
+      "name": "Buffer",
+      "typeParams": [
+        {
+          "name": "T",
+          "constraint": "numeric"
+        },
+        {
+          "name": "N",
+          "default": {
+            "kind": "primitive",
+            "name": "uint32"
+          }
+        }
+      ],
+      "attributes": [
+        {
+          "name": "items",
+          "type": {
+            "kind": "vector",
+            "of": {
+              "kind": "ref",
+              "name": "Buffer.T"
+            }
+          }
+        },
+        {
+          "name": "size",
+          "type": {
+            "kind": "ref",
+            "name": "Buffer.N"
+          }
+        }
+      ],
+      "ports": []
+    },
+    {
+      "name": "Gallery",
+      "typeParams": [
+        {
+          "name": "S",
+          "derivesFrom": "Shape"
+        }
+      ],
+      "ports": []
+    },
+    {
+      "name": "Samples",
+      "bases": [
+        "Buffer"
+      ],
+      "attributes": [
+        {
+          "name": "ints",
+          "type": {
+            "kind": "ref",
+            "name": "Buffer",
+            "args": [
+              {
+                "kind": "primitive",
+                "name": "int16"
+              },
+              {
+                "kind": "primitive",
+                "name": "uint8"
+              }
+            ]
+          }
+        },
+        {
+          "name": "shapes",
+          "type": {
+            "kind": "ref",
+            "name": "Gallery",
+            "args": [
+              {
+                "kind": "ref",
+                "name": "Circle"
+              }
+            ]
+          }
+        }
+      ],
+      "ports": []
+    }
+  ],
+  "links": [],
+  "editor": {
+    "layout": {
+      "Shape": {
+        "x": 20,
+        "y": 20,
+        "width": 200,
+        "height": 72
+      },
+      "Circle": {
+        "x": 300,
+        "y": 20,
+        "width": 200,
+        "height": 72
+      },
+      "Buffer": {
+        "x": 580,
+        "y": 20,
+        "width": 200,
+        "height": 116
+      },
+      "Gallery": {
+        "x": 860,
+        "y": 20,
+        "width": 200,
+        "height": 72
+      },
+      "Samples": {
+        "x": 1140,
+        "y": 20,
+        "width": 200,
+        "height": 116
+      }
+    }
+  }
+}

@@ -1,0 +1,3 @@
+error interface: Telemetry.publish(pose): exception 'Busy' can only be raised
+error interface: Telemetry.publish raises 'Vec3', which is not an exception
+error interface: Telemetry.publish raises 'Busy' more than once

@@ -1,0 +1,171 @@
+{
+  "schemaVersion": 1,
+  "project": {
+    "name": "Machines"
+  },
+  "types": [],
+  "interfaces": [],
+  "modules": [
+    {
+      "name": "Player",
+      "attributes": [
+        {
+          "name": "volume",
+          "type": {
+            "kind": "primitive",
+            "name": "float32"
+          }
+        }
+      ],
+      "methods": [
+        {
+          "name": "play",
+          "params": [
+            {
+              "name": "from",
+              "type": {
+                "kind": "primitive",
+                "name": "float32"
+              }
+            }
+          ],
+          "returns": null
+        },
+        {
+          "name": "stop",
+          "params": [],
+          "returns": null
+        },
+        {
+          "name": "reset",
+          "params": [],
+          "returns": null
+        }
+      ],
+      "stateMachine": {
+        "initial": "Idle",
+        "states": [
+          {
+            "name": "Idle",
+            "entry": "reset"
+          },
+          {
+            "name": "Playing"
+          },
+          {
+            "name": "Closed",
+            "final": true
+          }
+        ],
+        "transitions": [
+          {
+            "from": "Idle",
+            "to": "Playing",
+            "trigger": "play",
+            "guard": "from >= 0 and volume > 0"
+          },
+          {
+            "from": "Playing",
+            "to": "Idle",
+            "trigger": "stop",
+            "action": "reset"
+          },
+          {
+            "from": "Idle",
+            "to": "Closed"
+          }
+        ]
+      },
+      "ports": []
+    },
+    {
+      "name": "Player2",
+      "attributes": [
+        {
+          "name": "volume",
+          "type": {
+            "kind": "primitive",
+            "name": "float32"
+          }
+        }
+      ],
+      "methods": [
+        {
+          "name": "play",
+          "params": [
+            {
+              "name": "from",
+              "type": {
+                "kind": "primitive",
+                "name": "float32"
+              }
+            }
+          ],
+          "returns": null
+        },
+        {
+          "name": "stop",
+          "params": [],
+          "returns": null
+        },
+        {
+          "name": "reset",
+          "params": [],
+          "returns": null
+        }
+      ],
+      "stateMachine": {
+        "initial": "Idle",
+        "states": [
+          {
+            "name": "Idle",
+            "entry": "reset"
+          },
+          {
+            "name": "Playing"
+          },
+          {
+            "name": "Closed",
+            "final": true
+          }
+        ],
+        "transitions": [
+          {
+            "from": "Idle",
+            "to": "Playing",
+            "trigger": "play",
+            "guard": "from >= 0 and volume > 0"
+          },
+          {
+            "from": "Playing",
+            "to": "Idle",
+            "trigger": "stop",
+            "action": "reset"
+          },
+          {
+            "from": "Idle",
+            "to": "Closed"
+          }
+        ]
+      },
+      "ports": []
+    }
+  ],
+  "links": [],
+  "editor": {
+    "layout": {
+      "Player": {
+        "x": 20,
+        "y": 20,
+        "width": 200,
+        "height": 160
+      },
+      "Player2": {
+        "x": 50,
+        "y": 50,
+        "width": 200,
+        "height": 160
+      }
+    }
+  }
+}

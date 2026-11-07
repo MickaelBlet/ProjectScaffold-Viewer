@@ -1,0 +1,1 @@
+warning module: Equipment.serial: const, without a default value nor constructors setting it

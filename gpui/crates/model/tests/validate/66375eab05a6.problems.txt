@@ -1,0 +1,3 @@
+error module: Station: runs in no binary (the project has binaries)
+error link: Link 'camera_to_planner' joins binaries Onboard and Ground: it must be remote
+warning link: Link 'planner_to_station' is remote but has no transport

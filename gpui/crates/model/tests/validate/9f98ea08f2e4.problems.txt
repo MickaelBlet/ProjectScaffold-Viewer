@@ -1,0 +1,2 @@
+warning link: Link 'sensor_to_controller': transport settings set but link is not remote
+warning link: Link 'operator_to_core': name does not apply to transport 'tcp'

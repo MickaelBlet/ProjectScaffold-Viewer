@@ -1,0 +1,67 @@
+schemaVersion: 1
+project:
+  name: Hello
+  description: Smallest useful project, a starting point - two modules, one interface, one link
+types: []
+interfaces:
+  - name: Greeting
+    description: Says hello to someone
+    messages:
+      - name: greet
+        params:
+          - name: who
+            type:
+              kind: primitive
+              name: string
+        returns:
+          kind: primitive
+          name: string
+modules:
+  - name: Client
+    description: Asks for greetings
+    color: "#3b8fd1"
+    ports:
+      - name: greeter
+        role: out
+        interface: Greeting
+  - name: Server
+    description: Answers them
+    color: "#2e9e8f"
+    attributes:
+      - name: prefix
+        type:
+          kind: primitive
+          name: string
+        default: Hello
+    ports:
+      - name: greeting
+        role: in
+        interface: Greeting
+links:
+  - name: client_to_server
+    from:
+      module: Client
+      port: greeter
+    to:
+      module: Server
+      port: greeting
+    constraints:
+      direction: bidirectional
+      ack:
+        required: false
+      performance:
+        class: normal
+      remote:
+        enabled: false
+editor:
+  layout:
+    Client:
+      x: 20
+      y: 33
+      width: 200
+      height: 72
+    Server:
+      x: 336
+      y: 20
+      width: 200
+      height: 98

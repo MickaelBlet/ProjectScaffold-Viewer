@@ -1,0 +1,267 @@
+{
+  "schemaVersion": 1,
+  "project": {
+    "name": "Untitled"
+  },
+  "types": [
+    {
+      "kind": "enum",
+      "name": "Health",
+      "underlying": "int32",
+      "values": [
+        {
+          "name": "OK",
+          "value": 0
+        },
+        {
+          "name": "DEGRADED",
+          "value": 10
+        },
+        {
+          "name": "FAILED",
+          "value": 20
+        }
+      ]
+    },
+    {
+      "kind": "struct",
+      "name": "LevelChanged",
+      "description": "Level of a tank, as a share of its capacity.",
+      "fields": [
+        {
+          "name": "level",
+          "type": {
+            "kind": "primitive",
+            "name": "float64"
+          }
+        },
+        {
+          "name": "health",
+          "type": {
+            "kind": "ref",
+            "name": "Health"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "exception",
+      "name": "Stuck",
+      "fields": [
+        {
+          "name": "position",
+          "type": {
+            "kind": "primitive",
+            "name": "float64"
+          }
+        }
+      ]
+    }
+  ],
+  "interfaces": [
+    {
+      "name": "Valve",
+      "description": "Valve opening, from 0 (closed) to 1 (open).",
+      "messages": [
+        {
+          "name": "open",
+          "params": [
+            {
+              "name": "ratio",
+              "type": {
+                "kind": "primitive",
+                "name": "float64"
+              }
+            }
+          ],
+          "returns": null,
+          "raises": [
+            "Stuck"
+          ]
+        },
+        {
+          "name": "get_position",
+          "params": [],
+          "returns": {
+            "kind": "primitive",
+            "name": "float64"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Maintenance",
+      "messages": [
+        {
+          "name": "calibrate",
+          "params": [],
+          "returns": null
+        }
+      ]
+    },
+    {
+      "name": "LevelChangedConsumer",
+      "description": "Receives LevelChanged events.",
+      "messages": [
+        {
+          "name": "push",
+          "params": [
+            {
+              "name": "event",
+              "type": {
+                "kind": "ref",
+                "name": "LevelChanged"
+              }
+            }
+          ],
+          "returns": null
+        }
+      ]
+    }
+  ],
+  "constants": [
+    {
+      "name": "MAX_POINTS",
+      "type": {
+        "kind": "primitive",
+        "name": "int32"
+      },
+      "value": 1024
+    },
+    {
+      "name": "MAX_ID",
+      "type": {
+        "kind": "primitive",
+        "name": "int32"
+      },
+      "value": 16
+    }
+  ],
+  "modules": [
+    {
+      "name": "Equipment",
+      "description": "Anything that can be serviced in the field.",
+      "attributes": [
+        {
+          "name": "serial",
+          "const": true,
+          "type": {
+            "kind": "primitive",
+            "name": "string"
+          }
+        }
+      ],
+      "methods": [
+        {
+          "name": "calibrate",
+          "params": [],
+          "returns": null
+        }
+      ],
+      "ports": []
+    },
+    {
+      "name": "Tank",
+      "description": "Storage tank with an inlet valve and level events.",
+      "bases": [
+        "Equipment"
+      ],
+      "attributes": [
+        {
+          "name": "capacity",
+          "type": {
+            "kind": "primitive",
+            "name": "float64"
+          },
+          "description": "m3"
+        }
+      ],
+      "ports": [
+        {
+          "name": "inlet",
+          "role": "in",
+          "interface": "Valve"
+        },
+        {
+          "name": "outlets",
+          "role": "out",
+          "interface": "Valve",
+          "description": "Multiple connections."
+        },
+        {
+          "name": "level",
+          "role": "out",
+          "interface": "LevelChangedConsumer",
+          "description": "Publishes to any number of consumers."
+        },
+        {
+          "name": "pump_valve",
+          "role": "in",
+          "interface": "Valve"
+        },
+        {
+          "name": "pump_maintenance",
+          "role": "out",
+          "interface": "Maintenance"
+        }
+      ]
+    },
+    {
+      "name": "Supervisor",
+      "description": "Watches the levels of several tanks.",
+      "attributes": [
+        {
+          "name": "tanks",
+          "type": {
+            "kind": "vector",
+            "of": {
+              "kind": "primitive",
+              "name": "string"
+            },
+            "max": 4
+          }
+        }
+      ],
+      "ports": [
+        {
+          "name": "levels",
+          "role": "in",
+          "interface": "LevelChangedConsumer"
+        },
+        {
+          "name": "pump_valve",
+          "role": "out",
+          "interface": "Valve"
+        },
+        {
+          "name": "pump_maintenance",
+          "role": "in",
+          "interface": "Maintenance"
+        }
+      ]
+    }
+  ],
+  "links": [],
+  "editor": {
+    "layout": {
+      "Equipment": {
+        "x": 30,
+        "y": 30,
+        "width": 200,
+        "height": 124
+      },
+      "Tank": {
+        "x": 290,
+        "y": 30,
+        "width": 200,
+        "height": 146
+      },
+      "Supervisor": {
+        "x": 550,
+        "y": 30,
+        "width": 200,
+        "height": 122
+      }
+    }
+  }
+}

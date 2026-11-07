@@ -1,0 +1,2 @@
+error module: Sensor.publish: not as Telemetry.publish it implements (public, same parameters, result and exceptions)
+error module: Sensor.rate: not as Telemetry.rate it implements (public, same parameters, result and exceptions)

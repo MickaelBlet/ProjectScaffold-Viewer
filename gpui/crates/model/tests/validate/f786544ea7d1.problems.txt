@@ -1,0 +1,2 @@
+error module: Base.Circle.area: signature differs from IShape.area it overrides
+error module: Base.Circle does not implement pure method IShape.area (implement it or make the module abstract)

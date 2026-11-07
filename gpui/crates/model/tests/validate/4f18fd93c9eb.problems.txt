@@ -1,0 +1,2 @@
+error module: IShape.area: methods of an interface module must be pure
+error module: IShape: an interface module cannot have attributes

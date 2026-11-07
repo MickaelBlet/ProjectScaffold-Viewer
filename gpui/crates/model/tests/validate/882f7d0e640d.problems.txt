@@ -1,0 +1,1 @@
+warning module: Module 'Wiring' has the name of a type, interface or constant: 'Wiring' in a type names that one

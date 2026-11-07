@@ -1,0 +1,3 @@
+error module: Core.Sensor:out references unknown interface 'Missing'
+error link: Link 'sensor_to_controller': ports use different interfaces
+error link: Link 'sensor_to_logger': ports use different interfaces

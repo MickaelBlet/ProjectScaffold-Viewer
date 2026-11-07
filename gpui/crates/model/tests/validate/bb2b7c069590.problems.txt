@@ -1,0 +1,2 @@
+error type: Union 'Choice': discriminator must be an integer, bool, char or enum
+warning type: Union 'Choice' has no cases
