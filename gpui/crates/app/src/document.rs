@@ -2,10 +2,10 @@
 //! document part of `store/documents.ts` and `store/projectStore.ts`.
 
 use std::path::{Path, PathBuf};
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime};
 
 use scaffold_model::grid::snap_changes;
-use scaffold_model::serialize::{Format, format_from_path, load_text, save_text};
+use scaffold_model::serialize::{Format, format_from_path, load_text, reload_text, same_content, save_text};
 use scaffold_model::types::{Id, Project};
 
 /// Edits closer than this merge into one undo step.
@@ -36,6 +36,26 @@ pub struct Document {
     pub selected: Vec<Id>,
     /// Bumped on each change, for views to know when to redraw.
     pub version: u64,
+    /// Modification time of the file as last read or written.
+    disk_time: Option<SystemTime>,
+    /// Text of the file changed on disk while the document had unsaved changes.
+    pub conflict: Option<String>,
+}
+
+/// What a check of the file on disk found.
+#[derive(Debug, PartialEq, Eq)]
+pub enum DiskChange {
+    None,
+    /// Reloaded (the document had no unsaved changes).
+    Reloaded,
+    /// Changed while the document has unsaved changes: kept in `conflict`.
+    Conflict,
+    /// The new text does not load: the document is kept.
+    Invalid(String),
+}
+
+fn mtime(path: &Path) -> Option<SystemTime> {
+    std::fs::metadata(path).and_then(|m| m.modified()).ok()
 }
 
 impl Document {
@@ -53,6 +73,8 @@ impl Document {
             last_edit: None,
             selected: Vec::new(),
             version: 0,
+            disk_time: None,
+            conflict: None,
         }
     }
 
@@ -60,7 +82,58 @@ impl Document {
         let text = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
         let p = load_text(&text, format_from_path(&path.to_string_lossy()))
             .map_err(|e| format!("{}:\n{e}", path.display()))?;
-        Ok(Document::new(p, Some(path.to_path_buf())))
+        let mut d = Document::new(p, Some(path.to_path_buf()));
+        d.disk_time = mtime(path);
+        Ok(d)
+    }
+
+    /// Reload the file when it changed on disk since it was last read or written.
+    pub fn check_disk(&mut self) -> DiskChange {
+        let Some(path) = self.path.clone() else {
+            return DiskChange::None;
+        };
+        let now = mtime(&path);
+        if now.is_none() || now == self.disk_time {
+            return DiskChange::None;
+        }
+        self.disk_time = now;
+        let Ok(text) = std::fs::read_to_string(&path) else {
+            return DiskChange::None;
+        };
+        if self.dirty() {
+            self.conflict = Some(text);
+            self.version += 1;
+            return DiskChange::Conflict;
+        }
+        match self.reload(&text) {
+            Ok(true) => DiskChange::Reloaded,
+            Ok(false) => DiskChange::None,
+            Err(e) => DiskChange::Invalid(e),
+        }
+    }
+
+    /// Replace the project with a text of its file, keeping entity ids, as one undo step; the
+    /// document is then saved. False when nothing changed.
+    pub fn reload(&mut self, text: &str) -> Result<bool, String> {
+        let p = reload_text(text, self.format, &self.project).map_err(|e| e.to_string())?;
+        self.conflict = None;
+        if same_content(&p, &self.project) {
+            self.saved = self.project.clone();
+            self.version += 1;
+            return Ok(false);
+        }
+        self.seal();
+        self.undo.push(std::mem::replace(&mut self.project, p));
+        self.redo.clear();
+        self.saved = self.project.clone();
+        self.changed();
+        Ok(true)
+    }
+
+    /// Keep the unsaved changes over a change on disk.
+    pub fn keep_mine(&mut self) {
+        self.conflict = None;
+        self.version += 1;
     }
 
     pub fn title(&self) -> String {
@@ -161,6 +234,8 @@ impl Document {
         self.format = format;
         self.saved = self.project.clone();
         self.last_edit = None;
+        self.disk_time = mtime(path);
+        self.conflict = None;
         self.version += 1;
         Ok(())
     }
@@ -169,6 +244,38 @@ impl Document {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reloads_changes_on_disk_or_keeps_them_aside() {
+        let dir = std::env::temp_dir().join(format!("scaffold-doc-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("a.scaffold.yaml");
+        let mut d = Document::new(Project::default(), None);
+        d.edit(GRID, |p| p.name = "a".into());
+        d.save_to(&path).unwrap();
+        assert_eq!(d.check_disk(), DiskChange::None);
+        // Another program renames the project.
+        std::thread::sleep(Duration::from_millis(20));
+        let text = std::fs::read_to_string(&path)
+            .unwrap()
+            .replace("name: a", "name: b");
+        std::fs::write(&path, &text).unwrap();
+        d.disk_time = None;
+        assert_eq!(d.check_disk(), DiskChange::Reloaded);
+        assert_eq!(d.project.name, "b");
+        assert!(!d.dirty());
+        d.undo();
+        assert_eq!(d.project.name, "a");
+        // Unsaved changes: the text on disk is kept aside.
+        std::fs::write(&path, text.replace("name: b", "name: c")).unwrap();
+        d.disk_time = None;
+        assert_eq!(d.check_disk(), DiskChange::Conflict);
+        assert_eq!(d.project.name, "a");
+        let theirs = d.conflict.clone().unwrap();
+        d.reload(&theirs).unwrap();
+        assert_eq!(d.project.name, "c");
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
 
     #[test]
     fn undo_merges_close_edits() {

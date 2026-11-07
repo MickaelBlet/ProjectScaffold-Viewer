@@ -3,17 +3,20 @@
 mod canvas;
 mod document;
 mod node;
+mod prefs;
 mod theme;
 
 use std::path::PathBuf;
+use std::time::Duration;
 
+use gpui_kit::prelude::FluentBuilder;
 use gpui_kit::*;
 use scaffold_model::edit::{delete_items, nudge};
 use scaffold_model::project::{all_imported, prune_views};
 use scaffold_model::types::Id;
 
 use crate::canvas::Canvas;
-use crate::document::{Document, GRID};
+use crate::document::{DiskChange, Document, GRID};
 
 actions!(
     scaffold,
@@ -103,6 +106,32 @@ impl Workspace {
     fn set_doc(&mut self, doc: Document, cx: &mut Context<Self>) {
         let doc = cx.new(|_| doc);
         cx.observe(&doc, |_, _, cx| cx.notify()).detach();
+        // Follow changes of the file made by other programs.
+        let watched = doc.downgrade();
+        cx.spawn(async move |this, cx| {
+            loop {
+                cx.background_executor().timer(Duration::from_secs(1)).await;
+                let Some(doc) = watched.upgrade() else { break };
+                let change = doc.update(cx, |d, cx| {
+                    let c = d.check_disk();
+                    if c != DiskChange::None {
+                        cx.notify();
+                    }
+                    c
+                });
+                if let DiskChange::Invalid(e) = change
+                    && this
+                        .update(cx, |w, cx| {
+                            w.error = Some(format!("The file changed on disk but does not load:\n{e}"));
+                            cx.notify();
+                        })
+                        .is_err()
+                {
+                    break;
+                }
+            }
+        })
+        .detach();
         self.canvas = Some(cx.new(|cx| Canvas::new(doc.clone(), cx)));
         self.doc = Some(doc);
         self.error = None;
@@ -111,8 +140,14 @@ impl Workspace {
 
     fn open_path(&mut self, path: PathBuf, cx: &mut Context<Self>) {
         match Document::open(&path) {
-            Ok(d) => self.set_doc(d, cx),
+            Ok(d) => {
+                prefs::add_recent(&path);
+                self.set_doc(d, cx)
+            }
             Err(e) => {
+                if !path.exists() {
+                    prefs::remove_recent(&path);
+                }
                 self.error = Some(e);
                 cx.notify();
             }
@@ -279,13 +314,84 @@ impl Render for Workspace {
         window.set_window_title(&title);
         let body = match &self.canvas {
             Some(c) => div().size_full().child(c.clone()),
-            None => div()
-                .size_full()
-                .flex()
-                .items_center()
-                .justify_center()
-                .child("Open a project: Ctrl+O"),
+            None => {
+                let t = theme::light();
+                let recent = prefs::recent();
+                div()
+                    .size_full()
+                    .flex()
+                    .flex_col()
+                    .items_center()
+                    .justify_center()
+                    .gap_2()
+                    .bg(t.bg)
+                    .text_color(t.text)
+                    .child(div().text_xl().child("ProjectScaffold"))
+                    .child(div().text_color(t.muted).child("Open a project: Ctrl+O"))
+                    .when(!recent.is_empty(), |d| {
+                        d.child(div().mt_4().text_sm().text_color(t.muted).child("Recent"))
+                    })
+                    .children(recent.into_iter().enumerate().map(|(i, path)| {
+                        let label = path.display().to_string();
+                        div()
+                            .id(("recent", i))
+                            .px_2()
+                            .rounded_md()
+                            .text_color(t.accent)
+                            .cursor_pointer()
+                            .hover(|d| d.bg(theme::alpha(t.accent, 0.08)))
+                            .on_click(cx.listener(move |w, _, _, cx| w.open_path(path.clone(), cx)))
+                            .child(label)
+                    }))
+            }
         };
+        // The file changed on disk while there are unsaved changes.
+        let conflict = self
+            .doc
+            .as_ref()
+            .filter(|d| d.read(cx).conflict.is_some())
+            .map(|_| {
+                let button = |id: &'static str, label: &'static str| {
+                    div()
+                        .id(id)
+                        .px_2()
+                        .rounded_md()
+                        .border_1()
+                        .border_color(theme::hex("#b7791f"))
+                        .cursor_pointer()
+                        .child(label)
+                };
+                div()
+                    .absolute()
+                    .top_0()
+                    .left_0()
+                    .right_0()
+                    .p_2()
+                    .flex()
+                    .gap_2()
+                    .items_center()
+                    .bg(theme::hex("#fef3c7"))
+                    .text_color(theme::hex("#744210"))
+                    .text_sm()
+                    .child(
+                        div()
+                            .flex_1()
+                            .child("The file changed on disk. Your unsaved changes differ from it."),
+                    )
+                    .child(
+                        button("reload", "Reload from disk").on_click(cx.listener(|w, _, _, cx| {
+                            w.with_doc(cx, |d| {
+                                if let Some(text) = d.conflict.clone() {
+                                    let _ = d.reload(&text);
+                                }
+                            })
+                        })),
+                    )
+                    .child(
+                        button("keep", "Keep mine")
+                            .on_click(cx.listener(|w, _, _, cx| w.with_doc(cx, Document::keep_mine))),
+                    )
+            });
         let error = self.error.clone().map(|e| {
             div()
                 .absolute()
@@ -360,6 +466,7 @@ impl Render for Workspace {
                 }
             }))
             .child(body)
+            .children(conflict)
             .children(error)
     }
 }

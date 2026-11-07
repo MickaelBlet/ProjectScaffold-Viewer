@@ -8,12 +8,13 @@ use gpui_kit::*;
 use scaffold_layout::scene::{
     InheritPath, LinkPath, NodeBox, NodeKind, Pt, Scene, perf_color, project_scene,
 };
-use scaffold_model::edit::{RectPatch, reparent_module, set_layouts};
-use scaffold_model::grid::snap_changes;
+use scaffold_model::edit::{ConnectEnd, RectPatch, connect, link_ends, reparent_module, set_layouts};
+use scaffold_model::grid::{NOTE_MIN, snap_changes, snap_rect, snap_value};
 use scaffold_model::project::{
-    MODULE_HEADER, absolute_position, find_imported, find_module, imported_index, subtree_ids,
+    Compartments, MODULE_HEADER, absolute_position, find_imported, find_module, imported_index,
+    imported_parent, imported_roles, imported_size, min_size, module_roles, subtree_ids,
 };
-use scaffold_model::types::{Id, NoteKind, PortRole, Project, Rect, Side};
+use scaffold_model::types::{Id, NoteKind, Orientation, PortRole, Project, Rect, Side, Size as Size2};
 
 use crate::document::{Document, GRID};
 use crate::node::{self, Run, RunStyle};
@@ -32,6 +33,8 @@ enum Gesture {
         /// Item under the pointer, selected alone on a click without moving.
         clicked: Id,
         additive: bool,
+        /// A lone dragged item: its rect at the start and its siblings', for alignment guides.
+        guide: Option<(Rect, Vec<Rect>)>,
     },
     /// Selecting the items inside a box, between canvas points.
     Marquee {
@@ -40,6 +43,61 @@ enum Gesture {
     },
     /// Pressed on the empty canvas: a click clears the selection, a drag pans.
     Pane(Point<Pixels>),
+    /// Drawing a link from an end, to the pointer.
+    Connect {
+        from: ConnectEnd,
+        start: Pt,
+        at: Pt,
+    },
+    /// Resizing an item by a handle: its sides moved (-1 left/top, 1 right/bottom, 0 neither),
+    /// the canvas point where it started and the item's absolute rect then.
+    Resize {
+        id: Id,
+        handle: (i8, i8),
+        start: Pt,
+        rect: Rect,
+        resized: bool,
+    },
+}
+
+/// Handles of a resizable item: corners and the middle of its sides.
+const HANDLES: [(i8, i8); 8] = [
+    (-1, -1),
+    (0, -1),
+    (1, -1),
+    (1, 0),
+    (1, 1),
+    (0, 1),
+    (-1, 1),
+    (-1, 0),
+];
+/// Size of a resize handle, in screen pixels.
+const HANDLE_PX: f64 = 8.;
+
+fn handle_point(r: &Rect, (hx, hy): (i8, i8)) -> Pt {
+    Pt {
+        x: r.x + r.width * (f64::from(hx) + 1.) / 2.,
+        y: r.y + r.height * (f64::from(hy) + 1.) / 2.,
+    }
+}
+
+fn handle_cursor(h: (i8, i8)) -> CursorStyle {
+    match h {
+        (0, _) => CursorStyle::ResizeUpDown,
+        (_, 0) => CursorStyle::ResizeLeftRight,
+        (-1, -1) | (1, 1) => CursorStyle::ResizeUpLeftDownRight,
+        _ => CursorStyle::ResizeUpRightDownLeft,
+    }
+}
+
+/// Distance (screen pixels) within which a dragged item snaps to a sibling's edge or center.
+const GUIDE_PX: f64 = 6.;
+
+/// An alignment guide: a vertical line at `x`, or a horizontal one at `y`.
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum Guide {
+    V(f64),
+    H(f64),
 }
 
 /// Distance (screen pixels) a press must travel to become a drag.
@@ -57,6 +115,7 @@ pub struct Canvas {
     origin: Pt,
     zoom: f64,
     gesture: Gesture,
+    guides: Vec<Guide>,
     /// Bounds of the canvas as last laid out.
     bounds: Rc<Cell<Option<Bounds<Pixels>>>>,
     /// Size the view was fitted to; None once the user moved the view.
@@ -83,6 +142,7 @@ impl Canvas {
             origin: Pt { x: 0., y: 0. },
             zoom: 1.,
             gesture: Gesture::None,
+            guides: Vec::new(),
             bounds: Rc::new(Cell::new(None)),
             fitted: Some(None),
         }
@@ -94,6 +154,12 @@ impl Canvas {
         let o = self.bounds.get().map_or(point(px(0.), px(0.)), |b| b.origin);
         let (x, y) = self.screen(p);
         point(o.x + px(x), o.y + px(y))
+    }
+
+    /// Center of a port handle (tests).
+    #[cfg(test)]
+    pub fn port_point(&self, module: &str, port: &str) -> Option<Pt> {
+        self.scene.port(module, port).map(|p| p.at)
     }
 
     /// Rect of a drawn module or note (tests).
@@ -239,9 +305,137 @@ impl Canvas {
         self.project.links.iter().any(|l| l.id == id)
     }
 
+    /// The selected item when it alone is selected and can be resized, with its absolute rect.
+    fn resizable(&self) -> Option<(Id, Rect)> {
+        if self.selected.len() != 1 {
+            return None;
+        }
+        let id = self.selected.iter().next()?;
+        let p = &self.project;
+        let locked = find_module(p, id)
+            .map(|m| m.locked)
+            .or_else(|| p.notes.iter().find(|n| &n.id == id).map(|n| n.locked))
+            .or_else(|| find_imported(p, id).map(|(_, m)| m.locked))?;
+        if locked {
+            return None;
+        }
+        let rect = self
+            .scene
+            .nodes
+            .iter()
+            .find(|n| &n.id == id)
+            .map(|n| n.rect)
+            .or_else(|| self.scene.notes.iter().find(|n| &n.id == id).map(|n| n.layout))?;
+        Some((id.clone(), rect))
+    }
+
+    /// Resize handle of the resizable item under a canvas point.
+    fn handle_at(&self, at: Pt) -> Option<(Id, (i8, i8), Rect)> {
+        let (id, r) = self.resizable()?;
+        let reach = (HANDLE_PX / 2. + 2.) / self.zoom;
+        HANDLES
+            .into_iter()
+            .find(|h| {
+                let q = handle_point(&r, *h);
+                (q.x - at.x).abs() <= reach && (q.y - at.y).abs() <= reach
+            })
+            .map(|h| (id, h, r))
+    }
+
+    /// Port handle under a canvas point: its module and port, and its center.
+    fn port_at(&self, at: Pt) -> Option<(ConnectEnd, Pt)> {
+        let reach = (HANDLE_PX / 2. + 3.) / self.zoom;
+        self.scene.nodes.iter().rev().find_map(|n| {
+            n.ports
+                .iter()
+                .find(|pt| (pt.at.x - at.x).abs() <= reach && (pt.at.y - at.y).abs() <= reach)
+                .map(|pt| {
+                    (
+                        ConnectEnd {
+                            module_id: n.id.clone(),
+                            port_id: Some(pt.id.clone()),
+                        },
+                        pt.at,
+                    )
+                })
+        })
+    }
+
+    /// Where the connect handle of a selected module sits: the middle of its header's right side
+    /// (its bottom side in the vertical orientation).
+    fn connect_handles(&self) -> Vec<(Id, Pt)> {
+        self.scene
+            .nodes
+            .iter()
+            .filter(|n| n.kind != NodeKind::Imported && self.selected.contains(&n.id))
+            .map(|n| {
+                let at = if self.project.orientation == Orientation::Vertical {
+                    Pt {
+                        x: n.rect.x + n.rect.width / 2.,
+                        y: n.rect.y + n.rect.height,
+                    }
+                } else {
+                    Pt {
+                        x: n.rect.x + n.rect.width,
+                        y: n.rect.y + MODULE_HEADER / 2.,
+                    }
+                };
+                (n.id.clone(), at)
+            })
+            .collect()
+    }
+
+    /// End of a link dropped at a canvas point: a port, or a module (placed modules need a port).
+    fn drop_end(&self, at: Pt) -> Option<ConnectEnd> {
+        if let Some((e, _)) = self.port_at(at) {
+            return Some(e);
+        }
+        let inside = |r: &Rect| at.x >= r.x && at.y >= r.y && at.x <= r.x + r.width && at.y <= r.y + r.height;
+        let n = self
+            .scene
+            .nodes
+            .iter()
+            .filter(|n| n.kind != NodeKind::Imported && inside(&n.rect))
+            .max_by_key(|n| n.depth)?;
+        Some(ConnectEnd {
+            module_id: n.id.clone(),
+            port_id: None,
+        })
+    }
+
     fn on_down(&mut self, ev: &MouseDownEvent, window: &mut Window, cx: &mut Context<Self>) {
         let _ = window;
         let at = self.to_canvas(ev.position);
+        let reach = (HANDLE_PX / 2. + 4.) / self.zoom;
+        if let Some((id, start)) = self
+            .connect_handles()
+            .into_iter()
+            .find(|(_, q)| (q.x - at.x).abs() <= reach && (q.y - at.y).abs() <= reach)
+        {
+            self.gesture = Gesture::Connect {
+                from: ConnectEnd {
+                    module_id: id,
+                    port_id: None,
+                },
+                start,
+                at,
+            };
+            return;
+        }
+        if let Some((from, start)) = self.port_at(at) {
+            self.gesture = Gesture::Connect { from, start, at };
+            return;
+        }
+        if let Some((id, handle, rect)) = self.handle_at(at) {
+            self.gesture = Gesture::Resize {
+                id,
+                handle,
+                start: at,
+                rect,
+                resized: false,
+            };
+            return;
+        }
         let additive = ev.modifiers.shift || ev.modifiers.control || ev.modifiers.platform;
         let Some(id) = self.hit(at) else {
             self.gesture = if ev.modifiers.shift {
@@ -265,17 +459,23 @@ impl Canvas {
             d.select(sel.clone());
             cx.notify();
         });
-        let ids = if sel.contains(&id) && !self.is_link(&id) {
+        let mut ids = if sel.contains(&id) && !self.is_link(&id) {
             movable(&self.project, &sel)
         } else {
             Vec::new()
         };
+        let carried = self.carried(&ids);
+        let guide = (ids.len() == 1)
+            .then(|| self.guide_base(&ids[0], &carried))
+            .flatten();
+        ids.extend(carried);
         self.gesture = Gesture::Move {
             start: at,
             ids,
             offset: Pt { x: 0., y: 0. },
             clicked: id,
             additive,
+            guide,
         };
     }
 
@@ -308,15 +508,54 @@ impl Canvas {
                 *end = at;
                 cx.notify();
             }
-            Gesture::Move {
-                start, ids, offset, ..
+            Gesture::Connect { at: end, .. } => {
+                *end = at;
+                cx.notify();
+            }
+            Gesture::Resize {
+                id,
+                handle,
+                start,
+                rect,
+                resized,
             } => {
-                let o = Pt {
+                let d = Pt {
+                    x: at.x - start.x,
+                    y: at.y - start.y,
+                };
+                if !*resized && d.x.hypot(d.y) * self.zoom <= DRAG_SLOP {
+                    return;
+                }
+                *resized = true;
+                let doc = self.doc.read(cx);
+                let mut preview = doc.project.clone();
+                resized_to(&mut preview, id, *handle, *rect, d);
+                if GRID.snap {
+                    snap_changes(&doc.project, &mut preview, GRID.size);
+                }
+                self.scene = project_scene(&preview);
+                self.project = preview;
+                cx.notify();
+            }
+            Gesture::Move {
+                start,
+                ids,
+                offset,
+                guide,
+                ..
+            } => {
+                let mut o = Pt {
                     x: at.x - start.x,
                     y: at.y - start.y,
                 };
                 if offset.x == 0. && offset.y == 0. && o.x.hypot(o.y) * self.zoom <= DRAG_SLOP {
                     return;
+                }
+                self.guides.clear();
+                if let Some((r, siblings)) = guide {
+                    let (snapped, guides) = align(*r, siblings, o, GUIDE_PX / self.zoom);
+                    o = snapped;
+                    self.guides = guides;
                 }
                 *offset = o;
                 if ids.is_empty() {
@@ -341,8 +580,50 @@ impl Canvas {
 
     /// End of a press: commit a move, select a box, or select on a click.
     fn finish(&mut self, cx: &mut Context<Self>) {
+        self.guides.clear();
         match std::mem::replace(&mut self.gesture, Gesture::None) {
             Gesture::None | Gesture::Pan(_) => {}
+            Gesture::Resize {
+                id,
+                handle,
+                start: _,
+                rect,
+                resized: true,
+            } => {
+                // The preview holds the final rect: commit it as one undo step.
+                let r = self.rect_now(&id);
+                let preview = self.project.clone();
+                self.doc.update(cx, |d, cx| {
+                    d.seal();
+                    d.edit(GRID, |p| {
+                        if let Some(r) = r {
+                            set_rect(p, &id, r);
+                        } else {
+                            resized_to(p, &id, handle, rect, Pt { x: 0., y: 0. });
+                        }
+                    });
+                    d.seal();
+                    cx.notify();
+                });
+                self.after_commit(preview, cx);
+            }
+            Gesture::Resize { .. } => {}
+            Gesture::Connect { from, at, .. } => {
+                let Some(to) = self.drop_end(at) else { return };
+                let Some((a, b)) = link_ends(&self.project, &from, &to) else {
+                    return;
+                };
+                self.doc.update(cx, |d, cx| {
+                    d.seal();
+                    let mut link = None;
+                    d.edit(GRID, |p| link = connect(p, &a, &b));
+                    d.seal();
+                    if let Some(l) = link {
+                        d.select(vec![l]);
+                    }
+                    cx.notify();
+                });
+            }
             Gesture::Pane(_) => self.doc.update(cx, |d, cx| {
                 d.select(Vec::new());
                 cx.notify();
@@ -406,16 +687,89 @@ impl Canvas {
                     d.seal();
                     cx.notify();
                 });
-                // The document may not have changed (a move back): drop the preview.
-                if self.doc.read(cx).project != preview {
-                    self.version = u64::MAX;
-                    self.sync(cx);
-                } else {
-                    self.version = self.doc.read(cx).version;
-                }
-                cx.notify();
+                self.after_commit(preview, cx);
             }
         }
+    }
+
+    /// After committing a preview: redraw from the document unless it holds the preview already.
+    fn after_commit(&mut self, preview: Project, cx: &mut Context<Self>) {
+        if self.doc.read(cx).project != preview {
+            self.version = u64::MAX;
+            self.sync(cx);
+        } else {
+            self.version = self.doc.read(cx).version;
+        }
+        cx.notify();
+    }
+
+    /// Drawn rect of a module, placed module or note.
+    fn drawn_rect(&self, id: &str) -> Option<Rect> {
+        self.scene
+            .nodes
+            .iter()
+            .find(|n| n.id == id)
+            .map(|n| n.rect)
+            .or_else(|| self.scene.notes.iter().find(|n| n.id == id).map(|n| n.layout))
+    }
+
+    /// Module holding an item (placed modules: the placed module holding them); None at the top.
+    fn parent_of(&self, id: &str) -> Option<Id> {
+        let p = &self.project;
+        if let Some(m) = find_module(p, id) {
+            return m.parent_id.clone();
+        }
+        let (dep, m) = find_imported(p, id)?;
+        imported_parent(dep, m).map(|x| x.id.clone())
+    }
+
+    /// Top-level items lying fully inside the dragged frames, which they carry along.
+    fn carried(&self, ids: &[Id]) -> Vec<Id> {
+        let p = &self.project;
+        let frames: Vec<Rect> = ids
+            .iter()
+            .filter_map(|id| p.notes.iter().find(|n| &n.id == id && n.kind == NoteKind::Frame))
+            .map(|n| n.layout)
+            .collect();
+        if frames.is_empty() {
+            return Vec::new();
+        }
+        let candidates = self
+            .scene
+            .nodes
+            .iter()
+            .map(|n| (n.id.clone(), n.rect))
+            .chain(self.scene.notes.iter().map(|n| (n.id.clone(), n.layout)));
+        candidates
+            .filter(|(id, r)| {
+                !ids.contains(id)
+                    && self.parent_of(id).is_none()
+                    && frames.iter().any(|f| contains(f, r))
+                    && movable(p, std::slice::from_ref(id)).len() == 1
+            })
+            .map(|(id, _)| id)
+            .collect()
+    }
+
+    /// Rect of a lone dragged item and the rects of its siblings not moving with it.
+    fn guide_base(&self, id: &str, carried: &[Id]) -> Option<(Rect, Vec<Rect>)> {
+        let r = self.drawn_rect(id)?;
+        let parent = self.parent_of(id);
+        let siblings = self
+            .scene
+            .nodes
+            .iter()
+            .map(|n| (n.id.clone(), n.rect))
+            .chain(self.scene.notes.iter().map(|n| (n.id.clone(), n.layout)))
+            .filter(|(o, _)| o != id && !carried.contains(o) && self.parent_of(o) == parent)
+            .map(|(_, r)| r)
+            .collect();
+        Some((r, siblings))
+    }
+
+    /// Absolute rect of an item in the drawn project (its stored size, not grown to its ports).
+    fn rect_now(&self, id: &str) -> Option<Rect> {
+        item_rect(&self.project, id)
     }
 
     /// New parent of a module dropped on the canvas (with its place in it), when it changes: the
@@ -627,6 +981,131 @@ fn movable(p: &Project, sel: &[Id]) -> Vec<Id> {
         .collect()
 }
 
+/// Offset of a lone dragged item (rect `r` at the start) snapped to the grid, then to the edges and
+/// centers of its siblings within `reach`; on the grid, a guide never pulls the item off it.
+fn align(r: Rect, siblings: &[Rect], o: Pt, reach: f64) -> (Pt, Vec<Guide>) {
+    let mut pos = Pt {
+        x: r.x + o.x,
+        y: r.y + o.y,
+    };
+    if GRID.snap {
+        pos.x = snap_value(pos.x, GRID.size);
+        pos.y = snap_value(pos.y, GRID.size);
+    }
+    let off_grid = |delta: f64| GRID.snap && (delta / GRID.size - (delta / GRID.size).round()).abs() > 1e-6;
+    let axis = |at: f64, size: f64, theirs: &dyn Fn(&Rect) -> (f64, f64)| -> (f64, Option<f64>) {
+        let mine = [at, at + size / 2., at + size];
+        let mut best: Option<(f64, f64)> = None;
+        for s in siblings {
+            let (start, len) = theirs(s);
+            for t in [start, start + len / 2., start + len] {
+                for m in mine {
+                    let delta = t - m;
+                    if off_grid(delta) {
+                        continue;
+                    }
+                    if delta.abs() <= reach && best.is_none_or(|b| delta.abs() < b.0.abs()) {
+                        best = Some((delta, t));
+                    }
+                }
+            }
+        }
+        best.map_or((0., None), |b| (b.0, Some(b.1)))
+    };
+    let (dx, vx) = axis(pos.x, r.width, &|s| (s.x, s.width));
+    let (dy, hy) = axis(pos.y, r.height, &|s| (s.y, s.height));
+    let lines = vx.map(Guide::V).into_iter().chain(hy.map(Guide::H)).collect();
+    (
+        Pt {
+            x: pos.x + dx - r.x,
+            y: pos.y + dy - r.y,
+        },
+        lines,
+    )
+}
+
+/// Absolute rect of a module, note or placed module as stored.
+fn item_rect(p: &Project, id: &str) -> Option<Rect> {
+    if let Some(m) = find_module(p, id) {
+        let a = absolute_position(p, id);
+        return Some(Rect {
+            x: a.x,
+            y: a.y,
+            ..m.layout
+        });
+    }
+    if let Some(n) = p.notes.iter().find(|n| n.id == id) {
+        return Some(n.layout);
+    }
+    let (_, m) = find_imported(p, id)?;
+    let a = absolute_position(p, id);
+    let s = imported_size(m, p.orientation);
+    Some(Rect {
+        x: a.x,
+        y: a.y,
+        width: s.width,
+        height: s.height,
+    })
+}
+
+/// Smallest size of an item.
+fn min_of(p: &Project, id: &str) -> Size2 {
+    if let Some(m) = find_module(p, id) {
+        return min_size(&module_roles(m), Compartments::of_module(m), p.orientation);
+    }
+    if let Some((_, m)) = find_imported(p, id) {
+        return min_size(&imported_roles(m), Compartments::of_imported(m), p.orientation);
+    }
+    NOTE_MIN
+}
+
+/// Set the absolute rect of an item (stored parent-relative for modules and placed modules).
+fn set_rect(p: &mut Project, id: &str, r: Rect) {
+    let Some(now) = item_rect(p, id) else { return };
+    let own = find_module(p, id)
+        .map(|m| (m.layout.x, m.layout.y))
+        .or_else(|| find_imported(p, id).map(|(_, m)| (m.position.x, m.position.y)))
+        .unwrap_or((now.x, now.y));
+    // Origin of the parent the position is relative to.
+    let (ox, oy) = (now.x - own.0, now.y - own.1);
+    set_layouts(
+        p,
+        &[(
+            id.to_string(),
+            RectPatch {
+                x: Some(r.x - ox),
+                y: Some(r.y - oy),
+                width: Some(r.width),
+                height: Some(r.height),
+            },
+        )],
+    );
+}
+
+/// Resize an item from its rect `r` at the start by moving the sides of `handle` by `d`: not
+/// smaller than its minimum, on the grid, the opposite sides staying in place.
+fn resized_to(p: &mut Project, id: &str, handle: (i8, i8), r: Rect, d: Pt) {
+    let min = min_of(p, id);
+    let side = |pos: f64, size: f64, s: i8, delta: f64, least: f64| -> (f64, f64) {
+        match s {
+            -1 => {
+                let end = pos + size;
+                let size = (size - delta).max(least);
+                (end - size, size)
+            }
+            1 => (pos, (size + delta).max(least)),
+            _ => (pos, size),
+        }
+    };
+    let (x, width) = side(r.x, r.width, handle.0, d.x, min.width);
+    let (y, height) = side(r.y, r.height, handle.1, d.y, min.height);
+    let mut next = Rect { x, y, width, height };
+    if GRID.snap {
+        next = snap_rect(next, GRID.size, min, handle.0 < 0, handle.1 < 0);
+    }
+    set_rect(p, id, next);
+}
+
 /// Move items by an offset.
 fn moved(p: &mut Project, ids: &[Id], o: Pt) {
     let layouts: Vec<(Id, RectPatch)> = ids
@@ -731,6 +1210,9 @@ fn inward(side: Side) -> (f32, f32) {
 }
 
 struct Paint {
+    /// Link being drawn: from its start to the pointer.
+    pending: Option<(Pt, Pt)>,
+    accent: Hsla,
     links: Vec<LinkPath>,
     selected: HashSet<Id>,
     inherits: Vec<InheritPath>,
@@ -801,6 +1283,14 @@ fn paint(s: &Paint, bounds: Bounds<Pixels>, window: &mut Window) {
         }
         if let Ok(path) = heads.build() {
             window.paint_path(path, color);
+        }
+    }
+    if let Some((a, b)) = s.pending {
+        let mut line = PathBuilder::stroke(width).dash_array(&[px(5.), px(4.)]);
+        line.move_to(at(a));
+        line.line_to(at(b));
+        if let Ok(path) = line.build() {
+            window.paint_path(path, s.accent);
         }
     }
 }
@@ -971,7 +1461,88 @@ impl Render for Canvas {
             }
             _ => None,
         };
+        // Alignment guides of a dragged item.
+        let danger = hex("#d23f3f");
+        let guide_lines: Vec<Div> = self
+            .guides
+            .iter()
+            .map(|g| match *g {
+                Guide::V(x) => {
+                    let (sx, _) = self.screen(Pt { x, y: 0. });
+                    div()
+                        .absolute()
+                        .left(px(sx))
+                        .top_0()
+                        .bottom_0()
+                        .w(px(0.))
+                        .border_l(px(1.))
+                        .border_dashed()
+                        .border_color(danger)
+                }
+                Guide::H(y) => {
+                    let (_, sy) = self.screen(Pt { x: 0., y });
+                    div()
+                        .absolute()
+                        .top(px(sy))
+                        .left_0()
+                        .right_0()
+                        .h(px(0.))
+                        .border_t(px(1.))
+                        .border_dashed()
+                        .border_color(danger)
+                }
+            })
+            .collect();
+        // Resize handles of a lone selected item, connect handles of selected modules.
+        let mut handles = div().absolute().inset_0();
+        for (_, q) in self.connect_handles() {
+            let (x, y) = self.screen(q);
+            let h = 16.;
+            handles = handles.child(
+                div()
+                    .absolute()
+                    .left(px(x - h / 2.))
+                    .top(px(y - h / 2.))
+                    .size(px(h))
+                    .rounded_full()
+                    .bg(t.accent)
+                    .text_color(hex("#ffffff"))
+                    .text_size(px(11.))
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .cursor(CursorStyle::Crosshair)
+                    .child(if self.project.orientation == Orientation::Vertical {
+                        "↓"
+                    } else {
+                        "→"
+                    }),
+            );
+        }
+        if let Some((_, r)) = self.resizable() {
+            let h = HANDLE_PX as f32;
+            for hd in HANDLES {
+                let (x, y) = self.screen(handle_point(&r, hd));
+                handles = handles.child(
+                    div()
+                        .absolute()
+                        .left(px(x - h / 2.))
+                        .top(px(y - h / 2.))
+                        .size(px(h))
+                        .rounded(px(2.))
+                        .border(px(1.5))
+                        .border_color(t.accent)
+                        .bg(hex("#ffffff"))
+                        .cursor(handle_cursor(hd)),
+                );
+            }
+        }
         let paint_state = Paint {
+            pending: match &self.gesture {
+                Gesture::Connect { start, at, .. } => Some((*start, *at)),
+                _ => None,
+            },
+            accent: t.accent,
             selected: self.selected.clone(),
             links: self.scene.links.clone(),
             inherits: self.scene.inherits.clone(),
@@ -1027,6 +1598,33 @@ impl Render for Canvas {
             .child(modules)
             .child(layer)
             .child(front)
+            .child(handles)
+            .children(guide_lines)
             .children(marquee)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn rect(x: f64, y: f64, width: f64, height: f64) -> Rect {
+        Rect { x, y, width, height }
+    }
+
+    #[::core::prelude::v1::test]
+    fn align_snaps_to_the_grid_then_to_siblings_on_it() {
+        let r = rect(0., 0., 100., 60.);
+        // Lands at (203, 97) -> grid (200, 100); a sibling's left at 200 shows a guide.
+        let (o, g) = align(r, &[rect(200., 300., 80., 40.)], Pt { x: 203., y: 97. }, 6.);
+        assert_eq!((o.x, o.y), (200., 100.));
+        assert_eq!(g, vec![Guide::V(200.)]);
+        // A sibling edge off the grid never pulls the item off it.
+        let (o, g) = align(r, &[rect(203., 300., 80., 40.)], Pt { x: 203., y: 97. }, 6.);
+        assert_eq!((o.x, o.y), (200., 100.));
+        assert!(g.is_empty());
+        // Centers align too: sibling center 240 vs item center 250 -> off by 10, out of reach.
+        let (_, g) = align(r, &[rect(200., 100., 80., 60.)], Pt { x: 203., y: 97. }, 6.);
+        assert_eq!(g, vec![Guide::V(200.), Guide::H(100.)]);
     }
 }

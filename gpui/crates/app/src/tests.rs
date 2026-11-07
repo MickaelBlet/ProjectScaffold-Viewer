@@ -255,3 +255,134 @@ fn dragging_the_pane_pans_and_shift_drag_selects_a_box(cx: &mut TestAppContext) 
     .unwrap();
     assert_eq!(o.selected(cx), vec![op]);
 }
+
+#[gpui_kit::test]
+fn handles_resize_on_the_grid_keeping_the_opposite_side(cx: &mut TestAppContext) {
+    let o = open(cx, "robot.scaffold.yaml");
+    let logger = o.id(cx, "Logger");
+    let at = o.at(cx, &logger, 40., 15.);
+    o.drag(cx, at, at);
+    let before = o.rect(cx, &logger);
+    // Bottom-right corner: 60 wider, 40 taller (Logger is near the window's right side).
+    let corner = o.at(cx, &logger, before.width, before.height);
+    let (dx, dy) = (o.zoom_px(cx, 60.), o.zoom_px(cx, 40.));
+    o.drag(cx, corner, point(corner.x + dx, corner.y + dy));
+    let grown = o.rect(cx, &logger);
+    assert_eq!((grown.x, grown.y), (before.x, before.y));
+    assert_eq!(grown.width, before.width + 60., "{before:?} -> {grown:?}");
+    assert_eq!(grown.height, before.height + 40., "{before:?} -> {grown:?}");
+    assert_eq!((grown.x + grown.width) % 20., 0.);
+    // Left side far to the right: the minimum width wins, the right side stays.
+    let left = o.at(cx, &logger, 0., grown.height / 2.);
+    let far = o.zoom_px(cx, 250.);
+    o.drag(cx, left, point(left.x + far, left.y));
+    let shrunk = o.rect(cx, &logger);
+    assert_eq!(shrunk.x + shrunk.width, grown.x + grown.width);
+    assert!(shrunk.width >= 140. && shrunk.width < grown.width);
+    o.press(cx, "ctrl-z");
+    assert_eq!(o.rect(cx, &logger), grown);
+    o.press(cx, "ctrl-z");
+    assert_eq!(o.rect(cx, &logger), before);
+}
+
+#[gpui_kit::test]
+fn a_dragged_frame_carries_what_lies_inside(cx: &mut TestAppContext) {
+    let o = open(cx, "shop.scaffold.yaml");
+    let doc = o.doc(cx);
+    // Unlock the frame (locked in the example).
+    let frame = cx.update(|cx| {
+        doc.update(cx, |d, cx| {
+            let off = crate::document::Grid {
+                snap: false,
+                size: 20.,
+            };
+            let id = d
+                .project
+                .notes
+                .iter()
+                .find(|n| n.text == "Api binary")
+                .unwrap()
+                .id
+                .clone();
+            d.edit(off, |p| {
+                p.notes.iter_mut().find(|n| n.id == id).unwrap().locked = false;
+            });
+            d.seal();
+            cx.notify();
+            id
+        })
+    });
+    let inside: Vec<(Id, Rect)> = cx
+        .read(|cx| {
+            let p = &doc.read(cx).project;
+            let locked = |id: &str| {
+                p.modules.iter().any(|m| m.id == id && m.locked)
+                    || p.notes.iter().any(|n| n.id == id && n.locked)
+            };
+            scaffold_model::project::frame_contents(p, &frame)
+                .into_iter()
+                .map(|(id, _, _)| id)
+                .filter(|id| !locked(id))
+                .collect::<Vec<_>>()
+        })
+        .into_iter()
+        .filter_map(|id| {
+            // Notes of drill-down views are not drawn in the project view.
+            let c = o.canvas(cx);
+            let r = cx.read(|cx| c.read(cx).rect_of(&id))?;
+            Some((id, r))
+        })
+        .collect();
+    assert!(!inside.is_empty());
+    let f = o.rect(cx, &frame);
+    let from = o.at(cx, &frame, 4., 4.);
+    let by = o.zoom_px(cx, 40.);
+    o.drag(cx, from, point(from.x, from.y + by));
+    let g = o.rect(cx, &frame);
+    assert_eq!(g.y - f.y, 40., "{f:?} -> {g:?}");
+    for (id, r) in inside {
+        let now = o.rect(cx, &id);
+        // Moved items land on the grid, as in the web build.
+        assert!(
+            (now.x - r.x).abs() <= 10. && (now.y - r.y - 40.).abs() <= 10.,
+            "{id}: {r:?} -> {now:?}"
+        );
+    }
+}
+
+#[gpui_kit::test]
+fn dragging_from_a_port_to_a_module_links_them_through_a_new_port(cx: &mut TestAppContext) {
+    let o = open(cx, "robot.scaffold.yaml");
+    let (op, logger) = (o.id(cx, "Operator"), o.id(cx, "Logger"));
+    let doc = o.doc(cx);
+    let (port, links) = cx.read(|cx| {
+        let p = &doc.read(cx).project;
+        let m = p.modules.iter().find(|m| m.id == logger).unwrap();
+        (m.ports[0].id.clone(), p.links.len())
+    });
+    let c = o.canvas(cx);
+    let from = cx.read(|cx| {
+        let c = c.read(cx);
+        c.window_point(c.port_point(&logger, &port).unwrap())
+    });
+    let to = o.at(cx, &op, 60., 60.);
+    o.drag(cx, from, to);
+    let (count, last, sel) = cx.read(|cx| {
+        let d = doc.read(cx);
+        let l = d.project.links.last().unwrap();
+        (
+            d.project.links.len(),
+            (
+                l.from.module_id.clone(),
+                l.to.module_id.clone(),
+                l.to.port_id.clone(),
+            ),
+            d.selected.clone(),
+        )
+    });
+    assert_eq!(count, links + 1);
+    assert_eq!(last, (op, logger, port));
+    assert_eq!(sel.len(), 1);
+    o.press(cx, "ctrl-z");
+    assert_eq!(cx.read(|cx| doc.read(cx).project.links.len()), links);
+}

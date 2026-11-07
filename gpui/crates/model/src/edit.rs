@@ -5,10 +5,11 @@ use std::collections::{HashMap, HashSet};
 
 use crate::binaries::{binary_snapshot, settle_binaries};
 use crate::project::{
-    child_modules, find_imported, grow_ancestors, grow_imported_ancestors, imported_index, imported_parent,
-    link_origin, prune_views, subtree_ids, unique_name,
+    Compartments, LinkEnd, child_modules, default_constraints, find_imported, find_module, find_port,
+    grow_ancestors, grow_imported_ancestors, imported_index, imported_parent, is_imported_id, link_origin,
+    link_roles, min_size, module_roles, new_id, order_link_ends, prune_views, subtree_ids, unique_name,
 };
-use crate::types::{Id, Point, Project, Size};
+use crate::types::{Endpoint, Id, Link, Point, Port, PortRole, Project, Size};
 
 /// Part of a rect to set: unset fields keep their value.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -282,6 +283,142 @@ pub fn nudge(d: &mut Project, ids: &[Id], dx: f64, dy: f64) {
     }
 }
 
+/// An end of a link being drawn: a port, or a module getting a new port (`port_id` None).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ConnectEnd {
+    pub module_id: Id,
+    pub port_id: Option<Id>,
+}
+
+/// Ends of a connection drawn between two ends, in link order, or None when they cannot be linked
+/// (roles, interfaces, module to module). Port of `linkEnds` (`canvas/flowGraph.ts`).
+pub fn link_ends(p: &Project, a: &ConnectEnd, b: &ConnectEnd) -> Option<(ConnectEnd, ConnectEnd)> {
+    if a.module_id == b.module_id {
+        return None;
+    }
+    if a.port_id.is_none() && b.port_id.is_none() {
+        return None;
+    }
+    // A link to a placed module of a dependency needs one end here, and its own port.
+    if is_imported_id(&a.module_id) && is_imported_id(&b.module_id) {
+        return None;
+    }
+    let end = |e: &ConnectEnd| -> Option<LinkEnd<ConnectEnd>> {
+        let role = match &e.port_id {
+            Some(pid) => Some(find_port(p, &e.module_id, pid)?.role),
+            None if is_imported_id(&e.module_id) => return None,
+            None => None,
+        };
+        Some(LinkEnd {
+            module_id: e.module_id.clone(),
+            role,
+            data: e.clone(),
+        })
+    };
+    let (x, y) = order_link_ends(p, &end(a)?, &end(b)?)?;
+    let iface = |e: &ConnectEnd| {
+        e.port_id
+            .as_ref()
+            .and_then(|pid| find_port(p, &e.module_id, pid))
+            .and_then(|pt| pt.interface_id)
+    };
+    match (iface(&x.data), iface(&y.data)) {
+        (Some(i), Some(j)) if i != j => None,
+        _ => Some((x.data, y.data)),
+    }
+}
+
+/// Add a port to a module, growing it to show it; returns its id.
+fn push_port(d: &mut Project, module_id: &str, role: PortRole, interface_id: Option<Id>) -> Option<Id> {
+    let o = d.orientation;
+    let m = d.modules.iter_mut().find(|m| m.id == module_id)?;
+    let id = new_id();
+    let name = unique_name(role.as_str(), m.ports.iter().map(|p| p.name.as_str()));
+    m.ports.push(Port {
+        id: id.clone(),
+        name,
+        role,
+        interface_id,
+        description: String::new(),
+        label: None,
+    });
+    let min = min_size(&module_roles(m), Compartments::of_module(m), o);
+    m.layout.width = m.layout.width.max(min.width);
+    m.layout.height = m.layout.height.max(min.height);
+    grow_ancestors(d, module_id);
+    Some(id)
+}
+
+/// Link two ends (in link order), adding the missing ports and giving an untyped end the other's
+/// interface; returns the link id. Port of `connect` (`store/project.ts`).
+pub fn connect(d: &mut Project, from: &ConnectEnd, to: &ConnectEnd) -> Option<Id> {
+    let iface = |d: &Project, e: &ConnectEnd| {
+        e.port_id
+            .as_ref()
+            .and_then(|pid| find_port(d, &e.module_id, pid))
+            .and_then(|pt| pt.interface_id)
+    };
+    let shared = iface(d, from).or_else(|| iface(d, to));
+    let (from_role, to_role) = link_roles(d, &from.module_id, &to.module_id);
+    let from_port = match &from.port_id {
+        Some(p) => p.clone(),
+        None => push_port(d, &from.module_id, from_role, shared.clone())?,
+    };
+    let to_port = match &to.port_id {
+        Some(p) => p.clone(),
+        None => push_port(d, &to.module_id, to_role, shared)?,
+    };
+    let a = find_port(d, &from.module_id, &from_port);
+    let b = find_port(d, &to.module_id, &to_port);
+    if let (Some(a), Some(b)) = (&a, &b) {
+        for (m, port, other) in [(&from.module_id, &from_port, b), (&to.module_id, &to_port, a)] {
+            if let Some(pt) = d
+                .modules
+                .iter_mut()
+                .find(|x| &x.id == m)
+                .and_then(|x| x.ports.iter_mut().find(|pt| &pt.id == port))
+            {
+                if pt.interface_id.is_none() {
+                    pt.interface_id = other.interface_id.clone();
+                }
+            }
+        }
+    }
+    let id = new_id();
+    let module_name = |e: &str| {
+        find_module(d, e)
+            .map(|m| m.name.clone())
+            .or_else(|| find_imported(d, e).map(|(_, m)| m.path.rsplit('.').next().unwrap_or("").to_string()))
+    };
+    let base = format!(
+        "{}_to_{}",
+        module_name(&from.module_id).unwrap_or_else(|| "a".into()),
+        module_name(&to.module_id).unwrap_or_else(|| "b".into())
+    );
+    let name = unique_name(&base, d.links.iter().map(|l| l.name.as_str()));
+    let interface_id = find_port(d, &from.module_id, &from_port)
+        .and_then(|pt| pt.interface_id)
+        .or_else(|| find_port(d, &to.module_id, &to_port).and_then(|pt| pt.interface_id));
+    let constraints = default_constraints(d.interfaces.iter().find(|i| Some(&i.id) == interface_id.as_ref()));
+    d.links.push(Link {
+        id: id.clone(),
+        name,
+        description: String::new(),
+        from: Endpoint {
+            module_id: from.module_id.clone(),
+            port_id: from_port,
+        },
+        to: Endpoint {
+            module_id: to.module_id.clone(),
+            port_id: to_port,
+        },
+        constraints,
+        color: None,
+        route: None,
+    });
+    Some(id)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -291,6 +428,49 @@ mod tests {
     fn example(name: &str) -> Project {
         let path = format!("{}/../../../examples/{name}", env!("CARGO_MANIFEST_DIR"));
         load_text(&std::fs::read_to_string(path).unwrap(), Format::Yaml).unwrap()
+    }
+
+    #[test]
+    fn connects_ports_and_modules() {
+        let mut p = example("robot.scaffold.yaml");
+        let id = |p: &Project, n: &str| p.modules.iter().find(|m| m.name == n).unwrap().id.clone();
+        let (op, logger) = (id(&p, "Operator"), id(&p, "Logger"));
+        let logger_in = p.modules.iter().find(|m| m.id == logger).unwrap().ports[0].clone();
+        let a = ConnectEnd {
+            module_id: logger.clone(),
+            port_id: Some(logger_in.id.clone()),
+        };
+        let b = ConnectEnd {
+            module_id: op.clone(),
+            port_id: None,
+        };
+        // Dragged from the in port: the link still goes from Operator to Logger.
+        let (from, to) = link_ends(&p, &a, &b).unwrap();
+        assert_eq!(
+            (from.module_id.as_str(), to.module_id.as_str()),
+            (op.as_str(), logger.as_str())
+        );
+        let n = p.links.len();
+        connect(&mut p, &from, &to).unwrap();
+        assert_eq!(p.links.len(), n + 1);
+        let m = p.modules.iter().find(|m| m.id == op).unwrap();
+        let new = m.ports.last().unwrap();
+        assert_eq!(
+            (new.role, &new.interface_id),
+            (PortRole::Out, &logger_in.interface_id)
+        );
+        // Two modules without ports: dropped on the module instead.
+        assert!(
+            link_ends(
+                &p,
+                &ConnectEnd {
+                    module_id: op.clone(),
+                    port_id: None
+                },
+                &b
+            )
+            .is_none()
+        );
     }
 
     #[test]
