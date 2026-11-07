@@ -4,11 +4,12 @@
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant, SystemTime};
 
+use scaffold_layout::view_layout::{fold_layouts, in_view, shown_module_ids};
 use scaffold_model::edit::follow_interface_renames;
 use scaffold_model::grid::snap_changes;
 use scaffold_model::project::{has_missing_refs, resolve_missing_refs};
 use scaffold_model::serialize::{Format, format_from_path, load_text, reload_text, same_content, save_text};
-use scaffold_model::types::{Id, Project};
+use scaffold_model::types::{GLOBAL_VIEW, Id, Project, View};
 
 /// Edits closer than this merge into one undo step.
 const MERGE: Duration = Duration::from_millis(400);
@@ -33,6 +34,11 @@ pub struct Document {
     pub selected: Vec<Id>,
     /// What the inspector shows (None: several items, or nothing).
     pub selection: Option<Selection>,
+    /// Selections made, for going back and forth, and where in them the document is.
+    history: Vec<Selection>,
+    history_at: usize,
+    /// The view the canvas draws (`GLOBAL_VIEW`: the whole project).
+    pub view: Id,
     /// Bumped on each change, for views to know when to redraw.
     pub version: u64,
     /// Modification time of the file as last read or written.
@@ -138,6 +144,9 @@ impl Document {
             last_edit: None,
             selected: Vec::new(),
             selection: None,
+            history: Vec::new(),
+            history_at: 0,
+            view: GLOBAL_VIEW.to_string(),
             version: 0,
             disk_time: None,
             conflict: None,
@@ -229,6 +238,46 @@ impl Document {
         if grid.snap {
             snap_changes(&self.project, &mut next, grid.size);
         }
+        self.commit(next)
+    }
+
+    /// Edit the layout of the view drawn: the modules are at its rects, and what the edit moves
+    /// in a drill-down view becomes the view's own (see `fold_layouts`).
+    pub fn edit_layout(&mut self, grid: Grid, f: impl FnOnce(&mut Project)) -> bool {
+        let Some(view) = self.active_view() else {
+            return self.edit(grid, f);
+        };
+        let base = in_view(&self.project, &view);
+        let mut next = base.project.clone();
+        f(&mut next);
+        follow_interface_renames(&base.project, &mut next);
+        if has_missing_refs(&next) {
+            resolve_missing_refs(&mut next);
+        }
+        if grid.snap {
+            snap_changes(&base.project, &mut next, grid.size);
+        }
+        if next == base.project {
+            return false;
+        }
+        let folded = fold_layouts(&self.project, &base, next, &view.id);
+        self.commit(folded)
+    }
+
+    /// The project as the active view draws it, with the ids it shows (None: everything).
+    pub fn drawn(&self) -> (Project, Option<std::collections::HashSet<Id>>) {
+        match self.active_view() {
+            None => (self.project.clone(), None),
+            Some(v) => {
+                let drawn = in_view(&self.project, &v);
+                let shown = shown_module_ids(&drawn, &v);
+                (drawn.project, Some(shown))
+            }
+        }
+    }
+
+    /// Make `next` the project as one undo step (merged when close in time).
+    fn commit(&mut self, next: Project) -> bool {
         if next == self.project {
             return false;
         }
@@ -319,7 +368,25 @@ impl Document {
         });
     }
 
+    /// Draw another view of the project.
+    pub fn set_view(&mut self, id: Id) {
+        if id != self.view {
+            self.view = id;
+            self.selected.clear();
+            self.version += 1;
+        }
+    }
+
+    /// The view drawn (a temporary one resolved from its module), `None` for the whole project.
+    pub fn active_view(&self) -> Option<View> {
+        let v = scaffold_model::project::find_view(&self.project, &self.view);
+        (v.id != GLOBAL_VIEW).then_some(v)
+    }
+
     fn changed(&mut self) {
+        if self.view != GLOBAL_VIEW && self.active_view().is_none() {
+            self.view = GLOBAL_VIEW.to_string();
+        }
         self.retain_selection();
         self.version += 1;
     }
@@ -333,8 +400,50 @@ impl Document {
         if ids != self.selected || selection != self.selection {
             self.selected = ids;
             self.selection = selection;
+            self.record();
             self.version += 1;
         }
+    }
+
+    /// Add the selection to the history, dropping what was ahead of it.
+    fn record(&mut self) {
+        let Some(sel) = self.selection.clone() else { return };
+        if self.history.get(self.history_at) == Some(&sel) {
+            return;
+        }
+        if !self.history.is_empty() {
+            self.history.truncate(self.history_at + 1);
+        }
+        self.history.push(sel);
+        if self.history.len() > HISTORY {
+            self.history.remove(0);
+        }
+        self.history_at = self.history.len() - 1;
+    }
+
+    /// The previous (-1) or next (1) selection of the history still in the project.
+    pub fn travel(&mut self, delta: isize) -> Option<Selection> {
+        let mut i = self.history_at as isize;
+        loop {
+            i += delta;
+            let sel = self.history.get(usize::try_from(i).ok()?)?;
+            let alive = match sel {
+                Selection::Project => true,
+                other => other
+                    .id()
+                    .and_then(|id| Selection::of(&self.project, id))
+                    .is_some_and(|s| std::mem::discriminant(&s) == std::mem::discriminant(other)),
+            };
+            if alive {
+                self.history_at = i as usize;
+                return Some(sel.clone());
+            }
+        }
+    }
+
+    pub fn can_travel(&self, delta: isize) -> bool {
+        let i = self.history_at as isize + delta;
+        i >= 0 && (i as usize) < self.history.len()
     }
 
     /// Show an entity in the inspector, selecting it on the canvas when drawn there.
@@ -344,6 +453,7 @@ impl Document {
             _ => Vec::new(),
         };
         self.selection = sel;
+        self.record();
         self.version += 1;
     }
 

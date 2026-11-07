@@ -203,9 +203,9 @@ impl Render for ExplorerPanel {
                 .child("No document.")
                 .into_any_element();
         };
-        let (p, sel): (Project, Option<Selection>) = {
+        let (p, sel, active_view): (Project, Option<Selection>, String) = {
             let d = doc.read(cx);
-            (d.project.clone(), d.selection.clone())
+            (d.project.clone(), d.selection.clone(), d.view.clone())
         };
         let is_sel = |s: &Selection| sel.as_ref() == Some(s);
         let q = self.filter.read(cx).value().trim().to_string();
@@ -216,17 +216,29 @@ impl Render for ExplorerPanel {
         // Views.
         let views: Vec<AnyElement> = std::iter::once(("global".to_string(), "Project".to_string()))
             .chain(p.views.iter().map(|v| (v.id.clone(), v.name.clone())))
+            // The temporary view drawn (a module opened in its own view), until kept.
+            .chain(
+                Some(scaffold_model::project::find_view(&p, &active_view))
+                    .filter(|v| v.temporary)
+                    .map(|v| (v.id, format!("{} (temporary)", v.name))),
+            )
             .filter(|(_, n)| keep(n))
             .map(|(id, name)| {
+                let (d, vid) = (doc.clone(), id.clone());
                 self.item(
                     format!("view-{id}"),
                     0,
                     None,
                     name,
                     None,
+                    id == active_view,
                     false,
-                    id != "global",
-                    |_, _| {},
+                    move |_, cx| {
+                        d.update(cx, |d, cx| {
+                            d.set_view(vid.clone());
+                            cx.notify();
+                        })
+                    },
                 )
                 .into_any_element()
             })

@@ -105,6 +105,22 @@ enum Guide {
 /// Distance (screen pixels) a press must travel to become a drag.
 const DRAG_SLOP: f64 = 3.;
 
+/// The project as the document's view draws it, and its scene (modules the view hides left out).
+fn view_scene(d: &Document) -> (Project, Scene) {
+    let (mut project, shown) = d.drawn();
+    if let Some(shown) = shown {
+        project.modules.retain(|m| shown.contains(&m.id));
+        for dep in &mut project.dependencies {
+            dep.modules.retain(|m| shown.contains(&m.id));
+        }
+        project
+            .links
+            .retain(|l| shown.contains(&l.from.module_id) && shown.contains(&l.to.module_id));
+    }
+    let scene = project_scene(&project);
+    (project, scene)
+}
+
 pub struct Canvas {
     doc: Entity<Document>,
     /// Version of the document the scene was built from.
@@ -135,11 +151,11 @@ impl Canvas {
         })
         .detach();
         let d = doc.read(cx);
-        let project = d.project.clone();
+        let (project, scene) = view_scene(d);
         let selected = d.selected.iter().cloned().collect();
         let version = d.version;
         Canvas {
-            scene: project_scene(&project),
+            scene,
             project,
             selected,
             version,
@@ -223,9 +239,10 @@ impl Canvas {
         }
         self.version = d.version;
         self.selected = d.selected.iter().cloned().collect();
-        if self.project != d.project {
-            self.project = d.project.clone();
-            self.scene = project_scene(&self.project);
+        let (project, scene) = view_scene(d);
+        if self.project != project || self.scene.nodes.len() != scene.nodes.len() {
+            self.project = project;
+            self.scene = scene;
         }
     }
 
@@ -665,7 +682,7 @@ impl Canvas {
                 let preview = self.project.clone();
                 self.doc.update(cx, |d, cx| {
                     d.seal();
-                    d.edit(grid(), |p| {
+                    d.edit_layout(grid(), |p| {
                         if let Some(r) = r {
                             set_rect(p, &id, r);
                         } else {
@@ -686,7 +703,7 @@ impl Canvas {
                 self.doc.update(cx, |d, cx| {
                     d.seal();
                     let mut link = None;
-                    d.edit(grid(), |p| link = connect(p, &a, &b));
+                    d.edit_layout(grid(), |p| link = connect(p, &a, &b));
                     d.seal();
                     if let Some(l) = link {
                         d.select(vec![l]);
@@ -750,7 +767,7 @@ impl Canvas {
                 let preview = self.project.clone();
                 self.doc.update(cx, |d, cx| {
                     d.seal();
-                    d.edit(grid(), |p| match target {
+                    d.edit_layout(grid(), |p| match target {
                         Some((parent, x, y)) => reparent_module(p, &ids[0], parent.as_deref(), x, y),
                         None => moved(p, &ids, offset),
                     });

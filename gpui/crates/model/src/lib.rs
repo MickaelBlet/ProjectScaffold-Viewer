@@ -8,6 +8,7 @@ pub mod completion;
 pub mod constraints;
 pub mod contracts;
 pub mod defaults;
+pub mod dependencies;
 pub mod edit;
 pub mod emit;
 pub mod entities;

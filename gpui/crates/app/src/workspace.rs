@@ -26,7 +26,7 @@ use scaffold_model::validate::{Severity, validate};
 
 use crate::canvas::Canvas;
 use crate::commands::{self, CmdState, OpenRecent};
-use crate::document::{DiskChange, Document, Selection};
+use crate::document::{DiskChange, Document, Grid, Selection};
 use crate::panels::explorer::ExplorerPanel;
 use crate::panels::inspector::InspectorPanel;
 use crate::panels::lists::{OutputPanel, ProblemsPanel, SearchPanel};
@@ -66,6 +66,10 @@ pub struct Workspace {
     settings_panel: Entity<SettingsPanel>,
     state_machine: Entity<StateMachinePanel>,
     pub source: Entity<SourcePanel>,
+    /// The workspace file last opened or saved, and what it lists.
+    workspace_file: Option<(PathBuf, scaffold_model::workspace::Workspace)>,
+    /// Project of each document as last pushed to the documents depending on it.
+    synced: std::collections::HashMap<EntityId, Project>,
 }
 
 /// Arrow keys move by a grid cell (five when far) on the grid, else by 2px (20px).
@@ -81,29 +85,12 @@ fn nudge_step(far: bool) -> f64 {
 
 /// Commands of features not ported yet.
 const LATER: &[&str] = &[
-    "file.saveWorkspace",
-    "file.saveWorkspaceAs",
     "file.importSettings",
     "file.exportSettings",
     "file.exportPng",
     "file.exportSvg",
     "file.openIdlText",
     "insert.projectContent",
-    "insert.dependency",
-    "insert.refreshDependencies",
-    "view.back",
-    "view.forward",
-    "view.openModule",
-    "view.openModuleSplit",
-    "view.keep",
-    "view.new",
-    "view.hide",
-    "view.resetLayout",
-    "view.showAll",
-    "arrange.auto",
-    "arrange.all",
-    "arrange.horizontal",
-    "arrange.vertical",
     "help.tutorial",
 ];
 
@@ -161,6 +148,20 @@ pub fn doc_command_state(id: &str, doc: Option<&Document>) -> CmdState {
         .count();
     match id {
         "edit.undo" => on(d.can_undo()),
+        "view.back" => on(d.can_travel(-1)),
+        "view.openModule" | "view.openModuleSplit" => on(matches!(
+            d.selection,
+            Some(Selection::Module { .. } | Selection::Imported(_))
+        )),
+        "view.keep" => on(d
+            .active_view()
+            .is_some_and(|v| scaffold_model::project::can_keep_view(&v))),
+        "view.resetLayout" => on(d
+            .active_view()
+            .is_some_and(|v| scaffold_layout::view_layout::has_own_layout(&v))),
+        "view.showAll" => on(d.active_view().is_some_and(|v| !v.hidden.is_empty())),
+        "view.hide" => on(!d.selected.is_empty()),
+        "view.forward" => on(d.can_travel(1)),
         "edit.redo" => on(d.can_redo()),
         "edit.cut" | "edit.copy" | "edit.duplicate" => on(!sel.is_empty()),
         "edit.delete" => on(!sel.is_empty()),
@@ -176,6 +177,43 @@ pub fn doc_command_state(id: &str, doc: Option<&Document>) -> CmdState {
         "view.fit" => on(true),
         _ => on(true),
     }
+}
+
+/// Add a view to the project; gives its id.
+fn add_view(d: &mut Document, name: &str, root: Option<Id>) -> Id {
+    let id = scaffold_model::project::new_id();
+    let vid = id.clone();
+    d.edit(
+        Grid {
+            snap: false,
+            size: 1.,
+        },
+        |p| {
+            let name = scaffold_model::project::unique_name(name, p.views.iter().map(|v| v.name.as_str()));
+            p.views.push(scaffold_model::types::View {
+                id: vid,
+                name,
+                root_module_id: root,
+                hidden: Vec::new(),
+                layouts: None,
+                routes: None,
+                port_labels: None,
+                stand_ins: None,
+                temporary: false,
+            });
+        },
+    );
+    id
+}
+
+/// Store the temporary view drawn in the project and draw it; gives the id of the view drawn.
+fn keep_view(d: &mut Document) -> Id {
+    let Some(v) = d.active_view().filter(scaffold_model::project::can_keep_view) else {
+        return d.view.clone();
+    };
+    let id = add_view(d, &v.name, v.root_module_id.clone());
+    d.set_view(id.clone());
+    id
 }
 
 impl Workspace {
@@ -199,6 +237,8 @@ impl Workspace {
             settings_panel: cx.new(|_| SettingsPanel::new()),
             state_machine: cx.new(|_| StateMachinePanel::new(ws.clone())),
             source: cx.new(|cx| SourcePanel::new(ws.clone(), window, cx)),
+            workspace_file: None,
+            synced: Default::default(),
             tabs: Vec::new(),
             active: 0,
             error: None,
@@ -222,7 +262,12 @@ impl Workspace {
 
     fn add_doc(&mut self, doc: Document, window: Option<&mut Window>, cx: &mut Context<Self>) {
         let doc = cx.new(|_| doc);
-        cx.observe(&doc, |_, _, cx| cx.notify()).detach();
+        self.synced.insert(doc.entity_id(), doc.read(cx).project.clone());
+        cx.observe(&doc, |w, doc, cx| {
+            w.push_to_dependents(&doc, cx);
+            cx.notify();
+        })
+        .detach();
         // Follow changes of the file made by other programs.
         let watched = doc.downgrade();
         cx.spawn(async move |this, cx| {
@@ -260,6 +305,12 @@ impl Workspace {
     }
 
     pub fn open_path(&mut self, path: PathBuf, cx: &mut Context<Self>) {
+        if path
+            .to_string_lossy()
+            .ends_with(scaffold_model::workspace::WORKSPACE_SUFFIX)
+        {
+            return self.open_workspace(path, cx);
+        }
         // An open file is activated, not opened twice.
         let canon = std::fs::canonicalize(&path).ok();
         if let Some(i) = self.tabs.iter().position(|t| {
@@ -431,6 +482,423 @@ impl Workspace {
         }
     }
 
+    /// Auto-arrange: the content of the selected module (or the view drawn), everything, or with
+    /// an orientation. Port of `arrangeLayout`.
+    fn auto_arrange(&mut self, id: &str, cx: &mut Context<Self>) {
+        use scaffold_layout::auto_layout::{arrange, arrange_options};
+        use scaffold_model::types::Orientation;
+        let Some(doc) = self.doc() else { return };
+        doc.update(cx, |d, cx| {
+            let orientation = match id {
+                "arrange.horizontal" => Orientation::Horizontal,
+                "arrange.vertical" => Orientation::Vertical,
+                _ => d.project.orientation,
+            };
+            let scope: Option<Id> = match (id, &d.selection) {
+                ("arrange.all", _) => None,
+                (_, Some(Selection::Module { id, .. }))
+                    if d.project.modules.iter().any(|m| m.parent_id.as_ref() == Some(id)) =>
+                {
+                    Some(id.clone())
+                }
+                _ => d.active_view().and_then(|v| v.root_module_id),
+            };
+            let opts = arrange_options(orientation);
+            d.seal();
+            d.edit_layout(
+                Grid {
+                    snap: false,
+                    size: 1.,
+                },
+                |p| {
+                    let mut q = arrange(p, scope.as_deref(), &opts);
+                    q.orientation = orientation;
+                    *p = q;
+                },
+            );
+            d.seal();
+            cx.notify();
+        });
+    }
+
+    /// The project saved at `path`: an open document's, else read from the file.
+    fn project_at(&self, path: &std::path::Path, cx: &App) -> Option<Project> {
+        let canon = std::fs::canonicalize(path).ok()?;
+        if let Some(t) = self.tabs.iter().find(|t| {
+            t.doc
+                .read(cx)
+                .path
+                .as_ref()
+                .and_then(|p| std::fs::canonicalize(p).ok())
+                == Some(canon.clone())
+        }) {
+            return Some(t.doc.read(cx).project.clone());
+        }
+        let text = std::fs::read_to_string(path).ok()?;
+        scaffold_model::serialize::load_text(
+            &text,
+            scaffold_model::serialize::format_from_path(&path.to_string_lossy()),
+        )
+        .ok()
+    }
+
+    /// Lines telling what a dependency change did.
+    fn dependency_lines(r: &scaffold_model::dependencies::DependencyResult) -> Vec<String> {
+        r.conflicts
+            .iter()
+            .map(|x| format!("Not taken: {x}"))
+            .chain(r.renamed.iter().map(|x| format!("Renamed {x}")))
+            .chain(
+                r.detached
+                    .iter()
+                    .map(|x| format!("{x}: no longer in its project, kept here")),
+            )
+            .chain(r.missing.iter().cloned())
+            .collect()
+    }
+
+    fn report(&mut self, what: String, lines: Vec<String>, cx: &mut Context<Self>) {
+        if lines.is_empty() {
+            self.log(what);
+        } else {
+            self.error = Some(format!("{what}\n{}", lines.join("\n")));
+        }
+        cx.notify();
+    }
+
+    /// Depend on project files picked by the user (with the dependencies they read).
+    fn pick_dependency(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let rx = cx.prompt_for_paths(PathPromptOptions {
+            files: true,
+            directories: false,
+            multiple: true,
+            prompt: Some("Depend on".into()),
+        });
+        cx.spawn_in(window, async move |this, cx| {
+            if let Ok(Ok(Some(paths))) = rx.await {
+                this.update(cx, |w, cx| w.depend_on(paths, cx)).ok();
+            }
+        })
+        .detach();
+    }
+
+    pub fn depend_on(&mut self, paths: Vec<PathBuf>, cx: &mut Context<Self>) {
+        use scaffold_model::dependencies::{DependencySource, add_dependencies};
+        use scaffold_model::sync::{base_name, relative_file};
+        let Some(doc) = self.doc() else { return };
+        let own = doc
+            .read(cx)
+            .path
+            .as_ref()
+            .map(|p| p.to_string_lossy().into_owned());
+        let mut lines = Vec::new();
+        let mut read: Vec<(Project, String, bool)> = Vec::new();
+        for path in &paths {
+            let Some(p) = self.project_at(path, cx) else {
+                lines.push(format!("Cannot read {}", path.display()));
+                continue;
+            };
+            // The dependencies it reads come along, as indirect ones.
+            let dir = path.parent().map(PathBuf::from).unwrap_or_default();
+            for d in &p.dependencies {
+                let nested = dir.join(&d.file);
+                if let Some(q) = self.project_at(&nested, cx) {
+                    read.push((q, relative_file(own.as_deref(), &nested.to_string_lossy()), true));
+                }
+            }
+            read.insert(
+                0,
+                (p, relative_file(own.as_deref(), &path.to_string_lossy()), false),
+            );
+        }
+        if read.is_empty() {
+            return self.report("No dependency added".into(), lines, cx);
+        }
+        let names: Vec<String> = read
+            .iter()
+            .filter(|r| !r.2)
+            .map(|r| base_name(&r.1).to_string())
+            .collect();
+        let self_name = own.as_deref().map(|o| base_name(o).to_string());
+        let result = doc.update(cx, |d, cx| {
+            let mut r = Default::default();
+            d.edit(
+                Grid {
+                    snap: false,
+                    size: 1.,
+                },
+                |p| {
+                    let sources: Vec<DependencySource> = read
+                        .iter()
+                        .map(|(q, file, indirect)| DependencySource {
+                            project: q,
+                            file: file.clone(),
+                            indirect: *indirect,
+                        })
+                        .collect();
+                    r = add_dependencies(p, &sources, self_name.as_deref());
+                },
+            );
+            cx.notify();
+            r
+        });
+        lines.extend(Self::dependency_lines(&result));
+        self.report(format!("Depending on {}", names.join(", ")), lines, cx);
+    }
+
+    /// Read the dependencies again from their projects.
+    fn refresh_dependencies(&mut self, cx: &mut Context<Self>) {
+        use scaffold_model::dependencies::refresh_dependencies;
+        use scaffold_model::sync::base_name;
+        let Some(doc) = self.doc() else { return };
+        let (deps, own) = {
+            let d = doc.read(cx);
+            (d.project.dependencies.clone(), d.path.clone())
+        };
+        let dir = own
+            .as_deref()
+            .and_then(|p| p.parent())
+            .map(PathBuf::from)
+            .unwrap_or_default();
+        let mut lines = Vec::new();
+        let mut sources = std::collections::HashMap::new();
+        for x in &deps {
+            match self.project_at(&dir.join(&x.file), cx) {
+                Some(p) => {
+                    sources.insert(x.id.clone(), p);
+                }
+                None if !x.indirect => {
+                    lines.push(format!("{}: cannot read {} next to this file", x.name, x.file))
+                }
+                None => {}
+            }
+        }
+        let n = sources.len();
+        if n > 0 {
+            let self_name = own
+                .as_deref()
+                .map(|o| base_name(&o.to_string_lossy()).to_string());
+            let r = doc.update(cx, |d, cx| {
+                let mut r = Default::default();
+                d.edit(
+                    Grid {
+                        snap: false,
+                        size: 1.,
+                    },
+                    |p| r = refresh_dependencies(p, &sources, self_name.as_deref()),
+                );
+                cx.notify();
+                r
+            });
+            lines.extend(Self::dependency_lines(&r));
+        }
+        self.report(
+            format!("Refreshed {n} dependenc{}", if n == 1 { "y" } else { "ies" }),
+            lines,
+            cx,
+        );
+    }
+
+    /// Carry a document's renames and definitions to the open documents depending on it, each as
+    /// an undoable edit of its own. Port of `store/sync.ts`.
+    fn push_to_dependents(&mut self, doc: &Entity<Document>, cx: &mut Context<Self>) {
+        use scaffold_model::dependencies::{apply_dependency_renames, refresh_dependencies};
+        use scaffold_model::sync::{base_name, diff_renames, is_dependency_file};
+        let (next, file) = {
+            let d = doc.read(cx);
+            (d.project.clone(), d.path.clone())
+        };
+        let Some(prev) = self.synced.insert(doc.entity_id(), next.clone()) else {
+            return;
+        };
+        // What dependents read: definitions, modules and ports, and the dependencies carried along.
+        if prev.types == next.types
+            && prev.interfaces == next.interfaces
+            && prev.consts == next.consts
+            && prev.modules == next.modules
+            && prev.dependencies == next.dependencies
+        {
+            return;
+        }
+        let Some(file) = file.map(|f| f.to_string_lossy().into_owned()) else {
+            return;
+        };
+        let linked: Vec<Entity<Document>> = self
+            .tabs
+            .iter()
+            .map(|t| t.doc.clone())
+            .filter(|d| d.entity_id() != doc.entity_id())
+            .filter(|d| {
+                let d = d.read(cx);
+                let from = d.path.as_ref().map(|p| p.to_string_lossy().into_owned());
+                d.project
+                    .dependencies
+                    .iter()
+                    .any(|x| is_dependency_file(from.as_deref(), &x.file, &file))
+            })
+            .collect();
+        if linked.is_empty() {
+            return;
+        }
+        let renames = diff_renames(&prev, &next);
+        let mut updated = Vec::new();
+        let mut conflicts = Vec::new();
+        for d in linked {
+            let changed = d.update(cx, |d, cx| {
+                let from = d.path.as_ref().map(|p| p.to_string_lossy().into_owned());
+                let self_name = from.as_deref().map(|f| base_name(f).to_string());
+                let title = d.title();
+                d.seal();
+                let changed = d.edit(
+                    Grid {
+                        snap: false,
+                        size: 1.,
+                    },
+                    |p| {
+                        let Some(dep) = p
+                            .dependencies
+                            .iter()
+                            .find(|x| is_dependency_file(from.as_deref(), &x.file, &file))
+                            .map(|x| (x.id.clone(), x.file.clone()))
+                        else {
+                            return;
+                        };
+                        if let Some(r) = &renames {
+                            apply_dependency_renames(p, &dep.1, r);
+                        }
+                        let sources = std::collections::HashMap::from([(dep.0, next.clone())]);
+                        conflicts.extend(refresh_dependencies(p, &sources, self_name.as_deref()).conflicts);
+                    },
+                );
+                d.seal();
+                if changed {
+                    cx.notify();
+                }
+                changed.then_some(title)
+            });
+            updated.extend(changed);
+        }
+        if !conflicts.is_empty() {
+            self.status = Some(format!("Not taken from this project: {}", conflicts.join("; ")));
+        } else if !updated.is_empty() && renames.is_some() {
+            self.status = Some(format!("Renamed in dependent documents: {}", updated.join(", ")));
+        }
+    }
+
+    /// Open the projects a workspace file lists.
+    fn open_workspace(&mut self, path: PathBuf, cx: &mut Context<Self>) {
+        use scaffold_model::serialize::{Format, parse_text};
+        use scaffold_model::workspace::workspace_from_file;
+        let read = std::fs::read_to_string(&path)
+            .map_err(|e| e.to_string())
+            .and_then(|t| parse_text(&t, Format::Yaml).map_err(|e| e.to_string()))
+            .and_then(|data| workspace_from_file(&data).map_err(|e| e.to_string()));
+        match read {
+            Ok(ws) => {
+                prefs::add_recent(&path);
+                self.recent = prefs::recent();
+                let dir = path.parent().map(PathBuf::from).unwrap_or_default();
+                for p in &ws.projects {
+                    self.open_path(dir.join(p), cx);
+                }
+                self.log(format!(
+                    "Opened workspace {} ({} projects)",
+                    ws.name,
+                    ws.projects.len()
+                ));
+                self.workspace_file = Some((path, ws));
+            }
+            Err(e) => {
+                self.error = Some(format!("{}:\n{e}", path.display()));
+                cx.notify();
+            }
+        }
+    }
+
+    /// Save the open project files as a workspace file.
+    fn save_workspace(&mut self, save_as: bool, window: &mut Window, cx: &mut Context<Self>) {
+        use scaffold_model::workspace::{WORKSPACE_SUFFIX, Workspace as Ws};
+        let saved: Vec<PathBuf> = self
+            .tabs
+            .iter()
+            .filter_map(|t| t.doc.read(cx).path.clone())
+            .collect();
+        if saved.is_empty() {
+            self.error = Some("No project file to list in a workspace: save the open projects first.".into());
+            cx.notify();
+            return;
+        }
+        let name = self.workspace_file.as_ref().map_or_else(
+            || {
+                let n = self.tabs[0].doc.read(cx).project.name.clone();
+                if n.is_empty() { "Workspace".into() } else { n }
+            },
+            |(_, w)| w.name.clone(),
+        );
+        let description = self
+            .workspace_file
+            .as_ref()
+            .and_then(|(_, w)| w.description.clone());
+        let target = self
+            .workspace_file
+            .as_ref()
+            .map(|(p, _)| p.clone())
+            .filter(|_| !save_as);
+        let dir = saved[0].parent().map(PathBuf::from).unwrap_or_default();
+        let file: String = name
+            .chars()
+            .map(|c| {
+                if c.is_alphanumeric() || matches!(c, '.' | '-' | '_') {
+                    c
+                } else {
+                    '_'
+                }
+            })
+            .collect();
+        let write = move |w: &mut Self, path: PathBuf, cx: &mut Context<Self>| {
+            let dir = path.parent().map(PathBuf::from).unwrap_or_default();
+            // Paths relative to the workspace file when inside its folder, else file names.
+            let projects: Vec<String> = saved
+                .iter()
+                .map(|p| {
+                    p.strip_prefix(&dir).map_or_else(
+                        |_| {
+                            p.file_name()
+                                .map_or(String::new(), |n| n.to_string_lossy().into_owned())
+                        },
+                        |r| r.to_string_lossy().replace('\\', "/"),
+                    )
+                })
+                .collect();
+            let ws = Ws {
+                name: name.clone(),
+                description: description.clone(),
+                projects,
+            };
+            match std::fs::write(&path, scaffold_model::workspace::workspace_text(&ws)) {
+                Ok(()) => {
+                    w.log(format!("Saved workspace {}", path.display()));
+                    prefs::add_recent(&path);
+                    w.recent = prefs::recent();
+                    w.workspace_file = Some((path, ws));
+                }
+                Err(e) => w.error = Some(format!("{}: {e}", path.display())),
+            }
+            cx.notify();
+        };
+        if let Some(path) = target {
+            write(self, path, cx);
+            return;
+        }
+        let rx = cx.prompt_for_new_path(&dir, Some(&format!("{file}{WORKSPACE_SUFFIX}")));
+        cx.spawn_in(window, async move |this, cx| {
+            if let Ok(Ok(Some(path))) = rx.await {
+                this.update(cx, |w, cx| write(w, path, cx)).ok();
+            }
+        })
+        .detach();
+    }
+
     fn save_as(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(doc) = self.doc() else {
             return;
@@ -485,7 +953,7 @@ impl Workspace {
                 let sel = d.selected.clone();
                 let mut next = None;
                 d.seal();
-                d.edit(settings::grid(), |p| next = f(p, &sel));
+                d.edit_layout(settings::grid(), |p| next = f(p, &sel));
                 d.seal();
                 if let Some(ids) = next {
                     d.select(ids);
@@ -561,6 +1029,110 @@ impl Workspace {
                 self.save(window, cx);
             }
             "file.saveAs" => self.save_as(window, cx),
+            "view.back" | "view.forward" => {
+                let delta = if id == "view.back" { -1 } else { 1 };
+                if let Some(doc) = self.doc() {
+                    let sel = doc.update(cx, |d, _| d.travel(delta));
+                    if sel.is_some() {
+                        // Revealing records nothing: it is the history's own entry.
+                        self.reveal(sel, window, cx);
+                    }
+                }
+            }
+            "view.new" => self.with_doc(cx, |d| {
+                let id = add_view(d, "View", None);
+                d.set_view(id);
+            }),
+            "view.openModule" | "view.openModuleSplit" => self.with_doc(cx, |d| {
+                let id = match &d.selection {
+                    Some(Selection::Module { id, .. } | Selection::Imported(id)) => id.clone(),
+                    _ => return,
+                };
+                let existing = d
+                    .project
+                    .views
+                    .iter()
+                    .find(|v| v.root_module_id.as_ref() == Some(&id) && v.hidden.is_empty())
+                    .map(|v| v.id.clone());
+                d.set_view(existing.unwrap_or_else(|| scaffold_model::project::isolated_view_id(&id)));
+            }),
+            "view.keep" => self.with_doc(cx, |d| {
+                keep_view(d);
+            }),
+            "view.hide" => self.with_doc(cx, |d| {
+                let ids: Vec<Id> = d
+                    .selected
+                    .iter()
+                    .filter(|id| d.project.modules.iter().any(|m| &m.id == *id))
+                    .cloned()
+                    .collect();
+                if ids.is_empty() {
+                    return;
+                }
+                // The global view and temporary views are stored first.
+                let view = if d.view == scaffold_model::types::GLOBAL_VIEW {
+                    let id = add_view(d, "Filtered", None);
+                    d.set_view(id.clone());
+                    id
+                } else {
+                    keep_view(d)
+                };
+                d.edit(
+                    Grid {
+                        snap: false,
+                        size: 1.,
+                    },
+                    |p| {
+                        if let Some(v) = p.views.iter_mut().find(|v| v.id == view) {
+                            for id in ids {
+                                if !v.hidden.contains(&id) {
+                                    v.hidden.push(id);
+                                }
+                            }
+                        }
+                    },
+                );
+                d.select(Vec::new());
+            }),
+            "view.showAll" => self.with_doc(cx, |d| {
+                let view = d.view.clone();
+                d.edit(
+                    Grid {
+                        snap: false,
+                        size: 1.,
+                    },
+                    |p| {
+                        if let Some(v) = p.views.iter_mut().find(|v| v.id == view) {
+                            v.hidden.clear();
+                        }
+                    },
+                );
+            }),
+            "view.resetLayout" => self.with_doc(cx, |d| {
+                let view = d.view.clone();
+                d.edit(
+                    Grid {
+                        snap: false,
+                        size: 1.,
+                    },
+                    |p| {
+                        if let Some(v) = p.views.iter_mut().find(|v| v.id == view) {
+                            v.layouts = None;
+                            v.routes = None;
+                            v.port_labels = None;
+                            v.stand_ins = None;
+                        }
+                    },
+                );
+            }),
+            "arrange.auto" | "arrange.all" | "arrange.horizontal" | "arrange.vertical" => {
+                self.auto_arrange(id, cx);
+                self.with_canvas(cx, |c, cx| c.fit_items(None, cx));
+            }
+            "insert.dependency" => self.pick_dependency(window, cx),
+            "insert.refreshDependencies" => self.refresh_dependencies(cx),
+            "file.saveWorkspace" => self.save_workspace(false, window, cx),
+            "file.saveWorkspaceAs" => self.save_workspace(true, window, cx),
             "file.saveAll" => {
                 self.save_all(window, cx);
             }
