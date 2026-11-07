@@ -5633,6 +5633,7 @@ dependencies = [
  "gpui-kit",
  "indexmap",
  "lsp-types",
+ "resvg 0.45.1",
  "scaffold-layout",
  "scaffold-model",
  "serde",

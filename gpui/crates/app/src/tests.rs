@@ -600,3 +600,62 @@ fn renames_reach_the_documents_depending_on_a_project(cx: &mut TestAppContext) {
     assert!(p.interfaces.iter().any(|i| i.name == "Status"));
     assert!(!p.interfaces.iter().any(|i| i.name == "Telemetry"));
 }
+
+#[gpui_kit::test]
+fn imports_projects_and_idl_files(cx: &mut TestAppContext) {
+    let o = open(cx, "robot.scaffold.yaml");
+    o.press(cx, "alt-n");
+    let doc = o.doc(cx);
+    let idl = std::fs::read_dir(example("idl"))
+        .unwrap()
+        .filter_map(|e| e.ok().map(|e| e.path()))
+        .find(|p| p.extension().is_some_and(|x| x == "idl"))
+        .unwrap();
+    let ws = o.ws.clone();
+    cx.update(|cx| {
+        ws.update(cx, |w, cx| {
+            w.import_content(vec![idl, example("hello.scaffold.yaml")], cx)
+        })
+    });
+    let p = cx.read(|cx| doc.read(cx).project.clone());
+    assert!(!p.modules.is_empty());
+    assert!(!p.interfaces.is_empty() || !p.types.is_empty());
+}
+
+#[gpui_kit::test]
+fn the_tutorial_steps_through_and_closes(cx: &mut TestAppContext) {
+    let o = open(cx, "robot.scaffold.yaml");
+    o.run(cx, "help.tutorial");
+    let checked =
+        |cx: &mut TestAppContext| cx.read(|cx| o.ws.read(cx).command_state("help.tutorial", cx).checked);
+    assert!(checked(cx));
+    o.run(cx, "help.tutorial");
+    assert!(!checked(cx));
+}
+
+#[gpui_kit::test]
+fn idl_files_are_edited_as_text(cx: &mut TestAppContext) {
+    let o = open(cx, "robot.scaffold.yaml");
+    let dir = std::env::temp_dir().join(format!("scaffold-idl-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("a.idl");
+    std::fs::write(&path, "module M { struct S { long x; }; };\n").unwrap();
+    let ws = o.ws.clone();
+    cx.update_window(o.window, |_, w, cx| {
+        ws.update(cx, |ws, cx| ws.open_text(path.clone(), w, cx))
+    })
+    .unwrap();
+    cx.update_window(o.window, |_, w, cx| w.render_frame(cx)).unwrap();
+    let panel = cx.read(|cx| ws.read(cx).text_file.clone().unwrap());
+    let editor = cx.read(|cx| panel.read(cx).editor.clone());
+    cx.update_window(o.window, |_, w, cx| {
+        editor.update(cx, |e, cx| {
+            e.replace_all("module M { struct T { long y; }; };\n", w, cx)
+        })
+    })
+    .unwrap();
+    assert!(cx.read(|cx| panel.read(cx).dirty()));
+    cx.update(|cx| panel.update(cx, |p, cx| p.save(cx)));
+    assert!(std::fs::read_to_string(&path).unwrap().contains("struct T"));
+    std::fs::remove_dir_all(&dir).ok();
+}

@@ -14,6 +14,7 @@ pub mod emit;
 pub mod entities;
 pub mod fuzzy;
 pub mod grid;
+pub mod idl;
 pub mod locate;
 pub mod project;
 pub mod reuse;

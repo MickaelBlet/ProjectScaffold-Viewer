@@ -3,12 +3,14 @@
 mod canvas;
 mod commands;
 mod document;
+mod export;
 mod form;
 mod node;
 mod panels;
 mod prefs;
 mod settings;
 mod theme;
+mod tutorial;
 mod workspace;
 
 use std::path::PathBuf;

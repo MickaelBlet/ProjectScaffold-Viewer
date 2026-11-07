@@ -12,7 +12,9 @@ use gpui_kit::component::{TitleBar, WindowExt};
 use gpui_kit::prelude::FluentBuilder;
 use gpui_kit::*;
 use scaffold_model::align::{AlignMode, SizeDim, align, distribute, same_size};
-use scaffold_model::clipboard::{PasteOptions, PasteParent, copy_items, parse_clip, paste_clip, to_text};
+use scaffold_model::clipboard::{
+    PasteOptions, PasteParent, copy_items, copy_project, parse_clip, paste_clip, to_text,
+};
 use scaffold_model::edit::{
     add_module, add_note, add_port, add_submodule, apply_absolute, delete_items, group_modules, locked_of,
     nudge, selected_rects, set_locked,
@@ -70,6 +72,10 @@ pub struct Workspace {
     workspace_file: Option<(PathBuf, scaffold_model::workspace::Workspace)>,
     /// Project of each document as last pushed to the documents depending on it.
     synced: std::collections::HashMap<EntityId, Project>,
+    /// An IDL file edited as text beside the canvas.
+    pub text_file: Option<Entity<crate::panels::text_file::TextFilePanel>>,
+    /// Step of the tutorial shown, if any.
+    tutorial: Option<usize>,
 }
 
 /// Arrow keys move by a grid cell (five when far) on the grid, else by 2px (20px).
@@ -84,15 +90,7 @@ fn nudge_step(far: bool) -> f64 {
 }
 
 /// Commands of features not ported yet.
-const LATER: &[&str] = &[
-    "file.importSettings",
-    "file.exportSettings",
-    "file.exportPng",
-    "file.exportSvg",
-    "file.openIdlText",
-    "insert.projectContent",
-    "help.tutorial",
-];
+const LATER: &[&str] = &["file.importSettings", "file.exportSettings"];
 
 /// State of a command that only depends on the active document.
 pub fn doc_command_state(id: &str, doc: Option<&Document>) -> CmdState {
@@ -179,6 +177,24 @@ pub fn doc_command_state(id: &str, doc: Option<&Document>) -> CmdState {
     }
 }
 
+fn is_idl(path: &Path) -> bool {
+    path.extension().is_some_and(|e| e.eq_ignore_ascii_case("idl"))
+}
+
+/// IDL files by path, with the files they include read from disk.
+fn idl_files(paths: &[PathBuf]) -> indexmap::IndexMap<String, String> {
+    let files: indexmap::IndexMap<String, String> = paths
+        .iter()
+        .filter_map(|p| {
+            Some((
+                p.to_string_lossy().replace('\\', "/"),
+                std::fs::read_to_string(p).ok()?,
+            ))
+        })
+        .collect();
+    scaffold_model::idl::read_idl_includes(&files, |p| std::fs::read_to_string(p).ok())
+}
+
 /// Add a view to the project; gives its id.
 fn add_view(d: &mut Document, name: &str, root: Option<Id>) -> Id {
     let id = scaffold_model::project::new_id();
@@ -239,6 +255,8 @@ impl Workspace {
             source: cx.new(|cx| SourcePanel::new(ws.clone(), window, cx)),
             workspace_file: None,
             synced: Default::default(),
+            tutorial: None,
+            text_file: None,
             tabs: Vec::new(),
             active: 0,
             error: None,
@@ -521,6 +539,160 @@ impl Workspace {
         });
     }
 
+    /// Export the view drawn as an SVG or PNG image next to the project file.
+    fn export_image(&mut self, png: bool, window: &mut Window, cx: &mut Context<Self>) {
+        let (Some(canvas), Some(doc)) = (self.canvas(), self.doc()) else {
+            return;
+        };
+        let svg = {
+            let c = canvas.read(cx);
+            let (p, scene) = c.drawn();
+            crate::export::scene_svg(p, scene)
+        };
+        let d = doc.read(cx);
+        let dir = d
+            .path
+            .as_deref()
+            .and_then(|p| p.parent())
+            .map(PathBuf::from)
+            .or_else(|| std::env::current_dir().ok())
+            .unwrap_or_default();
+        let stem = d
+            .path
+            .as_deref()
+            .and_then(|p| p.file_name())
+            .map_or("project".to_string(), |n| {
+                let n = n.to_string_lossy();
+                n.split('.').next().unwrap_or("project").to_string()
+            });
+        let view = d
+            .active_view()
+            .map(|v| format!("-{}", v.name))
+            .unwrap_or_default();
+        let name = format!("{stem}{view}.{}", if png { "png" } else { "svg" });
+        let rx = cx.prompt_for_new_path(&dir, Some(&name));
+        cx.spawn_in(window, async move |this, cx| {
+            if let Ok(Ok(Some(path))) = rx.await {
+                let bytes = if png {
+                    crate::export::svg_png(&svg, 2.)
+                } else {
+                    Ok(svg.into_bytes())
+                };
+                let result = bytes.and_then(|b| std::fs::write(&path, b).map_err(|e| e.to_string()));
+                this.update(cx, |w, cx| {
+                    match result {
+                        Ok(()) => w.log(format!("Exported {}", path.display())),
+                        Err(e) => w.error = Some(format!("{}: {e}", path.display())),
+                    }
+                    cx.notify();
+                })
+                .ok();
+            }
+        })
+        .detach();
+    }
+
+    /// The tutorial card, over the bottom right corner of the work.
+    fn tutorial_card(&self, cx: &mut Context<Self>) -> Option<Stateful<Div>> {
+        use crate::tutorial::STEPS;
+        let i = self.tutorial?.min(STEPS.len() - 1);
+        let step = &STEPS[i];
+        let t = theme::light();
+        let button = |id: SharedString, label: String, enabled: bool| {
+            div()
+                .id(id)
+                .px_2()
+                .py(px(2.))
+                .rounded_md()
+                .border_1()
+                .border_color(t.border)
+                .text_sm()
+                .when(enabled, |d| {
+                    d.cursor_pointer().hover(|d| d.bg(theme::alpha(t.accent, 0.08)))
+                })
+                .when(!enabled, |d| d.opacity(0.5))
+                .child(label)
+        };
+        let tries = step.commands.iter().filter_map(|id| {
+            let c = commands::command(id)?;
+            let enabled = self.command_state(id, cx).enabled;
+            let key = c.keys.first().map(|k| format!(" ({k})")).unwrap_or_default();
+            let id = *id;
+            Some(
+                button(
+                    SharedString::from(format!("tut-{id}")),
+                    format!("{}{key}", c.title),
+                    enabled,
+                )
+                .when(enabled, |b| {
+                    b.on_click(cx.listener(move |w, _, window, cx| w.run(id, window, cx)))
+                }),
+            )
+        });
+        let last = i + 1 >= STEPS.len();
+        Some(
+            div()
+                .id("tutorial")
+                .absolute()
+                .right(px(16.))
+                .bottom(px(16.))
+                .w(px(380.))
+                .p_3()
+                .rounded_lg()
+                .border_1()
+                .border_color(t.border)
+                .bg(theme::hex("#ffffff"))
+                .shadow_lg()
+                .flex()
+                .flex_col()
+                .gap_2()
+                .child(
+                    div()
+                        .flex()
+                        .justify_between()
+                        .child(div().font_weight(FontWeight::SEMIBOLD).child(step.title))
+                        .child(div().text_xs().text_color(t.muted).child(format!(
+                            "{} / {}",
+                            i + 1,
+                            STEPS.len()
+                        ))),
+                )
+                .children(step.text.iter().map(|x| div().text_sm().child(*x)))
+                .child(div().flex().flex_wrap().gap_1().children(tries))
+                .child(
+                    div()
+                        .flex()
+                        .gap_2()
+                        .justify_end()
+                        .child(
+                            button("tut-close".into(), "Close".into(), true).on_click(cx.listener(
+                                |w, _, _, cx| {
+                                    w.tutorial = None;
+                                    cx.notify();
+                                },
+                            )),
+                        )
+                        .child(button("tut-back".into(), "Back".into(), i > 0).when(i > 0, |b| {
+                            b.on_click(cx.listener(move |w, _, _, cx| {
+                                w.tutorial = Some(i - 1);
+                                cx.notify();
+                            }))
+                        }))
+                        .child(
+                            button(
+                                "tut-next".into(),
+                                if last { "Done".into() } else { "Next".into() },
+                                true,
+                            )
+                            .on_click(cx.listener(move |w, _, _, cx| {
+                                w.tutorial = if last { None } else { Some(i + 1) };
+                                cx.notify();
+                            })),
+                        ),
+                ),
+        )
+    }
+
     /// The project saved at `path`: an open document's, else read from the file.
     fn project_at(&self, path: &std::path::Path, cx: &App) -> Option<Project> {
         let canon = std::fs::canonicalize(path).ok()?;
@@ -534,12 +706,177 @@ impl Workspace {
         }) {
             return Some(t.doc.read(cx).project.clone());
         }
+        if is_idl(path) {
+            let files = idl_files(&[path.to_path_buf()]);
+            return scaffold_model::idl::idl_project(&path.to_string_lossy(), &files)
+                .ok()
+                .map(|r| r.project);
+        }
         let text = std::fs::read_to_string(path).ok()?;
         scaffold_model::serialize::load_text(
             &text,
             scaffold_model::serialize::format_from_path(&path.to_string_lossy()),
         )
         .ok()
+    }
+
+    /// Edit a text (IDL) file beside the canvas.
+    pub fn open_text(&mut self, path: PathBuf, window: &mut Window, cx: &mut Context<Self>) {
+        use crate::panels::text_file::{CloseText, TextFilePanel};
+        if let Some(t) = &self.text_file
+            && t.read(cx).dirty()
+        {
+            self.error = Some("Save or close the IDL file being edited first.".into());
+            cx.notify();
+            return;
+        }
+        let text = match std::fs::read_to_string(&path) {
+            Ok(t) => t,
+            Err(e) => {
+                self.error = Some(format!("{}: {e}", path.display()));
+                cx.notify();
+                return;
+            }
+        };
+        let panel = cx.new(|cx| TextFilePanel::new(path, text, window, cx));
+        cx.subscribe(&panel, |w, _, _: &CloseText, cx| {
+            w.text_file = None;
+            cx.notify();
+        })
+        .detach();
+        self.text_file = Some(panel);
+        cx.notify();
+    }
+
+    /// Copy the content of picked project and IDL files into the project. Port of
+    /// `importProjectContent`.
+    fn pick_import(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let rx = cx.prompt_for_paths(PathPromptOptions {
+            files: true,
+            directories: false,
+            multiple: true,
+            prompt: Some("Import".into()),
+        });
+        cx.spawn_in(window, async move |this, cx| {
+            if let Ok(Ok(Some(paths))) = rx.await {
+                this.update(cx, |w, cx| w.import_content(paths, cx)).ok();
+            }
+        })
+        .detach();
+    }
+
+    pub fn import_content(&mut self, paths: Vec<PathBuf>, cx: &mut Context<Self>) {
+        use scaffold_model::dependencies::add_dependency_of;
+        use scaffold_model::sync::relative_file;
+        let Some(doc) = self.doc() else { return };
+        let (idl, projects): (Vec<PathBuf>, Vec<PathBuf>) = paths.into_iter().partition(|p| is_idl(p));
+        let mut lines = Vec::new();
+        let mut at = self.view_center(cx);
+        let parent = doc.read(cx).selection.as_ref().and_then(|s| match s {
+            Selection::Module { id, .. } => Some(id.clone()),
+            _ => None,
+        });
+        let mut pasted: Vec<Id> = Vec::new();
+        let (mut modules, mut defs) = (0, 0);
+        // IDL files first, whole.
+        if !idl.is_empty() {
+            let files = idl_files(&idl);
+            match scaffold_model::idl::parse_idl_files(&files) {
+                Err(e) => lines.push(format!("Cannot read the IDL files: {e}")),
+                Ok(file) => {
+                    lines.extend(file.warnings.iter().cloned());
+                    let target = doc.read(cx).project.clone();
+                    let r = scaffold_model::idl::idl_import(&file, &target, None, true);
+                    lines.extend(
+                        r.unresolved
+                            .iter()
+                            .map(|n| format!("{n} is defined in none of the files: added empty")),
+                    );
+                    if let Some(clip) = r.clip {
+                        modules += clip.modules.len();
+                        defs += clip.types.len() + clip.interfaces.len();
+                        let opts = PasteOptions {
+                            parent: PasteParent::Module(None),
+                            at: Some(scaffold_model::types::Point { x: at.x, y: at.y }),
+                            ..Default::default()
+                        };
+                        doc.update(cx, |d, _| {
+                            d.edit(
+                                Grid {
+                                    snap: false,
+                                    size: 1.,
+                                },
+                                |p| pasted.extend(paste_clip(p, &clip, &opts)),
+                            )
+                        });
+                    }
+                }
+            }
+        }
+        let own = doc
+            .read(cx)
+            .path
+            .as_ref()
+            .map(|p| p.to_string_lossy().into_owned());
+        for path in projects {
+            let Some(other) = self.project_at(&path, cx) else {
+                lines.push(format!("Cannot read {}", path.display()));
+                continue;
+            };
+            let file = relative_file(own.as_deref(), &path.to_string_lossy());
+            doc.update(cx, |d, _| {
+                d.edit(
+                    Grid {
+                        snap: false,
+                        size: 1.,
+                    },
+                    |p| {
+                        // Its dependencies are used here too, not copied.
+                        for n in other.dependencies.iter().filter(|n| !n.indirect) {
+                            let r = add_dependency_of(p, &other, &file, &n.id);
+                            lines.extend(Self::dependency_lines(&r));
+                        }
+                        // Below what was pasted before.
+                        let below: Vec<_> = pasted
+                            .iter()
+                            .filter(|id| p.modules.iter().any(|m| &m.id == *id))
+                            .map(|id| scaffold_model::project::absolute_rect(p, id))
+                            .collect();
+                        if !below.is_empty() {
+                            let b = scaffold_model::project::bounds_of(&below);
+                            at.y = b.y + b.height + 60.;
+                        }
+                        let Some(content) = copy_project(&other, p, parent.is_none()) else {
+                            lines.push(format!("{} is empty", path.display()));
+                            return;
+                        };
+                        modules += content.modules.len();
+                        defs += content.types.len() + content.interfaces.len();
+                        let opts = PasteOptions {
+                            parent: PasteParent::Module(parent.clone()),
+                            at: Some(scaffold_model::types::Point { x: at.x, y: at.y }),
+                            ..Default::default()
+                        };
+                        pasted.extend(paste_clip(p, &content, &opts));
+                    },
+                );
+            });
+        }
+        doc.update(cx, |d, cx| {
+            d.seal();
+            let ids: Vec<Id> = pasted
+                .iter()
+                .filter(|id| d.project.modules.iter().any(|m| &m.id == *id))
+                .cloned()
+                .collect();
+            d.select(ids);
+            cx.notify();
+        });
+        self.report(
+            format!("Imported {modules} modules, {defs} types and interfaces"),
+            lines,
+            cx,
+        );
     }
 
     /// Lines telling what a dependency change did.
@@ -934,9 +1271,14 @@ impl Workspace {
         });
         cx.spawn_in(window, async move |this, cx| {
             if let Ok(Ok(Some(paths))) = rx.await {
-                this.update(cx, |w, cx| {
+                this.update_in(cx, |w, window, cx| {
                     for path in paths {
-                        w.open_path(path, cx);
+                        // IDL files open as text.
+                        if is_idl(&path) {
+                            w.open_text(path, window, cx);
+                        } else {
+                            w.open_path(path, cx);
+                        }
                     }
                 })
                 .ok();
@@ -996,6 +1338,10 @@ impl Workspace {
             };
         }
         match id {
+            "help.tutorial" => CmdState {
+                enabled: true,
+                checked: self.tutorial.is_some(),
+            },
             "view.source" => CmdState {
                 enabled: doc.is_some(),
                 checked: self.dock.source,
@@ -1128,6 +1474,25 @@ impl Workspace {
             "arrange.auto" | "arrange.all" | "arrange.horizontal" | "arrange.vertical" => {
                 self.auto_arrange(id, cx);
                 self.with_canvas(cx, |c, cx| c.fit_items(None, cx));
+            }
+            "file.exportSvg" | "file.exportPng" => self.export_image(id == "file.exportPng", window, cx),
+            "insert.projectContent" => self.pick_import(window, cx),
+            "file.openIdlText" => {
+                let rx = cx.prompt_for_paths(PathPromptOptions {
+                    files: true,
+                    directories: false,
+                    multiple: false,
+                    prompt: Some("Open IDL file".into()),
+                });
+                cx.spawn_in(window, async move |this, cx| {
+                    if let Ok(Ok(Some(paths))) = rx.await
+                        && let Some(path) = paths.into_iter().next()
+                    {
+                        this.update_in(cx, |w, window, cx| w.open_text(path, window, cx))
+                            .ok();
+                    }
+                })
+                .detach();
             }
             "insert.dependency" => self.pick_dependency(window, cx),
             "insert.refreshDependencies" => self.refresh_dependencies(cx),
@@ -1305,6 +1670,7 @@ impl Workspace {
             "window.nextDoc" => self.cycle(1),
             "window.prevDoc" => self.cycle(-1),
             "help.shortcuts" => self.open_shortcuts(window, cx),
+            "help.tutorial" => self.tutorial = if self.tutorial.is_some() { None } else { Some(0) },
             "help.about" => self.open_about(window, cx),
             "help.resetData" => {
                 prefs::clear();
@@ -2012,6 +2378,24 @@ impl Render for Workspace {
         self.refresh_menus(cx);
         let t = theme::light();
         let center = match self.canvas() {
+            Some(c) if self.text_file.is_some() => {
+                let mut split = gpui_kit::component::resizable::h_resizable("center-text")
+                    .child(gpui_kit::component::resizable::resizable_panel().child(c));
+                if self.dock.source {
+                    split = split.child(
+                        gpui_kit::component::resizable::resizable_panel()
+                            .size(px(480.))
+                            .child(self.source.clone()),
+                    );
+                }
+                div().size_full().child(
+                    split.child(
+                        gpui_kit::component::resizable::resizable_panel()
+                            .size(px(480.))
+                            .child(self.text_file.clone().unwrap()),
+                    ),
+                )
+            }
             Some(c) if self.dock.source => div().size_full().child(
                 gpui_kit::component::resizable::h_resizable("center")
                     .child(gpui_kit::component::resizable::resizable_panel().child(c))
@@ -2024,7 +2408,12 @@ impl Render for Workspace {
             Some(c) => div().size_full().child(c),
             None => div().size_full().child(self.start_screen(cx)),
         };
-        let body = div().flex_1().min_h_0().child(self.docked(center, cx));
+        let body = div()
+            .flex_1()
+            .min_h_0()
+            .relative()
+            .child(self.docked(center, cx))
+            .children(self.tutorial_card(cx));
         // The file changed on disk while there are unsaved changes.
         let conflict = self.doc().filter(|d| d.read(cx).conflict.is_some()).map(|_| {
             let button = |id: &'static str, label: &'static str| {

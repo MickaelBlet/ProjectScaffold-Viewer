@@ -7,6 +7,7 @@ pub mod lists;
 pub mod settings_panel;
 pub mod source;
 pub mod state_machine;
+pub mod text_file;
 
 use gpui_kit::prelude::FluentBuilder;
 use gpui_kit::*;

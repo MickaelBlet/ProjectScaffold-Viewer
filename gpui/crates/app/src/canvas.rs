@@ -171,6 +171,11 @@ impl Canvas {
         }
     }
 
+    /// The project as drawn and its scene, for exports.
+    pub fn drawn(&self) -> (&Project, &Scene) {
+        (&self.project, &self.scene)
+    }
+
     pub fn focus_handle(&self) -> FocusHandle {
         self.focus.clone()
     }
