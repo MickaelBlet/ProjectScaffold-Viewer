@@ -506,3 +506,97 @@ fn the_source_panel_edits_the_project_as_text(cx: &mut TestAppContext) {
         .unwrap();
     assert_eq!(cx.read(|cx| doc.read(cx).project.name.clone()), "Robot");
 }
+
+impl Open {
+    fn run(&self, cx: &mut TestAppContext, id: &str) {
+        let ws = self.ws.clone();
+        cx.update_window(self.window, |_, w, cx| ws.update(cx, |ws, cx| ws.run(id, w, cx)))
+            .unwrap();
+        cx.update_window(self.window, |_, w, cx| w.render_frame(cx))
+            .unwrap();
+    }
+}
+
+#[gpui_kit::test]
+fn views_hide_modules_and_open_a_module_on_its_own(cx: &mut TestAppContext) {
+    let o = open(cx, "robot.scaffold.yaml");
+    let doc = o.doc(cx);
+    let id = o.id(cx, "Logger");
+    let before = cx.read(|cx| doc.read(cx).project.views.len());
+    cx.update(|cx| doc.update(cx, |d, _| d.select(vec![id.clone()])));
+    // Hiding in the project view stores a view of its own.
+    o.run(cx, "view.hide");
+    let (views, view) = cx.read(|cx| {
+        let d = doc.read(cx);
+        (d.project.views.len(), d.view.clone())
+    });
+    assert_eq!(views, before + 1);
+    assert_ne!(view, scaffold_model::types::GLOBAL_VIEW);
+    let c = o.canvas(cx);
+    assert!(cx.read(|cx| c.read(cx).rect_of(&id)).is_none());
+    o.run(cx, "view.showAll");
+    assert!(cx.read(|cx| c.read(cx).rect_of(&id)).is_some());
+    // A module opens in a temporary view, kept on request.
+    let parent = cx.read(|cx| {
+        let p = &doc.read(cx).project;
+        p.modules.iter().find(|m| m.id == id).unwrap().parent_id.clone()
+    });
+    if let Some(parent) = parent {
+        cx.update(|cx| doc.update(cx, |d, _| d.select(vec![parent.clone()])));
+        o.run(cx, "view.openModule");
+        assert!(cx.read(|cx| doc.read(cx).active_view().unwrap().temporary));
+        o.run(cx, "view.keep");
+        assert!(cx.read(|cx| !doc.read(cx).active_view().unwrap().temporary));
+    }
+}
+
+#[gpui_kit::test]
+fn auto_arrange_leaves_no_overlap(cx: &mut TestAppContext) {
+    let o = open(cx, "robot.scaffold.yaml");
+    o.run(cx, "arrange.all");
+    let doc = o.doc(cx);
+    let p = cx.read(|cx| doc.read(cx).project.clone());
+    let tops: Vec<_> = p.modules.iter().filter(|m| m.parent_id.is_none()).collect();
+    for (i, a) in tops.iter().enumerate() {
+        for b in &tops[i + 1..] {
+            let (r, s) = (a.layout, b.layout);
+            let apart = r.x + r.width <= s.x
+                || s.x + s.width <= r.x
+                || r.y + r.height <= s.y
+                || s.y + s.height <= r.y;
+            assert!(apart, "{} overlaps {}", a.name, b.name);
+        }
+    }
+}
+
+#[gpui_kit::test]
+fn renames_reach_the_documents_depending_on_a_project(cx: &mut TestAppContext) {
+    let o = open(cx, "robot.scaffold.yaml");
+    let robot = o.doc(cx);
+    let ws = o.ws.clone();
+    cx.update(|cx| ws.update(cx, |w, cx| w.open_path(example("common.scaffold.yaml"), cx)));
+    let common = o.doc(cx);
+    assert_ne!(robot, common);
+    cx.update(|cx| {
+        common.update(cx, |d, cx| {
+            d.edit(
+                crate::document::Grid {
+                    snap: false,
+                    size: 1.,
+                },
+                |p| {
+                    p.interfaces
+                        .iter_mut()
+                        .find(|i| i.name == "Telemetry")
+                        .unwrap()
+                        .name = "Status".into();
+                },
+            );
+            cx.notify();
+        })
+    });
+    cx.run_until_parked();
+    let p = cx.read(|cx| robot.read(cx).project.clone());
+    assert!(p.interfaces.iter().any(|i| i.name == "Status"));
+    assert!(!p.interfaces.iter().any(|i| i.name == "Telemetry"));
+}
