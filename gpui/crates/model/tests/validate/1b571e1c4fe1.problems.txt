@@ -1,1 +1,0 @@
-error type: Pose.position: references unknown type 'Vec3'

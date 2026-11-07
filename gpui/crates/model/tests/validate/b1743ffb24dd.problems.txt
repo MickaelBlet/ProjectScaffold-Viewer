@@ -1,1 +1,0 @@
-error type: Pose.orientation: int32 cannot be bounded

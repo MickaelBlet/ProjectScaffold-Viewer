@@ -1,1 +1,0 @@
-error type: Vec3.field: 'Core.Sensor.Sample' is a protected type of module Core.Sensor, used by modules only

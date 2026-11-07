@@ -1,1 +1,0 @@
-error link: Link 'operator_to_core' is unidirectional but Control.raw has out parameters

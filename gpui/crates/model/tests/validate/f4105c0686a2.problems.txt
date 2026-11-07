@@ -1,2 +1,0 @@
-error module: Base.name: a override method must be virtual
-error module: Base.name: overrides no virtual method of a base

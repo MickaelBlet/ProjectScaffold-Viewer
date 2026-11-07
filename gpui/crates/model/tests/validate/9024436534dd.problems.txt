@@ -1,1 +1,0 @@
-error module: Monitor:telemetry references unknown interface 'Telemetry'

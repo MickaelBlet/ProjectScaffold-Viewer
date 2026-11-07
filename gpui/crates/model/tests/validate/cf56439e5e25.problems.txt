@@ -1,1 +1,0 @@
-warning module: Operator:spare has no interface

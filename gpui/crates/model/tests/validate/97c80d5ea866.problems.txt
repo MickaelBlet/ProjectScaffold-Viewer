@@ -1,1 +1,0 @@
-warning link: Link 'operator_to_core' listens on tcp 127.0.0.1:5000, as link 'sensor_to_controller'

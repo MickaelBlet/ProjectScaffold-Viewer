@@ -1,3 +1,0 @@
-error link: Link 'operator_to_core' is unidirectional but Control.setMode returns a value
-error link: Link 'operator_to_core' is unidirectional but Control.raw has out parameters
-error link: Link 'operator_to_core' is unidirectional but requires an ack

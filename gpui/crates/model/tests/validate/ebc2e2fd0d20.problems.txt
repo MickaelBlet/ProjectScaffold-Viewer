@@ -1,1 +1,0 @@
-error module: Core.Controller.setMode(mode): an inout parameter cannot be const

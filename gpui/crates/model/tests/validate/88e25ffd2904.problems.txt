@@ -1,2 +1,0 @@
-error module: Sensor(id, rate): a defaulted constructor has no parameters
-error module: Sensor(id, rate): same parameters as another constructor

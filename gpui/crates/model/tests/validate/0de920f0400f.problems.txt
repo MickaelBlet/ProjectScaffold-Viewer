@@ -1,4 +1,0 @@
-warning module: IShape.area: hides virtual Base.Circle.area (mark it override)
-error module: IShape derives from itself through its bases
-error module: Base derives from itself through its bases
-error module: Base.Circle derives from itself through its bases

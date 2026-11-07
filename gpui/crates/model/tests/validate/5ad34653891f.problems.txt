@@ -1,3 +1,0 @@
-warning module: Stack invariant: 'value' names nothing here
-warning module: Stack.push postcondition: 'result' names nothing here
-warning module: Stack.top postcondition: 'items' names nothing here

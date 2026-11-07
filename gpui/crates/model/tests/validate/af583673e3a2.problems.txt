@@ -1,2 +1,0 @@
-error module: Console: duplicate method 'write'
-error module: Console does not implement pure method Writer.write (implement it or make the module abstract)

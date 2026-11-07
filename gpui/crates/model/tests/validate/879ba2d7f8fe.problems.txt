@@ -1,1 +1,0 @@
-error module: Base.Circle.area: pure method in a concrete module (make it abstract or an interface)

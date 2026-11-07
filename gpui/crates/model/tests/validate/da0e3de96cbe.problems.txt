@@ -1,1 +1,0 @@
-error type: Pose.orientation: map key must be a primitive, an enum, a bitmask or a module

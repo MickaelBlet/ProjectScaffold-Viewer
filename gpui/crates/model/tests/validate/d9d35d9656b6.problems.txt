@@ -1,2 +1,0 @@
-error type: Bitmask 'Bits': bit 0 used more than once
-error type: Bitmask 'Bits': C (bit 8) does not fit in uint8

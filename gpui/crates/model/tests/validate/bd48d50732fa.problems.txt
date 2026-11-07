@@ -1,1 +1,0 @@
-error module: Base.name: a static method cannot be virtual

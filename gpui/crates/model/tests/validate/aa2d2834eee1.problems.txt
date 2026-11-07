@@ -1,1 +1,0 @@
-error module: Core.Logger.sample: 'Core.Sensor.Sample' is protected in Core.Sensor

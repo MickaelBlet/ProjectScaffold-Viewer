@@ -1,1 +1,0 @@
-warning module: Stack.top postcondition: 'items' names nothing here

@@ -1,2 +1,0 @@
-error module: Player state machine: duplicate state 'Idle'
-error module: Player state machine: no initial state

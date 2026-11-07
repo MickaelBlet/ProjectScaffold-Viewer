@@ -1,1 +1,0 @@
-error link: Link 'operator_to_core': message queue name 'a/b' is not valid

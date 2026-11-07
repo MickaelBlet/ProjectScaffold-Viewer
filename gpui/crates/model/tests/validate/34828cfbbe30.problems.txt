@@ -1,1 +1,0 @@
-warning module: Sensor: virtual methods, but a public destructor that is not virtual

@@ -1,2 +1,0 @@
-error link: Link 'sensor_to_logger': source port 'in' must be an 'out' port
-error link: Link 'sensor_to_logger': target port 'out' must be an 'in' port

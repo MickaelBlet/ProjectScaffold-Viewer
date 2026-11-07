@@ -1,1 +1,0 @@
-warning type: Pose.orientation: floating-point set key

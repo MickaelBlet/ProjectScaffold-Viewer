@@ -1,1 +1,0 @@
-error module: Station: runs in no binary (the project has binaries)

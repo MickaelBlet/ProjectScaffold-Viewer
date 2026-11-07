@@ -1,1 +1,0 @@
-error link: Link 'sensor_to_monitor': Robot/Core.Sensor:out uses interface 'Stream', not defined in this project

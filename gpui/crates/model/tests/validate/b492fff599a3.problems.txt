@@ -1,1 +1,0 @@
-error interface: Telemetry.publish raises unknown exception 'Nope'

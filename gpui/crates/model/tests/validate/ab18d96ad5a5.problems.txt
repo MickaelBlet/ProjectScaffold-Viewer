@@ -1,3 +1,0 @@
-error module: Sensor.rate: ownership applies to types referencing modules
-error module: Sensor.cache: a mutable attribute is not static
-error module: Sensor: lock 'read' has the name of a member

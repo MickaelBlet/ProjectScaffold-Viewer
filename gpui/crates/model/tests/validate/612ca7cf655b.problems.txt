@@ -1,3 +1,0 @@
-error module: Base: an abstract module cannot be final
-error module: Leaf derives from final module Base
-error module: More derives from final module Leaf

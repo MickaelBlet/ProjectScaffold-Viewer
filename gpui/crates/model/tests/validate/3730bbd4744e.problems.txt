@@ -1,1 +1,0 @@
-error module: Sensor(rate): leaves const attribute id unset

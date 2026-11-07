@@ -1,1 +1,0 @@
-warning module: Base.Circle.area: hides virtual IShape.area (mark it override)

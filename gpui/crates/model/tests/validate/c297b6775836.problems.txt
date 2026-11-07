@@ -1,1 +1,0 @@
-error type: Union 'U': discriminator must be an integer, bool, char or enum

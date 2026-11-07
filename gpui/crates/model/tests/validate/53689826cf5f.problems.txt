@@ -1,2 +1,0 @@
-error module: Sensor.rate: atomic, it needs no lock
-error module: Sensor.cache: atomic applies to booleans, characters, numbers, enums and bitmasks

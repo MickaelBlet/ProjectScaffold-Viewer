@@ -1,2 +1,0 @@
-warning interface: Interface 'Missing' has no messages
-warning interface: Interface 'Object' has no messages

@@ -1,1 +1,0 @@
-warning link: Link 'operator_to_core' uses the shared memory 'seg' of link 'sensor_to_controller'
