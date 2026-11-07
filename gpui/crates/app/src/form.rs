@@ -238,7 +238,7 @@ pub fn apply(doc: &Entity<Document>, cx: &mut App, f: impl FnOnce(&mut Project))
 
 /// Panel heading.
 pub fn heading(title: impl Into<SharedString>, sub: Option<String>) -> Div {
-    let t = theme::light();
+    let t = theme::current();
     div()
         .flex()
         .items_baseline()
@@ -255,7 +255,7 @@ pub fn heading(title: impl Into<SharedString>, sub: Option<String>) -> Div {
 
 /// A titled group of fields, with optional actions at the right of its title.
 pub fn section(title: impl Into<SharedString>, actions: Option<AnyElement>) -> Div {
-    let t = theme::light();
+    let t = theme::current();
     div().flex().flex_col().gap_1().pt_2().child(
         div()
             .flex()
@@ -277,7 +277,7 @@ pub fn section(title: impl Into<SharedString>, actions: Option<AnyElement>) -> D
 
 /// A labelled field.
 pub fn row(label: impl Into<SharedString>, field: impl IntoElement) -> Div {
-    let t = theme::light();
+    let t = theme::current();
     div()
         .flex()
         .items_center()
@@ -297,7 +297,7 @@ pub fn row(label: impl Into<SharedString>, field: impl IntoElement) -> Div {
 pub fn muted(text: impl Into<SharedString>) -> Div {
     div()
         .text_xs()
-        .text_color(theme::light().muted)
+        .text_color(theme::current().muted)
         .child(text.into())
 }
 
@@ -377,7 +377,7 @@ pub fn colors(
     on_change: impl Fn(Option<String>, &mut Window, &mut App) + 'static,
 ) -> Div {
     let on_change = Rc::new(on_change);
-    let t = theme::light();
+    let t = theme::current();
     let mut row = div().flex().flex_wrap().gap_1();
     let none = on_change.clone();
     row = row.child(
@@ -423,7 +423,7 @@ pub fn link(
     label: impl Into<SharedString>,
     on_click: impl Fn(&mut Window, &mut App) + 'static,
 ) -> Stateful<Div> {
-    let t = theme::light();
+    let t = theme::current();
     div()
         .id(id)
         .text_sm()

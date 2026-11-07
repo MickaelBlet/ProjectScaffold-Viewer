@@ -81,7 +81,7 @@ impl ExplorerPanel {
         rows: Vec<AnyElement>,
         cx: &mut Context<Self>,
     ) -> Div {
-        let t = theme::light();
+        let t = theme::current();
         let open = !self.collapsed.contains(title);
         div()
             .flex()
@@ -130,7 +130,7 @@ impl ExplorerPanel {
         dim: bool,
         on_click: impl Fn(&mut Window, &mut App) + 'static,
     ) -> Stateful<Div> {
-        let t = theme::light();
+        let t = theme::current();
         div()
             .id(SharedString::from(key))
             .flex()
@@ -176,7 +176,7 @@ fn pick(doc: &Entity<Document>, sel: Selection) -> impl Fn(&mut Window, &mut App
 
 /// An "add" glyph at the right of a section title.
 fn add_button(id: &'static str, on_click: impl Fn(&mut Window, &mut App) + 'static) -> AnyElement {
-    let t = theme::light();
+    let t = theme::current();
     div()
         .id(id)
         .px_1()
@@ -194,7 +194,7 @@ fn add_button(id: &'static str, on_click: impl Fn(&mut Window, &mut App) + 'stat
 
 impl Render for ExplorerPanel {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let t = theme::light();
+        let t = theme::current();
         let Some(doc) = self.ws.upgrade().and_then(|w| w.read(cx).doc()) else {
             return div()
                 .p_2()

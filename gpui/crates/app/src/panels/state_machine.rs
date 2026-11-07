@@ -41,7 +41,7 @@ fn on_machine(id: Id, f: impl Fn(&mut StateMachine) + 'static) -> impl Fn(&mut P
 
 impl Render for StateMachinePanel {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let t = theme::light();
+        let t = theme::current();
         let doc = self.ws.upgrade().and_then(|w| w.read(cx).doc());
         let Some(doc) = doc else {
             return div()

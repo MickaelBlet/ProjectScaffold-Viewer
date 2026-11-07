@@ -980,7 +980,7 @@ impl InspectorPanel {
                     .gap_1()
                     .pb_1()
                     .border_b_1()
-                    .border_color(crate::theme::light().border)
+                    .border_color(crate::theme::current().border)
                     .child(
                         div()
                             .flex()

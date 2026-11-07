@@ -4,7 +4,7 @@ ProjectScaffold is one React web build that runs in the browser, in two desktop 
 
 - [Web app](#web-app)
 - [Desktop apps](#desktop-apps)
-- [Native app (GPUI, preview)](#native-app-gpui-preview)
+- [Native app (GPUI)](#native-app-gpui)
 - [Checks](#checks)
 
 ## Web app
@@ -42,13 +42,22 @@ npm run tauri dev           # needs Rust + webkit2gtk-4.1
 npm run electron            # from the web build
 ```
 
-## Native app (GPUI, preview)
+## Native app (GPUI)
 
-`gpui/` is a native Rust port of the editor built on [GPUI](https://www.gpui.rs/), in progress. It reads and writes the same project files (saved byte for byte as the web build saves them) and reports the same problems. So far it draws the project view and edits its layout: select (click, Shift/Ctrl+click, Shift+drag a box), move modules and notes with alignment guides (dropping a module into another makes it a submodule; a frame carries what lies inside it), resize them by their handles, draw links from a port (or the arrow handle of a selected module) to a port or a module, arrow keys, delete, undo/redo, open (with recent files) and save; a file changed by another program is reloaded. Docked panels follow the web build: Explorer, Search, Inspector (project, modules, links, types, interfaces, notes, dependencies), Settings, Problems, Output and a State machine panel (states and transitions as lists). The Source panel (Alt+U) edits the file text beside the canvas, with diagnostics, schema completion and selection sync. Views, auto-arrange (own layered layout in place of ELK), dependencies with sync between open documents, and workspace files work as in the web build. IDL files (dependencies, imports, text editing), SVG/PNG export and the tutorial are there too. Menus, toolbar, document tabs, status bar, command palette (Ctrl+Shift+P), Go to (Ctrl+P), the canvas context menu and the shortcuts follow the web build; commands of features not ported yet show disabled.
+`gpui/` is a native Rust port of the editor built on [GPUI](https://www.gpui.rs/). It reads and writes the same project files (saved byte for byte as the web build saves them) and reports the same problems, and follows the web build's features:
+
+- **Canvas:** the views of the project (drill-down views of a module, hidden modules), selecting, moving with alignment guides, resizing, linking ports, notes and frames, grouping, aligning and distributing, auto-arrange (its own layered layout in place of ELK), undo/redo.
+- **Panels:** Explorer, Search, Inspector (project, modules, links, types, interfaces, notes, dependencies), Settings, Problems, Output and State machine (states and transitions as lists), docked and remembered.
+- **Text:** the Source panel (Alt+U) edits the YAML or JSON beside the canvas, with diagnostics, schema completion, key descriptions and selection sync; IDL files are edited as text too.
+- **Files:** open, save, recent files, reload on outside changes, dependencies (project and IDL files) kept in sync between open documents, importing projects and IDL files, workspace files, SVG/PNG export.
+- **Shell:** menus, toolbar, document tabs, status bar, command palette (Ctrl+Shift+P), Go to (Ctrl+P), context menus, the web build's shortcuts, themes (system, light, dark, black and the color themes) and the tutorial.
+
+Not ported: the diff of the Source panel against the saved file, the text minimap, and the compact drawing of modules outside a drill-down view. Settings, recent files and the panel layout are kept in `~/.config/project-scaffold/` (`%APPDATA%\project-scaffold\` on Windows).
 
 ```sh
 scripts/build_gpui.sh            # -> gpui/target/release/project-scaffold
 scripts/build_gpui.sh --check    # rustfmt, clippy and tests first
+scripts/build_gpui.sh --package  # also gpui/target/package/project-scaffold-<version>-<os>-<arch>.tar.gz
 gpui/target/release/project-scaffold examples/robot.scaffold.yaml
 ```
 

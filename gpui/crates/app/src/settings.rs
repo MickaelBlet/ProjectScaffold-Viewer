@@ -142,3 +142,56 @@ pub fn grid() -> Grid {
         size: s.grid_size,
     }
 }
+
+/// Take the valid settings of a settings file (known keys with values of the right type); the
+/// others keep their value. Gives how many were taken. Port of `parseSettings`.
+pub fn import(text: &str) -> Result<usize, String> {
+    let data: serde_json::Value = serde_json::from_str(text).map_err(|e| e.to_string())?;
+    let incoming = data.as_object().ok_or("Not a settings file")?.clone();
+    let same_type = |a: &serde_json::Value, b: &serde_json::Value| {
+        std::mem::discriminant(a) == std::mem::discriminant(b) || (a.is_number() && b.is_number())
+    };
+    let mut n = 0;
+    // Merged into the settings as they are when saved, not as read before.
+    update(|s| {
+        let Ok(mut current) = serde_json::to_value(&*s) else {
+            return;
+        };
+        let Some(obj) = current.as_object_mut() else {
+            return;
+        };
+        for (k, v) in &incoming {
+            if let Some(old) = obj.get_mut(k)
+                && same_type(old, v)
+            {
+                *old = v.clone();
+                n += 1;
+            }
+        }
+        if let Ok(next) = serde_json::from_value(current) {
+            *s = next;
+        }
+    });
+    if n == 0 {
+        return Err("No setting in this file: export settings to get a settings file.".into());
+    }
+    Ok(n)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[::core::prelude::v1::test]
+    fn imports_the_valid_settings_only() {
+        let before = get().theme;
+        assert_eq!(
+            import(r#"{"theme": "violet", "nope": 1, "gridSize": "big"}"#),
+            Ok(1)
+        );
+        assert_eq!(get().theme, "violet");
+        assert!(crate::theme::current().dark);
+        assert!(import(r#"{"nope": 1}"#).is_err());
+        update(|s| s.theme = before);
+    }
+}

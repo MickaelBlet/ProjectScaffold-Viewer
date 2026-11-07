@@ -191,7 +191,7 @@ pub fn region(
     on_tab: impl Fn(PanelId, &mut Window, &mut App) + Clone + 'static,
     on_close: impl Fn(PanelId, &mut Window, &mut App) + Clone + 'static,
 ) -> Div {
-    let t = theme::light();
+    let t = theme::current();
     let mut tabs = div()
         .flex()
         .items_center()

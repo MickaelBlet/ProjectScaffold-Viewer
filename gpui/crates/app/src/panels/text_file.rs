@@ -109,7 +109,7 @@ impl TextFilePanel {
 
 impl Render for TextFilePanel {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let t = theme::light();
+        let t = theme::current();
         let s = settings::get();
         let name = self
             .path

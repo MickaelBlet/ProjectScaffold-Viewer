@@ -493,7 +493,7 @@ fn validation_problems(text: &str, format: Format, project: &Project) -> Vec<Tex
 }
 
 fn pill(id: &'static str, label: String, on: bool) -> Stateful<Div> {
-    let t = theme::light();
+    let t = theme::current();
     div()
         .id(id)
         .px_2()
@@ -513,7 +513,7 @@ fn pill(id: &'static str, label: String, on: bool) -> Stateful<Div> {
 impl Render for SourcePanel {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         self.sync(window, cx);
-        let t = theme::light();
+        let t = theme::current();
         if self.doc.is_none() {
             return div()
                 .p_2()

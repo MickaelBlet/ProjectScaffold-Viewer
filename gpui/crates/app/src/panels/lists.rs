@@ -65,7 +65,7 @@ pub struct ProblemsPanel {
 
 impl Render for ProblemsPanel {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let t = theme::light();
+        let t = theme::current();
         let Some(doc) = self.ws.upgrade().and_then(|w| w.read(cx).doc()) else {
             return div()
                 .p_2()
@@ -133,7 +133,7 @@ pub struct OutputPanel {
 
 impl Render for OutputPanel {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let t = theme::light();
+        let t = theme::current();
         let lines = self
             .ws
             .upgrade()
@@ -178,7 +178,7 @@ impl SearchPanel {
 
 impl Render for SearchPanel {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let t = theme::light();
+        let t = theme::current();
         let q = self.query.read(cx).value().to_string();
         let doc = self.ws.upgrade().and_then(|w| w.read(cx).doc());
         let hits = match (&doc, q.trim().is_empty()) {

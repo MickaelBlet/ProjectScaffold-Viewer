@@ -416,7 +416,7 @@ impl InspectorPanel {
 
 impl Render for InspectorPanel {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let t = theme::light();
+        let t = theme::current();
         let Some(doc) = self.ws.upgrade().and_then(|w| w.read(cx).doc()) else {
             return div()
                 .p_2()

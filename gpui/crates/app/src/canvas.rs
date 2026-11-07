@@ -20,7 +20,7 @@ use scaffold_model::types::{Id, NoteKind, Orientation, PortRole, Project, Rect, 
 use crate::document::Document;
 use crate::node::{self, Run, RunStyle};
 use crate::settings::{self, grid};
-use crate::theme::{Theme, alpha, hex, light};
+use crate::theme::{Theme, alpha, current, hex};
 
 /// What a pointer drag does.
 enum Gesture {
@@ -1396,7 +1396,7 @@ impl Render for Canvas {
             self.fit(size);
             self.fitted = Some(Some(size));
         }
-        let t: Theme = light();
+        let t: Theme = current();
         let z = self.zoom as f32;
         // Stacking as the web build: containers, links, modules, then port handles and names.
         let mut containers = div().absolute().inset_0();
@@ -1642,7 +1642,7 @@ impl Render for Canvas {
             origin: self.origin,
             zoom: self.zoom,
             muted: t.muted,
-            node_bg: hex("#ffffff"),
+            node_bg: t.panel,
         };
         let size = self.bounds.clone();
         let entity = cx.entity();

@@ -90,7 +90,7 @@ fn nudge_step(far: bool) -> f64 {
 }
 
 /// Commands of features not ported yet.
-const LATER: &[&str] = &["file.importSettings", "file.exportSettings"];
+const LATER: &[&str] = &[];
 
 /// State of a command that only depends on the active document.
 pub fn doc_command_state(id: &str, doc: Option<&Document>) -> CmdState {
@@ -597,7 +597,7 @@ impl Workspace {
         use crate::tutorial::STEPS;
         let i = self.tutorial?.min(STEPS.len() - 1);
         let step = &STEPS[i];
-        let t = theme::light();
+        let t = theme::current();
         let button = |id: SharedString, label: String, enabled: bool| {
             div()
                 .id(id)
@@ -641,7 +641,7 @@ impl Workspace {
                 .rounded_lg()
                 .border_1()
                 .border_color(t.border)
-                .bg(theme::hex("#ffffff"))
+                .bg(t.panel)
                 .shadow_lg()
                 .flex()
                 .flex_col()
@@ -1477,6 +1477,57 @@ impl Workspace {
             }
             "file.exportSvg" | "file.exportPng" => self.export_image(id == "file.exportPng", window, cx),
             "insert.projectContent" => self.pick_import(window, cx),
+            "file.exportSettings" => {
+                let text = format!(
+                    "{}\n",
+                    serde_json::to_string_pretty(&settings::get()).unwrap_or_default()
+                );
+                let dir = std::env::current_dir().unwrap_or_default();
+                let rx = cx.prompt_for_new_path(&dir, Some("project-scaffold.settings.json"));
+                cx.spawn_in(window, async move |this, cx| {
+                    if let Ok(Ok(Some(path))) = rx.await {
+                        let r = std::fs::write(&path, text);
+                        this.update(cx, |w, cx| {
+                            match r {
+                                Ok(()) => w.log(format!("Exported settings to {}", path.display())),
+                                Err(e) => w.error = Some(format!("{}: {e}", path.display())),
+                            }
+                            cx.notify();
+                        })
+                        .ok();
+                    }
+                })
+                .detach();
+            }
+            "file.importSettings" => {
+                let rx = cx.prompt_for_paths(PathPromptOptions {
+                    files: true,
+                    directories: false,
+                    multiple: false,
+                    prompt: Some("Import settings".into()),
+                });
+                cx.spawn_in(window, async move |this, cx| {
+                    if let Ok(Ok(Some(paths))) = rx.await
+                        && let Some(path) = paths.into_iter().next()
+                    {
+                        let r = std::fs::read_to_string(&path)
+                            .map_err(|e| e.to_string())
+                            .and_then(|t| settings::import(&t));
+                        this.update(cx, |w, cx| {
+                            match r {
+                                Ok(n) => w.log(format!("Imported {n} settings from {}", path.display())),
+                                Err(e) => {
+                                    w.error =
+                                        Some(format!("Cannot import settings from {}: {e}", path.display()))
+                                }
+                            }
+                            cx.refresh_windows();
+                        })
+                        .ok();
+                    }
+                })
+                .detach();
+            }
             "file.openIdlText" => {
                 let rx = cx.prompt_for_paths(PathPromptOptions {
                     files: true,
@@ -2062,7 +2113,7 @@ impl Workspace {
     }
 
     fn toolbar(&self, cx: &mut Context<Self>) -> Div {
-        let t = theme::light();
+        let t = theme::current();
         let mut bar = div().flex().items_center().gap_1();
         for id in [
             "edit.undo",
@@ -2117,7 +2168,7 @@ impl Workspace {
     }
 
     fn doc_tabs(&self, cx: &mut Context<Self>) -> Div {
-        let t = theme::light();
+        let t = theme::current();
         let mut row = div()
             .flex()
             .items_center()
@@ -2193,7 +2244,7 @@ impl Workspace {
     }
 
     fn status_bar(&mut self, cx: &mut Context<Self>) -> Div {
-        let t = theme::light();
+        let t = theme::current();
         let (errors, warnings) = self.problem_counts(cx);
         let doc = self.doc();
         let snap = settings::get().snap_to_grid;
@@ -2320,7 +2371,7 @@ impl Workspace {
     }
 
     fn start_screen(&self, cx: &mut Context<Self>) -> Div {
-        let t = theme::light();
+        let t = theme::current();
         div()
             .size_full()
             .flex()
@@ -2368,6 +2419,20 @@ impl Render for Workspace {
             None => "ProjectScaffold".into(),
         };
         window.set_window_title(&title);
+        // The system theme follows the window's appearance; the components follow the theme.
+        theme::set_system_dark(matches!(
+            window.appearance(),
+            WindowAppearance::Dark | WindowAppearance::VibrantDark
+        ));
+        let dark = theme::current().dark;
+        if gpui_kit::component::theme::Theme::global(cx).is_dark() != dark {
+            let mode = if dark {
+                gpui_kit::component::theme::ThemeMode::Dark
+            } else {
+                gpui_kit::component::theme::ThemeMode::Light
+            };
+            gpui_kit::component::theme::Theme::change(mode, Some(window), cx);
+        }
         // Focus lost with a closed document: keys go to the active canvas.
         if window.focused(cx).is_none() {
             let focus = self
@@ -2376,7 +2441,7 @@ impl Render for Workspace {
             window.focus(&focus, cx);
         }
         self.refresh_menus(cx);
-        let t = theme::light();
+        let t = theme::current();
         let center = match self.canvas() {
             Some(c) if self.text_file.is_some() => {
                 let mut split = gpui_kit::component::resizable::h_resizable("center-text")
