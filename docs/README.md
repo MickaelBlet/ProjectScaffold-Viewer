@@ -7,6 +7,7 @@
 | [Keyboard shortcuts](shortcuts.md)  | every shortcut, by menu                                                   |
 | [File format](file-format.md)       | types, constants, interfaces, modules, ports, links, binaries, transports |
 | [Dependencies](dependencies.md)     | projects using other project files, importing projects, workspace files   |
+| [Scaffold text](scaffold-text.md)   | the compact `.scaffold` syntax of project files, its grammar              |
 | [IDL files](idl.md)                 | importing OMG IDL (CORBA, CCM, DDS) and how it maps to the model          |
 
 Code generation: [ProjectScaffold-Generator](https://github.com/MickaelBlet/ProjectScaffold-Generator). VS Code extension: [ProjectScaffold-VsCode](https://github.com/MickaelBlet/ProjectScaffold-VsCode).

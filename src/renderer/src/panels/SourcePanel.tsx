@@ -312,7 +312,7 @@ export function SourcePanel({ format }: { format: Format }): ReactNode {
           selection.kind === 'imported' ? { kind: 'module' as const, id: selection.id } : selection
         path = targetPath(data, p, target)
       }
-      const line = lineOfPath(text, path)
+      const line = lineOfPath(text, path, format)
       if (line !== undefined) revealLine(view, line)
     }
     const selectionOf = (s: ReturnType<typeof useDocs.getState>): Selection =>
@@ -428,7 +428,7 @@ export function SourcePanel({ format }: { format: Format }): ReactNode {
       </header>
       {stale ? <p className="source-stale">The project changed elsewhere since these edits.</p> : null}
       <CodeEditor
-        fileName={`project.${format}`}
+        fileName={`project.${format === 'dsl' ? 'scaffold' : format}`}
         label={`Project ${format.toUpperCase()}`}
         completion={completion}
         extensions={extensions}

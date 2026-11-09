@@ -163,6 +163,7 @@ const FILE_ICON: Record<LanguageId, string> = {
   yaml: '{}',
   json: '{}',
   idl: 'I',
+  scaffold: 'S',
   text: '¶'
 }
 

@@ -79,6 +79,24 @@ const idl = clike({
   }
 })
 
+/** Scaffold text syntax (`*.scaffold`, model/dsl.ts). */
+const scaffold = clike({
+  name: 'scaffold',
+  keywords: words(
+    'syntax project binary const module struct exception enum bitmask union switch case default alias ' +
+      'primitive interface link dependency in out inout raises implements extends constructor destructor ' +
+      'lock invariant statemachine state initial on if do class abstract public protected private static ' +
+      'mutable atomic virtual pure override final threadSafe noexcept nodiscard explicit delete ack latency ' +
+      'rate remote realtime low normal bulk'
+  ),
+  types: words(
+    'void bool char int8 int16 int32 int64 uint8 uint16 uint32 uint64 float32 float64 string bytes array ' +
+      'vector list set optional map'
+  ),
+  atoms: words('true false null'),
+  blockKeywords: words('module struct exception enum bitmask union interface dependency statemachine')
+})
+
 function plainSupport(id: FileLanguage['id']): LanguageSupport | null {
   switch (id) {
     case 'yaml':
@@ -87,6 +105,8 @@ function plainSupport(id: FileLanguage['id']): LanguageSupport | null {
       return json()
     case 'idl':
       return new LanguageSupport(StreamLanguage.define(idl))
+    case 'scaffold':
+      return new LanguageSupport(StreamLanguage.define(scaffold))
     case 'text':
       return null
   }

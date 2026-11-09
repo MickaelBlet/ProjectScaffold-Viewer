@@ -17,6 +17,7 @@ import {
   type FileTypeDef
 } from './schema'
 import { safeIntegers } from './defaults'
+import { DslError, dslLineOfPath, parseDsl, stringifyDsl } from './dsl'
 import { mapTypeRef, parseTypeExpr, printTypeExpr } from './typeExpr'
 import { pair } from './reuse'
 import {
@@ -87,7 +88,8 @@ const activeOf = (a: Active): FileModule['active'] => {
   return Object.keys(out).length ? out : true
 }
 
-export type Format = 'yaml' | 'json'
+/** yaml, json, or dsl: the Scaffold text syntax (`*.scaffold`, dsl.ts). */
+export type Format = 'yaml' | 'json' | 'dsl'
 
 /** Where a problem is: its path in the file data, and its line (from 1) once found in the text. */
 export interface LoadIssue {
@@ -1460,6 +1462,7 @@ export function fromFile(data: unknown, prev?: Project): Project {
 }
 
 export function stringify(file: FileProject, format: Format): string {
+  if (format === 'dsl') return stringifyDsl(file)
   return format === 'json' ? JSON.stringify(file, null, 2) + '\n' : YAML.stringify(file, { lineWidth: 0 })
 }
 
@@ -1473,6 +1476,14 @@ const readJson = (text: string): unknown =>
 
 /** Integers too large for a number are kept as decimal text, as in default values (see defaults.ts). */
 export function parseText(text: string, format: Format): unknown {
+  if (format === 'dsl') {
+    try {
+      return parseDsl(text)
+    } catch (e) {
+      if (!(e instanceof DslError)) throw e
+      throw new LoadError([{ message: `Invalid Scaffold text: ${e.message}`, line: e.line }])
+    }
+  }
   try {
     return format === 'json' ? readJson(text) : safeIntegers(YAML.parse(text, { intAsBigInt: true }))
   } catch (e) {
@@ -1495,7 +1506,8 @@ function syntaxErrorLine(text: string, e: unknown): number | undefined {
  * Line (from 1) of a path in the file data: the key of the deepest entry of the path found in the
  * text (JSON parses as YAML).
  */
-export function lineOfPath(text: string, path: DataPath): number | undefined {
+export function lineOfPath(text: string, path: DataPath, format?: Format): number | undefined {
+  if (format === 'dsl') return dslLineOfPath(text, path)
   const counter = new LineCounter()
   const doc = YAML.parseDocument(text, { lineCounter: counter })
   const start = (n: unknown): number | undefined => (n as YamlNode | null | undefined)?.range?.[0]
@@ -1520,22 +1532,23 @@ export function lineOfPath(text: string, path: DataPath): number | undefined {
 }
 
 /** A load error whose problems are located in the text they come from. */
-function located(text: string, e: unknown): unknown {
+function located(text: string, e: unknown, format: Format): unknown {
   if (!(e instanceof LoadError) || !e.issues.some((i) => i.path && !i.line)) return e
   return new LoadError(
-    e.issues.map((i) => (i.path && !i.line ? { ...i, line: lineOfPath(text, i.path) } : i))
+    e.issues.map((i) => (i.path && !i.line ? { ...i, line: lineOfPath(text, i.path, format) } : i))
   )
 }
 
 export function formatFromPath(path: string): Format {
-  return path.toLowerCase().endsWith('.json') ? 'json' : 'yaml'
+  const p = path.toLowerCase()
+  return p.endsWith('.json') ? 'json' : p.endsWith('.scaffold') ? 'dsl' : 'yaml'
 }
 
 export function loadText(text: string, format: Format): Project {
   try {
     return fromFile(parseText(text, format))
   } catch (e) {
-    throw located(text, e)
+    throw located(text, e, format)
   }
 }
 
@@ -1554,7 +1567,7 @@ export function reloadText(text: string, format: Format, prev: Project): Project
   try {
     return fromFile(data, prev)
   } catch (e) {
-    throw located(text, e)
+    throw located(text, e, format)
   }
 }
 

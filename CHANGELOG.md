@@ -5,6 +5,12 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Scaffold text (`*.scaffold`, [docs/scaffold-text.md](docs/scaffold-text.md)): a compact, `.proto`-like syntax of the project file (`struct Reading { float64 value = 1.5; }`, `module Plant { in Sink feed; }`, `link a: Plant.out -> Store.in ack;`), about three times shorter than YAML. Opened, edited (Source panel, with highlighting and problems on their lines) and saved like YAML and JSON; any project round-trips, the generic form `key = value;` standing in where the syntax has no shorthand.
+
 ## [1.1.2] - 2026-11-09
 
 ### Added

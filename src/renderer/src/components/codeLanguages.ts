@@ -1,6 +1,6 @@
 // Language of a file shown in a code editor, by its name.
 
-export type LanguageId = 'yaml' | 'json' | 'idl' | 'text'
+export type LanguageId = 'yaml' | 'json' | 'idl' | 'scaffold' | 'text'
 
 export interface FileLanguage {
   id: LanguageId
@@ -10,7 +10,8 @@ const BY_EXTENSION: Record<string, LanguageId> = {
   yaml: 'yaml',
   yml: 'yaml',
   json: 'json',
-  idl: 'idl'
+  idl: 'idl',
+  scaffold: 'scaffold'
 }
 
 /** Language of a file. */

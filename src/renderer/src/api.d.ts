@@ -17,8 +17,8 @@ export interface SaveRequest {
   path: string | null
   content: string
   defaultName: string
-  /** `text`: another kind of file (IDL), written as it is. */
-  format: 'yaml' | 'json' | 'text'
+  /** `dsl`: a Scaffold text project (`*.scaffold`); `text`: another kind of file (IDL), written as it is. */
+  format: 'yaml' | 'json' | 'dsl' | 'text'
   title?: string
 }
 

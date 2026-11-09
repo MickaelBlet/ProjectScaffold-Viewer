@@ -537,7 +537,10 @@ interface OtherProject {
   file: string
 }
 
-const SOURCE_FILES = { description: 'Projects and IDL files', extensions: ['yaml', 'yml', 'json', 'idl'] }
+const SOURCE_FILES = {
+  description: 'Projects and IDL files',
+  extensions: ['yaml', 'yml', 'json', 'scaffold', 'idl']
+}
 const isIdl = (path: string): boolean => /\.idl$/i.test(path)
 
 /** Reads a file IDL files include: by absolute path, else relative to this document. */

@@ -115,6 +115,6 @@ export function locateValidation(
   return problems.map((pb) => ({
     severity: pb.severity,
     message: pb.message,
-    line: lineOfPath(text, targetPath(data, project, pb.target)) ?? 1
+    line: lineOfPath(text, targetPath(data, project, pb.target), format) ?? 1
   }))
 }

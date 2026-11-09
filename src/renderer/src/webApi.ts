@@ -54,6 +54,7 @@ interface FsAccessWindow {
 const TYPES: Record<SaveRequest['format'], PickerType> = {
   yaml: { description: 'YAML', accept: { 'application/yaml': ['.yaml', '.yml'] } },
   json: { description: 'JSON', accept: { 'application/json': ['.json'] } },
+  dsl: { description: 'Scaffold text', accept: { 'text/plain': ['.scaffold'] } },
   text: { description: 'Text', accept: { 'text/plain': ['.idl', '.txt'] } }
 }
 
@@ -72,7 +73,10 @@ function isAbort(e: unknown): boolean {
   return e instanceof DOMException && e.name === 'AbortError'
 }
 
-const PROJECT_FILES: FileFilter = { description: 'Architecture', extensions: ['yaml', 'yml', 'json'] }
+const PROJECT_FILES: FileFilter = {
+  description: 'Architecture',
+  extensions: ['yaml', 'yml', 'json', 'scaffold']
+}
 
 function pickWithInput(multiple: boolean, filter: FileFilter): Promise<File[]> {
   return new Promise((done) => {
@@ -94,7 +98,12 @@ function downloadUrl(name: string, url: string): void {
 }
 
 function download(name: string, content: string, format: SaveRequest['format']): void {
-  const type = format === 'json' ? 'application/json' : format === 'text' ? 'text/plain' : 'application/yaml'
+  const type =
+    format === 'json'
+      ? 'application/json'
+      : format === 'text' || format === 'dsl'
+        ? 'text/plain'
+        : 'application/yaml'
   const url = URL.createObjectURL(new Blob([content], { type }))
   downloadUrl(name, url)
   setTimeout(() => URL.revokeObjectURL(url), 1000)
