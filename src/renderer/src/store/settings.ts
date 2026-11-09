@@ -26,6 +26,8 @@ export interface Settings {
   selectToMove: boolean
   edgeStyle: EdgeStyle
   portStyle: PortStyle
+  /** Distance in pixels from a module's border to its port handles, where links end. */
+  portOffset: number
   minimap: boolean
   edgeBadges: boolean
   /** Link ends attach to the module side facing the other end. */
@@ -112,6 +114,7 @@ export const DEFAULT_SETTINGS: Settings = {
   selectToMove: true,
   edgeStyle: 'bezier',
   portStyle: 'hollow',
+  portOffset: 0,
   minimap: true,
   edgeBadges: true,
   autoOrientLinks: true,
@@ -225,6 +228,18 @@ export function applyForceAnimations(force: boolean): void {
 
 export function applyPortStyle(style: PortStyle): void {
   document.documentElement.dataset.portStyle = style
+}
+
+/** Largest port offset, in pixels. */
+export const MAX_PORT_OFFSET = 40
+
+/** Distance from a module's border to where links end at its ports: the port offset. */
+export const portReach = (s: Pick<Settings, 'portOffset'>): number =>
+  Math.min(MAX_PORT_OFFSET, Math.max(0, s.portOffset))
+
+export function applyPortOffset(offset: number): void {
+  const px = Math.min(MAX_PORT_OFFSET, Math.max(0, offset))
+  document.documentElement.style.setProperty('--port-offset', `${px}px`)
 }
 
 /** Light or dark scheme of a theme (for components with their own colors), 'system' when it follows it. */

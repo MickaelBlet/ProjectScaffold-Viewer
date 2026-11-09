@@ -224,7 +224,10 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
       )}
       {!mod.kind && (concurrencyOn || !!mod.active) && (
         <Row label="Active">
-          <label className="check" title="Its own thread runs the calls reaching its in ports, queued in order">
+          <label
+            className="check"
+            title="Its own thread runs the calls reaching its in ports, queued in order"
+          >
             <input
               type="checkbox"
               checked={!!mod.active}
@@ -340,9 +343,7 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
                 icon="x"
                 title="Remove base"
                 danger
-                onClick={() =>
-                  withModule(id, (m) => removeBase(m, b))
-                }
+                onClick={() => withModule(id, (m) => removeBase(m, b))}
               />
             </li>
           ))}
@@ -612,7 +613,11 @@ export function ModuleInspector({ id }: { id: string }): ReactNode {
       >
         <div className="field-list">
           {mod.ports.map((pt) => (
-            <div key={pt.id} className={`field-row port-${pt.role}`}>
+            <div
+              key={pt.id}
+              className={`field-row port-${pt.role} ${member === pt.id ? 'focused' : ''}`}
+              data-member={pt.id}
+            >
               <div className="name">
                 <CommitInput
                   value={pt.name}

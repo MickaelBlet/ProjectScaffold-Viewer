@@ -1,7 +1,10 @@
-// Full-text search over the project (names, descriptions and metadata).
-import { modulePath, typeNames } from './project'
+// Full-text search over every value of the project, as its file writes it.
+import { modulePaths, typeNames } from './project'
+import { toFile } from './serialize'
+import { printTypeExpr } from './typeExpr'
+import type { FileTypeRef } from './schema'
 import type { ProblemTarget } from './validate'
-import type { Project } from './types'
+import type { Id, Project, TypeDef } from './types'
 
 export interface SearchHit {
   target: ProblemTarget
@@ -10,6 +13,15 @@ export interface SearchHit {
   /** Where the text matched: name, description, metadata key... */
   field: string
   text: string
+  /** Ids of the items holding the text, outermost first: an attribute, then its parameter... */
+  members?: Id[]
+}
+
+/** Where values are being read: the entity, the label of the item and the ids of the items. */
+interface Ctx {
+  target: ProblemTarget
+  label: string
+  members: Id[]
 }
 
 /** Text at a line (from 1) of a file: `length` characters from `column` (from 0). */
@@ -19,83 +31,231 @@ export interface TextSpot {
   length: number
 }
 
-export function searchProject(p: Project, query: string): SearchHit[] {
+/** Hits of a query: every value containing it, or the types under a scope (`Core.`, `Dep/`). */
+export function searchProject(p: Project, query: string, index?: SearchHit[]): SearchHit[] {
   const q = query.trim().toLowerCase()
   if (!q) return []
+  if (q.endsWith('.') || q.endsWith('/')) return scopeTypes(p, q)
+  return (index ?? searchIndex(p)).filter((h) => h.text.toLowerCase().includes(q))
+}
+
+const REF_KINDS = new Set(['primitive', 'ref', 'array', 'vector', 'list', 'set', 'optional', 'map'])
+/** Keys holding definitions (not references) of types. */
+const TYPE_LISTS = new Set(['types', 'typeParams'])
+/** Free maps: their keys are data too. */
+const FREE_MAPS = new Set(['metadata', 'options'])
+const SKIPPED = new Set(['schemaVersion', 'color'])
+const SINGULAR: Record<string, string> = {
+  params: 'parameter',
+  typeParams: 'type parameter',
+  values: 'value',
+  cases: 'case',
+  flags: 'flag',
+  modules: 'module',
+  states: 'state',
+  transitions: 'transition'
+}
+const singular = (key: string): string => SINGULAR[key] ?? key.replace(/ies$/, 'y').replace(/s$/, '')
+/** Label of an item named `name` in the list `key` of the entity labelled `label`. */
+const itemLabel = (label: string, key: string, name: string): string =>
+  key === 'ports'
+    ? `${label}:${name}`
+    : key === 'params'
+      ? `${label}(${name})`
+      : key === 'modules'
+        ? `${label}/${name}`
+        : `${label}.${name}`
+
+const isRecord = (v: unknown): v is Record<string, unknown> =>
+  typeof v === 'object' && v !== null && !Array.isArray(v)
+const isTypeRef = (v: Record<string, unknown>): boolean =>
+  typeof v.kind === 'string' && REF_KINDS.has(v.kind) && !('description' in v)
+
+/** Every value (text or number) of the project, with the entity it belongs to. */
+export function searchIndex(p: Project): SearchHit[] {
+  const file = toFile(p, { editor: false }) as unknown as Record<string, unknown>
   const hits: SearchHit[] = []
-  const check = (target: ProblemTarget, label: string, field: string, text: string | undefined): void => {
-    if (text && text.toLowerCase().includes(q)) hits.push({ target, label, field, text })
+  const add = (c: Ctx, field: string, text: string): void => {
+    if (text)
+      hits.push({
+        target: c.target,
+        label: c.label,
+        field,
+        text,
+        ...(c.members.length && { members: c.members })
+      })
   }
-  const meta = (target: ProblemTarget, label: string, m: Record<string, string>): void => {
-    for (const [k, v] of Object.entries(m)) {
-      check(target, label, 'metadata key', k)
-      check(target, label, `metadata ${k}`, v)
+  // Same item of the project (`src`, ids as in memory) as `v` of the file, if it has the name.
+  const idOf = (src: unknown, name: string): Id | undefined =>
+    isRecord(src) && (src.name === name || src.path === name) && typeof src.id === 'string'
+      ? src.id
+      : undefined
+
+  // Values of an entity below `keys` (the path from the entity or from its last named item); `src`
+  // is the same value in memory, giving the ids of the named items (`members`).
+  const walk = (c: Ctx, keys: string[], v: unknown, src: unknown, skip?: Set<string>): void => {
+    const field = keys.join(' ')
+    if (typeof v === 'string' || typeof v === 'number' || typeof v === 'bigint')
+      return add(c, field, String(v))
+    if (Array.isArray(v)) {
+      const key = keys[keys.length - 1] ?? ''
+      v.forEach((item: unknown, i) => {
+        const from: unknown = Array.isArray(src) ? src[i] : undefined
+        const nameKey =
+          !isRecord(item) || TYPE_LISTS.has(key) ? undefined : 'name' in item ? 'name' : 'module'
+        const name = nameKey && isRecord(item) ? item[nameKey] : undefined
+        if (typeof name !== 'string') return walk(c, keys, item, from)
+        // A named item (attribute, port...): its name has the item's kind as field.
+        const one = singular(key)
+        const id = idOf(from, name)
+        const at = {
+          target: c.target,
+          label: itemLabel(c.label, key, name),
+          members: id ? [...c.members, id] : c.members
+        }
+        add(at, one, name)
+        walk(at, [one], item, from, new Set([nameKey!]))
+      })
+      return
+    }
+    if (!isRecord(v)) return
+    if (isTypeRef(v) && !TYPE_LISTS.has(keys[keys.length - 1] ?? ''))
+      return add(c, field, printTypeExpr(v as unknown as FileTypeRef))
+    for (const [k, x] of Object.entries(v)) {
+      if (SKIPPED.has(k) || skip?.has(k)) continue
+      const sub: unknown = isRecord(src) ? src[k] : undefined
+      if (FREE_MAPS.has(k) && isRecord(x))
+        for (const [mk, mv] of Object.entries(x)) {
+          add(c, `${k} key`, mk)
+          walk(c, [...keys, k, mk], mv, undefined)
+        }
+      else walk(c, [...keys, k], x, sub)
     }
   }
-  check({ kind: 'project' }, 'Project', 'name', p.name)
-  check({ kind: 'project' }, 'Project', 'description', p.description)
-  meta({ kind: 'project' }, 'Project', p.metadata)
-  for (const m of p.modules) {
-    const target = { kind: 'module', id: m.id } as const
-    const path = modulePath(p, m.id)
-    check(target, path, 'module', m.name)
-    check(target, path, 'description', m.description)
-    meta(target, path, m.metadata)
-    for (const a of m.attributes) {
-      check(target, `${path}.${a.name}`, 'attribute', a.name)
-      check(target, `${path}.${a.name}`, 'attribute description', a.description)
-    }
-    for (const x of m.methods) {
-      check(target, `${path}.${x.name}`, 'method', x.name)
-      check(target, `${path}.${x.name}`, 'method description', x.description)
-      for (const prm of x.params) check(target, `${path}.${x.name}(${prm.name})`, 'parameter', prm.name)
-    }
-    for (const pt of m.ports) {
-      check(target, `${path}:${pt.name}`, `${pt.role} port`, pt.name)
-      check(target, `${path}:${pt.name}`, 'port description', pt.description)
-    }
+
+  /** An entity (`src` in memory): its name with the field `kind`, the rest of its values. */
+  const entity = (
+    target: ProblemTarget,
+    label: string,
+    kind: string,
+    v: unknown,
+    src: unknown,
+    skip?: Set<string>
+  ): void => {
+    if (!isRecord(v)) return
+    const c = { target, label, members: [] }
+    if (typeof v.name === 'string') add(c, kind, v.name)
+    walk(c, [], v, src, new Set(['name', ...(skip ?? [])]))
   }
-  for (const c of p.consts) {
-    if (c.dependency) continue
-    const target = { kind: 'const', id: c.id } as const
-    check(target, c.name, 'constant', c.name)
-    check(target, c.name, 'description', c.description)
-  }
-  for (const l of p.links) {
-    const target = { kind: 'link', id: l.id } as const
-    check(target, l.name, 'link', l.name)
-    check(target, l.name, 'description', l.description)
-    check(target, l.name, 'transport', l.constraints.remote.transport)
-  }
+
+  const ownType = new Map(p.types.filter((t) => !t.dependency && !t.module).map((t) => [t.name, t.id]))
   const typeName = typeNames(p)
-  for (const t of p.types) {
-    const target = { kind: 'type', id: t.id } as const
-    // Qualified for a type of a module: Core.Sensor.Mode.
-    const name = typeName.get(t.id)!
-    check(target, name, t.kind, t.name)
-    check(target, name, 'description', t.description)
-    if (t.kind === 'struct' || t.kind === 'exception')
-      for (const f of t.fields) {
-        check(target, `${name}.${f.name}`, 'field', f.name)
-        check(target, `${name}.${f.name}`, 'field description', f.description)
-      }
-    if (t.kind === 'enum') for (const v of t.values) check(target, `${name}.${v.name}`, 'value', v.name)
-    if (t.kind === 'union')
-      for (const c of t.cases) {
-        check(target, `${name}.${c.name}`, 'case', c.name)
-        check(target, `${name}.${c.name}`, 'case description', c.description)
-      }
-    if (t.kind === 'bitmask') for (const v of t.flags) check(target, `${name}.${v.name}`, 'flag', v.name)
+  const typeByName = new Map([...typeName].map(([id, name]) => [name, id]))
+  const types = new Map(p.types.map((t) => [t.id, t]))
+  const typeEntity = (id: Id | undefined, label: string, v: unknown, fallback: ProblemTarget): void => {
+    const t = id === undefined ? undefined : types.get(id)
+    entity(t ? { kind: 'type', id: t.id } : fallback, label, t?.kind ?? 'type', v, t)
   }
-  for (const i of p.interfaces) {
-    const target = { kind: 'interface', id: i.id } as const
-    check(target, i.name, 'interface', i.name)
-    check(target, i.name, 'description', i.description)
-    for (const m of i.messages) {
-      check(target, `${i.name}.${m.name}`, 'message', m.name)
-      check(target, `${i.name}.${m.name}`, 'message description', m.description)
-      for (const prm of m.params) check(target, `${i.name}.${m.name}(${prm.name})`, 'parameter', prm.name)
+  const list = (v: unknown): Record<string, unknown>[] => (Array.isArray(v) ? v.filter(isRecord) : [])
+  const nameOf = (v: Record<string, unknown>): string => (typeof v.name === 'string' ? v.name : '')
+
+  const project = { kind: 'project' } as const
+  const root = { target: project, label: 'Project', members: [] }
+  entity(project, 'Project', 'name', file.project, p)
+  walk(root, ['transports'], file.transports, undefined)
+  walk(root, ['remoteDefaults'], file.remoteDefaults, undefined)
+  for (const b of list(file.binaries)) entity(project, nameOf(b), 'binary', b, undefined)
+
+  // Modules, with their types; paths as `modulePaths` writes them.
+  const moduleByPath = new Map([...modulePaths(p)].map(([id, path]) => [path, id]))
+  const modules = (items: unknown, parent: string): void => {
+    for (const m of list(items)) {
+      const path = parent ? `${parent}.${nameOf(m)}` : nameOf(m)
+      const id = moduleByPath.get(path)
+      if (id === undefined) continue
+      const src = p.modules.find((x) => x.id === id)
+      entity({ kind: 'module', id }, path, 'module', m, src, new Set(['modules', 'types', 'typeParams']))
+      for (const t of [...list(m.typeParams), ...list(m.types)]) {
+        const name = `${path}.${nameOf(t)}`
+        typeEntity(typeByName.get(name), name, t, { kind: 'module', id })
+      }
+      modules(m.modules, path)
     }
   }
+
+  const owned = (
+    v: Record<string, unknown>,
+    dep: { id: Id; name: string } | undefined,
+    fallback: ProblemTarget
+  ): void => {
+    const inDep = <T extends { dependency?: Id; name: string; id: Id }>(
+      xs: T[],
+      name: string
+    ): T | undefined =>
+      xs.find(
+        (x) =>
+          x.dependency === dep?.id &&
+          x.name === name &&
+          !(x as { module?: Id }).module &&
+          !(x as { modulePath?: string }).modulePath
+      )
+    const label = (name: string): string => (dep ? `${dep.name}/${name}` : name)
+    for (const t of list(v.types)) {
+      const id = dep ? inDep(p.types, nameOf(t))?.id : ownType.get(nameOf(t))
+      typeEntity(id, dep ? label(nameOf(t)) : (typeName.get(id ?? '') ?? nameOf(t)), t, fallback)
+    }
+    for (const i of list(v.interfaces)) {
+      const found = inDep(p.interfaces, nameOf(i))
+      entity(found ? { kind: 'interface', id: found.id } : fallback, label(nameOf(i)), 'interface', i, found)
+    }
+    for (const c of list(v.constants)) {
+      const found = inDep(p.consts, nameOf(c))
+      entity(found ? { kind: 'const', id: found.id } : fallback, label(nameOf(c)), 'constant', c, found)
+    }
+  }
+
+  owned(file, undefined, project)
+  modules(file.modules, '')
+  list(file.links).forEach((l, i) => {
+    const link = p.links[i]
+    if (link) entity({ kind: 'link', id: link.id }, nameOf(l), 'link', l, link)
+  })
+  list(file.dependencies).forEach((d, i) => {
+    const dep = p.dependencies[i]
+    if (!dep) return
+    const target = { kind: 'dependency', id: dep.id } as const
+    entity(
+      target,
+      dep.name,
+      'dependency',
+      d,
+      dep,
+      new Set(['types', 'interfaces', 'constants', 'moduleTypes'])
+    )
+    owned(d, dep, target)
+    for (const g of list(d.moduleTypes))
+      for (const t of list(g.types)) {
+        const name = `${dep.name}/${String(g.module)}.${nameOf(t)}`
+        typeEntity(typeByName.get(name), name, t, target)
+      }
+  })
   return hits
+}
+
+/**
+ * Types under a module or dependency, for a query ending with `.` or `/`: `Core.` lists the types
+ * of Core and of its inner modules, `Common/` every type of the dependency Common.
+ */
+function scopeTypes(p: Project, q: string): SearchHit[] {
+  const names = typeNames(p)
+  const deps = new Map(p.dependencies.map((d) => [d.id, d.name]))
+  const scoped = (t: TypeDef): string =>
+    t.dependency && !t.module && !t.modulePath
+      ? `${deps.get(t.dependency) ?? '?'}/${t.name}`
+      : names.get(t.id)!
+  return p.types
+    .map((t) => ({ t, label: scoped(t) }))
+    .filter(({ label }) => label.toLowerCase().startsWith(q))
+    .sort((a, b) => a.label.localeCompare(b.label))
+    .map(({ t, label }) => ({ target: { kind: 'type', id: t.id }, label, field: t.kind, text: t.name }))
 }

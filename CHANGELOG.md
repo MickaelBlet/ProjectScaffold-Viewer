@@ -9,12 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Search: a query ending with `.` or `/` lists every type of a module (and its inner modules) or of a dependency: `Core.Sensor.`, `Common/`.
+- Search: a picked hit shows the item holding it: the attribute, method, port, field, value or message flashes in the inspector, a module member is selected on the canvas too.
 - Transport `mq` (POSIX message queues) for links between binaries, with settings `name` (the queues `<name>.call` and `<name>.reply`, default `<project>_<link>`), `maxMessages` and `messageSize` (link inspector: _Queues_, _Messages_, _Message size_). An invalid queue name is an error; two links sharing queues, a warning.
 - Modules: `active` (module inspector, _Active_, with the concurrency features on): the module's own thread runs the calls reaching its `in` ports, queued in order, with the size of its queue, the timeout of calls waiting for a result and what a call reaching a full queue does (`block`, `drop`, `error`). An active module is a `class`, not `utility`; one without `in` ports is a warning.
+- Settings: _Port offset_, the distance in pixels from a module's border to its ports, drawn on a stem; links end there.
+- Canvas: click the name of a port of a module to edit it in the inspector, which scrolls to it and highlights it (as the canvas does); Delete then removes only it, with its links.
 
 ### Changed
 
+- Canvas: square-cornered highlight of the attributes and methods of modules.
+- Search covers every value of the project (types of fields and parameters, default values, port interfaces, link ends and settings, binaries, dependencies…), not only names, descriptions and metadata; types of dependencies are labelled `Dependency/Type`.
 - Canvas: the mouse wheel scrolls instead of zooming (Ctrl+wheel zooms); Ctrl+double-click zooms out, as Shift+double-click.
+- Canvas: views other than the project view have an accent frame.
+
+### Fixed
+
+- A middle click closes tabs again where the browser started its autoscroll instead (Chromium on Windows).
 
 ## [1.1.1] - 2026-10-27
 

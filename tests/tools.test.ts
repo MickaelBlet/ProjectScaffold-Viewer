@@ -51,7 +51,50 @@ describe('search', () => {
   it('finds names, descriptions and metadata', () => {
     expect(searchProject(example, 'operator').map((h) => h.label)).toContain('Operator')
     expect(searchProject(example, 'team-a')[0]).toMatchObject({ label: 'Core', field: 'metadata owner' })
-    expect(searchProject(example, 'position').some((h) => h.label === 'Pose.position')).toBe(true)
+    expect(searchProject(example, 'position').some((h) => h.label === 'Common/Pose.position')).toBe(true)
     expect(searchProject(example, '  ')).toEqual([])
+  })
+
+  it('finds every value: types, interfaces, settings, dependencies', () => {
+    const hit = (q: string, field: string) => searchProject(example, q).find((h) => h.field === field)
+    expect(hit('Vec3', 'field type')).toMatchObject({ label: 'Common/Pose.position' })
+    expect(hit('Telemetry', 'port interface')?.target.kind).toBe('module')
+    expect(hit('tcp', 'constraints remote transport')?.target.kind).toBe('link')
+    expect(hit('common.scaffold', 'file')?.target.kind).toBe('dependency')
+  })
+
+  it('gives the ids of the items holding a hit', () => {
+    const m = example.modules.find((m) => m.attributes.length && m.ports.length)!
+    const [a, pt] = [m.attributes[0]!, m.ports[0]!]
+    const ids = (q: string, field: string) =>
+      searchProject(example, q).find((h) => h.target.kind === 'module' && h.field === field)?.members
+    expect(ids(a.name, 'attribute')).toEqual([a.id])
+    expect(ids(pt.name, 'port')).toEqual([pt.id])
+    expect(searchProject(example, 'team-a')[0]!.members).toBeUndefined()
+  })
+
+  it('lists the types of a module or dependency', () => {
+    const core = example.modules.find((m) => m.name === 'Core')!
+    const p = {
+      ...example,
+      types: [
+        ...example.types,
+        {
+          id: 'mode',
+          kind: 'enum' as const,
+          name: 'Mode',
+          description: '',
+          underlying: 'int32' as const,
+          values: [],
+          module: core.id
+        }
+      ]
+    }
+    const inCore = searchProject(p, 'core.').map((h) => h.label)
+    expect(inCore).toContain('Core.Mode')
+    expect(inCore.every((l) => l.startsWith('Core.'))).toBe(true)
+    const common = searchProject(p, 'Common/')
+    expect(common.map((h) => h.label)).toContain('Common/Vec3')
+    expect(common.every((h) => h.target.kind === 'type' && h.label.startsWith('Common/'))).toBe(true)
   })
 })

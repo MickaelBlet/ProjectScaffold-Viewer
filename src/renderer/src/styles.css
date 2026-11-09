@@ -519,6 +519,15 @@ button.link-button:hover {
   height: 100%;
   min-height: 0;
 }
+/* Views other than the project view: an accent frame tells them apart. */
+.canvas-subview::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 2px solid var(--accent);
+  pointer-events: none;
+  z-index: 10;
+}
 .inspector {
   position: relative;
   padding: 10px 12px 24px;
@@ -1638,6 +1647,20 @@ button.qualifier.on {
   margin-bottom: 8px;
   background: var(--panel-2);
 }
+/* Item of a search hit, just shown. */
+.inspector .flash {
+  animation: flash 1.6s ease-out;
+}
+@keyframes flash {
+  0%,
+  40% {
+    outline: 2px solid var(--accent);
+    background-color: var(--accent-soft);
+  }
+  100% {
+    outline: 2px solid transparent;
+  }
+}
 /* Member selected on the canvas. */
 .field-row.focused,
 .card.focused,
@@ -2627,7 +2650,6 @@ option.typed {
 }
 .module-attrs li {
   padding-inline: 3px;
-  border-radius: 3px;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -2799,6 +2821,53 @@ option.typed {
 }
 .handle.out {
   background: var(--accent) !important;
+}
+/* Port offset (Settings): handles stand --port-offset outside the border, on a stem from it. The
+   stem starts at the handle's padding edge, under its border. */
+.react-flow__handle.handle.react-flow__handle-right {
+  translate: var(--port-offset, 0px) 0;
+}
+.react-flow__handle.handle.react-flow__handle-left {
+  translate: calc(-1 * var(--port-offset, 0px)) 0;
+}
+.react-flow__handle.handle.react-flow__handle-top {
+  translate: 0 calc(-1 * var(--port-offset, 0px));
+}
+.react-flow__handle.handle.react-flow__handle-bottom {
+  translate: 0 var(--port-offset, 0px);
+}
+.react-flow__handle.handle::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+  background: var(--ok);
+}
+.react-flow__handle.handle.out::after {
+  background: var(--accent);
+}
+.react-flow__handle.handle.react-flow__handle-left::after,
+.react-flow__handle.handle.react-flow__handle-right::after {
+  top: calc(50% - 1px);
+  width: calc(var(--port-offset, 0px) - 50%);
+  height: 2px;
+}
+.react-flow__handle.handle.react-flow__handle-right::after {
+  right: 100%;
+}
+.react-flow__handle.handle.react-flow__handle-left::after {
+  left: 100%;
+}
+.react-flow__handle.handle.react-flow__handle-top::after,
+.react-flow__handle.handle.react-flow__handle-bottom::after {
+  left: calc(50% - 1px);
+  width: 2px;
+  height: calc(var(--port-offset, 0px) - 50%);
+}
+.react-flow__handle.handle.react-flow__handle-bottom::after {
+  bottom: 100%;
+}
+.react-flow__handle.handle.react-flow__handle-top::after {
+  top: 100%;
 }
 /* Port style (Settings): shape tells in from out, not only color.
    arrows: in points into the module, out points away from it.
@@ -4083,6 +4152,11 @@ mark {
   padding: 0 3px;
   background: var(--node-label-bg);
   border-radius: 3px;
+}
+.port-label.selected {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+  background-color: var(--accent-soft);
 }
 .port-label.dragging {
   cursor: grabbing;

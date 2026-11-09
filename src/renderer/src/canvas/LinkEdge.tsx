@@ -15,7 +15,7 @@ import {
 import { useShallow } from 'zustand/react/shallow'
 import { indexById, linkOrigin } from '@/model/project'
 import { setLinkRoute, useProjectStore } from '@/store/project'
-import { useSettings } from '@/store/settings'
+import { portReach, useSettings } from '@/store/settings'
 import { openContextMenu, select } from '@/store/ui'
 import { revealInspector } from '@/shell/controllers'
 import type { LinkRoute, Orientation } from '@/model/types'
@@ -23,6 +23,7 @@ import { OPPOSITE, PERF_COLORS, POSITION, SIDE, Z } from './constants'
 import { orientLinkEnds } from './linkEnds'
 import {
   anchorPoint,
+  DIR,
   fractionAlong,
   insertIndex,
   nearestAnchor,
@@ -48,6 +49,12 @@ function isAncestor(lookup: Lookup, ancestor: string, id: string): boolean {
   return false
 }
 
+/** `p` moved `d` along the outward direction of `side`. */
+const along = (p: Point, side: keyof typeof DIR, d: number): Point => ({
+  x: p.x + DIR[side].x * d,
+  y: p.y + DIR[side].y * d
+})
+
 const rectOf = (n: InternalNode) => ({
   ...n.internals.positionAbsolute,
   width: n.measured.width ?? 0,
@@ -62,12 +69,13 @@ function endPoints(
   lookup: Lookup,
   auto: boolean,
   orientation: Orientation,
-  route: LinkRoute | undefined
+  route: LinkRoute | undefined,
+  portOffset: number
 ) {
-  const ends = portEnds(props, source, target, lookup, auto, orientation)
+  const ends = portEnds(props, source, target, lookup, auto, orientation, portOffset)
   // Ports are drawn at their attachment (portAnchors) unless another link's attachment took them:
   // there the link ends at the port's handle (outside the border), as at an unanchored port.
-  const atPort = (p: Point, x: number, y: number): boolean => Math.hypot(p.x - x, p.y - y) < 12
+  const atPort = (p: Point, x: number, y: number): boolean => Math.hypot(p.x - x, p.y - y) < 12 + portOffset
   const anchored = (node: InternalNode | undefined, anchor: LinkRoute['from'], x: number, y: number) => {
     if (!node || !anchor) return null
     const p = anchorPoint(rectOf(node), anchor)
@@ -97,7 +105,8 @@ function portEnds(
   target: InternalNode | undefined,
   lookup: Lookup,
   auto: boolean,
-  orientation: Orientation
+  orientation: Orientation,
+  portOffset: number
 ) {
   const base = {
     sourceX: props.sourceX,
@@ -119,6 +128,14 @@ function portEnds(
     { rect: rectOf(target), handle: { x: props.targetX, y: props.targetY } },
     orientation
   )
+  // An end on its port's own edge leaves from the port, `portOffset` away from the border (the
+  // handles, measured with their offset, already hold it).
+  const own = orientation === 'vertical' ? (['bottom', 'top'] as const) : (['right', 'left'] as const)
+  for (const [end, side] of [
+    [ends.source, own[0]],
+    [ends.target, own[1]]
+  ] as const)
+    if (end.side === side) Object.assign(end, along(end, side, portOffset))
   const from = floats[0]
     ? { x: props.sourceX, y: props.sourceY, position: props.sourcePosition }
     : { x: ends.source.x, y: ends.source.y, position: POSITION[ends.source.side] }
@@ -183,8 +200,9 @@ export const LinkEdge = memo(function LinkEdge(props: EdgeProps): ReactNode {
     const l = indexById(p.links).get(props.id)
     return l ? linkOrigin(p, l) : null
   })
-  const { edgeStyle, edgeBadges, autoOrientLinks, snapToGrid, gridSize } = useSettings(
+  const { edgeStyle, edgeBadges, autoOrientLinks, snapToGrid, gridSize, portOffset } = useSettings(
     useShallow((s) => ({
+      portOffset: portReach(s),
       edgeStyle: s.edgeStyle,
       edgeBadges: s.edgeBadges,
       autoOrientLinks: s.autoOrientLinks,
@@ -211,7 +229,7 @@ export const LinkEdge = memo(function LinkEdge(props: EdgeProps): ReactNode {
       ? { ...link.route, points: link.route.points.map((pt) => ({ x: pt.x + offset.x, y: pt.y + offset.y })) }
       : undefined
   const route = draft ?? saved
-  const ends = endPoints(props, source, target, lookup, autoOrientLinks, orientation, route)
+  const ends = endPoints(props, source, target, lookup, autoOrientLinks, orientation, route, portOffset)
   const s = { x: ends.sourceX, y: ends.sourceY, side: SIDE[ends.sourcePosition] }
   const t = { x: ends.targetX, y: ends.targetY, side: SIDE[ends.targetPosition] }
   const shaped: Route | null = route?.points.length ? routeThrough(edgeStyle, s, t, route.points) : null

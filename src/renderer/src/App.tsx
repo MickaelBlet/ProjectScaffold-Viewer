@@ -22,7 +22,7 @@ import {
 } from './fileOps'
 import { installClipboard, installKeyboard, runCommand } from './commands'
 import { activeDoc, isDocDirty, useDoc, useDocs } from './store/documents'
-import { applyForceAnimations, applyPortStyle, applyTheme, useSettings } from './store/settings'
+import { applyForceAnimations, applyPortOffset, applyPortStyle, applyTheme, useSettings } from './store/settings'
 import { useProjectStore } from './store/project'
 import { useTextFiles } from './store/textFiles'
 import { useUiStore } from './store/ui'
@@ -159,6 +159,7 @@ export function App(): ReactNode {
   const theme = useSettings((s) => s.theme)
   const forceAnimations = useSettings((s) => s.forceAnimations)
   const portStyle = useSettings((s) => s.portStyle)
+  const portOffset = useSettings((s) => s.portOffset)
   // The session is only written once the startup documents are loaded, not to overwrite them.
   const [loaded, setLoaded] = useState(false)
 
@@ -172,6 +173,7 @@ export function App(): ReactNode {
   }, [theme])
   useEffect(() => applyForceAnimations(forceAnimations), [forceAnimations])
   useEffect(() => applyPortStyle(portStyle), [portStyle])
+  useEffect(() => applyPortOffset(portOffset), [portOffset])
   // After the theme: the first frame shown has the app colors.
   useEffect(showTauriWindow, [])
 

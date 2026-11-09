@@ -110,7 +110,7 @@ export function ImportedInspector({ id }: { id: string }): ReactNode {
             {module.ports.map((pt) => {
               const known = !pt.interface || project.interfaces.some((i) => i.name === pt.interface)
               return (
-                <tr key={pt.id} title={pt.description}>
+                <tr key={pt.id} title={pt.description} data-member={pt.id}>
                   <td>{pt.role}</td>
                   <td>{pt.name}</td>
                   <td className={known ? '' : 'error-text'}>

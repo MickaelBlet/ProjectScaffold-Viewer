@@ -60,7 +60,7 @@ IDL files can be edited as text too: see [IDL files](idl.md#editing-idl-files).
 
 ### Search
 
-Ctrl+Shift+F searches names, descriptions and metadata of the project.
+Ctrl+Shift+F searches every value of the project: names, descriptions, metadata, types of fields and parameters, default values, port interfaces, link ends and settings, binaries, dependencies. Clicking a hit selects its entity and flashes the item holding it in the inspector (an attribute, port, field…); a module member is selected on the canvas too. A query ending with `.` or `/` lists the types under a module or dependency: `Core.Sensor.` (with those of its inner modules), `Common/`.
 
 ### Command palette
 
@@ -88,6 +88,7 @@ Ctrl+Shift+F searches names, descriptions and metadata of the project.
 
 - `in` ports on the left, `out` ports on the right — or `in` on top, `out` at the bottom in vertical orientation.
 - The module inspector lists its ports tinted after their role, in the colors of their dots (`in` green, `out` accent).
+- Click a port's name on the canvas to edit it: the inspector scrolls to it and highlights it. Delete then removes only it, with its links.
 - Drag between an `out` port and an `in` port to create a link. A container's `in` port links to an `in` port inside it; an `out` port inside links to the container's `out` port.
 - Or link modules directly: drag the → in a module's header onto another module (or one of its `in` ports), or drag a port onto a module. The missing `out` / `in` ports are added, typed with the other end's interface.
 - A new link is bidirectional when its interface has a message returning a value or with `out` / `inout` parameters (IDL operations with results), unidirectional otherwise.
@@ -183,7 +184,7 @@ The diagram exports as PNG or SVG from the _File_ menu.
 - **Recent ▾** (toolbar) lists the last 10 opened / saved projects (exports excluded). Stored in IndexedDB (file handle + last content; reopening asks for file access again when needed).
 - **Settings** are kept per browser; the filter at the top of the panel matches their labels, hints and section titles:
   - theme: system, light, dark or a color theme (black, red, orange, yellow, green, pink, violet);
-  - link style and badges, port style (dots, arrows, hollow, shapes) to tell `in` from `out`;
+  - link style and badges, port style (dots, arrows, hollow, shapes) to tell `in` from `out`, port offset (pixels from the border to the ports, on a stem, where links end);
   - grid, guides, select before moving, Inspector shown on selection, minimap, arrange on open;
   - features: derives, lifecycle, contracts, state machine, concurrency, generics, value constraints, link quality of service; one turned off hides its editing from the Inspector (and the _State machine_ command) unless the project already uses it;
   - text editor: font, tab size, whitespace, indentation guides, word wrap, minimap, line numbers, folding, brackets, suggestions…

@@ -401,6 +401,7 @@ export const ModuleNode = memo(function ModuleNode({
       fallback={fallback}
       style={anchor && anchorStyle(anchor)}
       lift={hasChildren}
+      selected={member === p.id}
     />
   )
   const band = (ports: Port[], side: 'top' | 'bottom'): ReactNode => (

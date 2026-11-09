@@ -464,7 +464,7 @@ export function TypeInspector({ id }: { id: string }): ReactNode {
             <table className="grid">
               <tbody>
                 {t.values.map((v, i) => (
-                  <tr key={v.id} className={kindClass('enum')}>
+                  <tr key={v.id} className={kindClass('enum')} data-member={v.id}>
                     <td>
                       <CommitInput
                         value={v.name}
@@ -527,7 +527,7 @@ export function TypeInspector({ id }: { id: string }): ReactNode {
             <table className="grid">
               <tbody>
                 {t.flags.map((v, i) => (
-                  <tr key={v.id} className={kindClass('bitmask')}>
+                  <tr key={v.id} className={kindClass('bitmask')} data-member={v.id}>
                     <td>
                       <CommitInput
                         value={v.name}

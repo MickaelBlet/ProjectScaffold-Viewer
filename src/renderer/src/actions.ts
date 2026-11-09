@@ -19,6 +19,7 @@ import {
   canKeepView,
   childModules,
   defaultSize,
+  hasMember,
   findImported,
   findView,
   growAncestors,
@@ -67,6 +68,7 @@ import {
   deleteInterface,
   deleteItems,
   deleteLink,
+  deletePort,
   deleteType,
   getLayout,
   getProject,
@@ -296,6 +298,36 @@ export function navigateToNote(
   revealWhenDrawn([id], zoom)
 }
 
+/**
+ * After `navigate`: shows the item of `target` holding a search hit (`members`, outermost first).
+ * A member of a module (attribute, method...) is selected, on the canvas too; the innermost item
+ * the inspector draws flashes.
+ */
+export function revealMember(target: ProblemTarget, members: Id[]): void {
+  if (!members.length) return
+  if (target.kind === 'module') {
+    const m = getProject().modules.find((x) => x.id === target.id)
+    const member = m && [...members].reverse().find((id) => hasMember(m, id))
+    if (member) select({ kind: 'module', id: target.id, member })
+  }
+  // Once the inspector draws the selection.
+  requestAnimationFrame(() =>
+    requestAnimationFrame(() => {
+      for (const id of [...members].reverse()) {
+        const el = document.querySelector(`.inspector [data-member="${CSS.escape(id)}"]`)
+        if (!el) continue
+        el.scrollIntoView({ block: 'nearest' })
+        el.classList.remove('flash')
+        // Restarts the animation of an item flashing already.
+        void (el as HTMLElement).offsetWidth
+        el.classList.add('flash')
+        el.addEventListener('animationend', () => el.classList.remove('flash'), { once: true })
+        return
+      }
+    })
+  )
+}
+
 /** Go back (-1) or forward (1) through the selection history, showing each entity. */
 export function travelSelection(delta: -1 | 1): void {
   const p = getProject()
@@ -403,9 +435,13 @@ export function deleteSelection(): void {
     deleteLink(sel.id)
     return select(null)
   }
-  // An attribute or method selected on the canvas: only it goes.
+  // A port, attribute or method selected on the canvas: only it goes.
   if (sel?.kind === 'module' && sel.member && ids.length === 1 && ids[0] === sel.id) {
     const { id, member } = sel
+    if (p.modules.find((m) => m.id === id)?.ports.some((pt) => pt.id === member)) {
+      deletePort(id, member)
+      return select({ kind: 'module', id })
+    }
     update((d) => {
       const m = d.modules.find((m) => m.id === id)
       if (m) removeMember(m, member)

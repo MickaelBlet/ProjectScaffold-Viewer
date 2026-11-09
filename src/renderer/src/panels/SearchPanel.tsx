@@ -1,8 +1,8 @@
-// Search over the active document: its entities (names, descriptions, metadata).
+// Search over the active document: every value of its entities.
 import { useDeferredValue, useMemo, useState, type ReactNode } from 'react'
-import { searchProject } from '@/model/search'
+import { searchIndex, searchProject } from '@/model/search'
 import { useProjectStore } from '@/store/project'
-import { navigate } from '@/actions'
+import { navigate, revealMember } from '@/actions'
 import { onListKeyDown } from '@/components/listKeys'
 
 function Mark({ text, query }: { text: string; query: string }): ReactNode {
@@ -21,7 +21,8 @@ export function SearchPanel(): ReactNode {
   const project = useProjectStore((s) => s.project)
   const [query, setQuery] = useState('')
   const deferred = useDeferredValue(query.trim())
-  const hits = useMemo(() => searchProject(project, deferred), [project, deferred])
+  const index = useMemo(() => searchIndex(project), [project])
+  const hits = useMemo(() => searchProject(project, deferred, index), [project, deferred, index])
 
   return (
     <div className="search-panel">
@@ -29,7 +30,7 @@ export function SearchPanel(): ReactNode {
         <input
           data-autofocus
           type="search"
-          placeholder="Search names, descriptions, metadata"
+          placeholder="Search the project; Core. or Dep/ lists types"
           aria-label="Search the project"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -48,14 +49,17 @@ export function SearchPanel(): ReactNode {
             role="option"
             aria-selected={false}
             tabIndex={i === 0 ? 0 : -1}
-            onClick={() => navigate(h.target)}
+            onClick={() => {
+              navigate(h.target)
+              revealMember(h.target, h.members ?? [])
+            }}
           >
             <span className={`kind-badge ${h.target.kind === 'module' ? 'mod' : h.target.kind}`}>
               {h.target.kind[0]!.toUpperCase()}
             </span>
             <span className="result-label">{h.label}</span>
             <small>{h.field}</small>
-            {h.text !== h.label.split(/[.:]/).pop() && (
+            {h.text !== h.label.split(/[./:]/).pop() && (
               <span className="result-text">
                 <Mark text={h.text} query={deferred} />
               </span>

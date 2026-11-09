@@ -2,6 +2,8 @@ import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, 
 import { Handle, useStore, ViewportPortal } from '@xyflow/react'
 import type { Id, LinkAnchor, PortRole, Side } from '@/model/types'
 import { setPortLabel } from '@/store/project'
+import { patchDoc } from '@/store/documents'
+import { revealInspector } from '@/shell/controllers'
 import { Icon } from '@/components/Icon'
 import { OPPOSITE, POSITION, Z } from './constants'
 
@@ -66,7 +68,8 @@ function towards(dx: number, dy: number): Side {
 /**
  * Port as a point on its module's `edge` (placed by the parent's CSS, or `style`): its handle
  * there, its name on one side of it, by default `fallback`, dragged to another side; with `lift`,
- * the name is drawn above the links.
+ * the name is drawn above the links. With `selected` (false when not), a click on the name selects the
+ * port as a member of its module.
  */
 export function PortPoint({
   moduleId,
@@ -77,7 +80,8 @@ export function PortPoint({
   fallback,
   className = '',
   style,
-  lift = false
+  lift = false,
+  selected
 }: {
   moduleId: Id
   port: { id: Id; role: PortRole; name: string; label?: Side }
@@ -88,6 +92,7 @@ export function PortPoint({
   className?: string
   style?: CSSProperties
   lift?: boolean
+  selected?: boolean
 }): ReactNode {
   /** Side of the name being dragged. */
   const [draft, setDraft] = useState<Side | null>(null)
@@ -121,9 +126,20 @@ export function PortPoint({
 
   const name = (
     <span
-      className={`port-label label-${label} nodrag nopan ${draft ? 'dragging' : ''}`}
+      className={`port-label label-${label} nodrag nopan ${draft ? 'dragging' : ''} ${selected ? 'selected' : ''}`}
       title={`${title}\nDrag around the port to move its name; double-click to reset`}
+      data-member={selected === undefined ? undefined : port.id}
       onPointerDown={dragLabel}
+      // A lifted name is outside its node: no node click selects it.
+      onClick={
+        lift && selected !== undefined
+          ? (e) => {
+              if (e.shiftKey || e.ctrlKey || e.metaKey) return
+              revealInspector()
+              patchDoc({ selection: { kind: 'module', id: moduleId, member: port.id } })
+            }
+          : undefined
+      }
       onDoubleClick={(e) => {
         e.stopPropagation()
         if (port.label) setPortLabel(moduleId, port.id, undefined)

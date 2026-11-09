@@ -2,6 +2,7 @@ import { createContext, useContext, useState, type ReactNode } from 'react'
 import {
   COLOR_THEMES,
   DEFAULT_SETTINGS,
+  MAX_PORT_OFFSET,
   setSetting,
   useSettings,
   type EdgeStyle,
@@ -191,6 +192,16 @@ export function SettingsPanel(): ReactNode {
               value={s.portStyle}
               options={['dots', 'arrows', 'hollow', 'shapes'] as PortStyle[]}
               onChange={(v) => setSetting('portStyle', v)}
+            />
+          </Field>
+          <Field label="Port offset (px)">
+            <NumberField
+              value={s.portOffset}
+              min={0}
+              max={MAX_PORT_OFFSET}
+              step={2}
+              fallback={DEFAULT_SETTINGS.portOffset}
+              onChange={(v) => setSetting('portOffset', v)}
             />
           </Field>
           <Check

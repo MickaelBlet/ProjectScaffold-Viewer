@@ -5,6 +5,7 @@ import 'dockview-react/dist/styles/dockview.css'
 import './styles.css'
 import { App } from './App'
 import { IN_VSCODE } from './host'
+import { installMiddleClickTabs } from './shell/middleClickTabs'
 import { installOverflowTabs } from './shell/overflowTabs'
 import { installRenameSync } from './store/sync'
 import { installVscodeApi } from './vscodeApi'
@@ -14,6 +15,7 @@ if (IN_VSCODE) installVscodeApi()
 else installWebApi()
 installRenameSync()
 installOverflowTabs()
+installMiddleClickTabs()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

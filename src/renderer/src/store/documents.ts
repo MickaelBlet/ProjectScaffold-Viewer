@@ -6,7 +6,7 @@ import { createProjectStore, type ProjectStore } from './projectStore'
 
 export type Selection =
   | { kind: 'project' }
-  /** With `member`, one of its attributes, methods, constructors or its destructor (see `hasMember`). */
+  /** With `member`, one of its ports, attributes, methods, constructors or its destructor (see `hasMember`). */
   | { kind: 'module'; id: Id; member?: Id }
   | { kind: 'link'; id: Id }
   | { kind: 'type'; id: Id }

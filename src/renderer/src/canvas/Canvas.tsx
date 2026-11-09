@@ -11,6 +11,7 @@ import {
   useEdgesState,
   useNodesState,
   useReactFlow,
+  useUpdateNodeInternals,
   type Connection,
   type Edge,
   type Node,
@@ -215,7 +216,9 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
       minimap: s.minimap,
       inheritance: s.inheritance,
       associations: s.associations,
-      selectToMove: s.selectToMove
+      selectToMove: s.selectToMove,
+      portOffset: s.portOffset,
+      portStyle: s.portStyle
     }))
   )
   const flow = useReactFlow()
@@ -251,6 +254,11 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
       setNodes((prev) => reuseUnchanged(prev, toNodes(drawn, view, selectedSet, sides, grid, selectToMove))),
     [drawn, view, selectedSet, sides, grid, selectToMove, setNodes]
   )
+  // Handles moved by the port offset and style (CSS): measure them again, links end on them.
+  const updateNodeInternals = useUpdateNodeInternals()
+  useEffect(() => {
+    updateNodeInternals(flow.getNodes().map((n) => n.id))
+  }, [settings.portOffset, settings.portStyle, flow, updateNodeInternals])
   const [edges, setEdges] = useEdgesState<Edge>([])
   useEffect(
     () =>
@@ -924,7 +932,11 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
   }
 
   return (
-    <div className="canvas" ref={container} onPointerDownCapture={focusView}>
+    <div
+      className={viewId === GLOBAL_VIEW ? 'canvas' : 'canvas canvas-subview'}
+      ref={container}
+      onPointerDownCapture={focusView}
+    >
       <Breadcrumbs view={view} />
       <ViewContext.Provider value={viewId}>
         <ReactFlow
