@@ -226,9 +226,12 @@ function shiftBends(d: Project, layouts: Map<Id, Partial<Rect>>): void {
       pt.y += a.y
     }
   }
-  // The same for the inheritance lines.
+  // The same for the inheritance and association lines.
   for (const m of d.modules)
-    for (const [b, { points }] of Object.entries(m.baseRoutes ?? {})) {
+    for (const [b, { points }] of [
+      ...Object.entries(m.baseRoutes ?? {}),
+      ...Object.values(m.associationRoutes ?? {}).flatMap((r) => Object.entries(r))
+    ]) {
       if (moved(linkOrigin(d, { from: { moduleId: m.id }, to: { moduleId: b } }))) continue
       const a = moved(m.id)
       const c = moved(b)
@@ -712,6 +715,29 @@ export function setBaseRoute(moduleId: Id, baseId: Id, route: BaseRoute | undefi
     else if (m.baseRoutes) {
       delete m.baseRoutes[baseId]
       if (!Object.keys(m.baseRoutes).length) delete m.baseRoutes
+    }
+  })
+}
+
+/**
+ * Set or clear (undefined, or nothing left) the hand-set shape of the association line from a
+ * module to a module one of its attributes references.
+ */
+export function setAssociationRoute(
+  moduleId: Id,
+  attributeId: Id,
+  targetId: Id,
+  route: BaseRoute | undefined
+): void {
+  updateLayout((d) => {
+    const m = d.modules.find((m) => m.id === moduleId)
+    if (!m) return
+    if (route && (route.points.length || route.from || route.to))
+      ((m.associationRoutes ??= {})[attributeId] ??= {})[targetId] = clean(route)
+    else if (m.associationRoutes?.[attributeId]) {
+      delete m.associationRoutes[attributeId][targetId]
+      if (!Object.keys(m.associationRoutes[attributeId]).length) delete m.associationRoutes[attributeId]
+      if (!Object.keys(m.associationRoutes).length) delete m.associationRoutes
     }
   })
 }

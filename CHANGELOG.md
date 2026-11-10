@@ -5,6 +5,16 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Association arrows are shaped by hand like inheritance lines, with their module selected: ends moved along the modules, bend points, attachments from the context menu (`editor.style.<module>.associations`, by attribute and referenced module). They follow the link style.
+
+### Fixed
+
+- Association arrows: the attribute label sits in the middle of the line on a light background, in front of the links, instead of covering the arrow head; several attributes referencing the same module (or modules referencing each other) get side-by-side arrows instead of overlapping ones.
+
 ## [1.2.0] - 2026-11-09
 
 ### Added

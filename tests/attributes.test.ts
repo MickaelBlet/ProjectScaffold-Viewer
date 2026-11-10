@@ -186,4 +186,24 @@ describe('attribute details', () => {
     ])
     expect(multiplicity({ kind: 'vector', of: { kind: 'ref', id: 'x' } })).toBe('*')
   })
+
+  it('spreads associations between the same modules and round-trips their shapes', () => {
+    const p = load()
+    const sensor = mod(p, 'Sensor')
+    const bus = mod(p, 'Bus')
+    const first = sensor.attributes.find((a) => a.name === 'bus')!
+    const second: Attribute = { ...structuredClone(first), id: 'second', name: 'other' }
+    sensor.attributes.push(second)
+    const edges = associationEdges(p, new Set(p.modules.map((m) => m.id))).filter(
+      (e) => e.source === sensor.id
+    )
+    expect(edges.map((e) => e.data?.spread)).toEqual([-11, 11])
+    const shape = { points: [{ x: 10, y: 20 }], from: { side: 'right' as const, at: 0.5 } }
+    sensor.associationRoutes = { [second.id]: { [bus.id]: shape, gone: { points: [] } } }
+    const file = toFile(p, { editor: true })
+    expect(file.editor?.style?.Sensor?.associations).toEqual({ other: { Bus: shape } })
+    const again = fromFile(file)
+    const other = mod(again, 'Sensor').attributes.find((a) => a.name === 'other')!
+    expect(mod(again, 'Sensor').associationRoutes).toEqual({ [other.id]: { [mod(again, 'Bus').id]: shape } })
+  })
 })

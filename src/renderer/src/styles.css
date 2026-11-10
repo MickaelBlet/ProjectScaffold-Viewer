@@ -4307,15 +4307,25 @@ mark {
   stroke-width: 1.2;
   stroke-linejoin: round;
 }
+/* Its module selected: its bends and attachments can be edited. */
+.react-flow__edge-path.association-edge.active,
+.association-arrow.active,
+.association-diamond.active {
+  stroke: var(--accent);
+}
+.association-diamond.owned.active {
+  fill: var(--accent);
+}
 .association-label {
   position: absolute;
-  padding: 0 3px;
-  border-radius: 3px;
+  padding: 1px 5px;
+  border: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  border-radius: 4px;
   font-size: 10px;
   color: var(--muted);
   white-space: nowrap;
   pointer-events: none;
-  background: var(--bg);
+  background: color-mix(in srgb, var(--panel) 85%, transparent);
 }
 
 /* Default value of a bitmask: opens the flags to toggle. */

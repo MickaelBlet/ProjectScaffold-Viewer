@@ -371,6 +371,7 @@ export function pasteClip(d: Project, clip: Clip, options: PasteOptions): Id[] {
       if (m.implements) m.implements = m.implements.map(rebind)
       // Shapes of inheritance lines are relative to modules that may not have come along.
       delete m.baseRoutes
+      delete m.associationRoutes
       if (m.bases) {
         const args = m.baseArgs
         delete m.baseArgs

@@ -823,6 +823,12 @@ const Editor = z
               .optional()
               .describe(
                 'hand-set shapes of the inheritance lines to its bases, by base path (bend points relative to the innermost module holding both, absolute at the top level)'
+              ),
+            associations: z
+              .record(Identifier, z.record(ModulePath, InheritShape))
+              .optional()
+              .describe(
+                'hand-set shapes of the association lines of its attributes, by attribute name, then referenced module path (bend points as for `bases`)'
               )
           })
           .describe('look of the module on the canvas')

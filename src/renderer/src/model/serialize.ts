@@ -486,6 +486,18 @@ export function toFile(p: Project, options: { editor: boolean }): FileProject {
       ? Object.fromEntries(set.map((b) => [modulePath(p, b), routeEntry(m.baseRoutes![b]!)]))
       : undefined
   }
+  /** Shapes of the association lines of a module, by attribute name, then referenced module path. */
+  const associationRoutes = (m: Module) => {
+    const set = m.attributes.flatMap((a) => {
+      const byTarget = Object.entries(m.associationRoutes?.[a.id] ?? {}).filter(
+        ([t]) => p.modules.some((x) => x.id === t) || findImported(p, t)
+      )
+      return byTarget.length
+        ? [[a.name, Object.fromEntries(byTarget.map(([t, r]) => [modulePath(p, t), routeEntry(r)]))] as const]
+        : []
+    })
+    return set.length ? Object.fromEntries(set) : undefined
+  }
   if (options.editor) {
     const editor: FileEditor = {
       layout: Object.fromEntries(p.modules.map((m) => [modulePath(p, m.id), { ...m.layout }]))
@@ -501,12 +513,19 @@ export function toFile(p: Project, options: { editor: boolean }): FileProject {
         outside: viewStandIns(p, v),
         notes: v.rootModuleId && viewNotes(p, v).length ? viewNotes(p, v).map(noteEntry) : undefined
       }))
-    const styled = p.modules.filter((m) => m.locked || portLabels(m.ports) || baseRoutes(m))
+    const styled = p.modules.filter(
+      (m) => m.locked || portLabels(m.ports) || baseRoutes(m) || associationRoutes(m)
+    )
     if (styled.length)
       editor.style = Object.fromEntries(
         styled.map((m) => [
           modulePath(p, m.id),
-          { locked: m.locked || undefined, labels: portLabels(m.ports), bases: baseRoutes(m) }
+          {
+            locked: m.locked || undefined,
+            labels: portLabels(m.ports),
+            bases: baseRoutes(m),
+            associations: associationRoutes(m)
+          }
         ])
       )
     if (p.dependencies.some((x) => x.modules.length))
@@ -1011,6 +1030,14 @@ export function fromFile(data: unknown, prev?: Project): Project {
   const modules: Module[] = []
   const moduleByPath = new Map<string, Module>()
   const prevPaths = prev ? modulePaths(prev) : new Map<Id, string>()
+  /** Shapes of the association lines of the modules, resolved once all modules are known. */
+  const associated: {
+    mod: Module
+    /** In the file, by attribute name, then module path; unset: no style for the module. */
+    shapes?: NonNullable<NonNullable<FileEditor['style']>[string]['associations']>
+    /** Those of the module renamed since the previous state. */
+    prevShapes?: Module['associationRoutes']
+  }[] = []
   /** Modules with bases, resolved once all modules are known. */
   const derived: {
     mod: Module
@@ -1149,6 +1176,12 @@ export function fromFile(data: unknown, prev?: Project): Project {
           at: [...at, i, 'bases'],
           shapes: style ? (style.bases ?? {}) : undefined,
           prevShapes: renamed ? was.baseRoutes : undefined
+        })
+      if (style?.associations || (!style && renamed && was.associationRoutes))
+        associated.push({
+          mod,
+          shapes: style?.associations,
+          prevShapes: style ? undefined : was?.associationRoutes
         })
 
       const inner = addModules(fm.modules ?? [], mod.id, path, height, [...at, i, 'modules'])
@@ -1373,6 +1406,21 @@ export function fromFile(data: unknown, prev?: Project): Project {
     dependencies.flatMap((x) => x.modules.map((m): [string, ImportedModule] => [`${x.name}/${m.path}`, m]))
   )
   const anyModuleAt = (path: string): Id | undefined => moduleAt(path) ?? importedByPath.get(path)?.id
+  // Association shapes: by attribute and referenced module (own, or placed module of a dependency).
+  for (const { mod, shapes, prevShapes } of associated)
+    for (const a of mod.attributes) {
+      const byTarget = shapes
+        ? Object.entries(shapes[a.name] ?? {}).flatMap(([path, shape]) => {
+            const id = anyModuleAt(path)
+            return id ? [[id, shape] as const] : []
+          })
+        : Object.entries(prevShapes?.[a.id] ?? {})
+      for (const [id, shape] of byTarget)
+        ((mod.associationRoutes ??= {})[a.id] ??= {})[id] = clean({
+          ...structuredClone(shape),
+          points: shape.points ?? []
+        })
+    }
   const prevViews = named(prev?.views, f.editor?.views ?? [])
   const linkByName = new Map(links.map((l) => [l.name, l]))
   /** Notes of a file entry, keeping the ids of `before` (by index). */

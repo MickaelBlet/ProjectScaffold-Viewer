@@ -9,13 +9,21 @@ import { MODULE_HANDLE, Z } from './constants'
 
 /** Data of an association edge, from a module (source) to a module an attribute references. */
 export type AssociationEdgeData = {
+  attributeId: Id
   ownership?: Ownership
+  /** Sideways offset apart from the other association lines between the same modules. */
+  spread: number
+  /** Goes from the module with the greater id, against the order `spread` is given in. */
+  flip: boolean
   /** Attribute name and multiplicity, at the referenced module. */
   label: string
 }
 
 /** Id prefix of the association edges. */
 export const ASSOCIATION = 'association:'
+
+/** Distance between association lines drawn between the same modules. */
+const SPREAD = 22
 
 /** Association edges between visible modules, one per attribute and module it references. */
 export function associationEdges(p: Project, visible: Set<Id>): Edge<AssociationEdgeData>[] {
@@ -28,7 +36,7 @@ export function associationEdges(p: Project, visible: Set<Id>): Edge<Association
       of && p.dependencies.find((d) => d.id === of.dependency)?.modules.find((m) => m.path === of.path)?.id
     )
   }
-  return p.modules.flatMap((m) =>
+  const edges = p.modules.flatMap((m) =>
     visible.has(m.id)
       ? m.attributes.flatMap((a) => {
           const targets: Id[] = []
@@ -48,11 +56,26 @@ export function associationEdges(p: Project, visible: Set<Id>): Edge<Association
             focusable: false,
             zIndex: Z.link,
             data: {
+              attributeId: a.id,
               ...(a.ownership && { ownership: a.ownership }),
+              spread: 0,
+              flip: m.id > target,
               label: `${a.name} [${multiplicity(a.type)}]`
             }
           }))
         })
       : []
   )
+  // Lines between the same modules, either way, side by side.
+  const pairs = new Map<string, Edge<AssociationEdgeData>[]>()
+  for (const e of edges) {
+    const key = e.source < e.target ? `${e.source}>${e.target}` : `${e.target}>${e.source}`
+    const list = pairs.get(key)
+    if (list) list.push(e)
+    else pairs.set(key, [e])
+  }
+  for (const list of pairs.values())
+    if (list.length > 1)
+      for (const [i, e] of list.entries()) e.data!.spread = (i - (list.length - 1) / 2) * SPREAD
+  return edges
 }

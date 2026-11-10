@@ -45,6 +45,7 @@ import {
   getProject,
   reparentModule,
   reverseLink,
+  setAssociationRoute,
   setBaseRoute,
   setLayouts,
   lineUpOutside,
@@ -77,7 +78,7 @@ import { openView, registerCanvas, revealInspector } from '@/shell/controllers'
 import { endOf, linkEnds, placedPortEnds, toEdges, toNodes, type ConnectEnd } from './flowGraph'
 import { INHERIT } from './inheritEdges'
 import { attachItems } from './anchorMenu'
-import { ASSOCIATION } from './associationEdges'
+import { ASSOCIATION, type AssociationEdgeData } from './associationEdges'
 import { reuseUnchanged } from './reuseUnchanged'
 import { floatingPortSides } from './portSides'
 import { ModuleNode } from './ModuleNode'
@@ -834,8 +835,16 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
     }
     if (edge.id.startsWith(ASSOCIATION)) {
       select({ kind: 'module', id: edge.source })
+      const attributeId = (edge.data as AssociationEdgeData | undefined)?.attributeId ?? ''
       openContextMenu(e, [
-        { label: 'Go to referenced module', run: () => navigate({ kind: 'module', id: edge.target }) }
+        { label: 'Go to referenced module', run: () => navigate({ kind: 'module', id: edge.target }) },
+        'separator',
+        ...attachItems(
+          drawn.modules.find((m) => m.id === edge.source)?.associationRoutes?.[attributeId]?.[edge.target],
+          ['Attach module end', 'Attach referenced end'],
+          'Automatic',
+          (r) => setAssociationRoute(edge.source, attributeId, edge.target, r)
+        )
       ])
       return
     }

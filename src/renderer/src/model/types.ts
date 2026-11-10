@@ -510,6 +510,8 @@ export interface Module {
   locked?: boolean
   /** Editor-only: shapes of the inheritance lines to its bases, by base. */
   baseRoutes?: Record<Id, BaseRoute>
+  /** Editor-only: shapes of the association lines of its attributes, by attribute, then referenced module. */
+  associationRoutes?: Record<Id, Record<Id, BaseRoute>>
 }
 
 /** An executable of the project: top-level modules run in one each, links between two are remote. */
