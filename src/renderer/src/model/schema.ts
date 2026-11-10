@@ -525,7 +525,7 @@ const Module: z.ZodType<FileModule> = z
         'conditions on its attributes holding between calls of its public methods (expressions)'
       ),
       metadata: Metadata,
-      color: z.string().optional().describe('accent color (CSS color)'),
+      color: z.string().optional().describe('deprecated: use its `editor.style` entry'),
       binary: Identifier.optional().describe(
         "name of the binary (`binaries`) it runs in: top-level modules only, inner ones run in their ancestor's"
       ),
@@ -555,7 +555,7 @@ const Binary = z
   .object({
     name: Identifier.describe('name of the binary'),
     description: Description,
-    color: z.string().optional().describe('accent color (CSS color)')
+    color: z.string().optional().describe('deprecated: use its `editor.binaries` entry')
   })
   .describe('An executable of the project, holding some of its top-level modules')
 
@@ -705,7 +705,7 @@ const Link = z.object({
     "receiver side (an `in` port; an inner `in` port from its container, the container's `out` port from its content)"
   ),
   constraints: LinkConstraints.describe('how messages travel along the link'),
-  color: z.string().optional().describe('color (CSS color); absent: the color of its performance class')
+  color: z.string().optional().describe('deprecated: use its `editor.links` entry')
 })
 
 const X = z.number().describe('left edge')
@@ -759,6 +759,9 @@ const EditorLink = z.object({
 const ModuleRect = Rect.describe('position and size of the module')
 const InheritShape = EditorLink.omit({ label: true }).describe('shape of the inheritance line')
 const LinkShape = EditorLink.describe('shape of the link')
+const LinkStyle = EditorLink.extend({
+  color: z.string().optional().describe('color (CSS color); absent: the color of its performance class')
+}).describe('look of the link: hand-set shape and color')
 
 const EditorView = z.object({
   name: z.string().describe('name of the view'),
@@ -815,7 +818,7 @@ const Editor = z
         QualifiedName,
         z
           .object({
-            color: z.string().optional().describe('deprecated: use the module `color`'),
+            color: z.string().optional().describe('accent color (CSS color)'),
             locked: Locked,
             labels: PortLabels,
             bases: z
@@ -863,7 +866,16 @@ const Editor = z
       .enum(['horizontal', 'vertical'])
       .optional()
       .describe('port placement: in left / out right (default), or in top / out bottom'),
-    links: z.record(Identifier, LinkShape).optional().describe('hand-set link shapes, by link name')
+    links: z.record(Identifier, LinkStyle).optional().describe('look of the links, by link name'),
+    binaries: z
+      .record(
+        Identifier,
+        z
+          .object({ color: z.string().optional().describe('accent color (CSS color)') })
+          .describe('look of the binary')
+      )
+      .optional()
+      .describe('look of the binaries, by binary name')
   })
   .describe('Editor-only data, ignored by generators')
 

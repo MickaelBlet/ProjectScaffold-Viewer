@@ -125,24 +125,37 @@ describe('serialize', () => {
     const p = fromFile(example)
     p.modules[1]!.ports[0]!.label = 'top'
     const file = toFile(p, { editor: true })
-    expect(file.editor?.style).toEqual({ 'Core.Sensor': { labels: { out: 'top' } } })
+    expect(file.editor?.style?.['Core.Sensor']?.labels).toEqual({ out: 'top' })
     expect(fromFile(file).modules.map((m) => m.ports.map((pt) => pt.label))).toEqual(
       p.modules.map((m) => m.ports.map((pt) => pt.label))
     )
     expect(toFile(p, { editor: false }).editor).toBeUndefined()
   })
 
-  it('exports module colors without editor data, and reads the legacy editor style', () => {
+  it('keeps colors in the editor data, left out of exports, and reads the legacy entity colors', () => {
     const p = fromFile(example)
     p.modules[1]!.color = '#ff0000'
+    p.links[0]!.color = '#00ff00'
+    const file = toFile(p, { editor: true })
+    expect(file.editor?.style?.['Core.Sensor']?.color).toBe('#ff0000')
+    expect(file.editor?.links).toEqual({ [p.links[0]!.name]: { color: '#00ff00' } })
+    expect(file.modules[0]!.modules![0]!.color).toBeUndefined()
+    expect(file.links[0]!.color).toBeUndefined()
+    const again = fromFile(file)
+    expect(again.modules[1]!.color).toBe('#ff0000')
+    expect(again.links[0]!.color).toBe('#00ff00')
+    expect(again.links[0]!.route).toBeUndefined()
     const exported = toFile(p, { editor: false })
-    expect(exported.modules[0]!.modules![0]!.color).toBe('#ff0000')
-    expect(fromFile(exported).modules[1]!.color).toBe('#ff0000')
+    expect(exported.editor).toBeUndefined()
+    expect(JSON.stringify(exported)).not.toContain('#ff0000')
+    // Legacy colors on the entities apply when the editor data has none.
     const legacy = structuredClone(example)
-    // The legacy style only applies to modules without their own color.
-    delete legacy.modules[0].modules[0].color
-    legacy.editor.style = { 'Core.Sensor': { color: '#00ff00' } }
-    expect(fromFile(legacy).modules[1]!.color).toBe('#00ff00')
+    delete legacy.editor.style
+    legacy.modules[0].modules[0].color = '#0000ff'
+    legacy.links[0].color = '#00ffff'
+    const old = fromFile(legacy)
+    expect(old.modules[1]!.color).toBe('#0000ff')
+    expect(old.links[0]!.color).toBe('#00ffff')
   })
 
   it('output matches the published JSON Schema', () => {

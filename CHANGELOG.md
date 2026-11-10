@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Module, link and binary colors are editor data: saved in the `editor` section (`editor.style.<module>.color`, `editor.links.<link>.color`, `editor.binaries.<binary>.color`) and stripped on export. Their `color` on the entity itself is deprecated: still read when the `editor` section has none, moved to `editor` on save.
+
 ### Added
 
 - Text editor: _YAML_ / _Scaffold_ buttons switch the project text between YAML and Scaffold text, whatever the file's format (remembered; saving keeps the file's format).

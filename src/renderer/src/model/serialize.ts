@@ -400,7 +400,6 @@ export function toFile(p: Project, options: { editor: boolean }): FileProject {
         active: m.active && activeOf(m.active),
         invariants: m.invariants?.length ? [...m.invariants] : undefined,
         metadata: optMeta(m.metadata),
-        color: m.color,
         binary: m.binaryId ? binaryName.get(m.binaryId) : undefined,
         types: types.length ? types.map(moduleTypeDef) : undefined,
         attributes: m.attributes.length ? m.attributes.map((a) => attribute(a, m.locks)) : undefined,
@@ -441,7 +440,7 @@ export function toFile(p: Project, options: { editor: boolean }): FileProject {
     remoteDefaults:
       p.remoteDefaults && Object.keys(p.remoteDefaults).length ? clean(p.remoteDefaults) : undefined,
     binaries: p.binaries.length
-      ? p.binaries.map((b) => ({ name: b.name, description: opt(b.description), color: b.color }))
+      ? p.binaries.map((b) => ({ name: b.name, description: opt(b.description) }))
       : undefined,
     ...owned(undefined),
     modules: moduleTree(null),
@@ -450,8 +449,7 @@ export function toFile(p: Project, options: { editor: boolean }): FileProject {
       description: opt(l.description),
       from: endpoint(l.from),
       to: endpoint(l.to),
-      constraints: l.constraints,
-      color: l.color
+      constraints: l.constraints
     })),
     dependencies: p.dependencies.length
       ? p.dependencies.map((x) => ({
@@ -514,13 +512,14 @@ export function toFile(p: Project, options: { editor: boolean }): FileProject {
         notes: v.rootModuleId && viewNotes(p, v).length ? viewNotes(p, v).map(noteEntry) : undefined
       }))
     const styled = p.modules.filter(
-      (m) => m.locked || portLabels(m.ports) || baseRoutes(m) || associationRoutes(m)
+      (m) => m.color || m.locked || portLabels(m.ports) || baseRoutes(m) || associationRoutes(m)
     )
     if (styled.length)
       editor.style = Object.fromEntries(
         styled.map((m) => [
           modulePath(p, m.id),
           {
+            color: m.color,
             locked: m.locked || undefined,
             labels: portLabels(m.ports),
             bases: baseRoutes(m),
@@ -543,8 +542,14 @@ export function toFile(p: Project, options: { editor: boolean }): FileProject {
           ])
       )
     if (p.orientation !== 'horizontal') editor.orientation = p.orientation
-    const routed = p.links.filter((l) => l.route)
-    if (routed.length) editor.links = Object.fromEntries(routed.map((l) => [l.name, routeEntry(l.route!)]))
+    const styledLinks = p.links.filter((l) => l.route || l.color)
+    if (styledLinks.length)
+      editor.links = Object.fromEntries(
+        styledLinks.map((l) => [l.name, { ...(l.route && routeEntry(l.route)), color: l.color }])
+      )
+    const coloredBinaries = p.binaries.filter((b) => b.color)
+    if (coloredBinaries.length)
+      editor.binaries = Object.fromEntries(coloredBinaries.map((b) => [b.name, { color: b.color }]))
     const notes = p.notes.filter((n) => !n.viewId)
     if (notes.length) editor.notes = notes.map(noteEntry)
     file.editor = editor
@@ -591,7 +596,9 @@ export function fromFile(data: unknown, prev?: Project): Project {
     if (binaryIds.has(b.name)) report(`Duplicate binary '${b.name}'`, ['binaries', i, 'name'])
     const id = idOf(prevBinaries[i], () => `binary:${b.name}`)
     binaryIds.set(b.name, id)
-    return { id, name: b.name, description: b.description ?? '', ...(b.color ? { color: b.color } : {}) }
+    // The binary's own `color` is deprecated: the editor's entry wins.
+    const color = f.editor?.binaries?.[b.name]?.color ?? b.color
+    return { id, name: b.name, description: b.description ?? '', ...(color ? { color } : {}) }
   })
 
   // Types and interfaces share one namespace.
@@ -1185,7 +1192,8 @@ export function fromFile(data: unknown, prev?: Project): Project {
         })
 
       const inner = addModules(fm.modules ?? [], mod.id, path, height, [...at, i, 'modules'])
-      const color = fm.color ?? style?.color
+      // The module's own `color` is deprecated: the editor's style wins.
+      const color = style?.color ?? fm.color
       if (color) mod.color = color
       if (style ? style.locked : renamed && was.locked) mod.locked = true
       for (const [j, pt] of mod.ports.entries()) {
@@ -1380,7 +1388,13 @@ export function fromFile(data: unknown, prev?: Project): Project {
   const prevLinks = named(prev?.links, f.links)
   const links: Link[] = f.links.map((l, i) => {
     const was = prevLinks[i]
-    const route = f.editor?.links?.[l.name] ?? (was?.name !== l.name ? was?.route : undefined)
+    const entry = f.editor?.links?.[l.name]
+    const { color: styleColor, ...shape } = entry ?? {}
+    // An entry holding only a color sets no shape.
+    const shaped = entry && (Object.keys(shape).length > 0 || styleColor === undefined)
+    const route = shaped ? shape : was?.name !== l.name ? was?.route : undefined
+    // The link's own `color` is deprecated: the editor's entry wins.
+    const color = styleColor ?? l.color
     return {
       id: was?.id ?? newId(),
       name: l.name,
@@ -1388,7 +1402,7 @@ export function fromFile(data: unknown, prev?: Project): Project {
       from: endpoint(l.from, `Link '${l.name}' from`, ['links', i, 'from']),
       to: endpoint(l.to, `Link '${l.name}' to`, ['links', i, 'to']),
       constraints: clean(l.constraints),
-      ...(l.color ? { color: l.color } : {}),
+      ...(color ? { color } : {}),
       ...(route ? { route: clean({ ...route, points: route.points ?? [] }) } : {})
     }
   })

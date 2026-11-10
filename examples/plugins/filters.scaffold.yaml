@@ -8,7 +8,6 @@ modules:
   - name: Blur
     bases:
       - Sdk/Plugin
-    color: "#3b8fd1"
     attributes:
       - name: radius
         type:
@@ -46,7 +45,6 @@ modules:
   - name: Sharpen
     bases:
       - Sdk/Plugin
-    color: "#d14f9e"
     attributes:
       - name: amount
         type:
@@ -317,6 +315,11 @@ editor:
       y: 232
       width: 200
       height: 160
+  style:
+    Blur:
+      color: "#3b8fd1"
+    Sharpen:
+      color: "#d14f9e"
   dependencies:
     Sdk:
       Plugin:

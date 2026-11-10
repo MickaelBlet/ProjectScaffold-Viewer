@@ -98,7 +98,6 @@ interfaces:
 modules:
   - name: HAL
     description: Hardware abstraction layer (class hierarchy only, no ports)
-    color: "#7a7a7a"
     ports: []
     modules:
       - name: ISensor
@@ -186,7 +185,6 @@ modules:
     metadata:
       safety: DAL-B
       cpu: stm32h7
-    color: "#d14f4f"
     ports:
       - name: command
         role: in
@@ -204,7 +202,6 @@ modules:
       - name: Imu
         bases:
           - HAL.SensorBase
-        color: "#8a4fd1"
         attributes:
           - name: bias
             type:
@@ -253,7 +250,6 @@ modules:
       - name: Gps
         bases:
           - HAL.SensorBase
-        color: "#8a4fd1"
         attributes:
           - name: device
             const: true
@@ -331,7 +327,6 @@ modules:
             interface: Telemetry
       - name: FlightController
         description: Mode logic and attitude control
-        color: "#d14f9e"
         attributes:
           - name: mode
             type:
@@ -462,7 +457,6 @@ modules:
             interface: Actuation
   - name: Motors
     description: ESCs on the CAN bus
-    color: "#e08a2e"
     attributes:
       - name: count
         const: true
@@ -488,7 +482,6 @@ modules:
         interface: Actuation
   - name: Payload
     description: Companion computer for the camera
-    color: "#2e9e8f"
     ports:
       - name: video
         role: out
@@ -560,7 +553,6 @@ modules:
     description: Datalink to the ground station
     metadata:
       band: 2.4GHz
-    color: "#d6c21f"
     attributes:
       - name: callsign
         type:
@@ -1380,12 +1372,26 @@ editor:
     - name: Estimator
       root: Avionics.Estimator
   style:
+    HAL:
+      color: "#7a7a7a"
     Avionics:
+      color: "#d14f4f"
       locked: true
+    Avionics.Imu:
+      color: "#8a4fd1"
+    Avionics.Gps:
+      color: "#8a4fd1"
+    Avionics.FlightController:
+      color: "#d14f9e"
     Motors:
+      color: "#e08a2e"
       locked: true
       labels:
         throttle: left
+    Payload:
+      color: "#2e9e8f"
+    Radio:
+      color: "#d6c21f"
   links:
     imu_to_estimator:
       points:

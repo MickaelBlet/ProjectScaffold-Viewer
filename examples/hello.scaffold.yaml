@@ -19,14 +19,12 @@ interfaces:
 modules:
   - name: Client
     description: Asks for greetings
-    color: "#3b8fd1"
     ports:
       - name: greeter
         role: out
         interface: Greeting
   - name: Server
     description: Answers them
-    color: "#2e9e8f"
     attributes:
       - name: prefix
         type:
@@ -65,3 +63,8 @@ editor:
       y: 20
       width: 200
       height: 98
+  style:
+    Client:
+      color: "#3b8fd1"
+    Server:
+      color: "#2e9e8f"

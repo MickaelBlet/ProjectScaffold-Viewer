@@ -5,10 +5,8 @@ project:
 binaries:
   - name: Onboard
     description: Runs on the rover
-    color: "#d1733b"
   - name: Ground
     description: Runs on the ground station
-    color: "#4f9ed1"
 types:
   - kind: bitmask
     name: Channels
@@ -207,7 +205,6 @@ constants:
 modules:
   - name: Camera
     description: Captures frames
-    color: "#d6c21f"
     binary: Onboard
     ports:
       - name: frames
@@ -218,7 +215,6 @@ modules:
         interface: Lifecycle
   - name: Perception
     description: Finds objects in the frames
-    color: "#2e9e8f"
     binary: Onboard
     ports:
       - name: frames
@@ -233,7 +229,6 @@ modules:
     modules:
       - name: Preprocess
         description: Undistorts and scales the frames
-        color: "#3b8fd1"
         ports:
           - name: in
             role: in
@@ -242,7 +237,6 @@ modules:
             role: out
             interface: FrameSink
       - name: Detector
-        color: "#8a4fd1"
         ports:
           - name: in
             role: in
@@ -255,7 +249,6 @@ modules:
             interface: DetectionSink
   - name: Planner
     description: Turns detections into drive commands
-    color: "#d14f9e"
     binary: Onboard
     ports:
       - name: detections
@@ -265,7 +258,6 @@ modules:
         role: out
         interface: Drive
   - name: Motors
-    color: "#d1733b"
     binary: Onboard
     ports:
       - name: drive
@@ -276,7 +268,6 @@ modules:
         interface: Lifecycle
   - name: Recorder
     description: Logs frames and detections
-    color: "#6b7f8e"
     binary: Onboard
     ports:
       - name: frames
@@ -287,7 +278,6 @@ modules:
         interface: DetectionSink
   - name: Supervisor
     description: Starts, stops and watches the others
-    color: "#4f9ed1"
     binary: Ground
     ports:
       - name: camera
@@ -547,4 +537,26 @@ editor:
       y: 9
       width: 364
       height: 101
+  style:
+    Camera:
+      color: "#d6c21f"
+    Perception:
+      color: "#2e9e8f"
+    Perception.Preprocess:
+      color: "#3b8fd1"
+    Perception.Detector:
+      color: "#8a4fd1"
+    Planner:
+      color: "#d14f9e"
+    Motors:
+      color: "#d1733b"
+    Recorder:
+      color: "#6b7f8e"
+    Supervisor:
+      color: "#4f9ed1"
   orientation: vertical
+  binaries:
+    Onboard:
+      color: "#d1733b"
+    Ground:
+      color: "#4f9ed1"

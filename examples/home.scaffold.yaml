@@ -13,22 +13,16 @@ remoteDefaults:
 binaries:
   - name: Hub
     description: Home server process
-    color: "#2e9e8f"
   - name: Vision
     description: Camera process on the hub box
-    color: "#8a4fd1"
   - name: Voice
     description: Speech assistant process on the hub box
-    color: "#d14f9e"
   - name: Cloud
     description: Remote service
-    color: "#3b8fd1"
   - name: Mobile
     description: Phone app
-    color: "#d6c21f"
   - name: Firmware
     description: Microcontrollers of the devices
-    color: "#d1733b"
 types:
   - kind: alias
     name: DeviceId
@@ -257,7 +251,6 @@ interfaces:
 modules:
   - name: Automation
     description: Runs the rules on the readings
-    color: "#2e9e8f"
     binary: Hub
     ports:
       - name: readings
@@ -288,7 +281,6 @@ modules:
         role: out
         interface: Backup
   - name: Camera
-    color: "#8a4fd1"
     binary: Vision
     attributes:
       - name: fps
@@ -301,7 +293,6 @@ modules:
         role: out
         interface: Frames
   - name: Assistant
-    color: "#d14f9e"
     binary: Voice
     attributes:
       - name: wakeWord
@@ -315,7 +306,6 @@ modules:
         interface: Intents
   - name: Service
     description: Stores rules and events, sends notifications
-    color: "#3b8fd1"
     binary: Cloud
     ports:
       - name: events
@@ -331,7 +321,6 @@ modules:
         role: out
         interface: Events
   - name: App
-    color: "#d6c21f"
     binary: Mobile
     ports:
       - name: rules
@@ -342,14 +331,12 @@ modules:
         interface: Events
   - name: Sensors
     description: Battery sensors on the Zigbee mesh
-    color: "#d1733b"
     binary: Firmware
     ports:
       - name: readings
         role: out
         interface: Readings
   - name: Lights
-    color: "#d1733b"
     binary: Firmware
     ports:
       - name: switch
@@ -357,7 +344,6 @@ modules:
         interface: Switch
   - name: Boiler
     description: Boiler controller wired to the hub
-    color: "#d1733b"
     binary: Firmware
     ports:
       - name: climate
@@ -367,7 +353,6 @@ modules:
         role: out
         interface: Readings
   - name: Doorbell
-    color: "#d1733b"
     binary: Firmware
     ports:
       - name: presence
@@ -667,3 +652,35 @@ editor:
       y: 498
       width: 200
       height: 72
+  style:
+    Automation:
+      color: "#2e9e8f"
+    Camera:
+      color: "#8a4fd1"
+    Assistant:
+      color: "#d14f9e"
+    Service:
+      color: "#3b8fd1"
+    App:
+      color: "#d6c21f"
+    Sensors:
+      color: "#d1733b"
+    Lights:
+      color: "#d1733b"
+    Boiler:
+      color: "#d1733b"
+    Doorbell:
+      color: "#d1733b"
+  binaries:
+    Hub:
+      color: "#2e9e8f"
+    Vision:
+      color: "#8a4fd1"
+    Voice:
+      color: "#d14f9e"
+    Cloud:
+      color: "#3b8fd1"
+    Mobile:
+      color: "#d6c21f"
+    Firmware:
+      color: "#d1733b"

@@ -447,7 +447,6 @@ constants:
 modules:
   - name: Api
     description: REST front end
-    color: "#3b8fd1"
     attributes:
       - name: port
         type:
@@ -474,7 +473,6 @@ modules:
         interface: Reports
   - name: Book
     description: Keeps accounts and balances
-    color: "#2e9e8f"
     attributes:
       - name: currencies
         type:
@@ -523,14 +521,12 @@ modules:
         role: out
         interface: Audit
   - name: Reporting
-    color: "#d6c21f"
     ports:
       - name: reports
         role: in
         interface: Reports
   - name: Auditor
     description: Append-only trail of the postings
-    color: "#6b7f8e"
     attributes:
       - name: retentionYears
         type:
@@ -627,3 +623,12 @@ editor:
       y: 125
       width: 200
       height: 98
+  style:
+    Api:
+      color: "#3b8fd1"
+    Book:
+      color: "#2e9e8f"
+    Reporting:
+      color: "#d6c21f"
+    Auditor:
+      color: "#6b7f8e"

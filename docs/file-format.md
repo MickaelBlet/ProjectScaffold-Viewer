@@ -27,10 +27,10 @@ constants: [...] # named values (optional)
 modules: [...] # recursive (modules[].modules)
 links: [...]
 dependencies: [...] # other project files whose types, interfaces and modules this one uses (optional)
-editor: { layout, views?, style?, notes?, dependencies?, orientation?, links? } # editor only, ignored by generators
+editor: { layout, views?, style?, notes?, dependencies?, orientation?, links?, binaries? } # editor only, ignored by generators
 ```
 
-The `editor` section holds layout and view data only; it is stripped on export.
+The `editor` section holds layout and view data only, colors included; it is stripped on export. Colors: `editor.style.<module path>.color`, `editor.links.<link>.color` (absent: the color of its performance class), `editor.binaries.<binary>.color`. A `color` on a module, link or binary itself is deprecated: still read when the `editor` section has none, written in `editor` on save.
 
 ## Names
 
@@ -221,7 +221,6 @@ links:
       ack: { required: bool, timeoutMs? }
       performance: { class: realtime | low | normal | bulk, maxLatencyMs?, rateHz? }
       remote: { enabled: bool, transport?, settings? } # e.g. ipc, shm, mq, tcp, udp, grpc, mqtt, can
-    color: '#d14f4f' # optional; absent: the color of its performance class
 ```
 
 Links to modules of other projects: [Dependencies › File format](dependencies.md#file-format).
@@ -230,7 +229,7 @@ Links to modules of other projects: [Dependencies › File format](dependencies.
 
 ```yaml
 binaries:
-  - { name: Onboard, description?, color? }
+  - { name: Onboard, description? }
   - { name: Ground }
 modules:
   - name: Camera

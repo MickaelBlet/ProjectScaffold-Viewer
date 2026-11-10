@@ -8,16 +8,12 @@ project:
 binaries:
   - name: Powertrain
     description: Motor and battery ECU
-    color: "#d1733b"
   - name: Chassis
     description: Brakes and steering ECU
-    color: "#2e9e8f"
   - name: Cockpit
     description: Dashboard and infotainment
-    color: "#3b8fd1"
   - name: Diagnostics
     description: Workshop tester on the OBD port
-    color: "#6b7f8e"
 types:
   - kind: enum
     name: Gear
@@ -173,7 +169,6 @@ constants:
 modules:
   - name: Vcu
     description: Vehicle control unit
-    color: "#d1733b"
     binary: Powertrain
     ports:
       - name: wheels
@@ -265,7 +260,6 @@ modules:
             interface: Diagnosis
   - name: Esc
     description: Electronic stability control
-    color: "#2e9e8f"
     binary: Chassis
     ports:
       - name: wheels
@@ -292,14 +286,12 @@ modules:
             role: in
             interface: Brake
   - name: Dashboard
-    color: "#3b8fd1"
     binary: Cockpit
     ports:
       - name: battery
         role: in
         interface: BatteryStatus
   - name: Tester
-    color: "#6b7f8e"
     binary: Diagnostics
     ports:
       - name: diagnosis
@@ -581,3 +573,21 @@ editor:
       y: 481
       width: 200
       height: 72
+  style:
+    Vcu:
+      color: "#d1733b"
+    Esc:
+      color: "#2e9e8f"
+    Dashboard:
+      color: "#3b8fd1"
+    Tester:
+      color: "#6b7f8e"
+  binaries:
+    Powertrain:
+      color: "#d1733b"
+    Chassis:
+      color: "#2e9e8f"
+    Cockpit:
+      color: "#3b8fd1"
+    Diagnostics:
+      color: "#6b7f8e"

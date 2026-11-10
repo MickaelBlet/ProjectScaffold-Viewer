@@ -85,7 +85,6 @@ constants:
 modules:
   - name: Platform
     description: Window, input devices and clock
-    color: "#6b7f8e"
     attributes:
       - name: title
         type:
@@ -113,7 +112,6 @@ modules:
         role: in
         interface: Sound
   - name: Engine
-    color: "#2e9e8f"
     ports:
       - name: tick
         role: in
@@ -813,3 +811,8 @@ editor:
       y: 46
       width: 200
       height: 72
+  style:
+    Platform:
+      color: "#6b7f8e"
+    Engine:
+      color: "#2e9e8f"

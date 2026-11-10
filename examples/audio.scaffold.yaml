@@ -69,7 +69,6 @@ modules:
   - name: Processor
     description: Anything processing audio in place
     kind: interface
-    color: "#6b7f8e"
     methods:
       - name: process
         virtual: true
@@ -101,7 +100,6 @@ modules:
   - name: Meter
     description: Exposes a level
     kind: interface
-    color: "#6b7f8e"
     methods:
       - name: level
         const: true
@@ -117,7 +115,6 @@ modules:
     kind: abstract
     bases:
       - Processor
-    color: "#8a4fd1"
     attributes:
       - name: bypass
         type:
@@ -240,7 +237,6 @@ modules:
     ports: []
   - name: Source
     description: Reads the input device
-    color: "#3b8fd1"
     attributes:
       - name: device
         type:
@@ -309,7 +305,6 @@ modules:
     bases:
       - Effect
     final: true
-    color: "#2e9e8f"
     types:
       - kind: enum
         name: Shape
@@ -437,7 +432,6 @@ modules:
     bases:
       - Effect
       - Meter
-    color: "#d14f9e"
     attributes:
       - name: thresholdDb
         type:
@@ -502,7 +496,6 @@ modules:
     description: Compressor with an infinite ratio and look-ahead
     bases:
       - Compressor
-    color: "#d1733b"
     attributes:
       - name: ceilingDb
         type:
@@ -549,7 +542,6 @@ modules:
         interface: LevelSink
   - name: Sink
     description: Writes the output device
-    color: "#3b8fd1"
     ports:
       - name: in
         role: in
@@ -558,7 +550,6 @@ modules:
     description: Shows the gain reduction
     implements:
       - LevelSink
-    color: "#d6c21f"
     methods:
       - name: level
         description: Shows a level, from either port
@@ -728,3 +719,22 @@ editor:
       y: 438
       width: 200
       height: 96
+  style:
+    Processor:
+      color: "#6b7f8e"
+    Meter:
+      color: "#6b7f8e"
+    Effect:
+      color: "#8a4fd1"
+    Source:
+      color: "#3b8fd1"
+    Equalizer:
+      color: "#2e9e8f"
+    Compressor:
+      color: "#d14f9e"
+    Limiter:
+      color: "#d1733b"
+    Sink:
+      color: "#3b8fd1"
+    Display:
+      color: "#d6c21f"

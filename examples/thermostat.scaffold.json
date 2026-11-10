@@ -140,7 +140,6 @@
     {
       "name": "Probe",
       "description": "Thermistor on the ADC",
-      "color": "#3b8fd1",
       "attributes": [
         {
           "name": "periodMs",
@@ -162,7 +161,6 @@
     {
       "name": "Regulator",
       "description": "PI controller following the schedule",
-      "color": "#2e9e8f",
       "attributes": [
         {
           "name": "kp",
@@ -229,7 +227,6 @@
     {
       "name": "Relay",
       "description": "Drives the heater with slow PWM",
-      "color": "#d1733b",
       "ports": [
         {
           "name": "heater",
@@ -241,7 +238,6 @@
     {
       "name": "Display",
       "description": "LCD and buttons",
-      "color": "#d6c21f",
       "ports": [
         {
           "name": "panel",
@@ -348,6 +344,20 @@
         "y": 162,
         "width": 200,
         "height": 72
+      }
+    },
+    "style": {
+      "Probe": {
+        "color": "#3b8fd1"
+      },
+      "Regulator": {
+        "color": "#2e9e8f"
+      },
+      "Relay": {
+        "color": "#d1733b"
+      },
+      "Display": {
+        "color": "#d6c21f"
       }
     }
   }

@@ -47,7 +47,6 @@ interfaces:
 modules:
   - name: Datalink
     description: Ground side of the radio link
-    color: "#d6c21f"
     attributes:
       - name: port
         const: true
@@ -95,7 +94,6 @@ modules:
         interface: Video
   - name: MissionControl
     description: Planning and supervision
-    color: "#2e9e8f"
     ports:
       - name: telemetry
         role: in
@@ -1151,8 +1149,11 @@ editor:
           height: 100
   style:
     Datalink:
+      color: "#d6c21f"
       labels:
         uplink: left
+    MissionControl:
+      color: "#2e9e8f"
     VideoWall:
       labels:
         video: bottom

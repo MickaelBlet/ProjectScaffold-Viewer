@@ -12,16 +12,12 @@ remoteDefaults:
 binaries:
   - name: Frontend
     description: Single-page app in the browser
-    color: "#d6c21f"
   - name: Api
     description: Backend services
-    color: "#2e9e8f"
   - name: Jobs
     description: Background workers
-    color: "#8a4fd1"
   - name: Provider
     description: Payment provider
-    color: "#6b7f8e"
 types:
   - kind: alias
     name: Sku
@@ -214,7 +210,6 @@ interfaces:
         returns: null
 modules:
   - name: Web
-    color: "#d6c21f"
     binary: Frontend
     ports:
       - name: api
@@ -222,7 +217,6 @@ modules:
         interface: Storefront
   - name: Gateway
     description: Authenticates and routes the requests
-    color: "#3b8fd1"
     binary: Api
     ports:
       - name: api
@@ -235,7 +229,6 @@ modules:
         role: out
         interface: Ordering
   - name: Backend
-    color: "#2e9e8f"
     binary: Api
     ports:
       - name: catalog
@@ -286,7 +279,6 @@ modules:
             interface: Stock
   - name: Notifier
     description: Mails the customers when their orders change
-    color: "#8a4fd1"
     binary: Jobs
     ports:
       - name: events
@@ -294,7 +286,6 @@ modules:
         interface: OrderEvents
   - name: Psp
     description: Payment service provider
-    color: "#6b7f8e"
     binary: Provider
     ports:
       - name: payment
@@ -552,11 +543,20 @@ editor:
       hidden:
         - Notifier
   style:
+    Web:
+      color: "#d6c21f"
     Gateway:
+      color: "#3b8fd1"
       locked: true
+    Backend:
+      color: "#2e9e8f"
     Backend.Orders:
       labels:
         events: bottom
+    Notifier:
+      color: "#8a4fd1"
+    Psp:
+      color: "#6b7f8e"
   links:
     charge:
       from:
@@ -572,6 +572,15 @@ editor:
           y: 300
         - x: 1495
           y: 262
+  binaries:
+    Frontend:
+      color: "#d6c21f"
+    Api:
+      color: "#2e9e8f"
+    Jobs:
+      color: "#8a4fd1"
+    Provider:
+      color: "#6b7f8e"
   notes:
     - kind: frame
       text: Api binary

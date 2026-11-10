@@ -96,7 +96,7 @@
                 "type": "string"
               },
               "color": {
-                "description": "accent color (CSS color)",
+                "description": "deprecated: use its `editor.binaries` entry",
                 "type": "string"
               }
             },
@@ -287,7 +287,7 @@
                 "description": "how messages travel along the link"
               },
               "color": {
-                "description": "color (CSS color); absent: the color of its performance class",
+                "description": "deprecated: use its `editor.links` entry",
                 "type": "string"
               }
             },
@@ -1021,7 +1021,7 @@
                 "type": "object",
                 "properties": {
                   "color": {
-                    "description": "deprecated: use the module `color`",
+                    "description": "accent color (CSS color)",
                     "type": "string"
                   },
                   "locked": {
@@ -1357,7 +1357,7 @@
               ]
             },
             "links": {
-              "description": "hand-set link shapes, by link name",
+              "description": "look of the links, by link name",
               "type": "object",
               "propertyNames": {
                 "type": "string",
@@ -1444,9 +1444,31 @@
                     "type": "number",
                     "minimum": 0,
                     "maximum": 1
+                  },
+                  "color": {
+                    "description": "color (CSS color); absent: the color of its performance class",
+                    "type": "string"
                   }
                 },
-                "description": "shape of the link"
+                "description": "look of the link: hand-set shape and color"
+              }
+            },
+            "binaries": {
+              "description": "look of the binaries, by binary name",
+              "type": "object",
+              "propertyNames": {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+              },
+              "additionalProperties": {
+                "type": "object",
+                "properties": {
+                  "color": {
+                    "description": "accent color (CSS color)",
+                    "type": "string"
+                  }
+                },
+                "description": "look of the binary"
               }
             }
           },
@@ -2464,7 +2486,7 @@
           }
         },
         "color": {
-          "description": "accent color (CSS color)",
+          "description": "deprecated: use its `editor.style` entry",
           "type": "string"
         },
         "binary": {

@@ -153,7 +153,6 @@ constants:
 modules:
   - name: RfFrontEnd
     description: Device - tuner and analog-to-digital converter
-    color: "#d1733b"
     attributes:
       - name: sampleRate
         type:
@@ -179,7 +178,6 @@ modules:
         interface: IqStream
   - name: Channelizer
     description: Moves the station to baseband and decimates to 240 kHz
-    color: "#8a4fd1"
     attributes:
       - name: decimation
         type:
@@ -202,7 +200,6 @@ modules:
         interface: IqStream
   - name: FmDemod
     description: Stereo FM demodulator with RDS decoder
-    color: "#2e9e8f"
     attributes:
       - name: deemphasis
         type:
@@ -230,7 +227,6 @@ modules:
         role: out
         interface: RdsStream
   - name: RdsDecoder
-    color: "#d14f9e"
     ports:
       - name: groups
         role: in
@@ -240,7 +236,6 @@ modules:
         interface: StationInfo
   - name: AudioSink
     description: Device - sound card
-    color: "#3b8fd1"
     attributes:
       - name: volume
         type:
@@ -258,7 +253,6 @@ modules:
         interface: AudioStream
   - name: Controller
     description: Assembly controller - tunes and reads the station name
-    color: "#d6c21f"
     attributes:
       - name: presets
         type:
@@ -408,3 +402,16 @@ editor:
       y: 100
       width: 200
       height: 122
+  style:
+    RfFrontEnd:
+      color: "#d1733b"
+    Channelizer:
+      color: "#8a4fd1"
+    FmDemod:
+      color: "#2e9e8f"
+    RdsDecoder:
+      color: "#d14f9e"
+    AudioSink:
+      color: "#3b8fd1"
+    Controller:
+      color: "#d6c21f"

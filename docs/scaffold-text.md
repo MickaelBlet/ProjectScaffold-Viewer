@@ -70,7 +70,7 @@ Every property of the file format can be written in its generic form, so any pro
 ```
 transports = [lora];
 remoteDefaults = { basePort: 48000 };
-module Pump [color = "#c33"] {
+module Pump [copy = delete] {
   binary = controller;
   metadata = { owner: hydraulics };
 }

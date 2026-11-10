@@ -12,14 +12,12 @@ modules:
   - name: Core
     metadata:
       owner: team-a
-    color: "#2e9e8f"
     ports:
       - name: control
         role: in
         interface: Control
     modules:
       - name: Sensor
-        color: "#8a4fd1"
         types:
           - kind: enum
             name: Filter
@@ -71,7 +69,6 @@ modules:
             role: out
             interface: Telemetry
       - name: Controller
-        color: "#d14f9e"
         attributes:
           - name: mode
             type:
@@ -121,14 +118,12 @@ modules:
             role: in
             interface: Telemetry
       - name: Logger
-        color: "#3b8fd1"
         ports:
           - name: in
             role: in
             interface: Telemetry
   - name: Operator
     description: Remote operator console
-    color: "#d6c21f"
     ports:
       - name: cmd
         role: out
@@ -315,3 +310,14 @@ editor:
   views:
     - name: Operator
       root: Operator
+  style:
+    Core:
+      color: "#2e9e8f"
+    Core.Sensor:
+      color: "#8a4fd1"
+    Core.Controller:
+      color: "#d14f9e"
+    Core.Logger:
+      color: "#3b8fd1"
+    Operator:
+      color: "#d6c21f"

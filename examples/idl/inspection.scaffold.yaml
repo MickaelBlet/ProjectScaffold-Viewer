@@ -53,7 +53,6 @@ interfaces:
 modules:
   - name: Inspector
     description: Finds defects in the frames
-    color: "#2e9e8f"
     attributes:
       - name: format
         type:
@@ -89,7 +88,6 @@ modules:
         interface: FrameListener
   - name: Reject
     description: Pushes failed parts off the conveyor
-    color: "#d1733b"
     ports:
       - name: results
         role: in
@@ -560,6 +558,11 @@ editor:
       y: 60
       width: 200
       height: 72
+  style:
+    Inspector:
+      color: "#2e9e8f"
+    Reject:
+      color: "#d1733b"
   dependencies:
     imaging:
       Imaging:

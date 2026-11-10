@@ -7,7 +7,6 @@ interfaces: []
 modules:
   - name: Editor
     description: Runs the plugins the user picks on the open image
-    color: "#2e9e8f"
     attributes:
       - name: enabled
         type:
@@ -29,7 +28,6 @@ modules:
     description: Built-in plugin
     bases:
       - Sdk/Plugin
-    color: "#d6c21f"
     attributes:
       - name: text
         type:
@@ -380,6 +378,11 @@ editor:
       y: 250
       width: 200
       height: 160
+  style:
+    Editor:
+      color: "#2e9e8f"
+    Watermark:
+      color: "#d6c21f"
   dependencies:
     Sdk:
       Plugin:
