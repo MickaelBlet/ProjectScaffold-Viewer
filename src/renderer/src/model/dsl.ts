@@ -171,8 +171,8 @@ const METHOD_MODS = new Set([
   'noexcept',
   'nodiscard'
 ])
-/** Method qualifiers written after the parameters (`= 0` sets `pure`). */
-const TRAILING_MODS = new Set(['const', 'noexcept', 'override', 'final'])
+/** Method qualifiers read after the parameters (`pure` or `= 0`, written `= 0`). */
+const TRAILING_MODS = new Set(['const', 'noexcept', 'override', 'final', 'pure'])
 const MODULE_MODS = new Set([...KINDS, 'final'])
 const PERF = new Set(['realtime', 'low', 'normal', 'bulk'])
 const CLAUSES = new Set(['ack', 'latency', 'rate', 'remote', ...PERF])

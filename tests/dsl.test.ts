@@ -103,6 +103,8 @@ final module Old { const pure override noexcept void run(); }
     expect(text).toContain('module Box<T> final : Base {')
     expect(text).toContain('virtual uint32 size() const noexcept raises (E) override final = 0;')
     expect(text).toContain('module Old final {')
+    const pure = parseDsl(`${minimal}module P { void f() const pure; }`)
+    expect((pure.modules as never[])[0]).toMatchObject({ methods: [{ const: true, pure: true }] })
     expect(() => parseDsl(`${minimal}interface I { void f() const; }`)).toThrow(DslError)
     expect(() => parseDsl(`${minimal}module M { void f() = 1; }`)).toThrow(DslError)
   })

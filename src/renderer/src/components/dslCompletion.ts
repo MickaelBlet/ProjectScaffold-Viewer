@@ -34,9 +34,9 @@ const MODIFIERS = new Set([
   'nodiscard',
   'explicit'
 ])
-/** Written after a method's parameters, as in C++ (`= 0`: pure); not offered before the type. */
-const TRAILING = ['const', 'noexcept', 'raises', 'override', 'final']
-const LEADING = [...MODIFIERS].filter((w) => !['pure', 'override', 'final', 'noexcept'].includes(w))
+/** Written after a method's parameters, as in C++ (`pure` or `= 0`); not offered before the type. */
+const TRAILING = ['const', 'noexcept', 'raises', 'override', 'final', 'pure']
+const LEADING = [...MODIFIERS].filter((w) => !['override', 'final', 'noexcept'].includes(w))
 const TYPEDEFS = ['struct', 'exception', 'enum', 'bitmask', 'union', 'alias', 'primitive']
 const FILE_WORDS = [
   'syntax',

@@ -156,7 +156,7 @@ member    = [doc] ( "in" | "out" ) ( name | "?" ) name [opts] ";"    a port (`?`
           | typedef | module | generic
 ```
 
-Modifiers and qualifiers set the flags of the same name to `true`, in C++ positions: attributes `static const mutable atomic`; methods `static virtual threadSafe nodiscard` before the result type, then after the parameters `qualifier = "const" | "noexcept" | "raises" "(" … ")" | "override" | "final"` and `= 0` for `pure`; constructors `explicit`; destructors `virtual`; and an access level for all of them. `false` values go in `opts`.
+Modifiers and qualifiers set the flags of the same name to `true`, in C++ positions: attributes `static const mutable atomic`; methods `static virtual threadSafe nodiscard` before the result type, then after the parameters `qualifier = "const" | "noexcept" | "raises" "(" … ")" | "override" | "final" | "pure"`, `= 0` also for `pure` (written `= 0`); constructors `explicit`; destructors `virtual`; and an access level for all of them. `false` values go in `opts`.
 
 ```
 protected virtual uint32 latency() const noexcept override = 0;

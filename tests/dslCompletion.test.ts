@@ -34,7 +34,14 @@ describe('Scaffold text completion', () => {
     )
     expect(at('module A {\n  static |')).toContain('uint8')
     expect(at('module A {\n  int32 |')).toBeNull()
-    expect(at('module A {\n  int32 get() |')).toEqual(['const', 'noexcept', 'raises', 'override', 'final'])
+    expect(at('module A {\n  int32 get() |')).toEqual([
+      'const',
+      'noexcept',
+      'raises',
+      'override',
+      'final',
+      'pure'
+    ])
     expect(at('module A {\n  int32 get() const ov|')).toEqual(['override'])
     expect(at('interface I {\n  int32 get() |')).toEqual(['raises'])
   })

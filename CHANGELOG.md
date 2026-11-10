@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Scaffold text: method qualifiers in C++ positions, after the parameters (`virtual uint32 size() const noexcept override final = 0;`, `= 0` for pure), and `final` after a module's name (`module Equalizer final : Effect`). The 1.2 forms (`const virtual pure void run();`, `final module M`) are still read.
+- Scaffold text: method qualifiers in C++ positions, after the parameters (`virtual uint32 size() const noexcept override final = 0;`, `pure` or `= 0` for pure), and `final` after a module's name (`module Equalizer final : Effect`). The 1.2 forms (`const virtual pure void run();`, `final module M`) are still read.
 - Module, link and binary colors are editor data: saved in the `editor` section (`editor.style.<module>.color`, `editor.links.<link>.color`, `editor.binaries.<binary>.color`) and stripped on export. Their `color` on the entity itself is deprecated: still read when the `editor` section has none, moved to `editor` on save.
 
 ### Added
