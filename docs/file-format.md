@@ -2,13 +2,49 @@
 
 A project file is language-agnostic data, described by [`schema/scaffold.schema.json`](../schema/scaffold.schema.json) (JSON Schema 2020-12), written in one of three formats holding the same data:
 
-| Format                            | Files                               | Use                                                                  |
-| --------------------------------- | ----------------------------------- | -------------------------------------------------------------------- |
-| [Scaffold text](scaffold-text.md) | `*.scaffold`                        | default: new projects and the examples; compact, `.proto`-like       |
-| YAML                              | `*.scaffold.yaml`, `*.scaffold.yml` | the data model below; _File › Export as YAML…_ (without editor data) |
-| JSON                              | `*.scaffold.json`                   | same keys as YAML                                                    |
+| Format                            | Files                               | Use                                                                        |
+| --------------------------------- | ----------------------------------- | -------------------------------------------------------------------------- |
+| [Scaffold text](scaffold-text.md) | `*.scaffold`                        | default: new projects and the examples; compact, `.proto`-like             |
+| YAML                              | `*.scaffold.yaml`, `*.scaffold.yml` | the data model, key by key; _File › Export as YAML…_ (without editor data) |
+| JSON                              | `*.scaffold.json`                   | same keys as YAML                                                          |
 
-This page shows the data model in YAML. Example: [`examples/robot.scaffold`](../examples/robot.scaffold) (open it and switch the text editor to _YAML_ to see it in YAML).
+Each section shows Scaffold text first, then the same data in YAML, whose keys are those of the schema (a Scaffold text property without a shorthand is written `key = value;` with these keys: [generic properties](scaffold-text.md#generic-properties)). Full syntax: [Scaffold text](scaffold-text.md). Example: [`examples/robot.scaffold`](../examples/robot.scaffold) (open it and switch the text editor to _YAML_ to see it in YAML).
+
+```
+syntax = "scaffold1";                       // schemaVersion: 1
+
+/// A drone and its ground station
+project "Fleet";
+
+binary Onboard;
+binary Ground;
+
+struct Reading {
+  float64 value = 1.5 [constraints = { min: 0, unit: m }];
+}
+
+const float32 MaxSpeed = 2.5;
+
+interface Telemetry {
+  void publish(Reading r);
+}
+
+module Core {
+  binary = Onboard;
+
+  module Sensor {
+    out Telemetry out;
+  }
+}
+
+module Monitor {
+  binary = Ground;
+
+  in Telemetry telemetry;
+}
+
+link sensor_to_monitor: Core.Sensor.out -> Monitor.telemetry realtime remote tcp;
+```
 
 - [Top level](#top-level)
 - [Names](#names)
@@ -23,6 +59,8 @@ This page shows the data model in YAML. Example: [`examples/robot.scaffold`](../
 Dependencies on other project files and workspace files: [Dependencies](dependencies.md).
 
 ## Top level
+
+In Scaffold text, the top-level statements, in any order: `syntax`, `project`, `binary`, type definitions (`struct`, `enum`…), `interface`, `const`, `module`, `link`, `dependency`, and `key = value;` for the others (`remoteDefaults = { … };`, `editor = { … };`). In YAML:
 
 ```yaml
 schemaVersion: 1
@@ -52,14 +90,18 @@ The `editor` section holds layout and view data only, colors included; it is str
 
 A type reference is always structured, never a string:
 
-| kind                  | fields                | notes                                                                                                                                 |
-| --------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `primitive`           | `name`, `max`         | `bool char int8 int16 int32 int64 uint8 uint16 uint32 uint64 float32 float64 string bytes`; `max` (string, bytes): most bytes (UTF-8) |
-| `array`               | `of`, `size`          | fixed size                                                                                                                            |
-| `vector` `list` `set` | `of`, `max`           | `max`: most items                                                                                                                     |
-| `optional`            | `of`                  |                                                                                                                                       |
-| `map`                 | `key`, `value`, `max` | key: primitive or enum; `max`: most entries                                                                                           |
-| `ref`                 | `name`                | user type (struct, enum or alias), or module (see [Modules as types](#modules-as-types))                                              |
+| kind                  | fields                | Scaffold text                          | notes                                                                                                                                 |
+| --------------------- | --------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `primitive`           | `name`, `max`         | `uint32`, `string(64)`                 | `bool char int8 int16 int32 int64 uint8 uint16 uint32 uint64 float32 float64 string bytes`; `max` (string, bytes): most bytes (UTF-8) |
+| `array`               | `of`, `size`          | `array<T, 4>`                          | fixed size                                                                                                                            |
+| `vector` `list` `set` | `of`, `max`           | `vector<T>`, `set<T, 8>`               | `max`: most items                                                                                                                     |
+| `optional`            | `of`                  | `optional<T>`                          |                                                                                                                                       |
+| `map`                 | `key`, `value`, `max` | `map<K, V>`, `map<K, V, 8>`            | key: primitive or enum; `max`: most entries                                                                                           |
+| `ref`                 | `name`                | `Reading`, `Core.Sensor`, `Robot/Pose` | user type (struct, enum or alias), or module (see [Modules as types](#modules-as-types))                                              |
+
+```
+map<string, Reading, 8>
+```
 
 ```yaml
 type: { kind: map, key: { kind: primitive, name: string }, value: { kind: ref, name: Reading }, max: 8 }
@@ -70,6 +112,12 @@ Bounds (`max`, optional) are written `string<16>`, `bytes<4>`, `vector<T, 8>`, `
 ### Modules as types
 
 A `ref` may name a module by its path: a reference to an instance of the module (a pointer or a reference for generators), anywhere a type is used (struct fields, union cases, aliases, constants, interface messages, attributes, method parameters and returns), in containers too (`vector<Core.Sensor>`, a map key).
+
+```
+Logger log;
+vector<Core.Sensor> sensors;
+Robot/Drivers.Imu imu;   // a module of dependency Robot
+```
 
 ```yaml
 attributes:
@@ -94,6 +142,34 @@ attributes:
 | `alias`     | `type`                                                                           | those of the type                    |
 | `primitive` | custom primitive, opaque                                                         | passed as is to generators           |
 
+```
+struct Point [derives = [equality, ordering, hash]] {
+  float64 x = 0;
+  float64 y = 0;
+}
+
+exception Busy {}
+
+enum State : int8 {
+  Off = -1;
+  On = 1;
+}
+
+bitmask Access : uint8 {
+  Read = 1 << 0;
+  Write = 1 << 1;
+}
+
+union Shape switch (uint8) {
+  case 1: float64 radius;
+  case default: float64 side;
+}
+
+alias Tags = map<string, Reading, 8>;
+
+primitive Handle;
+```
+
 - A union case has `labels`, the discriminator values selecting it, or `default: true`.
 - An exception is listed by the `raises` of messages and methods: `raises: [Busy]`.
 - Modules have [types of their own](#types-of-modules), named `Core.Sensor.Filter`.
@@ -101,6 +177,10 @@ attributes:
 Structs take `derives` too: `{ kind: struct, name: Point, derives: [equality, ordering, hash], fields: [...] }`, operations derived from their fields (see [Modules](#modules)). Generators: C++ `operator==`, `operator<` (or `<=>`), `std::hash`, `operator<<`; Python `__eq__`, `__lt__`, `__hash__`, `__str__`.
 
 ## Constants
+
+```
+const float32 MaxSpeed = 2.5;
+```
 
 ```yaml
 constants: # { name, description?, type, value }
@@ -112,6 +192,12 @@ A constant's value is checked against its type, as [default values](#default-val
 ## Interfaces
 
 An interface is a named set of messages:
+
+```
+interface Greeting {
+  string greet(string who) raises (Busy);   // void: no return value; parameters in (default), out, inout
+}
+```
 
 ```yaml
 interfaces: # { name, description?, messages }
@@ -125,6 +211,43 @@ interfaces: # { name, description?, messages }
 ```
 
 ## Modules
+
+```
+/// Counts up to Limit
+module Counter : Base implements Telemetry {
+  active = { queue: 16, overflow: drop };
+  invariant "count <= Limit";
+  lock guard: mutex;
+
+  static const uint32 Limit = 100;
+  uint32 count = 0 [accessors = read, guardedBy = guard];
+
+  explicit constructor(uint32 count);
+  virtual destructor;
+  copy = delete;
+
+  uint32 count() const noexcept;
+  virtual void add(uint32 n = 1) override [pre = ["count + n <= Limit"]];
+  void reset();
+
+  statemachine {
+    initial Idle;
+    state Idle;
+    state Counting;
+    Idle -> Counting on add;
+    Counting -> Idle on reset;
+  }
+
+  in Commands commands;
+  out Telemetry telemetry;
+}
+
+abstract module Base {
+  virtual void add(uint32 n) = 0;
+}
+```
+
+In YAML, a module is `{ name, description?, kind?, bases?, implements?, attributes?, methods?, constructors?, destructor?, ports?, modules?, … }`:
 
 - **Attributes** (optional): typed properties, `{ name, access?, static?, const?, mutable?, atomic?, type, description?, default?, constraints?, ownership?, accessors?, guardedBy? }` like struct fields (see [Constraints and ownership](#constraints-and-ownership)). `static`: shared by all instances of the module; `const`: not changed after initialization; `mutable`: changed by const methods too (not `static` nor `const`); `atomic`: read and written atomically (booleans, characters, numbers, enums, bitmasks; no `guardedBy`).
   - `accessors`: `read` (a getter only) or `none`; absent: a getter and a setter (no setter when `const`).
@@ -163,6 +286,22 @@ interfaces: # { name, description?, messages }
 
 A module has types of its own, like types nested in a C++ class (or in an IDL module): user types (as in `types`) with an `access`. A constant of a module is a `static` `const` attribute with a `default`.
 
+```
+module Core {
+  module Sensor {
+    enum Filter : uint8 {
+      None = 0;
+      LowPass = 1;
+    }
+
+    protected struct Sample { /* … */ }
+
+    static const uint16 HISTORY = 64;
+    Core.Sensor.Filter filter = LowPass;
+  }
+}
+```
+
 ```yaml
 modules:
   - name: Core
@@ -194,7 +333,7 @@ Struct fields, exception fields and module attributes take:
 
 ## Default values
 
-`default` (attributes and struct fields) is a YAML value checked against the type, aliases followed:
+`default` (attributes and struct fields; `= value` in Scaffold text, a [value](scaffold-text.md#values) there) is a YAML value checked against the type, aliases followed:
 
 | Type                    | Value                                                |
 | ----------------------- | ---------------------------------------------------- |
@@ -216,8 +355,13 @@ In a struct value, unknown and missing fields are errors, except fields with the
 
 ## Ports and links
 
-- **Port**: `role` `out` (initiates / sends) or `in` (receives / serves), `interface` name.
+- **Port**: `role` `out` (initiates / sends) or `in` (receives / serves), `interface` name: `out Telemetry out;`, `in Telemetry telemetry;` in a module.
 - **Link**: `from` (an `out` port) → `to` (an `in` port), same interface — or, between a module and its content, `in` → `in` into it and `out` → `out` out of it — with `constraints`:
+
+```
+// -> unidirectional, <-> bidirectional; clauses: ack [timeoutMs], realtime | low | normal | bulk, latency, rate, remote [transport] [settings]
+link sensor_to_monitor: Core.Sensor.out -> Monitor.telemetry ack 20 realtime latency 5 rate 100 remote tcp { server: { port: 47001 } };
+```
 
 ```yaml
 links:
@@ -234,6 +378,16 @@ links:
 Links to modules of other projects: [Dependencies › File format](dependencies.md#file-format).
 
 ## Binaries and transports
+
+```
+binary Onboard;
+binary Ground;
+remoteDefaults = { client: { host: "10.0.0.2" }, basePort: 48000 };
+
+module Camera {
+  binary = Onboard;
+}
+```
 
 ```yaml
 binaries:

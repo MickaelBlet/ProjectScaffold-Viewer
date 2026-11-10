@@ -59,11 +59,11 @@ link client_to_server: Client.greeter <-> Server.greeting;
 
 | Guide                                    | Content                                                                   |
 | ---------------------------------------- | ------------------------------------------------------------------------- |
+| [Scaffold text](docs/scaffold-text.md)   | the `.scaffold` syntax of project files (default format), its grammar     |
+| [File format](docs/file-format.md)       | types, constants, interfaces, modules, ports, links, binaries, transports |
 | [Building and running](docs/building.md) | web, desktop, checks                                                      |
 | [Editor](docs/editor.md)                 | documents, panels, views, text editor, diagram, binaries, settings        |
 | [Keyboard shortcuts](docs/shortcuts.md)  | every shortcut, by menu                                                   |
-| [Scaffold text](docs/scaffold-text.md)   | the `.scaffold` syntax of project files (default format), its grammar     |
-| [File format](docs/file-format.md)       | types, constants, interfaces, modules, ports, links, binaries, transports |
 | [Dependencies](docs/dependencies.md)     | projects using other project files, importing projects, workspace files   |
 | [IDL files](docs/idl.md)                 | importing OMG IDL and how it maps to the model                            |
 

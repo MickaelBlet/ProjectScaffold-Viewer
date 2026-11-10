@@ -5,6 +5,12 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- Documentation: [File format](docs/file-format.md) shows each part of the project file in Scaffold text, then in YAML, with an overview project and the Scaffold text form of each type reference; the guide tables list Scaffold text and File format first.
+
 ## [1.3.0] - 2026-11-10
 
 ### Changed
