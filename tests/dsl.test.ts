@@ -81,6 +81,32 @@ link plant_query: Plant.query <-> Plant.Store.query ack 20 low remote tcp;
       }
     })
   })
+  it('reads qualifiers in C++ positions, and before the type as in 1.2', () => {
+    const d = parseDsl(`${minimal}
+module Box<T> final : Base {
+  virtual uint32 size() const noexcept raises (E) override final = 0;
+}
+final module Old { const pure override noexcept void run(); }
+`)
+    const [box, old] = d.modules as Record<string, unknown>[]
+    expect(box).toMatchObject({ name: 'Box', final: true, bases: ['Base'] })
+    const flags = { const: true, noexcept: true, override: true, final: true, pure: true }
+    expect((box!.methods as never[])[0]).toMatchObject({ virtual: true, raises: ['E'], ...flags })
+    expect(old).toMatchObject({ final: true })
+    expect((old!.methods as never[])[0]).toMatchObject({
+      const: true,
+      pure: true,
+      override: true,
+      noexcept: true
+    })
+    const text = stringifyDsl(d)
+    expect(text).toContain('module Box<T> final : Base {')
+    expect(text).toContain('virtual uint32 size() const noexcept raises (E) override final = 0;')
+    expect(text).toContain('module Old final {')
+    expect(() => parseDsl(`${minimal}interface I { void f() const; }`)).toThrow(DslError)
+    expect(() => parseDsl(`${minimal}module M { void f() = 1; }`)).toThrow(DslError)
+  })
+
   it('reports errors with their line', () => {
     expect(() => parseDsl(`${minimal}struct A {\n  int32;\n}`)).toThrow(
       new DslError("expected a name, found ';'", 4)

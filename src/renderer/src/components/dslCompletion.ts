@@ -34,6 +34,9 @@ const MODIFIERS = new Set([
   'nodiscard',
   'explicit'
 ])
+/** Written after a method's parameters, as in C++ (`= 0`: pure); not offered before the type. */
+const TRAILING = ['const', 'noexcept', 'raises', 'override', 'final']
+const LEADING = [...MODIFIERS].filter((w) => !['pure', 'override', 'final', 'noexcept'].includes(w))
 const TYPEDEFS = ['struct', 'exception', 'enum', 'bitmask', 'union', 'alias', 'primitive']
 const FILE_WORDS = [
   'syntax',
@@ -47,6 +50,7 @@ const FILE_WORDS = [
   'dependency'
 ]
 const MODULE_HEAD = ['class', 'abstract', 'interface', 'final']
+const MODULE_KINDS = ['class', 'abstract', 'interface']
 const MODULE_WORDS = [
   'in',
   'out',
@@ -56,9 +60,9 @@ const MODULE_WORDS = [
   'invariant',
   'statemachine',
   'module',
-  ...MODULE_HEAD.filter((w) => w !== 'final'),
+  ...MODULE_KINDS,
   ...TYPEDEFS,
-  ...MODIFIERS,
+  ...LEADING,
   'void'
 ]
 const CLAUSES = ['ack', 'realtime', 'low', 'normal', 'bulk', 'latency', 'rate', 'remote']
@@ -195,10 +199,13 @@ function headItems(t: string[], l: Lists): Completion[] | null {
     const colon = t.indexOf(':')
     if (colon >= 0 && (last === ':' || last === ',')) return l.modules
     if (colon >= 0 && last !== '<') return words(['implements'])
+    // After the name (and type parameters): `final`, as in C++.
+    if (t.at(-2) === 'module' || (last === '>' && !t.includes('<', t.lastIndexOf('>') + 1)))
+      return words(t.includes('final') ? ['implements'] : ['final', 'implements'])
+    if (last === 'final') return words(['implements'])
     return null
   }
-  if (t.every((w) => MODULE_HEAD.includes(w)))
-    return words(t.includes('final') ? ['module'] : ['final', 'module'])
+  if (t.every((w) => MODULE_HEAD.includes(w))) return words(['module'])
   return null
 }
 
@@ -208,6 +215,14 @@ function linkItems(t: string[], n: ProjectNames): Completion[] | null {
   const last = t.at(-1)!
   if (last === ':' || last === '->' || last === '<->') return endpoints(n)
   return t.some((w) => w === '->' || w === '<->') ? words(CLAUSES) : null
+}
+
+/** Qualifiers after a method's parameters `()` not written yet; none after `=` or `[…]`. */
+function qualifiers(t: string[], allowed: string[]): Completion[] | null {
+  const rest = t.slice(t.indexOf('()') + 1)
+  if (rest.includes('=') || rest.includes('[]') || rest.at(-1) === 'raises') return null
+  const left = allowed.filter((w) => !rest.includes(w))
+  return left.length ? words(left) : null
 }
 
 /** Items expected after `t` in a block of `kind`. */
@@ -239,14 +254,16 @@ function blockItems(
       const rest = t.slice(i)
       if (!rest.length) {
         const typedefs = t.every((w) => ACCESS.includes(w)) ? TYPEDEFS : []
-        return [...words([...MODIFIERS, ...typedefs, 'void', 'constructor', 'destructor']), ...l.types]
+        return [...words([...LEADING, ...typedefs, 'void', 'constructor', 'destructor']), ...l.types]
       }
       if ([...TYPEDEFS, ...MODULE_HEAD, 'module'].includes(rest[0]!)) return headItems(rest, l)
+      if (rest.includes('()')) return qualifiers(rest, TRAILING)
       return typeExpected(rest) ? l.types : null
     }
     case 'struct':
       return typeExpected(t) ? l.types : null
     case 'interface':
+      if (t.includes('()')) return qualifiers(t, ['raises'])
       return !t.length ? [...words(['void']), ...l.types] : typeExpected(t) ? l.types : null
     case 'union': {
       if (!t.length) return words(['case'])

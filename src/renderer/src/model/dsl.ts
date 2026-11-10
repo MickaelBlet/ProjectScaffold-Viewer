@@ -171,6 +171,8 @@ const METHOD_MODS = new Set([
   'noexcept',
   'nodiscard'
 ])
+/** Method qualifiers written after the parameters (`= 0` sets `pure`). */
+const TRAILING_MODS = new Set(['const', 'noexcept', 'override', 'final'])
 const MODULE_MODS = new Set([...KINDS, 'final'])
 const PERF = new Set(['realtime', 'low', 'normal', 'bulk'])
 const CLAUSES = new Set(['ack', 'latency', 'rate', 'remote', ...PERF])
@@ -738,19 +740,32 @@ class Parser {
     if (method) this.applyMods(o, mods, METHOD_MODS, 'a method')
     o.params = this.params([...path, 'params'])
     o.returns = returns
-    if (this.isKw('raises')) {
-      this.next()
-      this.rec([...path, 'raises'], this.peek().line)
-      const raises: Json[] = []
-      this.expect('(')
-      while (!this.accept(')')) {
-        raises.push(this.qualified('an exception'))
-        if (!this.accept(',')) {
-          this.expect(')')
-          break
+    // Qualifiers after the parameters, as in C++: `const noexcept raises (…) override final = 0`.
+    for (;;) {
+      const t = this.peek()
+      if (method && t.kind === 'ident' && !t.escaped && TRAILING_MODS.has(t.text)) {
+        this.next()
+        o[t.text] = true
+      } else if (this.isKw('raises')) {
+        this.next()
+        this.rec([...path, 'raises'], this.peek().line)
+        const raises: Json[] = []
+        this.expect('(')
+        while (!this.accept(')')) {
+          raises.push(this.qualified('an exception'))
+          if (!this.accept(',')) {
+            this.expect(')')
+            break
+          }
         }
-      }
-      o.raises = raises
+        o.raises = raises
+      } else break
+    }
+    if (method && this.accept('=')) {
+      const zero = this.peek()
+      if (zero.kind !== 'number' || zero.text !== '0') this.fail(`'0'`)
+      this.next()
+      o.pure = true
     }
     this.options(o, path)
     this.expect(';')
@@ -811,6 +826,10 @@ class Parser {
       } while (this.accept(','))
       this.expect('>')
       o.typeParams = tps
+    }
+    if (this.isKw('final')) {
+      this.next()
+      o.final = true
     }
     if (this.accept(':')) {
       this.rec([...path, 'bases'], this.peek().line)
@@ -1345,12 +1364,18 @@ function withParams(head: string, params: string[], tail: string): string[] {
 function messageLines(m: Obj, mods: string, used: string[], method: boolean): string[] {
   used.push('name', 'description', 'params', 'returns')
   const ret = m.returns === null ? 'void' : typeStr(m.returns)
-  let tail = ''
+  const qualifier = (f: string, word = f) => {
+    if (!method || m[f] !== true) return ''
+    used.push(f)
+    return ' ' + word
+  }
+  let tail = qualifier('const') + qualifier('noexcept')
   if (m.raises !== undefined) {
     if (!Array.isArray(m.raises)) throw new NoSugar()
     tail += ` raises (${m.raises.map((r) => escPath(r as string)).join(', ')})`
     used.push('raises')
   }
+  tail += qualifier('override') + qualifier('final') + qualifier('pure', '= 0')
   const params = paramsStr(m.params, method)
   return [
     ...docLines(m.description),
@@ -1546,11 +1571,7 @@ function attributeLines(a: Obj): string[] {
 
 function methodLines(m: Obj): string[] {
   const used: string[] = []
-  const mods = modWords(
-    m,
-    ['static', 'const', 'virtual', 'pure', 'override', 'final', 'threadSafe', 'noexcept', 'nodiscard'],
-    used
-  )
+  const mods = modWords(m, ['static', 'virtual', 'threadSafe', 'nodiscard'], used)
   return messageLines(m, mods, used, true)
 }
 
@@ -1703,10 +1724,6 @@ function moduleLines(m: Obj): string[] {
     mods += m.kind + ' '
     used.push('kind')
   }
-  if (m.final === true) {
-    mods += 'final '
-    used.push('final')
-  }
   let head = `${mods}module ${name(m.name)}`
   const tryPart = (k: string, f: () => string) => {
     if (m[k] === undefined) return
@@ -1723,6 +1740,10 @@ function moduleLines(m: Obj): string[] {
     return v
   }
   tryPart('typeParams', () => `<${nonEmpty('typeParams').map(TYPE_PARAM).join(', ')}>`)
+  if (m.final === true) {
+    head += ' final'
+    used.push('final')
+  }
   tryPart('bases', () => {
     const bs = nonEmpty('bases').map(baseStr)
     if (bs.some((b) => b === 'implements' || b.startsWith('implements.') || b.startsWith('implements/')))

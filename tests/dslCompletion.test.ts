@@ -22,7 +22,9 @@ describe('Scaffold text completion', () => {
   it('completes the words starting a file statement', () => {
     expect(at('mod|')).toEqual(['module'])
     expect(at('module A {}\n|')).toContain('struct')
-    expect(at('class |')).toEqual(['final', 'module'])
+    expect(at('class |')).toEqual(['module'])
+    expect(at('class module A |')).toEqual(['final', 'implements'])
+    expect(at('module Box<T> f|')).toEqual(['final'])
   })
 
   it('completes module members and their types', () => {
@@ -32,6 +34,9 @@ describe('Scaffold text completion', () => {
     )
     expect(at('module A {\n  static |')).toContain('uint8')
     expect(at('module A {\n  int32 |')).toBeNull()
+    expect(at('module A {\n  int32 get() |')).toEqual(['const', 'noexcept', 'raises', 'override', 'final'])
+    expect(at('module A {\n  int32 get() const ov|')).toEqual(['override'])
+    expect(at('interface I {\n  int32 get() |')).toEqual(['raises'])
   })
 
   it('completes interfaces of ports and implements', () => {

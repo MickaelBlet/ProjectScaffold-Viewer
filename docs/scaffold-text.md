@@ -26,7 +26,7 @@ interface Query {
 
 abstract module Device : Base {
   static uint32 instances = 0;
-  const virtual string describe(string prefix);
+  virtual string describe(string prefix) const = 0;
 }
 
 module Plant {
@@ -136,15 +136,15 @@ constant  = [doc] "const" type name "=" value [opts] ";"
 ### Modules
 
 ```
-module    = [doc] [ "class" | "abstract" | "interface" ] [ "final" ] "module" name
-            [ "<" typeParam ( "," typeParam )* ">" ]
+module    = [doc] [ "class" | "abstract" | "interface" ] "module" name
+            [ "<" typeParam ( "," typeParam )* ">" ] [ "final" ]
             [ ":" base ( "," base )* ] [ "implements" name ( "," name )* ] [opts]
             "{" member* "}"
 typeParam = name [ ":" ( "numeric" | "integral" ) ] [ "extends" name ] [ "=" type ]
 base      = module path, with type arguments for a generic module: Box<int32>
 member    = [doc] ( "in" | "out" ) ( name | "?" ) name [opts] ";"    a port (`?`: no interface yet)
           | [doc] modifier* type name [ "=" value ] [opts] ";"       an attribute
-          | [doc] modifier* result name params [ "raises" … ] [opts] ";"   a method
+          | [doc] modifier* result name params qualifier* [ "=" "0" ] [opts] ";"   a method
           | [doc] modifier* "constructor" params [ "=" ( "default" | "delete" ) ] [opts] ";"
           | modifier* "destructor" [opts] ";"
           | "lock" name ":" ( "mutex" | "shared" | "recursive" ) [opts] ";"
@@ -156,7 +156,14 @@ member    = [doc] ( "in" | "out" ) ( name | "?" ) name [opts] ";"    a port (`?`
           | typedef | module | generic
 ```
 
-Modifiers set the flags of the same name to `true`: attributes `static const mutable atomic`; methods `static const virtual pure override final threadSafe noexcept nodiscard`; constructors `explicit`; destructors `virtual`; and an access level for all of them. `false` values go in `opts`.
+Modifiers and qualifiers set the flags of the same name to `true`, in C++ positions: attributes `static const mutable atomic`; methods `static virtual threadSafe nodiscard` before the result type, then after the parameters `qualifier = "const" | "noexcept" | "raises" "(" … ")" | "override" | "final"` and `= 0` for `pure`; constructors `explicit`; destructors `virtual`; and an access level for all of them. `false` values go in `opts`.
+
+```
+protected virtual uint32 latency() const noexcept override = 0;
+module Equalizer final : Effect {}
+```
+
+Files of version 1.2 wrote method flags and `final` of modules before the type (`const virtual pure void run();`, `final module M`): still read, written in the new positions on save.
 
 ### Links and dependencies
 
