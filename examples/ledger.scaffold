@@ -1,0 +1,202 @@
+syntax = "scaffold1";
+
+/// Accounting service touring every kind of type, type reference, default value and constant; generated in Python
+project "Ledger" [metadata = { version: "1.2.0", owner: "finance-team" }];
+
+/// Exact decimal number, mapped by generators to a native type (decimal.Decimal)
+primitive Decimal;
+
+/// UTC time point (datetime.datetime)
+primitive Instant;
+
+/// IBAN-like identifier, at most 34 characters
+alias AccountId = string(34);
+
+/// ISO 4217
+enum Currency : uint16 {
+  EUR = 978;
+  USD = 840;
+  GBP = 826;
+  JPY = 392;
+  CHF = 756;
+}
+
+enum Side : int8 {
+  Debit = -1;
+  Credit = 1;
+}
+
+bitmask AccountFlags : uint16 {
+  Frozen = 1 << 0;
+  Overdraft = 1 << 1;
+  Joint = 1 << 2;
+  Business = 1 << 3;
+  Closed = 1 << 15;
+}
+
+struct Money {
+  Decimal amount = "0.00";
+  Currency currency = EUR;
+}
+
+struct Card {
+  array<char, 4> last4;
+  /// MM/YY
+  string(5) expiry;
+}
+
+struct BankTransfer {
+  AccountId iban;
+  optional<string(11)> bic = null;
+}
+
+/// How a transaction was paid
+union PaymentMethod switch (char) {
+  case c: Card card;
+  case t: BankTransfer transfer;
+  case v, g: string(16) voucher;
+  /// Free text for any other method
+  case default: string other;
+}
+
+/// One line of a transaction
+struct Entry {
+  AccountId account;
+  Side side;
+  Money amount;
+}
+
+struct Transaction {
+  uint64 id;
+  Instant at;
+  /// Balanced debits and credits
+  vector<Entry, 32> entries;
+  PaymentMethod method = { other: unknown };
+  set<string(24), 8> tags = [];
+  optional<string(140)> memo = null;
+  bytes(65536) attachment = "";
+}
+
+struct Account {
+  AccountId id;
+  string owner;
+  AccountFlags flags = [];
+  map<Currency, Decimal, 8> balances = { EUR: "0.00" };
+  /// Transaction ids
+  list<uint64> history = [];
+}
+
+struct Statement {
+  AccountId account;
+  vector<Transaction> lines;
+  /// Closing balance of each month
+  array<Money, 12> monthly;
+}
+
+exception InsufficientFunds {
+  AccountId account;
+  Money missing;
+}
+
+exception AccountFrozen {
+  AccountId account;
+  Instant since;
+}
+
+/// Debits and credits differ
+exception Unbalanced {
+  Money difference;
+}
+
+interface Accounts {
+  AccountId open(string owner, AccountFlags flags);
+  optional<Account> get(AccountId id);
+  void freeze(AccountId id, bool frozen);
+}
+
+/// Records balanced transactions
+interface Postings {
+  void post(
+    /// Gets its id and time
+    inout Transaction transaction
+  ) raises (InsufficientFunds, AccountFrozen, Unbalanced);
+  Money balance(
+    AccountId id,
+    Currency currency,
+    /// Amount of the transactions not settled yet
+    out Money pending
+  );
+}
+
+interface Reports {
+  Statement statement(AccountId id, uint16 year);
+}
+
+interface Audit {
+  void posted(Transaction transaction);
+}
+
+const uint8 MaxEntries = 32;
+const string Bank = "Example Bank";
+const Currency BaseCurrency = EUR;
+const Money Zero = { amount: "0.00", currency: EUR };
+/// Flags of an account just opened
+const AccountFlags NewAccount = [Overdraft];
+const array<uint8, 4> Quarters = [3, 6, 9, 12];
+/// Percent per method
+const map<string, float64> FeeRates = { card: 1.5, transfer: 0, voucher: 2.25 };
+const PaymentMethod DefaultMethod = { transfer: { iban: FR7630006000011234567890189 } };
+
+/// REST front end
+module Api {
+  uint16 port = 8080;
+  vector<string> origins = ["https://bank.example"];
+
+  out Accounts accounts;
+  out Postings postings;
+  out Reports reports;
+}
+
+/// Keeps accounts and balances
+module Book {
+  set<Currency> currencies = [EUR, USD, GBP];
+  map<AccountFlags, Money> limits = {};
+
+  /// Raises when the transaction cannot be posted
+  protected void check(const Transaction transaction) const raises (InsufficientFunds, AccountFrozen, Unbalanced);
+
+  in Accounts accounts;
+  in Postings postings;
+  out Audit audit;
+}
+
+module Reporting {
+  in Reports reports;
+}
+
+/// Append-only trail of the postings
+module Auditor {
+  uint8 retentionYears = 10;
+
+  in Audit audit;
+}
+
+link api_accounts: Api.accounts <-> Book.accounts;
+link api_postings: Api.postings <-> Book.postings ack 2000 latency 200;
+link api_reports: Api.reports <-> Reporting.reports bulk;
+link book_audit: Book.audit <-> Auditor.audit ack 1000 low;
+
+editor = {
+  layout: {
+    Api: { x: 20, y: 92, width: 200, height: 164 },
+    Book: { x: 336, y: 20, width: 200, height: 166 },
+    Reporting: { x: 336, y: 256, width: 200, height: 72 },
+    Auditor: { x: 652, y: 125, width: 200, height: 98 }
+  },
+  style: {
+    Api: { color: "#3b8fd1" },
+    Book: { color: "#2e9e8f" },
+    Reporting: { color: "#d6c21f" },
+    Auditor: { color: "#6b7f8e" }
+  }
+};

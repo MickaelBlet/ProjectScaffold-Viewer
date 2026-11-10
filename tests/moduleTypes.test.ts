@@ -1,8 +1,9 @@
+import { exampleYaml } from './exampleYaml'
 import { readFileSync } from 'node:fs'
 import YAML from 'yaml'
 import { produce } from 'immer'
 import { describe, expect, it } from 'vitest'
-import { fromFile, loadText, saveText, toFile } from '@/model/serialize'
+import { fromFile, loadText, parseText, saveText, toFile } from '@/model/serialize'
 import { validate } from '@/model/validate'
 import { parseTypeExpr, printTypeExpr } from '@/model/typeExpr'
 import { canUseType, modulePath, nameError, typeNames, typeScope } from '@/model/project'
@@ -14,7 +15,7 @@ import { copyItems, pasteClip } from '@/model/clipboard'
 import type { Project, StructDef } from '@/model/types'
 import type { FileProject } from '@/model/schema'
 
-const exampleText = readFileSync('examples/robot.scaffold.yaml', 'utf8')
+const exampleText = exampleYaml('examples/robot.scaffold')
 const example = YAML.parse(exampleText)
 /** The example, with the types and interfaces of its dependencies made its own. */
 const load = (): Project => {
@@ -162,8 +163,8 @@ describe('types of modules', () => {
       ])
     )
     expect(r.types.size).toBe(0)
-    const station = fromFile(YAML.parse(readFileSync('examples/station.scaffold.yaml', 'utf8')))
-    const after = produce(station, (d) => applyDependencyRenames(d, 'robot.scaffold.yaml', r))
+    const station = fromFile(parseText(readFileSync('examples/station.scaffold', 'utf8'), 'dsl'))
+    const after = produce(station, (d) => applyDependencyRenames(d, 'robot.scaffold', r))
     expect(typeNames(after).get(after.types.find((t) => t.name === 'Point')!.id)).toBe(
       'Robot/Core.Lidar.Point'
     )

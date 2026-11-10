@@ -1,0 +1,218 @@
+syntax = "scaffold1";
+
+/// Audio effect chain built on a class hierarchy - interface and abstract modules, multiple inheritance, virtual, pure and override methods; generated in C++20
+project "Audio";
+
+alias Sample = float32;
+
+/// Interleaved block of samples
+struct Buffer {
+  uint8 channels = 2;
+  uint32 rate = 48000;
+  vector<Sample> samples;
+}
+
+/// The buffer has a channel count or rate the effect cannot handle
+exception FormatError {
+  uint8 channels;
+  uint32 rate;
+}
+
+interface AudioSink {
+  void push(Buffer buffer);
+}
+
+interface LevelSink {
+  void level(float32 db);
+}
+
+const float32 SilenceDb = -96;
+
+/// Anything processing audio in place
+interface module Processor {
+  virtual void process(inout Buffer buffer) raises (FormatError) = 0;
+
+  virtual void reset() = 0;
+
+  /// Delay added, in samples
+  virtual uint32 latency() const = 0;
+}
+
+/// Exposes a level
+interface module Meter {
+  virtual float32 level() const = 0;
+}
+
+/// Processor that can be bypassed; derived effects only implement apply
+abstract module Effect : Processor {
+  bool bypass = false;
+  protected uint32 rate = 48000;
+  private static uint32 count = 0;
+
+  /// Checks the format, then applies the effect unless bypassed
+  virtual void process(inout Buffer buffer) raises (FormatError) override final;
+
+  virtual void reset() override;
+
+  virtual uint32 latency() const override;
+
+  protected virtual void apply(inout vector<Sample> samples) = 0;
+
+  /// Effects alive
+  static nodiscard uint32 instances();
+
+  /// Blends the processed signal into the dry one
+  void mix(float32 wet = 1);
+
+  /// Blends with a gain for each signal
+  void mix(float32 wet, float32 dry = 0);
+}
+
+/// Last values of a signal, oldest overwritten
+module Ring<T: numeric> {
+  vector<Ring.T> items;
+  const uint32 capacity = 64 [constraints = { min: 1 }];
+
+  void push(Ring.T value);
+}
+
+/// Reads the input device
+module Source {
+  string device = default;
+
+  uint16 blockSize = 256;
+
+  /// Levels of the last blocks
+  Ring<float32> history;
+
+  void open();
+  void start();
+  void stop();
+  void close();
+  private void flush();
+
+  statemachine {
+    initial Closed;
+    state Closed;
+    state Opened;
+    state Running [exit = flush];
+    Closed -> Opened on open if "blockSize > 0";
+    Opened -> Running on start;
+    Running -> Opened on stop;
+    Opened -> Closed on close;
+    Running -> Closed on close;
+  }
+
+  out AudioSink out;
+}
+
+module Equalizer final : Effect {
+  enum Shape : uint8 {
+    Peak = 0;
+    LowShelf = 1;
+    HighShelf = 2;
+    LowCut = 3;
+    HighCut = 4;
+  }
+
+  struct Band [derives = [equality, string]] {
+    Equalizer.Shape shape = Peak;
+    float32 frequency = 1000;
+    float32 gainDb = 0;
+    float32 q = 0.707;
+  }
+
+  private struct Coefficients {
+    array<float64, 3> b;
+    array<float64, 2> a;
+  }
+
+  static const uint8 MAX_BANDS = 8;
+  vector<Equalizer.Band, 8> bands = [{ shape: LowCut, frequency: 40 }, { frequency: 3000, gainDb: 2 }];
+  private vector<Equalizer.Coefficients> filters;
+
+  protected virtual void apply(inout vector<Sample> samples) override;
+  private static Equalizer.Coefficients design(const Equalizer.Band band, uint32 rate);
+
+  in AudioSink in;
+  out AudioSink out;
+}
+
+module Compressor : Effect, Meter {
+  float32 thresholdDb = -18;
+  float32 ratio = 4;
+  float32 attackMs = 10;
+  float32 releaseMs = 120;
+  protected float32 envelope = 0;
+
+  protected virtual void apply(inout vector<Sample> samples) override;
+
+  /// Gain reduction
+  virtual float32 level() const override;
+
+  in AudioSink in;
+  out AudioSink out;
+  out LevelSink reduction;
+}
+
+/// Compressor with an infinite ratio and look-ahead
+module Limiter : Compressor {
+  float32 ceilingDb = -0.3;
+
+  /// Samples
+  uint16 lookAhead = 64;
+
+  protected virtual void apply(inout vector<Sample> samples) override;
+  virtual uint32 latency() const override;
+
+  in AudioSink in;
+  out AudioSink out;
+  out LevelSink reduction;
+}
+
+/// Writes the output device
+module Sink {
+  in AudioSink in;
+}
+
+/// Shows the gain reduction
+module Display implements LevelSink {
+  /// Shows a level, from either port
+  void level(float32 db);
+
+  in LevelSink compressor;
+  in LevelSink limiter;
+}
+
+link source_to_eq: Source.out -> Equalizer.in realtime latency 2 rate 187.5;
+link eq_to_compressor: Equalizer.out -> Compressor.in realtime latency 2 rate 187.5;
+link compressor_to_limiter: Compressor.out -> Limiter.in realtime latency 2 rate 187.5;
+link limiter_to_sink: Limiter.out -> Sink.in realtime latency 2 rate 187.5;
+link compressor_meter: Compressor.reduction -> Display.compressor low rate 30;
+link limiter_meter: Limiter.reduction -> Display.limiter low rate 30;
+
+editor = {
+  layout: {
+    Processor: { x: 21, y: 20, width: 200, height: 134 },
+    Meter: { x: 21, y: 712, width: 200, height: 98 },
+    Effect: { x: 21, y: 224, width: 200, height: 232 },
+    Ring: { x: 336, y: 560, width: 200, height: 142 },
+    Source: { x: 20, y: 526, width: 200, height: 232 },
+    Equalizer: { x: 336, y: 335, width: 200, height: 160 },
+    Compressor: { x: 652, y: 296, width: 200, height: 238 },
+    Limiter: { x: 968, y: 323, width: 200, height: 184 },
+    Sink: { x: 1284, y: 296, width: 200, height: 72 },
+    Display: { x: 1284, y: 438, width: 200, height: 96 }
+  },
+  style: {
+    Processor: { color: "#6b7f8e" },
+    Meter: { color: "#6b7f8e" },
+    Effect: { color: "#8a4fd1" },
+    Source: { color: "#3b8fd1" },
+    Equalizer: { color: "#2e9e8f" },
+    Compressor: { color: "#d14f9e" },
+    Limiter: { color: "#d1733b" },
+    Sink: { color: "#3b8fd1" },
+    Display: { color: "#d6c21f" }
+  }
+};

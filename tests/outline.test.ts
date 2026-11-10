@@ -1,10 +1,10 @@
-import { readFileSync } from 'node:fs'
+import { exampleYaml } from './exampleYaml'
 import { describe, expect, it } from 'vitest'
 import { outline, type OutlineNode } from '@/model/outline'
 import { targetAt } from '@/components/sourceTarget'
 import { loadText } from '@/model/serialize'
 
-const robot = readFileSync('examples/robot.scaffold.yaml', 'utf8')
+const robot = exampleYaml('examples/robot.scaffold')
 
 const find = (nodes: OutlineNode[], name: string): OutlineNode | undefined => {
   for (const n of nodes) {
@@ -30,7 +30,7 @@ describe('outline', () => {
     expect(types.children.map((t) => `${t.kind} ${t.name}`)).toEqual(['primitive Primitive'])
     const dependencies = nodes.find((n) => n.name === 'Dependencies')!
     expect(dependencies.children.map((d) => `${d.kind} ${d.name} ${d.detail}`)).toEqual([
-      'dependency Common common.scaffold.yaml'
+      'dependency Common common.scaffold'
     ])
     expect(dependencies.children[0]!.children.map((t) => `${t.kind} ${t.name}`)).toEqual([
       'struct Vec3',
@@ -73,7 +73,7 @@ describe('outline', () => {
   })
 
   it('outlines type parameters, lifecycle, state machines and placed modules of dependencies', () => {
-    const audio = outline(readFileSync('examples/audio.scaffold.yaml', 'utf8'))
+    const audio = outline(exampleYaml('examples/audio.scaffold'))
     const ring = find(audio, 'Ring')!
     expect(ring.detail).toBe('<T>')
     expect(ring.children.map((c) => `${c.kind} ${c.name} ${c.detail}`)).toContain('typeParam T numeric')
@@ -84,14 +84,14 @@ describe('outline', () => {
     expect(machine.children.map((c) => `${c.kind} ${c.name}`)).toContain('transition Closed → Opened')
     expect(find(machine.children, 'Closed → Opened')?.detail).toBe('open [blockSize > 0]')
 
-    const game = outline(readFileSync('examples/game.scaffold.yaml', 'utf8'))
+    const game = outline(exampleYaml('examples/game.scaffold'))
     expect(
       find(game, 'System')!
         .children.filter((c) => c.kind === 'constructor')
         .map((c) => `${c.name} ${c.detail}`)
     ).toEqual(['System explicit', '~System virtual'])
 
-    const station = outline(readFileSync('examples/station.scaffold.yaml', 'utf8'))
+    const station = outline(exampleYaml('examples/station.scaffold'))
     const placed = station.find((n) => n.name === 'Dependencies')!.children.find((d) => d.name === 'Robot')!
     const sensor = placed.children.filter((m) => m.name === 'Core.Sensor').at(-1)!
     expect(sensor.children.map((c) => `${c.kind} ${c.name}`)).toContain('attribute rateHz')

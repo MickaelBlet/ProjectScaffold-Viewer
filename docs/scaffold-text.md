@@ -1,6 +1,6 @@
 # Scaffold text (`*.scaffold`)
 
-A compact, `.proto`-like syntax for project files: the same data as YAML or JSON ([file format](file-format.md)), written about three times shorter. Open, edit and save `.scaffold` files like the other formats; [ProjectScaffold-Generator](https://github.com/MickaelBlet/ProjectScaffold-Generator) reads them too.
+The default format of project files: a compact, `.proto`-like syntax holding the same data as YAML or JSON ([file format](file-format.md)), written about three times shorter. New projects are saved as `.scaffold`, the text editor shows Scaffold text, and every [example](../examples) is a `.scaffold` file; YAML and JSON files open and save as before, and _File › Export as YAML…_ writes a YAML copy without editor data. [ProjectScaffold-Generator](https://github.com/MickaelBlet/ProjectScaffold-Generator) reads `.scaffold` files too.
 
 ```
 syntax = "scaffold1";

@@ -1,0 +1,81 @@
+syntax = "scaffold1";
+
+/// Room thermostat on a small microcontroller; generated in C++98
+project "Thermostat";
+
+enum HeatMode : uint8 {
+  Off = 0;
+  Eco = 1;
+  Comfort = 2;
+  Boost = 3;
+}
+
+/// Mode of each hour of the day
+struct Schedule {
+  array<HeatMode, 24> hours;
+}
+
+interface Temperature {
+  void measured(float32 celsius);
+}
+
+interface Heater {
+  void power(uint8 percent);
+}
+
+interface Panel {
+  void show(float32 celsius, HeatMode mode);
+  float32 setpoint();
+}
+
+const float32 EcoCelsius = 17;
+const float32 ComfortCelsius = 20.5;
+
+/// Thermistor on the ADC
+module Probe {
+  uint16 periodMs = 1000;
+
+  out Temperature temperature;
+}
+
+/// PI controller following the schedule
+module Regulator {
+  float32 kp = 8;
+  float32 ki = 0.05;
+  HeatMode mode = Eco;
+
+  private uint8 step(float32 error);
+
+  in Temperature temperature;
+  out Heater heater;
+  out Panel panel;
+}
+
+/// Drives the heater with slow PWM
+module Relay {
+  in Heater heater;
+}
+
+/// LCD and buttons
+module Display {
+  in Panel panel;
+}
+
+link probe_to_regulator: Probe.temperature -> Regulator.temperature low rate 1;
+link regulator_to_relay: Regulator.heater -> Relay.heater low;
+link regulator_to_display: Regulator.panel <-> Display.panel;
+
+editor = {
+  layout: {
+    Probe: { x: 20, y: 78, width: 200, height: 98 },
+    Regulator: { x: 336, y: 35, width: 200, height: 184 },
+    Relay: { x: 652, y: 20, width: 200, height: 72 },
+    Display: { x: 652, y: 162, width: 200, height: 72 }
+  },
+  style: {
+    Probe: { color: "#3b8fd1" },
+    Regulator: { color: "#2e9e8f" },
+    Relay: { color: "#d1733b" },
+    Display: { color: "#d6c21f" }
+  }
+};

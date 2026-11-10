@@ -1,10 +1,9 @@
 import { readFileSync } from 'node:fs'
-import YAML from 'yaml'
 import { describe, expect, it } from 'vitest'
 import { align, distribute, sameSize } from '@/model/align'
 import { fuzzyFilter, fuzzyMatch } from '@/model/fuzzy'
 import { searchProject } from '@/model/search'
-import { fromFile } from '@/model/serialize'
+import { fromFile, parseText } from '@/model/serialize'
 import type { Rect } from '@/model/types'
 
 const rects = new Map<string, Rect>([
@@ -47,7 +46,7 @@ describe('fuzzy', () => {
 })
 
 describe('search', () => {
-  const example = fromFile(YAML.parse(readFileSync('examples/robot.scaffold.yaml', 'utf8')))
+  const example = fromFile(parseText(readFileSync('examples/robot.scaffold', 'utf8'), 'dsl'))
   it('finds names, descriptions and metadata', () => {
     expect(searchProject(example, 'operator').map((h) => h.label)).toContain('Operator')
     expect(searchProject(example, 'team-a')[0]).toMatchObject({ label: 'Core', field: 'metadata owner' })

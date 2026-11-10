@@ -3,6 +3,6 @@ workspace:
   name: Plugins
   description: An SDK, plugins deriving from it in another project, and the app using them
 projects:
-  - app.scaffold.yaml
-  - filters.scaffold.yaml
-  - sdk.scaffold.yaml
+  - app.scaffold
+  - filters.scaffold
+  - sdk.scaffold

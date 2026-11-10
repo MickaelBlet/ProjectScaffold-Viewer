@@ -1,13 +1,12 @@
 import { readFileSync } from 'node:fs'
-import YAML from 'yaml'
 import { produce } from 'immer'
 import { describe, expect, it } from 'vitest'
-import { fromFile } from '@/model/serialize'
+import { fromFile, parseText } from '@/model/serialize'
 import { copyItems, copyProject, parseClip, pasteClip } from '@/model/clipboard'
 import { absolutePosition, emptyProject, modulePath } from '@/model/project'
 import { validate } from '@/model/validate'
 
-const example = fromFile(YAML.parse(readFileSync('examples/robot.scaffold.yaml', 'utf8')))
+const example = fromFile(parseText(readFileSync('examples/robot.scaffold', 'utf8'), 'dsl'))
 const byPath = (path: string) => example.modules.find((m) => modulePath(example, m.id) === path)!
 
 describe('clipboard', () => {

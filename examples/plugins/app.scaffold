@@ -1,0 +1,185 @@
+syntax = "scaffold1";
+
+/// Image editor using the plugins of the Filters project (placed on the canvas) and one of its own, deriving from the SDK's Plugin
+project "App";
+
+/// Runs the plugins the user picks on the open image
+module Editor {
+  vector<string> enabled = [Blur, Watermark];
+
+  out ImageFilter filter;
+  in Log log;
+}
+
+/// Built-in plugin
+module Watermark : Sdk/Plugin {
+  string text = "© Example";
+  float32 opacity = 0.3;
+
+  virtual Sdk/Plugin.Info info() const override;
+  virtual bool load(const Sdk/Plugin.Settings settings) override;
+
+  in ImageFilter apply;
+}
+
+link editor_blur: Editor.filter <-> Filters/Blur.apply;
+link editor_sharpen: Editor.filter <-> Filters/Sharpen.apply;
+link editor_watermark: Editor.filter <-> Watermark.apply;
+link blur_log: Filters/Blur.log -> Editor.log low;
+link sharpen_log: Filters/Sharpen.log -> Editor.log low;
+
+dependency Sdk "sdk.scaffold" {
+  struct Image {
+    uint16 width;
+    uint16 height;
+    bytes rgba;
+  }
+
+  struct Version {
+    uint16 major;
+    uint16 minor;
+    uint16 patch = 0;
+  }
+
+  enum Level : uint8 {
+    Debug = 0;
+    Info = 1;
+    Warning = 2;
+    Error = 3;
+  }
+
+  interface Log {
+    void write(Level level, string text);
+  }
+
+  interface ImageFilter {
+    void apply(inout Image image);
+  }
+
+  const Version ApiVersion = { major: 3, minor: 1 };
+
+  moduleTypes = [
+    {
+      module: Plugin,
+      types: [
+        {
+          kind: struct,
+          name: Info,
+          fields: [
+            { name: name, type: { kind: primitive, name: string, max: 32 } },
+            { name: version, type: { kind: ref, name: Version } },
+            {
+              name: author,
+              type: { kind: optional, of: { kind: primitive, name: string } },
+              default: null
+            }
+          ]
+        },
+        {
+          kind: alias,
+          name: Settings,
+          type: {
+            kind: map,
+            key: { kind: primitive, name: string },
+            value: { kind: primitive, name: string }
+          }
+        }
+      ]
+    }
+  ];
+
+  modules = [
+    {
+      module: Plugin,
+      methods: [
+        {
+          name: info,
+          const: true,
+          virtual: true,
+          pure: true,
+          params: [],
+          returns: { kind: ref, name: "Sdk/Plugin.Info" }
+        },
+        {
+          name: load,
+          virtual: true,
+          pure: true,
+          params: [{ name: settings, type: { kind: ref, name: "Sdk/Plugin.Settings" }, const: true }],
+          returns: { kind: primitive, name: bool }
+        },
+        {
+          name: unload,
+          description: "Does nothing unless overridden",
+          virtual: true,
+          params: [],
+          returns: null
+        }
+      ],
+      ports: []
+    }
+  ];
+}
+
+dependency Filters "filters.scaffold" {
+  uses = [Sdk];
+
+  modules = [
+    {
+      module: Blur,
+      attributes: [{ name: radius, type: { kind: primitive, name: float32 }, default: 2 }],
+      methods: [
+        {
+          name: info,
+          const: true,
+          virtual: true,
+          override: true,
+          params: [],
+          returns: { kind: ref, name: "Sdk/Plugin.Info" }
+        },
+        {
+          name: load,
+          virtual: true,
+          override: true,
+          params: [{ name: settings, type: { kind: ref, name: "Sdk/Plugin.Settings" }, const: true }],
+          returns: { kind: primitive, name: bool }
+        }
+      ],
+      ports: [{ name: apply, role: in, interface: ImageFilter }, { name: log, role: out, interface: Log }]
+    },
+    {
+      module: Sharpen,
+      attributes: [{ name: amount, type: { kind: primitive, name: float32 }, default: 0.5 }],
+      methods: [
+        {
+          name: info,
+          const: true,
+          virtual: true,
+          override: true,
+          params: [],
+          returns: { kind: ref, name: "Sdk/Plugin.Info" }
+        },
+        {
+          name: load,
+          virtual: true,
+          override: true,
+          params: [{ name: settings, type: { kind: ref, name: "Sdk/Plugin.Settings" }, const: true }],
+          returns: { kind: primitive, name: bool }
+        },
+        { name: unload, virtual: true, override: true, params: [], returns: null }
+      ],
+      ports: [{ name: apply, role: in, interface: ImageFilter }, { name: log, role: out, interface: Log }]
+    }
+  ];
+}
+
+editor = {
+  layout: {
+    Editor: { x: 20, y: 378, width: 200, height: 98 },
+    Watermark: { x: 336, y: 250, width: 200, height: 160 }
+  },
+  style: { Editor: { color: "#2e9e8f" }, Watermark: { color: "#d6c21f" } },
+  dependencies: {
+    Sdk: { Plugin: { x: 20, y: 166 } },
+    Filters: { Blur: { x: 336, y: 480 }, Sharpen: { x: 336, y: 20 } }
+  }
+};

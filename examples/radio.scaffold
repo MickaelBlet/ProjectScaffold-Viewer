@@ -1,0 +1,133 @@
+syntax = "scaffold1";
+
+/// Software-defined FM radio waveform - components with uses (out) and provides (in) ports and properties; generated as SCA components in C++98
+project "Radio";
+
+struct IqSample {
+  int16 i;
+  int16 q;
+}
+
+struct PacketHeader {
+  float64 sampleRate;
+  float64 centerHz;
+  bool endOfStream = false;
+  string(32) streamId;
+}
+
+enum Deemphasis : uint8 {
+  None = 0;
+  Us50 = 50;
+  Us75 = 75;
+}
+
+/// Radio Data System block group
+struct RdsGroup {
+  array<uint16, 4> blocks;
+}
+
+exception InvalidFrequency {
+  float64 hz;
+}
+
+interface IqStream {
+  void pushPacket(PacketHeader header, vector<IqSample> data);
+}
+
+interface AudioStream {
+  void pushPacket(PacketHeader header, vector<float32> left, vector<float32> right);
+}
+
+interface RdsStream {
+  void group(RdsGroup group);
+}
+
+interface Tuner {
+  void tune(float64 hz) raises (InvalidFrequency);
+  float32 signalStrength();
+}
+
+interface StationInfo {
+  string(8) name();
+  string(64) text();
+}
+
+const float64 FmLowHz = 87500000;
+const float64 FmHighHz = 108000000;
+
+/// Device - tuner and analog-to-digital converter
+module RfFrontEnd {
+  float64 sampleRate = 2400000;
+  float32 gainDb = 30;
+  bool agc = true;
+
+  in Tuner tuner;
+  out IqStream dataIq;
+}
+
+/// Moves the station to baseband and decimates to 240 kHz
+module Channelizer {
+  uint16 decimation = 10;
+  vector<float32> taps = [];
+
+  in IqStream dataIqIn;
+  out IqStream dataIqOut;
+}
+
+/// Stereo FM demodulator with RDS decoder
+module FmDemod {
+  Deemphasis deemphasis = Us50;
+  bool stereo = true;
+  uint32 audioRate = 48000;
+
+  in IqStream dataIqIn;
+  out AudioStream audioOut;
+  out RdsStream rdsOut;
+}
+
+module RdsDecoder {
+  in RdsStream groups;
+  in StationInfo info;
+}
+
+/// Device - sound card
+module AudioSink {
+  float32 volume = 0.8;
+  string device = "hw:0";
+
+  in AudioStream audioIn;
+}
+
+/// Assembly controller - tunes and reads the station name
+module Controller {
+  vector<float64, 10> presets = [91300000, 95800000, 104100000];
+
+  out Tuner tuner;
+  out StationInfo info;
+}
+
+link rf_to_channelizer: RfFrontEnd.dataIq -> Channelizer.dataIqIn realtime latency 10 rate 100;
+link channelizer_to_demod: Channelizer.dataIqOut -> FmDemod.dataIqIn realtime latency 10 rate 100;
+link demod_to_audio: FmDemod.audioOut -> AudioSink.audioIn realtime latency 10 rate 100;
+link demod_to_rds: FmDemod.rdsOut -> RdsDecoder.groups low rate 11.4;
+link control_tuner: Controller.tuner <-> RfFrontEnd.tuner;
+link control_info: Controller.info <-> RdsDecoder.info low;
+
+editor = {
+  layout: {
+    RfFrontEnd: { x: 336, y: 94, width: 200, height: 134 },
+    Channelizer: { x: 652, y: 103, width: 200, height: 116 },
+    FmDemod: { x: 968, y: 82, width: 200, height: 158 },
+    RdsDecoder: { x: 1284, y: 206, width: 200, height: 96 },
+    AudioSink: { x: 1284, y: 20, width: 200, height: 116 },
+    Controller: { x: 20, y: 100, width: 200, height: 122 }
+  },
+  style: {
+    RfFrontEnd: { color: "#d1733b" },
+    Channelizer: { color: "#8a4fd1" },
+    FmDemod: { color: "#2e9e8f" },
+    RdsDecoder: { color: "#d14f9e" },
+    AudioSink: { color: "#3b8fd1" },
+    Controller: { color: "#d6c21f" }
+  }
+};

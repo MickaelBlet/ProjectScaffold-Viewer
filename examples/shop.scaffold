@@ -1,0 +1,220 @@
+syntax = "scaffold1";
+
+/// Online shop services, laid out with the editor's tools - notes and frames, views of a module with hidden modules, placed outside modules and hand-set links, locked modules, port label sides
+project "Shop" [metadata = { version: "2.0.0", owner: "commerce-team" }];
+
+remoteDefaults = { client: { host: api.shop.example }, basePort: 9000 };
+
+/// Single-page app in the browser
+binary Frontend;
+/// Backend services
+binary Api;
+/// Background workers
+binary Jobs;
+/// Payment provider
+binary Provider;
+
+alias Sku = string(24);
+
+struct Product {
+  Sku sku;
+  string title;
+  uint32 priceCents;
+}
+
+struct Line {
+  Sku sku;
+  uint16 quantity = 1;
+}
+
+enum OrderStatus : uint8 {
+  Pending = 0;
+  Paid = 1;
+  Shipped = 2;
+  Cancelled = 3;
+}
+
+struct Order {
+  uint64 id;
+  vector<Line> lines;
+  OrderStatus status = Pending;
+}
+
+exception OutOfStock {
+  Sku sku;
+}
+
+exception PaymentDeclined {
+  string reason;
+}
+
+interface Storefront {
+  vector<Product> search(string query);
+  Order checkout(vector<Line> lines) raises (OutOfStock, PaymentDeclined);
+}
+
+interface Catalog {
+  vector<Product> search(string query);
+  uint32 price(Sku sku);
+}
+
+interface Ordering {
+  Order place(vector<Line> lines) raises (OutOfStock, PaymentDeclined);
+}
+
+interface Stock {
+  void reserve(vector<Line> lines) raises (OutOfStock);
+  void release(uint64 order);
+}
+
+interface Payment {
+  string charge(uint64 order, uint32 cents) raises (PaymentDeclined);
+}
+
+interface OrderEvents {
+  void changed(Order order);
+}
+
+module Web {
+  binary = Frontend;
+
+  out Storefront api;
+}
+
+/// Authenticates and routes the requests
+module Gateway {
+  binary = Api;
+
+  in Storefront api;
+  out Catalog catalog;
+  out Ordering orders;
+}
+
+module Backend {
+  binary = Api;
+
+  in Catalog catalog;
+  in Ordering orders;
+  out Payment payment;
+  out OrderEvents events;
+
+  module Products {
+    in Catalog catalog;
+  }
+
+  module Orders {
+    uint16 holdMinutes = 15;
+
+    in Ordering orders;
+    out Catalog prices;
+    out Stock stock;
+    out Payment payment;
+    out OrderEvents events;
+  }
+
+  module Inventory {
+    in Stock stock;
+  }
+}
+
+/// Mails the customers when their orders change
+module Notifier {
+  binary = Jobs;
+
+  in OrderEvents events;
+}
+
+/// Payment service provider
+module Psp {
+  binary = Provider;
+
+  in Payment payment;
+}
+
+link web_api: Web.api <-> Gateway.api latency 300 remote http { path: "/api" };
+link gateway_catalog: Gateway.catalog <-> Backend.catalog;
+link gateway_orders: Gateway.orders <-> Backend.orders;
+link catalog_in: Backend.catalog <-> Backend.Products.catalog;
+link orders_in: Backend.orders <-> Backend.Orders.orders;
+link order_prices: Backend.Orders.prices <-> Backend.Products.catalog;
+link order_stock: Backend.Orders.stock <-> Backend.Inventory.stock;
+link payment_out: Backend.Orders.payment <-> Backend.payment;
+link events_out: Backend.Orders.events -> Backend.events low;
+link charge: Backend.payment <-> Psp.payment ack 10000 remote grpc { client: { host: psp.example, port: 443 } };
+link order_events: Backend.events -> Notifier.events low remote mqtt { broker: { host: mq.shop.internal }, topic: "shop/orders" };
+
+editor = {
+  layout: {
+    Web: { x: 20, y: 155, width: 200, height: 72 },
+    Gateway: { x: 336, y: 143, width: 200, height: 96 },
+    Backend: { x: 652, y: 20, width: 785, height: 341 },
+    Backend.Products: { x: 443, y: 77, width: 200, height: 72 },
+    Backend.Orders: { x: 127, y: 99, width: 200, height: 170 },
+    Backend.Inventory: { x: 443, y: 219, width: 200, height: 72 },
+    Notifier: { x: 1553, y: 226, width: 200, height: 72 },
+    Psp: { x: 1553, y: 84, width: 200, height: 72 }
+  },
+  views: [
+    {
+      name: Checkout,
+      root: Backend,
+      hidden: [Backend.Products],
+      outside: {
+        Gateway: { x: -320, y: 120, width: 200, height: 96 },
+        Notifier: { x: 1000, y: 260 },
+        Psp: { x: 1000, y: 40 }
+      },
+      notes: [
+        {
+          kind: note,
+          text: "Products is hidden in this view: Orders asks it for prices.",
+          x: 440,
+          y: 60,
+          width: 240,
+          height: 80,
+          color: "#fff3b0"
+        }
+      ]
+    },
+    { name: "Without jobs", hidden: [Notifier] }
+  ],
+  style: {
+    Web: { color: "#d6c21f" },
+    Gateway: { color: "#3b8fd1", locked: true },
+    Backend: { color: "#2e9e8f" },
+    Backend.Orders: { labels: { events: bottom } },
+    Notifier: { color: "#8a4fd1" },
+    Psp: { color: "#6b7f8e" }
+  },
+  links: {
+    charge: { from: { side: right, at: 0.3 }, to: { side: left, at: 0.5 }, label: 0.4 },
+    order_events: { points: [{ x: 1495, y: 300 }, { x: 1495, y: 262 }] }
+  },
+  binaries: {
+    Frontend: { color: "#d6c21f" },
+    Api: { color: "#2e9e8f" },
+    Jobs: { color: "#8a4fd1" },
+    Provider: { color: "#6b7f8e" }
+  },
+  notes: [
+    {
+      kind: frame,
+      text: "Api binary",
+      x: 316,
+      y: -20,
+      width: 1141,
+      height: 401,
+      color: "#2e9e8f",
+      locked: true
+    },
+    {
+      kind: note,
+      text: "Views: Checkout shows Backend alone (Products hidden), Without jobs hides Notifier. Gateway is locked in place.",
+      x: 20,
+      y: -20,
+      width: 260,
+      height: 120,
+      color: "#fff3b0"
+    }
+  ]
+};

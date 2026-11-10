@@ -1,6 +1,14 @@
 # File format
 
-A project file is language-agnostic YAML or JSON, described by [`schema/scaffold.schema.json`](../schema/scaffold.schema.json) (JSON Schema 2020-12). Example: [`examples/robot.scaffold.yaml`](../examples/robot.scaffold.yaml).
+A project file is language-agnostic data, described by [`schema/scaffold.schema.json`](../schema/scaffold.schema.json) (JSON Schema 2020-12), written in one of three formats holding the same data:
+
+| Format                            | Files                               | Use                                                                  |
+| --------------------------------- | ----------------------------------- | -------------------------------------------------------------------- |
+| [Scaffold text](scaffold-text.md) | `*.scaffold`                        | default: new projects and the examples; compact, `.proto`-like       |
+| YAML                              | `*.scaffold.yaml`, `*.scaffold.yml` | the data model below; _File › Export as YAML…_ (without editor data) |
+| JSON                              | `*.scaffold.json`                   | same keys as YAML                                                    |
+
+This page shows the data model in YAML. Example: [`examples/robot.scaffold`](../examples/robot.scaffold) (open it and switch the text editor to _YAML_ to see it in YAML).
 
 - [Top level](#top-level)
 - [Names](#names)

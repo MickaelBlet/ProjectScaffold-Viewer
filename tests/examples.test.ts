@@ -12,10 +12,8 @@ import { validate } from '@/model/validate'
 import { isWorkspaceData, workspaceFromFile } from '@/model/workspace'
 
 const ROOT = 'examples'
-const files = (readdirSync(ROOT, { recursive: true }) as string[])
-  .map((f) => f.split('\\').join('/'))
-  .sort()
-const projects = files.filter((f) => /\.scaffold\.(yaml|json)$/.test(f))
+const files = (readdirSync(ROOT, { recursive: true }) as string[]).map((f) => f.split('\\').join('/')).sort()
+const projects = files.filter((f) => /\.scaffold(\.(yaml|json))?$/.test(f))
 const workspaces = files.filter((f) => f.endsWith('.scaffold-workspace.yaml'))
 
 const text = (file: string): string => readFileSync(join(ROOT, file), 'utf8')

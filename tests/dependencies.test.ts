@@ -3,7 +3,7 @@ import { Ajv2020 } from 'ajv/dist/2020.js'
 import YAML from 'yaml'
 import { produce } from 'immer'
 import { describe, expect, it } from 'vitest'
-import { fromFile, toFile } from '@/model/serialize'
+import { fromFile, parseText, toFile } from '@/model/serialize'
 import {
   addDependencies,
   addDependency,
@@ -34,7 +34,7 @@ import type { ImportedModule, Module, Project, TypeRef } from '@/model/types'
 
 const jsonSchema = JSON.parse(readFileSync('schema/scaffold.schema.json', 'utf8'))
 const load = (yaml: string): Project => fromFile(YAML.parse(yaml))
-const read = (name: string): Project => fromFile(YAML.parse(readFileSync(`examples/${name}`, 'utf8')))
+const read = (name: string): Project => fromFile(parseText(readFileSync(`examples/${name}`, 'utf8'), 'dsl'))
 const byPath = (p: Project, path: string) => p.modules.find((m) => modulePath(p, m.id) === path)!
 const errors = (p: Project) =>
   validate(p)
@@ -102,7 +102,7 @@ function withCommon(p: Project = station()): { p: Project; r: DependencyResult }
   return { p: q, r }
 }
 
-const robot = read('robot.scaffold.yaml')
+const robot = read('robot.scaffold')
 
 /** Robot's Core.Sensor placed in `p` (with Core). */
 const sensorOf = (p: Project): ImportedModule =>
@@ -120,7 +120,7 @@ function treePaths(p: Project, path: string): string[] {
 }
 
 /**
- * Station linking its Monitor to Robot's Core.Sensor, placed from robot.scaffold.yaml: placing it
+ * Station linking its Monitor to Robot's Core.Sensor, placed from robot.scaffold: placing it
  * places Core (`placedId`) with its content.
  */
 function monitor(): { p: Project; placedId: string; r: DependencyResult } {
@@ -130,10 +130,10 @@ function monitor(): { p: Project; placedId: string; r: DependencyResult } {
     const placed = placeModule(
       d,
       robot,
-      'robot.scaffold.yaml',
+      'robot.scaffold',
       byPath(robot, 'Core.Sensor').id,
       { x: 500, y: 40 },
-      'station.scaffold.yaml'
+      'station.scaffold'
     )
     placedId = placed.id!
     r = placed.result
@@ -206,7 +206,7 @@ describe('dependencies', () => {
           { project: common, file: 'lib/common.scaffold.yaml' },
           { project: newer, file: 'lib/units.scaffold.yaml', indirect: true }
         ],
-        'station.scaffold.yaml'
+        'station.scaffold'
       )
     })
     expect(r.conflicts).toEqual([])
@@ -224,7 +224,7 @@ describe('dependencies', () => {
           { project: units, file: 'lib/units.scaffold.yaml' },
           { project: common, file: 'lib/common.scaffold.yaml' }
         ],
-        'station.scaffold.yaml'
+        'station.scaffold'
       )
     })
     expect(q.dependencies.map((x) => [x.name, x.uses, x.indirect])).toEqual([
@@ -265,7 +265,7 @@ describe('dependencies', () => {
         }
       )
     })
-    const p = produce(station(), (d) => void addDependency(d, constants, 'common.scaffold.yaml', null))
+    const p = produce(station(), (d) => void addDependency(d, constants, 'common.scaffold', null))
     const dep = p.dependencies.find((x) => x.name === 'Common')!
     expect(p.consts.map((c) => [c.name, c.dependency])).toEqual([
       ['Gravity', dep.id],
@@ -282,7 +282,7 @@ describe('dependencies', () => {
     // Renamed in the dependency, then removed there.
     const renamed = produce(constants, (d) => void (d.consts[0]!.name = 'G'))
     const q = produce(p, (d) =>
-      applyDependencyRenames(d, 'common.scaffold.yaml', diffRenames(constants, renamed)!)
+      applyDependencyRenames(d, 'common.scaffold', diffRenames(constants, renamed)!)
     )
     expect(q.consts.map((c) => c.name)).toEqual(['G', 'Origin'])
     const removed = produce(renamed, (d) => void (d.consts = []))
@@ -304,7 +304,7 @@ describe('dependencies', () => {
   })
 
   it('takes over an own entity with the same definition, skips a different one', () => {
-    const same = produce(station(), (d) => void addDependency(d, units, 'units.scaffold.yaml', null))
+    const same = produce(station(), (d) => void addDependency(d, units, 'units.scaffold', null))
     const detached = produce(same, (d) => void detachDependency(d, d.dependencies[0]!.id))
     expect(detached.types[0]!.dependency).toBeUndefined()
     const again = withCommon(detached)
@@ -334,7 +334,7 @@ modules: []
 links: []
 `)
     let r!: DependencyResult
-    const p = produce(withCommon().p, (d) => void (r = addDependency(d, other, 'other.scaffold.yaml', null)))
+    const p = produce(withCommon().p, (d) => void (r = addDependency(d, other, 'other.scaffold', null)))
     expect(r.conflicts).toEqual([])
     const dep = (name: string) => p.dependencies.find((x) => x.name === name)!
     expect(dep('Other').shared).toEqual(['Meters'])
@@ -445,8 +445,8 @@ describe('placed modules', () => {
     const { p, placedId, r } = monitor()
     expect(r.conflicts).toEqual([])
     expect(p.dependencies.map((x) => [x.name, x.file, x.uses, x.indirect])).toEqual([
-      ['Robot', 'robot.scaffold.yaml', ['Common'], false],
-      ['Common', 'common.scaffold.yaml', [], true]
+      ['Robot', 'robot.scaffold', ['Common'], false],
+      ['Common', 'common.scaffold', [], true]
     ])
     // Its top-level module, with its content where its project puts it.
     const core = byPath(robot, 'Core')
@@ -496,7 +496,7 @@ describe('placed modules', () => {
     expect(errors(back)).toEqual([])
     // Refreshed from the same project: unchanged.
     const fresh = produce(p, (d) => {
-      refreshDependencies(d, new Map([[d.dependencies[0]!.id, robot]]), 'station.scaffold.yaml')
+      refreshDependencies(d, new Map([[d.dependencies[0]!.id, robot]]), 'station.scaffold')
     })
     expect(fresh.dependencies[0]!.modules).toBe(p.dependencies[0]!.modules)
   })
@@ -507,7 +507,7 @@ describe('placed modules', () => {
     let other: string | null = null
     const q = produce(p, (d) => {
       const place = (path: string) =>
-        placeModule(d, robot, 'robot.scaffold.yaml', byPath(robot, path).id, { x: 0, y: 0 }, null).id
+        placeModule(d, robot, 'robot.scaffold', byPath(robot, path).id, { x: 0, y: 0 }, null).id
       again = place('Core.Controller')
       other = place('Operator')
     })
@@ -525,7 +525,7 @@ describe('placed modules', () => {
     const file = toFile(p, { editor: true })
     expect(file.dependencies?.[0]).toMatchObject({
       name: 'Robot',
-      file: 'robot.scaffold.yaml',
+      file: 'robot.scaffold',
       uses: ['Common']
     })
     expect(file.dependencies?.[0]?.modules?.map((m) => m.module)).toEqual(treePaths(robot, 'Core'))
@@ -625,7 +625,7 @@ describe('placed modules', () => {
     // Content gone from its parent goes, with its links.
     const deleted = produce(robot, (d) => void (d.modules = d.modules.filter((m) => m.name !== 'Sensor')))
     const s = refresh(deleted)
-    expect(s.r.missing).toEqual(["Robot: module 'Core.Sensor' no longer exists in robot.scaffold.yaml"])
+    expect(s.r.missing).toEqual(["Robot: module 'Core.Sensor' no longer exists in robot.scaffold"])
     expect(s.q.dependencies[0]!.modules.map((m) => m.path)).toEqual(treePaths(deleted, 'Core'))
     expect(s.q.links).toEqual([])
 
@@ -678,13 +678,13 @@ describe('placed modules', () => {
 
   it('follows an interface renamed in the project it comes from', () => {
     const { p } = monitor()
-    const commonFile = read('common.scaffold.yaml')
+    const commonFile = read('common.scaffold')
     const renamed = produce(
       commonFile,
       (d) => void (d.interfaces.find((i) => i.name === 'Telemetry')!.name = 'Stream')
     )
     const q = produce(p, (d) =>
-      applyDependencyRenames(d, 'common.scaffold.yaml', diffRenames(commonFile, renamed)!)
+      applyDependencyRenames(d, 'common.scaffold', diffRenames(commonFile, renamed)!)
     )
     expect(q.interfaces.map((i) => i.name)).toContain('Stream')
     expect(sensorOf(q).ports[0]!.interface).toBe('Stream')
@@ -713,7 +713,7 @@ describe('dependency examples', () => {
     expect(errors(robot)).toEqual([])
     const fresh = produce(robot, (d) => {
       expect(
-        refreshDependencies(d, new Map([[d.dependencies[0]!.id, read('common.scaffold.yaml')]]), null)
+        refreshDependencies(d, new Map([[d.dependencies[0]!.id, read('common.scaffold')]]), null)
       ).toEqual({
         conflicts: [],
         detached: [],
@@ -725,14 +725,14 @@ describe('dependency examples', () => {
   })
 
   it('station depends on common and robot, links to a placed module, up to date', () => {
-    const station = read('station.scaffold.yaml')
+    const station = read('station.scaffold')
     expect(errors(station)).toEqual([])
     const sources = new Map([
-      [station.dependencies[0]!.id, read('common.scaffold.yaml')],
+      [station.dependencies[0]!.id, read('common.scaffold')],
       [station.dependencies[1]!.id, robot]
     ])
     const fresh = produce(station, (d) => {
-      expect(refreshDependencies(d, sources, 'station.scaffold.yaml')).toEqual({
+      expect(refreshDependencies(d, sources, 'station.scaffold')).toEqual({
         conflicts: [],
         detached: [],
         renamed: [],

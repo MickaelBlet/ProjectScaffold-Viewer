@@ -1,10 +1,9 @@
 import { readFileSync } from 'node:fs'
-import YAML from 'yaml'
 import { describe, expect, it } from 'vitest'
 import { placedPortEnds } from '@/canvas/flowGraph'
-import { fromFile } from '@/model/serialize'
+import { fromFile, parseText } from '@/model/serialize'
 
-const ground = fromFile(YAML.parse(readFileSync('examples/fleet/ground.scaffold.yaml', 'utf8')))
+const ground = fromFile(parseText(readFileSync('examples/fleet/ground.scaffold', 'utf8'), 'dsl'))
 const datalink = ground.modules.find((m) => m.name === 'Datalink')!
 const radio = ground.dependencies.flatMap((x) => x.modules).find((m) => m.path === 'Radio')!
 

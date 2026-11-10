@@ -1,10 +1,10 @@
-import { readFileSync } from 'node:fs'
+import { exampleYaml } from './exampleYaml'
 import { describe, expect, it } from 'vitest'
 import { locateProblems, locateValidation, targetPath } from '@/model/locate'
 import { lineOfPath, loadText, toFile } from '@/model/serialize'
 import { validate } from '@/model/validate'
 
-const robot = readFileSync('examples/robot.scaffold.yaml', 'utf8')
+const robot = exampleYaml('examples/robot.scaffold')
 const lineOf = (text: string, needle: string): number =>
   text.slice(0, text.indexOf(needle)).split('\n').length
 

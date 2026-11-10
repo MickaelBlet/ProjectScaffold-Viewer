@@ -12,9 +12,9 @@ A large architecture is split into project files depending on each other. A depe
 
 ## Example
 
-- [`examples/common.scaffold.yaml`](../examples/common.scaffold.yaml): types and interfaces only;
-- [`examples/robot.scaffold.yaml`](../examples/robot.scaffold.yaml) uses it;
-- [`examples/station.scaffold.yaml`](../examples/station.scaffold.yaml) uses both and links to a module of the robot.
+- [`examples/common.scaffold`](../examples/common.scaffold): types and interfaces only;
+- [`examples/robot.scaffold`](../examples/robot.scaffold) uses it;
+- [`examples/station.scaffold`](../examples/station.scaffold) uses both and links to a module of the robot.
 
 A larger one, opened at once through a [workspace file](#workspace-files): [`examples/fleet/`](../examples/fleet). Modules deriving from placed modules of a dependency: [`examples/plugins/`](../examples/plugins).
 
@@ -72,12 +72,28 @@ The copy is not linked to those projects, but their dependencies become this pro
 
 ## File format
 
-Each dependency keeps a copy of what is used, as last read, so the file stays self-contained for generators:
+Each dependency keeps a copy of what is used, as last read, so the file stays self-contained for generators. In Scaffold text, a `dependency` block ([grammar](scaffold-text.md#links-and-dependencies)):
+
+```
+dependency Common "common.scaffold" {
+  struct Vec3 {
+    float32 x;
+    float32 y;
+    float32 z;
+  }
+
+  interface Telemetry {
+    void publish(Pose pose, map<string, list<uint8>> tags);
+  }
+}
+```
+
+In YAML:
 
 ```yaml
 dependencies:
   - name: Robot # referenced by `uses` and link ends
-    file: robot.scaffold.yaml # relative to this file
+    file: robot.scaffold # relative to this file
     uses: [Common] # dependencies of this list that its types and interfaces use (optional)
     types: [...] # its own types, as in `types`
     interfaces: [...] # its own interfaces, as in `interfaces`
@@ -93,7 +109,7 @@ dependencies:
         methods: [...] # as in `modules[].methods` (optional)
         ports: [{ name: out, role: out, interface: Telemetry }]
   - name: Common
-    file: common.scaffold.yaml
+    file: common.scaffold
     indirect: true # only here because another dependency uses it (optional)
     shared: [Vec3] # defined the same way by another dependency of this list, listed there (optional)
     types: [...]
@@ -122,9 +138,9 @@ A workspace file (`*.scaffold-workspace.yaml`, schema [`schema/scaffold-workspac
 schemaVersion: 1
 workspace: { name, description? }
 projects: # relative to the workspace file, opened in tabs in this order (the first one shown)
-  - ground.scaffold.yaml
-  - drone.scaffold.yaml
-  - shared/units.scaffold.yaml
+  - ground.scaffold
+  - drone.scaffold
+  - shared/units.scaffold
 ```
 
 - _File › Open…_ on a workspace file opens its projects. The browser and desktop apps then ask for the folder holding it, to read them; files outside that folder cannot be read.

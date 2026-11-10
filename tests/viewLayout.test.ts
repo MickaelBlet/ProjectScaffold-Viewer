@@ -1,8 +1,7 @@
 import { readFileSync } from 'node:fs'
-import YAML from 'yaml'
 import { produce } from 'immer'
 import { describe, expect, it } from 'vitest'
-import { fromFile, toFile } from '@/model/serialize'
+import { fromFile, parseText, toFile } from '@/model/serialize'
 import {
   canKeepView,
   findView,
@@ -16,7 +15,7 @@ import {
 import { foldLayouts, inView, outsideOf } from '@/model/viewLayout'
 import type { Project } from '@/model/types'
 
-const example = fromFile(YAML.parse(readFileSync('examples/robot.scaffold.yaml', 'utf8')))
+const example = fromFile(parseText(readFileSync('examples/robot.scaffold', 'utf8'), 'dsl'))
 const idOf = (p: Project, path: string) => p.modules.find((m) => modulePath(p, m.id) === path)!.id
 const core = idOf(example, 'Core')
 const sensor = idOf(example, 'Core.Sensor')
@@ -210,7 +209,7 @@ describe('view layouts', () => {
   })
 
   it('keeps the place of a placed module of a dependency outside the view, saved and reloaded', () => {
-    const ground = fromFile(YAML.parse(readFileSync('examples/fleet/ground.scaffold.yaml', 'utf8')))
+    const ground = fromFile(parseText(readFileSync('examples/fleet/ground.scaffold', 'utf8'), 'dsl'))
     const datalink = idOf(ground, 'Datalink')
     const radio = ground.dependencies.flatMap((x) => x.modules).find((m) => m.path === 'Radio')!.id
     const id = ground.views.find((v) => v.rootModuleId === datalink)!.id
@@ -241,7 +240,7 @@ describe('view layouts', () => {
   })
 
   it('draws a placed module of a dependency in a view of its own, which keeps nothing of its own', () => {
-    const ground = fromFile(YAML.parse(readFileSync('examples/fleet/ground.scaffold.yaml', 'utf8')))
+    const ground = fromFile(parseText(readFileSync('examples/fleet/ground.scaffold', 'utf8'), 'dsl'))
     const datalink = idOf(ground, 'Datalink')
     const radio = ground.dependencies.flatMap((x) => x.modules).find((m) => m.path === 'Radio')!
     const id = isolatedViewId(radio.id)
@@ -256,7 +255,10 @@ describe('view layouts', () => {
       base,
       produce(base, (d) => {
         mod(d, datalink).layout.x -= 500
-        d.dependencies.flatMap((x) => x.modules).find((m) => m.id === radio.id)!.size = { width: 400, height: 300 }
+        d.dependencies.flatMap((x) => x.modules).find((m) => m.id === radio.id)!.size = {
+          width: 400,
+          height: 300
+        }
       }),
       id
     )

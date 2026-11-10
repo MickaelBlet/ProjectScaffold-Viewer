@@ -1,0 +1,31 @@
+syntax = "scaffold1";
+
+/// Smallest useful project, a starting point - two modules, one interface, one link
+project "Hello";
+
+/// Says hello to someone
+interface Greeting {
+  string greet(string who);
+}
+
+/// Asks for greetings
+module Client {
+  out Greeting greeter;
+}
+
+/// Answers them
+module Server {
+  string prefix = Hello;
+
+  in Greeting greeting;
+}
+
+link client_to_server: Client.greeter <-> Server.greeting;
+
+editor = {
+  layout: {
+    Client: { x: 20, y: 33, width: 200, height: 72 },
+    Server: { x: 336, y: 20, width: 200, height: 98 }
+  },
+  style: { Client: { color: "#3b8fd1" }, Server: { color: "#2e9e8f" } }
+};

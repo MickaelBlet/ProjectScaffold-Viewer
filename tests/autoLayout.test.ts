@@ -1,12 +1,11 @@
 import { readFileSync } from 'node:fs'
-import YAML from 'yaml'
 import { describe, expect, it } from 'vitest'
-import { fromFile } from '@/model/serialize'
+import { fromFile, parseText } from '@/model/serialize'
 import { arrange, crossings, relations } from '@/model/autoLayout'
 import { boundsOf, childModules, contentBottom, contentTop, LAYOUT_PAD } from '@/model/project'
 import type { Module, Project, Rect } from '@/model/types'
 
-const example = fromFile(YAML.parse(readFileSync('examples/robot.scaffold.yaml', 'utf8')))
+const example = fromFile(parseText(readFileSync('examples/robot.scaffold', 'utf8'), 'dsl'))
 
 const overlap = (a: Rect, b: Rect): boolean =>
   a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height
@@ -49,7 +48,7 @@ describe('autoLayout', () => {
   })
 
   it('fits each container to its content', async () => {
-    const drone = fromFile(YAML.parse(readFileSync('examples/fleet/drone.scaffold.yaml', 'utf8')))
+    const drone = fromFile(parseText(readFileSync('examples/fleet/drone.scaffold', 'utf8'), 'dsl'))
     for (const o of ['horizontal', 'vertical'] as const) {
       const p = await arrange(drone, null, { orientation: o, spacing: 70 })
       for (const m of p.modules) {

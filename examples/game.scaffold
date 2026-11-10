@@ -1,0 +1,206 @@
+syntax = "scaffold1";
+
+/// Game engine three modules deep - types and constants of modules with their access levels, used by path from other modules, bases between nested modules, static members; generated in C++14
+project "Game";
+
+alias Entity = uint32;
+
+struct Vec2 {
+  float32 x = 0;
+  float32 y = 0;
+}
+
+struct Input {
+  Vec2 axis;
+  uint32 buttons = 0;
+}
+
+interface Tick {
+  void update(float32 dt);
+}
+
+interface Controls {
+  void input(Input input);
+}
+
+interface DrawList {
+  void submit(vector<Engine.Render.Sprite> sprites);
+}
+
+interface Sound {
+  void play(Engine.Audio.ClipId clip, Vec2 at);
+}
+
+const uint16 TargetFps = 60;
+
+/// Window, input devices and clock
+module Platform {
+  string title = "Space Rocks";
+  Vec2 size = { x: 1280, y: 720 };
+
+  out Tick tick;
+  out Controls controls;
+  in DrawList draw;
+  in Sound sound;
+}
+
+module Engine {
+  in Tick tick;
+  in Controls controls;
+  out DrawList draw;
+  out Sound sound;
+
+  /// Base of the systems, run once per frame in order
+  abstract module System {
+    copy = delete;
+    move = delete;
+
+    enum Phase : uint8 {
+      Input = 0;
+      Simulate = 1;
+      Present = 2;
+    }
+
+    bool enabled = true;
+    protected const Engine.System.Phase phase = Simulate;
+
+    /// Runs in the given phase
+    protected explicit constructor(Engine.System.Phase phase = Simulate);
+
+    virtual destructor;
+
+    virtual void update(float32 dt) = 0;
+    virtual string name() const;
+  }
+
+  /// Entities and their components
+  module World {
+    struct Transform {
+      Vec2 position;
+      float32 rotation = 0;
+      Vec2 scale = { x: 1, y: 1 };
+    }
+
+    /// Storage of one entity
+    private struct Slot {
+      uint16 generation;
+      bool alive;
+    }
+
+    static const uint32 MAX_ENTITIES = 4096;
+    static const Entity NONE = 4294967295;
+    private vector<Engine.World.Slot> slots;
+    map<Entity, Engine.World.Transform> transforms;
+
+    Entity spawn(const Engine.World.Transform at);
+
+    void despawn(Entity entity);
+
+    uint32 count() const;
+
+    /// Transform at the origin
+    static Engine.World.Transform identity();
+  }
+
+  /// The systems, in run order
+  module Systems {
+    in Tick tick;
+    in Controls controls;
+    out DrawList draw;
+    out Sound sound;
+
+    module Player : Engine.System {
+      float32 speed = 220 [constraints = { min: 0, max: 1000, unit: "px/s" }];
+
+      /// The world the player moves in (a module used as a type)
+      Engine.World world [ownership = borrowed];
+
+      Entity ship = 0;
+
+      virtual void update(float32 dt) override [pre = ["dt > 0"]];
+
+      in Tick tick;
+      in Controls controls;
+    }
+
+    module Physics : Engine.System {
+      struct Body {
+        Vec2 velocity;
+        float32 mass = 1;
+        float32 radius = 8;
+      }
+
+      protected struct Contact {
+        Entity a;
+        Entity b;
+      }
+
+      static const Vec2 GRAVITY = { x: 0, y: 0 };
+      private static const uint8 SUBSTEPS = 4;
+      map<Entity, Engine.Systems.Physics.Body> bodies;
+      protected vector<Engine.Systems.Physics.Contact> contacts;
+
+      virtual void update(float32 dt) override;
+      protected virtual bool collide(const Engine.Systems.Physics.Body a, const Engine.Systems.Physics.Body b);
+
+      in Tick tick;
+      out Sound sound;
+    }
+
+    module Sprites : Engine.System {
+      uint8 layers = 4;
+
+      virtual void update(float32 dt) override;
+      virtual string name() const override;
+
+      in Tick tick;
+      out DrawList draw;
+    }
+  }
+
+  /// Sprite batches
+  module Render {
+    struct Sprite {
+      uint16 texture;
+      Engine.World.Transform transform;
+      array<uint8, 4> tint = [255, 255, 255, 255];
+    }
+  }
+
+  module Audio {
+    alias ClipId = uint16;
+
+    static const uint8 CHANNELS = 32;
+  }
+}
+
+link platform_tick: Platform.tick -> Engine.tick realtime latency 16 rate 60;
+link platform_controls: Platform.controls -> Engine.controls realtime latency 16 rate 60;
+link engine_draw: Engine.draw -> Platform.draw realtime latency 16 rate 60;
+link engine_sound: Engine.sound -> Platform.sound realtime latency 16 rate 60;
+link tick_in: Engine.tick -> Engine.Systems.tick realtime latency 16 rate 60;
+link controls_in: Engine.controls -> Engine.Systems.controls realtime latency 16 rate 60;
+link draw_out: Engine.Systems.draw -> Engine.draw realtime latency 16 rate 60;
+link sound_out: Engine.Systems.sound -> Engine.sound realtime latency 16 rate 60;
+link player_tick: Engine.Systems.tick -> Engine.Systems.Player.tick realtime latency 16 rate 60;
+link physics_tick: Engine.Systems.tick -> Engine.Systems.Physics.tick realtime latency 16 rate 60;
+link sprites_tick: Engine.Systems.tick -> Engine.Systems.Sprites.tick realtime latency 16 rate 60;
+link player_controls: Engine.Systems.controls -> Engine.Systems.Player.controls realtime latency 16 rate 60;
+link sprites_draw: Engine.Systems.Sprites.draw -> Engine.Systems.draw realtime latency 16 rate 60;
+link physics_sound: Engine.Systems.Physics.sound -> Engine.Systems.sound realtime latency 16 rate 60;
+
+editor = {
+  layout: {
+    Platform: { x: 887, y: 710, width: 200, height: 140 },
+    Engine: { x: 20, y: 20, width: 751, height: 1520 },
+    Engine.System: { x: 289, y: 1340, width: 200, height: 160 },
+    Engine.World: { x: 289, y: 188, width: 200, height: 196 },
+    Engine.Systems: { x: 140, y: 596, width: 499, height: 674 },
+    Engine.Systems.Player: { x: 187, y: 488, width: 200, height: 166 },
+    Engine.Systems.Physics: { x: 187, y: 258, width: 200, height: 160 },
+    Engine.Systems.Sprites: { x: 187, y: 46, width: 200, height: 142 },
+    Engine.Render: { x: 289, y: 454, width: 200, height: 72 },
+    Engine.Audio: { x: 289, y: 46, width: 200, height: 72 }
+  },
+  style: { Platform: { color: "#6b7f8e" }, Engine: { color: "#2e9e8f" } }
+};

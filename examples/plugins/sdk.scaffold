@@ -1,0 +1,67 @@
+syntax = "scaffold1";
+
+/// Plugin SDK of an image editor - the abstract Plugin module that plugins of other projects derive from, and the Host loading them
+project "Sdk" [metadata = { version: "3.1.0" }];
+
+struct Version {
+  uint16 major;
+  uint16 minor;
+  uint16 patch = 0;
+}
+
+enum Level : uint8 {
+  Debug = 0;
+  Info = 1;
+  Warning = 2;
+  Error = 3;
+}
+
+struct Image {
+  uint16 width;
+  uint16 height;
+  bytes rgba;
+}
+
+interface Log {
+  void write(Level level, string text);
+}
+
+interface ImageFilter {
+  void apply(inout Image image);
+}
+
+const Version ApiVersion = { major: 3, minor: 1 };
+
+/// Base of every plugin
+abstract module Plugin {
+  struct Info {
+    string(32) name;
+    Version version;
+    optional<string> author = null;
+  }
+
+  alias Settings = map<string, string>;
+
+  virtual Plugin.Info info() const = 0;
+
+  virtual bool load(const Plugin.Settings settings) = 0;
+
+  /// Does nothing unless overridden
+  virtual void unload();
+}
+
+/// Loads the plugins and runs them on images
+module Host {
+  string directory = plugins;
+
+  in Log log;
+  out ImageFilter filter;
+}
+
+editor = {
+  layout: {
+    Plugin: { x: 20, y: 20, width: 200, height: 134 },
+    Host: { x: 20, y: 224, width: 200, height: 98 }
+  },
+  style: { Plugin: { color: "#8a4fd1" }, Host: { color: "#2e9e8f" } }
+};

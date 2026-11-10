@@ -11,9 +11,7 @@ const example = parseText(readFileSync(EXAMPLE, 'utf8'), 'yaml')
 describe('workspace files', () => {
   it('tells workspaces from projects', () => {
     expect(isWorkspaceData(example)).toBe(true)
-    expect(isWorkspaceData(parseText(readFileSync('examples/robot.scaffold.yaml', 'utf8'), 'yaml'))).toBe(
-      false
-    )
+    expect(isWorkspaceData(parseText(readFileSync('examples/robot.scaffold', 'utf8'), 'dsl'))).toBe(false)
     expect(isWorkspaceData(null)).toBe(false)
     expect(isWorkspaceData('workspace')).toBe(false)
   })
@@ -23,7 +21,7 @@ describe('workspace files', () => {
     expect(ws.name).toBe('Fleet')
     expect(ws.projects).toHaveLength(5)
     for (const file of ws.projects)
-      expect(loadText(readFileSync(resolveRelative(EXAMPLE, file), 'utf8'), 'yaml').name).toBeTruthy()
+      expect(loadText(readFileSync(resolveRelative(EXAMPLE, file), 'utf8'), 'dsl').name).toBeTruthy()
   })
 
   it('normalizes paths and drops duplicates', () => {

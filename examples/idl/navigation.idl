@@ -1,5 +1,5 @@
 // Interfaces using types this file does not define: import it into a project that has
-// them (e.g. examples/robot.scaffold.yaml, which uses Vec3 and Pose of common.scaffold.yaml)
+// them (e.g. examples/robot.scaffold, which uses Vec3 and Pose of common.scaffold)
 // and they are matched by name; elsewhere they come in as custom primitives.
 
 module Navigation {

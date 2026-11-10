@@ -8,7 +8,7 @@ const roots = ['examples', ...(process.env.DSL_EXTRA_ROOTS?.split(':') ?? [])]
 const files = roots.flatMap((root) =>
   (readdirSync(root, { recursive: true }) as string[])
     .map((f) => join(root, f).split('\\').join('/'))
-    .filter((f) => /\.scaffold\.(yaml|json)$/.test(f))
+    .filter((f) => /\.scaffold(\.(yaml|json))?$/.test(f))
     .sort()
 )
 const data = (file: string): unknown => parseText(readFileSync(file, 'utf8'), formatFromPath(file))

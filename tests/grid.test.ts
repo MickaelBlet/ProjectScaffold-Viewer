@@ -1,12 +1,11 @@
 import { readFileSync } from 'node:fs'
-import YAML from 'yaml'
 import { produce } from 'immer'
 import { describe, expect, it } from 'vitest'
-import { fromFile } from '@/model/serialize'
+import { fromFile, parseText } from '@/model/serialize'
 import { snapChanges, snapRect } from '@/model/grid'
 import { absolutePosition, modulePath } from '@/model/project'
 
-const example = fromFile(YAML.parse(readFileSync('examples/robot.scaffold.yaml', 'utf8')))
+const example = fromFile(parseText(readFileSync('examples/robot.scaffold', 'utf8'), 'dsl'))
 const byPath = (path: string) => example.modules.find((m) => modulePath(example, m.id) === path)!
 const onGrid = (v: number): boolean => v % 20 === 0
 

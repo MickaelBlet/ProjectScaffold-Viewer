@@ -1,3 +1,4 @@
+import { exampleYaml } from './exampleYaml'
 import { readFileSync } from 'node:fs'
 import { Ajv2020 } from 'ajv/dist/2020.js'
 import YAML from 'yaml'
@@ -16,7 +17,7 @@ import { validate } from '@/model/validate'
 import type { StructDef } from '@/model/types'
 import type { FileProject } from '@/model/schema'
 
-const exampleText = readFileSync('examples/robot.scaffold.yaml', 'utf8')
+const exampleText = exampleYaml('examples/robot.scaffold')
 const example = YAML.parse(exampleText)
 const jsonSchema = JSON.parse(readFileSync('schema/scaffold.schema.json', 'utf8'))
 
@@ -99,7 +100,7 @@ describe('serialize', () => {
   })
 
   it('round-trips locked placed modules of dependencies', () => {
-    const ground = fromFile(YAML.parse(readFileSync('examples/fleet/ground.scaffold.yaml', 'utf8')))
+    const ground = fromFile(parseText(readFileSync('examples/fleet/ground.scaffold', 'utf8'), 'dsl'))
     const radio = ground.dependencies.flatMap((x) => x.modules).find((m) => m.path === 'Radio')!
     radio.locked = true
     const file = toFile(ground, { editor: true })

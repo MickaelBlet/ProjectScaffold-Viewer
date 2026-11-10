@@ -1,14 +1,13 @@
 import { readFileSync } from 'node:fs'
-import YAML from 'yaml'
 import { produce } from 'immer'
 import { describe, expect, it } from 'vitest'
-import { fromFile } from '@/model/serialize'
+import { fromFile, parseText } from '@/model/serialize'
 import { applyDependencyRenames, followInterfaceRenames, placeModule } from '@/model/dependencies'
 import { emptyProject, modulePath } from '@/model/project'
 import { diffRenames, isDependencyFile, relativeFile } from '@/model/sync'
 import type { Project } from '@/model/types'
 
-const robot = fromFile(YAML.parse(readFileSync('examples/robot.scaffold.yaml', 'utf8')))
+const robot = fromFile(parseText(readFileSync('examples/robot.scaffold', 'utf8'), 'dsl'))
 const byPath = (p: Project, path: string) => p.modules.find((m) => modulePath(p, m.id) === path)!
 
 /** Robot with the types and interfaces of its dependencies made its own. */
@@ -20,7 +19,7 @@ const own = produce(robot, (d) => {
 /** A project depending on Robot, with its Core.Sensor placed (with Core). */
 const sensorAt = (p: Project, path: string) => p.dependencies[0]!.modules.find((m) => m.path === path)!
 const station = produce(emptyProject(), (d) => {
-  placeModule(d, robot, 'robot.scaffold.yaml', byPath(robot, 'Core.Sensor').id, { x: 0, y: 0 }, null)
+  placeModule(d, robot, 'robot.scaffold', byPath(robot, 'Core.Sensor').id, { x: 0, y: 0 }, null)
 })
 
 describe('sync', () => {
@@ -59,9 +58,7 @@ describe('sync', () => {
       byPath(d, 'Core').name = 'Base'
       d.types.find((t) => t.name === 'Primitive')!.name = 'Opaque'
     })
-    const q = produce(station, (d) =>
-      applyDependencyRenames(d, 'robot.scaffold.yaml', diffRenames(robot, next)!)
-    )
+    const q = produce(station, (d) => applyDependencyRenames(d, 'robot.scaffold', diffRenames(robot, next)!))
     expect(q.dependencies[0]!.modules.map((m) => m.path)).toContain('Base')
     const m = sensorAt(q, 'Base.Sensor')
     expect(m.ports[0]).toMatchObject({ name: 'data', interface: 'Telemetry' })

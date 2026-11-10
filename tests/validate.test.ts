@@ -1,13 +1,12 @@
 import { readFileSync } from 'node:fs'
-import YAML from 'yaml'
 import { describe, expect, it } from 'vitest'
 import { produce } from 'immer'
 import { orphanRefs, resolveMissingRefs } from '@/model/project'
-import { fromFile, toFile } from '@/model/serialize'
+import { fromFile, parseText, toFile } from '@/model/serialize'
 import { validate } from '@/model/validate'
 import type { EnumDef, Project, StructDef, UnionDef } from '@/model/types'
 
-const example = YAML.parse(readFileSync('examples/robot.scaffold.yaml', 'utf8'))
+const example = parseText(readFileSync('examples/robot.scaffold', 'utf8'), 'dsl')
 /** The example, with the types and interfaces of its dependencies made its own: edited and checked here. */
 const load = (): Project => {
   const p = fromFile(structuredClone(example))

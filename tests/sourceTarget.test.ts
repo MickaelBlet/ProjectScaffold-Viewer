@@ -1,11 +1,11 @@
-import { readFileSync } from 'node:fs'
+import { exampleYaml } from './exampleYaml'
 import { describe, expect, it } from 'vitest'
 import { structureAt } from '@/components/completion'
 import { produce } from 'immer'
 import { targetAt } from '@/components/sourceTarget'
 import { loadText, saveText } from '@/model/serialize'
 
-const project = loadText(readFileSync('examples/robot.scaffold.yaml', 'utf8'), 'yaml')
+const project = loadText(exampleYaml('examples/robot.scaffold'), 'yaml')
 const text = saveText(project, 'yaml', { editor: true })
 
 /** Entity name at the first occurrence of `marker` in the text. */
@@ -36,7 +36,7 @@ describe('caret target', () => {
     expect(at('name: sensor_to_controller')).toBe('link:sensor_to_controller')
     expect(at('class: realtime')).toBe('link:sensor_to_controller')
     expect(at('- name: Common')).toBe('dependency:Common')
-    expect(at('file: common.scaffold.yaml')).toBe('dependency:Common')
+    expect(at('file: common.scaffold')).toBe('dependency:Common')
     expect(at('name: Vec3')).toBe('type:Vec3')
   })
 
@@ -45,7 +45,7 @@ describe('caret target', () => {
   })
 
   it('finds placed modules of dependencies from their editor data', () => {
-    const station = loadText(readFileSync('examples/station.scaffold.yaml', 'utf8'), 'yaml')
+    const station = loadText(exampleYaml('examples/station.scaffold'), 'yaml')
     const t = saveText(station, 'yaml', { editor: true })
     const find = (marker: string) => {
       const { path, names } = structureAt(t, t.indexOf(marker, t.indexOf('\neditor:')) + marker.length)
