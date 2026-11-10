@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Side bars keep their width (and the bottom panels their height) when the window is resized or the app reopened in a window of another size: the editor area takes the difference, instead of every panel being scaled.
 - Association arrows: the attribute label sits in the middle of the line on a light background, in front of the links, instead of covering the arrow head; several attributes referencing the same module (or modules referencing each other) get side-by-side arrows instead of overlapping ones.
 
 ## [1.2.0] - 2026-11-09

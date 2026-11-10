@@ -182,6 +182,8 @@ export function loadOuterLayout(api: DockviewApi): void {
     // A layout with panels no longer there (removed tools) is dropped for the default one.
     if (layout && Object.keys(layout.panels).every((id) => id === EDITOR_AREA || id in TOOL_TITLES)) {
       api.fromJSON(layout)
+      // Dockview scales the saved sizes to the window: give the side bars back their saved size.
+      holdSizes(sideBarPins(api, layout.grid))
       // Tools now in the VS Code side bar.
       if (INTEGRATED) for (const id of SIDE_TOOLS) api.getPanel(id)?.api.close()
       if (api.getPanel(EDITOR_AREA)) return lockEditorArea(api)
@@ -309,16 +311,73 @@ export function keepSizes(api: DockviewApi): void {
     const group = api.getGroup(changed)
     const size = requested?.[axis]
     if (group && size) pins.push([group, size])
-    const constrain = (group: IDockviewGroupPanel, min: number, max: number): void =>
-      group.api.setConstraints(
-        axis === 'width'
-          ? { minimumWidth: min, maximumWidth: max }
-          : { minimumHeight: min, maximumHeight: max }
-      )
-    for (const [group, size] of pins) constrain(group, size, size)
-    for (const [group] of pins)
-      constrain(group, axis === 'width' ? minWidthOf(group) : MIN_GROUP_SIZE, Number.MAX_SAFE_INTEGER)
+    holdSizes(pins.map(([group, size]) => [group, axis, size]))
   })
+}
+
+type Axis = keyof Size
+type Pin = [group: IDockviewGroupPanel, axis: Axis, size: number]
+
+const constrain = (group: IDockviewGroupPanel, axis: Axis, min: number, max: number): void =>
+  group.api.setConstraints(
+    axis === 'width' ? { minimumWidth: min, maximumWidth: max } : { minimumHeight: min, maximumHeight: max }
+  )
+
+/** Pins the groups to the sizes for one layout pass (`relayout`, else the constraint change itself). */
+function holdSizes(pins: Pin[], relayout?: () => void): void {
+  for (const [group, axis, size] of pins) constrain(group, axis, size, size)
+  relayout?.()
+  for (const [group, axis] of pins)
+    constrain(group, axis, axis === 'width' ? minWidthOf(group) : MIN_GROUP_SIZE, Number.MAX_SAFE_INTEGER)
+}
+
+const holdsEditor = (node: GridNode): boolean =>
+  node.type === 'leaf'
+    ? (node.data as GroupState).views.includes(EDITOR_AREA)
+    : (node.data as GridNode[]).some(holdsEditor)
+
+/**
+ * The side bars: siblings of the editor area and of the branches holding it, with their size in `grid`
+ * (width beside it, height above or below it).
+ */
+function sideBarPins(api: DockviewApi, grid: SerializedDockview['grid']): Pin[] {
+  const pins: Pin[] = []
+  let node = grid.root
+  let orientation = grid.orientation
+  while (node.type === 'branch') {
+    const children = node.data as GridNode[]
+    const next = children.find(holdsEditor)
+    if (!next) break
+    const axis = orientation === Orientation.HORIZONTAL ? 'width' : 'height'
+    for (const c of children) {
+      if (c === next || !c.size) continue
+      // A leaf, or the leaves of a cross branch, span the whole size of the sibling.
+      const leaves = c.type === 'leaf' ? [c] : (c.data as GridNode[]).filter((n) => n.type === 'leaf')
+      for (const leaf of leaves) {
+        const group = api.getGroup((leaf.data as GroupState).id)
+        if (group) pins.push([group, axis, c.size])
+      }
+    }
+    node = next
+    orientation = orientation === Orientation.HORIZONTAL ? Orientation.VERTICAL : Orientation.HORIZONTAL
+  }
+  return pins
+}
+
+/**
+ * Lays the dock out to its element as the window resizes (in place of dockview, which scales every
+ * group): the side bars keep their size, the editor area takes the difference.
+ */
+export function followElementSize(api: DockviewApi, element: HTMLElement): () => void {
+  const observer = new ResizeObserver(() => {
+    // Hidden (display: none): keep the last size.
+    if (!element.offsetParent) return
+    const { clientWidth: width, clientHeight: height } = element
+    if (width === api.width && height === api.height) return
+    holdSizes(sideBarPins(api, api.toJSON().grid), () => api.layout(width, height))
+  })
+  observer.observe(element)
+  return () => observer.disconnect()
 }
 
 export function resetLayout(): void {

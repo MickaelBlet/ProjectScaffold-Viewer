@@ -1,5 +1,5 @@
 // Outer layout: tool panels docked, tabbed or floating around the editor area.
-import { useCallback, useEffect, useSyncExternalStore, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useSyncExternalStore, type ReactNode } from 'react'
 import {
   DockviewReact,
   type DockviewReadyEvent,
@@ -18,6 +18,7 @@ import { OutputPanel } from '@/panels/OutputPanel'
 import { EditorArea } from './EditorArea'
 import {
   EDITOR_AREA,
+  followElementSize,
   keepMinWidths,
   keepSizes,
   loadOuterLayout,
@@ -119,8 +120,13 @@ const components = {
 }
 
 export function DockShell(): ReactNode {
+  const element = useRef<HTMLDivElement>(null)
+  const stopFollowing = useRef<() => void>(undefined)
+  useEffect(() => () => stopFollowing.current?.(), [])
   const onReady = useCallback((e: DockviewReadyEvent): void => {
     setOuterApi(e.api)
+    stopFollowing.current?.()
+    if (element.current) stopFollowing.current = followElementSize(e.api, element.current)
     loadOuterLayout(e.api)
     e.api.onDidLayoutChange(saveOuterLayout)
     keepSizes(e.api)
@@ -137,7 +143,9 @@ export function DockShell(): ReactNode {
   }, [])
   return (
     <DockviewReact
+      ref={element}
       className="dock"
+      disableAutoResizing
       components={components}
       defaultTabComponent={ToolTab}
       onReady={onReady}
