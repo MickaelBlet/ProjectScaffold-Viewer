@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - _File › Export as YAML…_: the project as YAML without editor data, for generators (blocked by errors).
-- Text editor: _YAML_ / _Scaffold_ buttons switch the project text between YAML and Scaffold text, whatever the file's format (remembered; saving keeps the file's format).
+- Text editor: _Scaffold_ / _YAML_ buttons switch the project text between YAML and Scaffold text, whatever the file's format (remembered; saving keeps the file's format).
 - Text editor: _Sync selection_ also in Scaffold text (cursor to element and element to cursor).
 - Text editor: completion in Scaffold text (keywords of each block, types, interfaces, modules, link ends and their ports, link clauses, states) and folding of its `{ … }` blocks.
 - Association arrows are shaped by hand like inheritance lines, with their module selected: ends moved along the modules, bend points, attachments from the context menu (`editor.style.<module>.associations`, by attribute and referenced module). They follow the link style.

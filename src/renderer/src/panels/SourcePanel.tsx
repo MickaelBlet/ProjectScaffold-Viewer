@@ -154,9 +154,9 @@ const noop = (): void => {}
 /** Tab title and selector label of each format. */
 export const FORMAT_TITLES: Record<Format, string> = { yaml: 'YAML', json: 'JSON', dsl: 'Scaffold' }
 
-/** Format selector of the header: the file's format, YAML and Scaffold text, joined into one pill. */
+/** Format selector of the header: the file's format, Scaffold text and YAML, joined into one pill. */
 function FormatChoice({ format, fileFormat }: { format: Format; fileFormat: Format }): ReactNode {
-  const formats: Format[] = fileFormat === 'json' ? ['yaml', 'json', 'dsl'] : ['yaml', 'dsl']
+  const formats: Format[] = fileFormat === 'json' ? ['dsl', 'yaml', 'json'] : ['dsl', 'yaml']
   return (
     <span className="source-pills" role="radiogroup" aria-label="Text format">
       {formats.map((f) => (
