@@ -754,6 +754,29 @@ export function isModuleRef(p: Pick<Project, 'modules'>, id: Id): boolean {
   return !!parseDependencyModuleRef(id) || p.modules.some((m) => m.id === id)
 }
 
+/**
+ * Modules an attribute's type references, once each: modules of the project, or placed modules of
+ * dependencies (by their node id).
+ */
+export function attributeTargets(
+  p: Pick<Project, 'modules' | 'dependencies'>,
+  a: Pick<Attribute, 'type'>
+): Id[] {
+  const targets: Id[] = []
+  walkTypeRef(a.type, (n) => {
+    if (n.kind !== 'ref') return
+    let target: Id | undefined
+    if (p.modules.some((m) => m.id === n.id)) target = n.id
+    else {
+      const of = parseDependencyModuleRef(n.id)
+      target =
+        of && p.dependencies.find((d) => d.id === of.dependency)?.modules.find((m) => m.path === of.path)?.id
+    }
+    if (target && !targets.includes(target)) targets.push(target)
+  })
+  return targets
+}
+
 // Missing references: to a type, module or interface deleted while in use (or never defined in
 // the file). They keep the name the file writes, and validation reports them until fixed.
 

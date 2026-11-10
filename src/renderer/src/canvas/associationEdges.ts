@@ -2,8 +2,7 @@
 // AssociationEdge), as UML compositions (owned), aggregations (shared) or plain associations.
 import type { Edge } from '@xyflow/react'
 import { multiplicity } from '@/model/constraints'
-import { parseDependencyModuleRef } from '@/model/project'
-import { walkTypeRef } from '@/model/typeExpr'
+import { attributeTargets } from '@/model/project'
 import type { Id, Ownership, Project } from '@/model/types'
 import { MODULE_HANDLE, Z } from './constants'
 
@@ -27,24 +26,10 @@ const SPREAD = 22
 
 /** Association edges between visible modules, one per attribute and module it references. */
 export function associationEdges(p: Project, visible: Set<Id>): Edge<AssociationEdgeData>[] {
-  const modules = new Set(p.modules.map((m) => m.id))
-  /** The node of a referenced module: its own, or the placed module of a dependency. */
-  const nodeOf = (id: Id): Id | undefined => {
-    if (modules.has(id)) return id
-    const of = parseDependencyModuleRef(id)
-    return (
-      of && p.dependencies.find((d) => d.id === of.dependency)?.modules.find((m) => m.path === of.path)?.id
-    )
-  }
   const edges = p.modules.flatMap((m) =>
     visible.has(m.id)
       ? m.attributes.flatMap((a) => {
-          const targets: Id[] = []
-          walkTypeRef(a.type, (n) => {
-            const target = n.kind === 'ref' ? nodeOf(n.id) : undefined
-            if (target && target !== m.id && visible.has(target) && !targets.includes(target))
-              targets.push(target)
-          })
+          const targets = attributeTargets(p, a).filter((t) => t !== m.id && visible.has(t))
           return targets.map((target): Edge<AssociationEdgeData> => ({
             id: `${ASSOCIATION}${m.id}>${a.id}>${target}`,
             type: 'association',

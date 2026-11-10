@@ -148,7 +148,7 @@ Modules work as C++-like classes:
 
 ### Arrange
 
-- _Auto-arrange_ (Ctrl+Alt+L) lays out the selected container's content, the view's module, or everything, with ELK (layered, port aware, nested modules).
+- _Auto-arrange_ (Ctrl+Alt+L) lays out the selected container's content, the view's module, or everything, with ELK (layered, port aware, nested modules). Bases come before the modules deriving from them and modules before the modules their attributes reference, along the flow; of several tries, the one whose links, inheritance and association lines cross the least is kept.
 - _Arrange horizontally_ (Ctrl+Alt+H) and _vertically_ (Ctrl+Alt+V) also set the document's orientation: ports on the sides with links flowing right, or ports and their names on the top / bottom edges with links flowing down (saved in `editor.orientation`).
 - Align, distribute, same size and _Group into a module_ (Ctrl+G) act on the selection.
 - Alignment guides and snap to grid while dragging.

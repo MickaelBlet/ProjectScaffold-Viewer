@@ -2,9 +2,9 @@ import { readFileSync } from 'node:fs'
 import YAML from 'yaml'
 import { describe, expect, it } from 'vitest'
 import { fromFile } from '@/model/serialize'
-import { arrange } from '@/model/autoLayout'
+import { arrange, crossings, relations } from '@/model/autoLayout'
 import { boundsOf, childModules, contentBottom, contentTop, LAYOUT_PAD } from '@/model/project'
-import type { Project, Rect } from '@/model/types'
+import type { Module, Project, Rect } from '@/model/types'
 
 const example = fromFile(YAML.parse(readFileSync('examples/robot.scaffold.yaml', 'utf8')))
 
@@ -113,5 +113,63 @@ describe('autoLayout, vertical', () => {
     expect(h.orientation).toBe('horizontal')
     checkNoOverlap(h)
     checkChildrenInside(h)
+  })
+})
+
+describe('autoLayout, relations', () => {
+  const template = example.modules.find((m) => !childModules(example, m.id).length)!
+  const leaf = (id: string, extra: Partial<Module> = {}): Module => ({
+    ...template,
+    id,
+    name: id,
+    parentId: null,
+    ports: [],
+    attributes: [],
+    methods: [],
+    bases: undefined,
+    ...extra
+  })
+  // Two modules derive from Base; Car holds a Wheel.
+  const project: Project = {
+    ...example,
+    links: [],
+    modules: [
+      leaf('Car', {
+        bases: ['Base'],
+        attributes: [{ id: 'wheel', name: 'wheel', description: '', type: { kind: 'ref', id: 'Wheel' } }]
+      }),
+      leaf('Wheel'),
+      leaf('Bike', { bases: ['Base'] }),
+      leaf('Base')
+    ]
+  }
+
+  it('lists inheritance and association lines, once per pair', () => {
+    expect(relations(project, new Set(project.modules.map((m) => m.id)))).toEqual([
+      { from: 'Base', to: 'Car' },
+      { from: 'Base', to: 'Bike' },
+      { from: 'Car', to: 'Wheel' }
+    ])
+  })
+
+  it('places bases and modules holding attributes first along the flow', async () => {
+    for (const o of ['horizontal', 'vertical'] as const) {
+      const p = await arrange(project, null, { orientation: o, spacing: 70 })
+      checkNoOverlap(p)
+      const at = (n: string): Rect => p.modules.find((m) => m.id === n)!.layout
+      const end = (r: Rect): number => (o === 'vertical' ? r.y + r.height : r.x + r.width)
+      const start = (r: Rect): number => (o === 'vertical' ? r.y : r.x)
+      expect(start(at('Car')), o).toBeGreaterThan(end(at('Base')))
+      expect(start(at('Bike')), o).toBeGreaterThan(end(at('Base')))
+      expect(start(at('Wheel')), o).toBeGreaterThan(end(at('Car')))
+    }
+  })
+
+  it('counts crossings between lines of different modules', () => {
+    const x = { from: { x: 0, y: 0 }, to: { x: 10, y: 10 }, ends: ['a', 'b'] as [string, string] }
+    const y = { from: { x: 0, y: 10 }, to: { x: 10, y: 0 }, ends: ['c', 'd'] as [string, string] }
+    expect(crossings([x, y])).toBe(1)
+    expect(crossings([x, { ...y, ends: ['a', 'd'] }])).toBe(0)
+    expect(crossings([x, { ...y, to: { x: 4, y: 6 } }])).toBe(0)
   })
 })
