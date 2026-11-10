@@ -1015,10 +1015,10 @@ export function Canvas({ viewId }: { viewId: Id }): ReactNode {
               <button
                 type="button"
                 className="canvas-source"
-                title={`Edit as text (YAML) (${keyLabel('Alt+U')})`}
+                title={`Edit as text (${keyLabel('Alt+U')})`}
                 onClick={() => runCommand('view.source')}
               >
-                <Icon name="code" /> YAML
+                <Icon name="code" /> Scaffold
               </button>
             </Panel>
           )}
