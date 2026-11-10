@@ -28,6 +28,8 @@ export interface ProjectNames {
   placed: Record<string, string[]>
   /** Qualified type names (`Core.Sensor.Filter`, `Dependency/Core.Sensor.Filter`). */
   types: string[]
+  /** Port names of each module path above (Scaffold text link ends). */
+  ports?: Record<string, string[]>
 }
 
 export interface Completion {

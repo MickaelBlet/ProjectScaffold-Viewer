@@ -44,9 +44,9 @@ Double-click a type or interface in the Explorer (or ↗ in the Inspector) to ed
 
 _View › Edit as text_ (Alt+U) opens the project as text in a code editor (CodeMirror), in the file's format by default; the buttons at the top left switch it to YAML or [Scaffold text](scaffold-text.md) (remembered; saving keeps the file's format).
 
-- Syntax colors, folding, multiple cursors.
+- Syntax colors, folding (`{ … }` blocks in Scaffold text), multiple cursors.
 - Search and replace in a floating widget like VS Code's (Ctrl+F, Ctrl+H): match case, whole word, regular expression, match count.
-- Completion of the keys, values and names the file allows (Ctrl+Space).
+- Completion of the keys, values and names the file allows (Ctrl+Space); in Scaffold text, the words a statement starts with in its block, then the types, interfaces, modules, link ends (`Module.port`), clauses and states expected after what is written.
 - Hovering a key (YAML) shows its description from the file schema.
 - Load and validation errors and warnings marked on their lines and listed below the text.
 - Changes since the last save shown in the text, the minimap and the scrollbar (_Changes_, on by default); ↑ / ↓ in the _Changes_ button (Shift+Alt+F5 / Alt+F5) go to the previous / next change.

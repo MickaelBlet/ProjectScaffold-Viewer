@@ -31,6 +31,7 @@ import { Icon } from '@/components/Icon'
 import { problemsOf } from '@/panels/ProblemsPanel'
 import { navigate, navigateToNote } from '@/actions'
 import { targetAt } from '@/components/sourceTarget'
+import { completeDsl } from '@/components/dslCompletion'
 import {
   complete,
   describeKey,
@@ -60,7 +61,15 @@ function projectNames(p: Project): ProjectNames {
     modules: p.modules.map((m) => paths.get(m.id)!),
     placed: Object.fromEntries(p.dependencies.map((d) => [d.name, d.modules.map((m) => m.path)])),
     // The types of the modules of dependencies this project can use: their public ones.
-    types: p.types.filter((t) => !(t.dependency && t.modulePath && t.access)).map((t) => qualified.get(t.id)!)
+    types: p.types
+      .filter((t) => !(t.dependency && t.modulePath && t.access))
+      .map((t) => qualified.get(t.id)!),
+    ports: Object.fromEntries<string[]>([
+      ...p.modules.map((m): [string, string[]] => [paths.get(m.id)!, m.ports.map((port) => port.name)]),
+      ...p.dependencies.flatMap((d) =>
+        d.modules.map((m): [string, string[]] => [`${d.name}/${m.path}`, m.ports.map((port) => port.name)])
+      )
+    ])
   }
 }
 
@@ -228,13 +237,16 @@ export function SourcePanel({ format, fileFormat }: { format: Format; fileFormat
     [changes, format]
   )
 
-  /** Keys and values the schema allows at the caret, and names of the project. */
+  /** YAML: keys and values the schema allows at the caret; Scaffold text: words, types and names. */
   const completion = useMemo((): CompletionSource | undefined => {
-    if (format !== 'yaml') return undefined
+    if (format === 'json') return undefined
     return (context) => {
       const { state, pos, explicit } = context
       if (!state.selection.main.empty) return null
-      const result = complete(state.doc.toString(), pos, fileSchema(), projectNames(store.getState().project))
+      const text = state.doc.toString()
+      const names = projectNames(store.getState().project)
+      const result =
+        format === 'dsl' ? completeDsl(text, pos, names) : complete(text, pos, fileSchema(), names)
       const items = result ? filterItems(result) : []
       if (!result || !items.length || (!explicit && !result.value && !result.prefix)) return null
       return {

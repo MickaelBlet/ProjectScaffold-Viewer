@@ -14,6 +14,7 @@ import {
   bracketMatching,
   foldGutter,
   foldKeymap,
+  foldService,
   indentOnInput,
   indentUnit,
   LanguageSupport,
@@ -23,7 +24,7 @@ import {
 import { clike } from '@codemirror/legacy-modes/mode/clike'
 import { lintGutter, lintKeymap } from '@codemirror/lint'
 import { highlightSelectionMatches, searchKeymap } from '@codemirror/search'
-import { Annotation, Compartment, EditorState, Prec, type Extension } from '@codemirror/state'
+import { Annotation, Compartment, EditorState, Prec, type Extension, type Text } from '@codemirror/state'
 import {
   crosshairCursor,
   drawSelection,
@@ -47,6 +48,7 @@ import { codeTheme } from './codeTheme'
 import { indentGuides } from './indentGuides'
 import { minimap } from './minimap'
 import { findWidget, replaceKeymap } from './searchPanel'
+import { braceFoldAt, bracePairs, type BracePair } from './dslScan'
 
 const words = (list: string): Record<string, true> =>
   Object.fromEntries(list.split(' ').map((w) => [w, true]))
@@ -97,6 +99,16 @@ const scaffold = clike({
   blockKeywords: words('module struct exception enum bitmask union interface dependency statemachine')
 })
 
+/** `{ … }` pairs of each document, scanned once per version. */
+const pairsOf = new WeakMap<Text, BracePair[]>()
+
+/** Scaffold text folds its `{ … }` blocks (the stream language gives no fold ranges). */
+const braceFolding = foldService.of((state, from, to) => {
+  let pairs = pairsOf.get(state.doc)
+  if (!pairs) pairsOf.set(state.doc, (pairs = bracePairs(state.doc.toString())))
+  return braceFoldAt(pairs, from, to)
+})
+
 function plainSupport(id: FileLanguage['id']): LanguageSupport | null {
   switch (id) {
     case 'yaml':
@@ -106,7 +118,7 @@ function plainSupport(id: FileLanguage['id']): LanguageSupport | null {
     case 'idl':
       return new LanguageSupport(StreamLanguage.define(idl))
     case 'scaffold':
-      return new LanguageSupport(StreamLanguage.define(scaffold))
+      return new LanguageSupport(StreamLanguage.define(scaffold), [braceFolding])
     case 'text':
       return null
   }

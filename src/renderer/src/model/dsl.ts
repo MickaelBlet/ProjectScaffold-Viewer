@@ -1185,11 +1185,15 @@ const esc = (s: string): string => (RESERVED.has(s) ? `\`${s}\`` : s)
 /** A path, its reserved words escaped. */
 function escPath(s: string): string {
   if (!QUALIFIED.test(s)) throw new NoSugar()
-  return s
+  return dslName(s)
+}
+
+/** A name or path as written in Scaffold text: its reserved words escaped (completion inserts). */
+export const dslName = (s: string): string =>
+  s
     .split('/')
     .map((part) => part.split('.').map(esc).join('.'))
     .join('/')
-}
 
 const str = (s: string): string => JSON.stringify(s)
 const key = (k: string): string => (DOTTED.test(k) ? k : str(k))

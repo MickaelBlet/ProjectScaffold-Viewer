@@ -43,6 +43,8 @@ link plant_query: Plant.query <-> Plant.Store.query;
 link ask_store: Client.ask <-> Plant.Store.query ack 20 low latency 5 remote tcp;
 ```
 
+The editor's text view completes keywords, types and names as you type (Ctrl+Space) and folds `{ … }` blocks.
+
 ## Lexical rules
 
 - Comments: `// …` and `/* … */`. `/// …` lines are documentation: they set the `description` of the definition that follows (several lines join with line breaks; one space after `///` is dropped). Plain comments are not kept when the editor saves the file.
