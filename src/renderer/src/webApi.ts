@@ -75,7 +75,7 @@ function isAbort(e: unknown): boolean {
 
 const PROJECT_FILES: FileFilter = {
   description: 'Architecture',
-  extensions: ['yaml', 'yml', 'json', 'scaffold']
+  extensions: ['scaffold', 'yaml', 'yml', 'json']
 }
 
 function pickWithInput(multiple: boolean, filter: FileFilter): Promise<File[]> {

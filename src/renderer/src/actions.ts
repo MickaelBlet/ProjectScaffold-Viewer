@@ -539,7 +539,7 @@ interface OtherProject {
 
 const SOURCE_FILES = {
   description: 'Projects and IDL files',
-  extensions: ['yaml', 'yml', 'json', 'scaffold', 'idl']
+  extensions: ['scaffold', 'yaml', 'yml', 'json', 'idl']
 }
 const isIdl = (path: string): boolean => /\.idl$/i.test(path)
 
