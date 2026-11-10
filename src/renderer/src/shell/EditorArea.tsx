@@ -94,7 +94,7 @@ function EntityPanel(props: IDockviewPanelProps<{ kind: EditorKind; id: Id }>): 
 }
 
 function SourceEditor({ api }: IDockviewPanelProps): ReactNode {
-  const fileFormat = useDoc((d) => (d.filePath ? formatFromPath(d.filePath) : 'yaml'))
+  const fileFormat = useDoc((d) => (d.filePath ? formatFromPath(d.filePath) : 'dsl'))
   const chosen = useSettings((s) => s.sourceFormat)
   const format = chosen === 'file' ? fileFormat : chosen
   useEffect(() => api.setTitle(FORMAT_TITLES[format]), [format, api])

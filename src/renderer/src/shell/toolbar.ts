@@ -12,6 +12,7 @@ const COMMAND_ICONS: Partial<Record<string, IconName>> = {
   'file.importSettings': 'import',
   'file.exportSettings': 'export',
   'file.openIdlText': 'file-text',
+  'file.exportYaml': 'export',
   'file.exportPng': 'image',
   'file.exportSvg': 'vector',
   'file.close': 'x',

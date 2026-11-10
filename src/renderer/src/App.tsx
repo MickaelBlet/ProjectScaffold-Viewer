@@ -139,7 +139,7 @@ function SidePanelView(): ReactNode {
               <Content />
             ) : (
               <p className="side-panel-empty">
-                Open a project file (*.scaffold.yaml) to see its content here.
+                Open a project file (*.scaffold, *.scaffold.yaml) to see its content here.
               </p>
             )}
           </div>

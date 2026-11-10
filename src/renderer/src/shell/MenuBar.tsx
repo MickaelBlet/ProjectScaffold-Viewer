@@ -29,6 +29,7 @@ const MENUS: [Category, string[]][] = [
       '-',
       'file.openIdlText',
       '-',
+      'file.exportYaml',
       'file.exportPng',
       'file.exportSvg',
       '-',

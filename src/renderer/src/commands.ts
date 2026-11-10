@@ -45,6 +45,7 @@ import {
   saveWorkspace,
   importSettings,
   exportSettings,
+  exportYaml,
   switchPreviewLayout
 } from './fileOps'
 import { focusedEditorHistory, setPassedKeys } from './components/CodeEditor'
@@ -201,6 +202,12 @@ const allCommands: Command[] = [
     keys: ['Alt+W'],
     global: true,
     run: () => closeDocument()
+  },
+  {
+    id: 'file.exportYaml',
+    title: 'Export as YAML…',
+    category: 'File',
+    run: () => void exportYaml()
   },
   {
     id: 'file.exportPng',

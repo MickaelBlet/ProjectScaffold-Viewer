@@ -10,6 +10,7 @@ import {
   type Format
 } from '@/model/serialize'
 import { arrange, arrangeOptions } from '@/model/autoLayout'
+import { validate } from '@/model/validate'
 import { baseName } from '@/model/sync'
 import type { Project } from '@/model/types'
 import {
@@ -421,11 +422,12 @@ export async function saveProject(saveAs = false): Promise<void> {
   const doc = activeDoc()
   const { filePath } = doc
   const project = doc.store.getState().project
-  const format: Format = filePath ? formatFromPath(filePath) : 'yaml'
+  // New projects are saved as Scaffold text.
+  const format: Format = filePath ? formatFromPath(filePath) : 'dsl'
   const path = await window.api.saveFile({
     path: saveAs ? null : filePath,
     content: saveText(project, format, { editor: true }),
-    defaultName: `${project.name || 'project'}.scaffold.yaml`,
+    defaultName: `${project.name || 'project'}.scaffold`,
     format,
     title: 'Save project'
   })
@@ -458,6 +460,21 @@ export async function saveAll(): Promise<void> {
     await saveProject()
   }
   activateDoc(activeId)
+}
+
+/** Exports the active project as YAML, without editor data (for generators); blocked by errors. */
+export async function exportYaml(): Promise<void> {
+  const project = activeDoc().store.getState().project
+  const errors = validate(project).filter((p) => p.severity === 'error')
+  if (errors.length)
+    return showDialog(
+      `Cannot export: ${errors.length} error${errors.length > 1 ? 's' : ''}`,
+      errors.map((e) => e.message)
+    )
+  const text = saveText(project, 'yaml', { editor: false })
+  const url = `data:application/yaml;charset=utf-8,${encodeURIComponent(text)}`
+  const saved = await window.api.saveExport(`${project.name || 'project'}.scaffold.yaml`, url)
+  if (saved) setStatus('info', `Exported ${saved}`)
 }
 
 const SETTINGS_FILES = { description: 'Settings', extensions: ['json'] }

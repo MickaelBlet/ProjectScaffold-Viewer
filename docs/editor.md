@@ -170,6 +170,8 @@ Module and link colors, sticky notes and titled frames (right click the canvas) 
 
 ### Export
 
+New projects are saved as [Scaffold text](scaffold-text.md) (`*.scaffold`); _Save as…_ also writes YAML or JSON. _File › Export as YAML…_ writes the project as YAML without editor data (`*.scaffold.yaml`, for generators); errors block it.
+
 The diagram exports as PNG or SVG from the _File_ menu.
 
 ## Model panels

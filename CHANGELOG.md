@@ -9,12 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- New projects are saved as Scaffold text (`*.scaffold`) by default, and their text editor shows Scaffold text.
 - Scaffold text: method qualifiers in C++ positions, after the parameters (`virtual uint32 size() const noexcept override final = 0;`, `pure` or `= 0` for pure), and `final` after a module's name (`module Equalizer final : Effect`). The 1.2 forms (`const virtual pure void run();`, `final module M`) are still read.
 - Module, link and binary colors are editor data: saved in the `editor` section (`editor.style.<module>.color`, `editor.links.<link>.color`, `editor.binaries.<binary>.color`) and stripped on export. Their `color` on the entity itself is deprecated: still read when the `editor` section has none, moved to `editor` on save.
 - _Auto-arrange_ takes inheritance and association lines into account: bases before the modules deriving from them and modules before the modules their attributes reference (along the flow), with fewer crossings between links, inheritance and association lines.
 
 ### Added
 
+- _File › Export as YAML…_: the project as YAML without editor data, for generators (blocked by errors).
 - Text editor: _YAML_ / _Scaffold_ buttons switch the project text between YAML and Scaffold text, whatever the file's format (remembered; saving keeps the file's format).
 - Text editor: _Sync selection_ also in Scaffold text (cursor to element and element to cursor).
 - Text editor: completion in Scaffold text (keywords of each block, types, interfaces, modules, link ends and their ports, link clauses, states) and folding of its `{ … }` blocks.
