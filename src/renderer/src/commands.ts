@@ -472,7 +472,7 @@ const allCommands: Command[] = [
   { id: 'view.new', title: 'New view', category: 'View', run: newView },
   {
     id: 'view.source',
-    title: 'Edit as text (YAML)',
+    title: 'Edit as text',
     category: 'View',
     keys: ['Alt+U'],
     run: () => openSource()

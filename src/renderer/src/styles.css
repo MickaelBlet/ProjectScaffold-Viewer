@@ -565,21 +565,23 @@ button.link-button:hover {
 .source-editor header > * {
   white-space: nowrap;
 }
-/* Changes toggle with its previous / next buttons, joined into one pill. */
-.source-changes {
+/* Buttons joined into one pill: format choice; Changes toggle with its previous / next buttons. */
+.source-pills {
   display: inline-flex;
 }
-.source-changes button.qualifier + button.qualifier {
+.source-pills button.qualifier + button.qualifier {
   margin-left: -1px;
-  padding: 0 4px;
   border-top-left-radius: 0;
   border-bottom-left-radius: 0;
   --icon-size: 12px;
 }
-.source-changes button.qualifier + button.qualifier:hover {
+.source-pills button.qualifier.on + button.qualifier.on:has(.ico) {
+  padding: 0 4px;
+}
+.source-pills button.qualifier.on + button.qualifier.on:has(.ico):hover {
   background: color-mix(in srgb, var(--accent) 25%, transparent);
 }
-.source-changes button.qualifier:has(+ button.qualifier) {
+.source-pills button.qualifier:has(+ button.qualifier) {
   border-top-right-radius: 0;
   border-bottom-right-radius: 0;
 }

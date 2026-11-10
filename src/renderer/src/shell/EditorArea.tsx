@@ -30,7 +30,8 @@ import { TypeInspector } from '@/panels/TypeInspector'
 import { InterfaceInspector } from '@/panels/InterfaceInspector'
 import { ModuleInspector } from '@/panels/ModuleInspector'
 import { LinkInspector } from '@/panels/LinkInspector'
-import { SourcePanel } from '@/panels/SourcePanel'
+import { FORMAT_TITLES, SourcePanel } from '@/panels/SourcePanel'
+import { useSettings } from '@/store/settings'
 import { FilePanel } from '@/panels/FilePanel'
 import { languageOf, type LanguageId } from '@/components/codeLanguages'
 import { dropTextFile, isFileDirty, textFileKey, useTextFiles, type TextFileRef } from '@/store/textFiles'
@@ -93,9 +94,11 @@ function EntityPanel(props: IDockviewPanelProps<{ kind: EditorKind; id: Id }>): 
 }
 
 function SourceEditor({ api }: IDockviewPanelProps): ReactNode {
-  const format = useDoc((d) => (d.filePath ? formatFromPath(d.filePath) : 'yaml'))
-  useEffect(() => api.setTitle(format.toUpperCase()), [format, api])
-  return <SourcePanel format={format} />
+  const fileFormat = useDoc((d) => (d.filePath ? formatFromPath(d.filePath) : 'yaml'))
+  const chosen = useSettings((s) => s.sourceFormat)
+  const format = chosen === 'file' ? fileFormat : chosen
+  useEffect(() => api.setTitle(FORMAT_TITLES[format]), [format, api])
+  return <SourcePanel format={format} fileFormat={fileFormat} />
 }
 
 const KIND_ICON: Record<EditorKind | 'source', string> = {

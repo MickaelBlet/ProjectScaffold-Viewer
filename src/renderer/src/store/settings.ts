@@ -15,6 +15,8 @@ export type PortStyle = 'dots' | 'arrows' | 'hollow' | 'shapes'
 export type WhitespaceShown = 'all' | 'trailing' | 'none'
 /** Code editor minimap: characters shaded by their ink, or solid blocks. */
 export type MinimapRender = 'characters' | 'blocks'
+/** Format of the project text: the file's own, YAML or Scaffold text. */
+export type SourceFormat = 'file' | 'yaml' | 'dsl'
 
 export interface Settings {
   theme: Theme
@@ -79,6 +81,7 @@ export interface Settings {
   sourceFollow: boolean
   /** The project text shows its changes since the last save. */
   sourceChanges: boolean
+  sourceFormat: SourceFormat
   /** Explorer sections top to bottom; sections missing here keep their default place. */
   explorerOrder: string[]
   /** Explorer sections not shown. */
@@ -143,6 +146,7 @@ export const DEFAULT_SETTINGS: Settings = {
   editorMinimapRender: 'characters',
   sourceFollow: true,
   sourceChanges: true,
+  sourceFormat: 'file',
   explorerOrder: [],
   explorerHidden: [],
   explorerSticky: true,
@@ -176,7 +180,8 @@ const CHOICES: Partial<Record<keyof Settings, readonly unknown[]>> = {
   edgeStyle: ['bezier', 'smoothstep', 'step', 'straight'],
   portStyle: ['dots', 'arrows', 'hollow', 'shapes'],
   editorWhitespace: ['all', 'trailing', 'none'],
-  editorMinimapRender: ['characters', 'blocks']
+  editorMinimapRender: ['characters', 'blocks'],
+  sourceFormat: ['file', 'yaml', 'dsl']
 }
 
 /** Settings of an exported settings file: the known ones holding a valid value. Throws when the

@@ -42,7 +42,7 @@ Double-click a type or interface in the Explorer (or ↗ in the Inspector) to ed
 
 ### Text editor
 
-_View › Edit as text_ (Alt+U) opens the project file's YAML (or JSON) in a code editor (CodeMirror).
+_View › Edit as text_ (Alt+U) opens the project as text in a code editor (CodeMirror), in the file's format by default; the buttons at the top left switch it to YAML or [Scaffold text](scaffold-text.md) (remembered; saving keeps the file's format).
 
 - Syntax colors, folding, multiple cursors.
 - Search and replace in a floating widget like VS Code's (Ctrl+F, Ctrl+H): match case, whole word, regular expression, match count.

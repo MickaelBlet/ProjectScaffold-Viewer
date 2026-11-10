@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Text editor: _YAML_ / _Scaffold_ buttons switch the project text between YAML and Scaffold text, whatever the file's format (remembered; saving keeps the file's format).
 - Association arrows are shaped by hand like inheritance lines, with their module selected: ends moved along the modules, bend points, attachments from the context menu (`editor.style.<module>.associations`, by attribute and referenced module). They follow the link style.
 
 ### Fixed

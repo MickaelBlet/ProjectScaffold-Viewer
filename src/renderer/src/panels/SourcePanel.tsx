@@ -141,6 +141,35 @@ interface Handlers {
 
 const noop = (): void => {}
 
+/** Tab title and selector label of each format. */
+export const FORMAT_TITLES: Record<Format, string> = { yaml: 'YAML', json: 'JSON', dsl: 'Scaffold' }
+
+/** Format selector of the header: the file's format, YAML and Scaffold text, joined into one pill. */
+function FormatChoice({ format, fileFormat }: { format: Format; fileFormat: Format }): ReactNode {
+  const formats: Format[] = fileFormat === 'json' ? ['yaml', 'json', 'dsl'] : ['yaml', 'dsl']
+  return (
+    <span className="source-pills" role="radiogroup" aria-label="Text format">
+      {formats.map((f) => (
+        <button
+          key={f}
+          type="button"
+          role="radio"
+          className={`qualifier ${f === format ? 'on' : ''}`}
+          aria-checked={f === format}
+          title={
+            f === fileFormat
+              ? `Edit as ${FORMAT_TITLES[f]}, the file's format`
+              : `Edit as ${FORMAT_TITLES[f]}; the file is still saved as ${FORMAT_TITLES[fileFormat]}`
+          }
+          onClick={() => setSetting('sourceFormat', f === fileFormat ? 'file' : (f as 'yaml' | 'dsl'))}
+        >
+          {FORMAT_TITLES[f]}
+        </button>
+      ))}
+    </span>
+  )
+}
+
 /** Option of the header: a pill, muted when off, accent when on. */
 function Toggle(props: {
   label: string
@@ -161,7 +190,7 @@ function Toggle(props: {
   )
 }
 
-export function SourcePanel({ format }: { format: Format }): ReactNode {
+export function SourcePanel({ format, fileFormat }: { format: Format; fileFormat: Format }): ReactNode {
   const store = useDoc((d) => d.store)
   const [problems, setProblems] = useState<TextProblem[]>([])
   /** The text cannot be read: the problems are its load errors. */
@@ -357,6 +386,7 @@ export function SourcePanel({ format }: { format: Format }): ReactNode {
   return (
     <section className="source-editor">
       <header>
+        <FormatChoice format={format} fileFormat={fileFormat} />
         {format === 'yaml' ? (
           <Toggle
             label="Sync selection"
@@ -367,7 +397,7 @@ export function SourcePanel({ format }: { format: Format }): ReactNode {
         ) : null}
         {IN_VSCODE ? null : (
           // One pill: the toggle, then previous / next change while there are some.
-          <span className="source-changes">
+          <span className="source-pills">
             <button
               type="button"
               className={`qualifier ${showChanges ? 'on' : ''}`}
@@ -429,7 +459,7 @@ export function SourcePanel({ format }: { format: Format }): ReactNode {
       {stale ? <p className="source-stale">The project changed elsewhere since these edits.</p> : null}
       <CodeEditor
         fileName={`project.${format === 'dsl' ? 'scaffold' : format}`}
-        label={`Project ${format.toUpperCase()}`}
+        label={`Project ${FORMAT_TITLES[format]}`}
         completion={completion}
         extensions={extensions}
         onChange={() => handlers.current.input()}
