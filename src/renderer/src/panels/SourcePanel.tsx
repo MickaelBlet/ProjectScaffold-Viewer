@@ -7,6 +7,7 @@ import { setDiagnostics, type Diagnostic } from '@codemirror/lint'
 import { getChunks, unifiedMergeView } from '@codemirror/merge'
 import { Prec, type EditorState, type Extension } from '@codemirror/state'
 import { EditorView, hoverTooltip, keymap } from '@codemirror/view'
+import { dslStructureAt } from '@/model/dsl'
 import { FileProjectSchema } from '@/model/schema'
 import { modulePaths, notePath, typeNames } from '@/model/project'
 import { locateValidation, targetPath } from '@/model/locate'
@@ -305,9 +306,14 @@ export function SourcePanel({ format, fileFormat }: { format: Format; fileFormat
     let followTimer: ReturnType<typeof setTimeout> | undefined
     const caret = (v: EditorView): void => {
       clearTimeout(followTimer)
-      if (format !== 'yaml' || !useSettings.getState().sourceFollow) return
+      if (format === 'json' || !useSettings.getState().sourceFollow) return
       followTimer = setTimeout(() => {
-        const { path, names } = structureAt(v.state.doc.toString(), v.state.selection.main.head)
+        const text = v.state.doc.toString()
+        const head = v.state.selection.main.head
+        const at =
+          format === 'dsl' ? dslStructureAt(text, v.state.doc.lineAt(head).number) : structureAt(text, head)
+        if (!at) return
+        const { path, names } = at
         const target = targetAt(store.getState().project, path, names)
         const key = target ? `${target.kind}:${'id' in target ? target.id : ''}` : ''
         if (!target || key === followed) return
@@ -322,7 +328,7 @@ export function SourcePanel({ format, fileFormat }: { format: Format; fileFormat
 
     // The caret goes to the entity selected elsewhere (canvas, lists...).
     const reveal = (selection: Selection): void => {
-      if (format !== 'yaml' || !selection || view.hasFocus || !useSettings.getState().sourceFollow) return
+      if (format === 'json' || !selection || view.hasFocus || !useSettings.getState().sourceFollow) return
       const p = store.getState().project
       const text = view.state.doc.toString()
       let data: unknown
@@ -387,7 +393,7 @@ export function SourcePanel({ format, fileFormat }: { format: Format; fileFormat
     <section className="source-editor">
       <header>
         <FormatChoice format={format} fileFormat={fileFormat} />
-        {format === 'yaml' ? (
+        {format !== 'json' ? (
           <Toggle
             label="Sync selection"
             title="Select the element under the cursor, move the cursor to the selected element"

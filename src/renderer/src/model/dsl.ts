@@ -196,6 +196,8 @@ class Parser {
   private toks: Tok[]
   private i = 0
   readonly lines = new Map<string, number>()
+  /** Each recorded path, in the order of the text. */
+  readonly paths: DataPath[] = []
 
   constructor(readonly text: string) {
     this.toks = lex(text)
@@ -241,7 +243,9 @@ class Parser {
   }
   private rec(path: DataPath, line: number): void {
     const k = pathKey(path)
-    if (!this.lines.has(k)) this.lines.set(k, line)
+    if (this.lines.has(k)) return
+    this.lines.set(k, line)
+    this.paths.push(path)
   }
   private atEnd(closer: '}' | 'eof'): boolean {
     return closer === 'eof' ? this.peek().kind === 'eof' : this.isP('}')
@@ -1049,10 +1053,10 @@ class Parser {
 type Ctx = 'top' | 'dependency' | 'module' | 'fields' | 'union' | 'interface' | 'stateMachine' | 'generic'
 
 /** Data of a Scaffold text, with the line of each of its nodes. */
-export function parseDslDoc(text: string): { data: Obj; lines: Map<string, number> } {
+export function parseDslDoc(text: string): { data: Obj; lines: Map<string, number>; paths: DataPath[] } {
   const p = new Parser(text)
   const data = p.file()
-  return { data, lines: p.lines }
+  return { data, lines: p.lines, paths: p.paths }
 }
 
 /** Data of a Scaffold text (the file data, before the schema check). */
@@ -1073,6 +1077,43 @@ export function dslLineOfPath(text: string, path: DataPath): number | undefined 
     if (l !== undefined) return l
   }
   return undefined
+}
+
+/**
+ * Where a line (from 1) of a Scaffold text is in its data: the deepest path starting last on or
+ * before it, and the `name` (`module` for the modules of an import) of each list item along it.
+ * Null when the text cannot be read.
+ */
+export function dslStructureAt(
+  text: string,
+  line: number
+): { path: DataPath; names: (string | undefined)[] } | null {
+  let doc: ReturnType<typeof parseDslDoc>
+  try {
+    doc = parseDslDoc(text)
+  } catch {
+    return null
+  }
+  let path: DataPath = []
+  let at = 0
+  for (const p of doc.paths) {
+    const l = doc.lines.get(pathKey(p))!
+    if (l > line) continue
+    if (l > at || (l === at && p.length > path.length)) {
+      path = p
+      at = l
+    }
+  }
+  const names: (string | undefined)[] = []
+  let node: unknown = doc.data
+  for (const key of path) {
+    const next: unknown = (node as Record<string | number, unknown> | null | undefined)?.[key]
+    const item = Array.isArray(node) && next && typeof next === 'object' ? (next as Obj) : undefined
+    const name = item?.name ?? item?.module
+    names.push(typeof name === 'string' ? name : undefined)
+    node = next
+  }
+  return { path, names }
 }
 
 // Writer

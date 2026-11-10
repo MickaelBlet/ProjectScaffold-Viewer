@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { DslError, dslLineOfPath, parseDsl, stringifyDsl } from '@/model/dsl'
+import { DslError, dslLineOfPath, dslStructureAt, parseDsl, stringifyDsl } from '@/model/dsl'
 import { formatFromPath, fromFile, LoadError, loadText, parseText, saveText, toFile } from '@/model/serialize'
 
 const roots = ['examples', ...(process.env.DSL_EXTRA_ROOTS?.split(':') ?? [])]
@@ -95,6 +95,13 @@ link plant_query: Plant.query <-> Plant.Store.query ack 20 low remote tcp;
     const text = `${minimal}\nmodule M {\n  in ? p;\n}\n`
     expect(dslLineOfPath(text, ['modules', 0, 'ports', 0, 'interface'])).toBe(5)
     expect(dslLineOfPath(text, ['modules', 0, 'name'])).toBe(4)
+  })
+  it('finds the data path of a line', () => {
+    const text = `${minimal}\nmodule M {\n  in ? p;\n}\n`
+    expect(dslStructureAt(text, 4)).toEqual({ path: ['modules', 0], names: [undefined, 'M'] })
+    expect(dslStructureAt(text, 5)?.path.slice(0, 4)).toEqual(['modules', 0, 'ports', 0])
+    expect(dslStructureAt(text, 5)?.names[3]).toBe('p')
+    expect(dslStructureAt('module {', 1)).toBeNull()
   })
 })
 

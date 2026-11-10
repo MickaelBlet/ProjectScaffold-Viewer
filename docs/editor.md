@@ -52,7 +52,7 @@ _View › Edit as text_ (Alt+U) opens the project as text in a code editor (Code
 - Changes since the last save shown in the text, the minimap and the scrollbar (_Changes_, on by default); ↑ / ↓ in the _Changes_ button (Shift+Alt+F5 / Alt+F5) go to the previous / next change.
 - A minimap on the right (_View › Text minimap_): the lines in view, selections, search matches, matching brackets, problems, changes and section headers.
 - Valid edits apply to the project after a pause, one undo step each.
-- _Sync selection_: the element under the cursor is selected in the diagram; the cursor moves to the element selected in the diagram or a list. In a view's data (`editor.views`, `editor.links`), the module or link it is about is selected. Following the cursor never opens or switches a view: the element is shown when the focused view draws it.
+- _Sync selection_ (YAML and Scaffold text): the element under the cursor is selected in the diagram; the cursor moves to the element selected in the diagram or a list. In a view's data (`editor.views`, `editor.links`), the module or link it is about is selected. Following the cursor never opens or switches a view: the element is shown when the focused view draws it.
 
 Font, tab size, whitespace, word wrap (_View › Word wrap_, Alt+Z), the minimap and the editor's helpers are set in _Settings › Text editor_.
 
