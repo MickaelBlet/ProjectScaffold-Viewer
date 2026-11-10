@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- New projects are saved as Scaffold text (`*.scaffold`) by default, their text editor shows Scaffold text, open dialogs list `.scaffold` first, and the canvas text button reads _Scaffold_.
+- New projects are saved as Scaffold text (`*.scaffold`) by default, the text editor shows Scaffold text whatever the file's format, open dialogs list `.scaffold` first, and the canvas text button reads _Scaffold_.
 - Scaffold text: method qualifiers in C++ positions, after the parameters (`virtual uint32 size() const noexcept override final = 0;`, `pure` or `= 0` for pure), and `final` after a module's name (`module Equalizer final : Effect`). The 1.2 forms (`const virtual pure void run();`, `final module M`) are still read.
 - Module, link and binary colors are editor data: saved in the `editor` section (`editor.style.<module>.color`, `editor.links.<link>.color`, `editor.binaries.<binary>.color`) and stripped on export. Their `color` on the entity itself is deprecated: still read when the `editor` section has none, moved to `editor` on save.
 - _Auto-arrange_ takes inheritance and association lines into account: bases before the modules deriving from them and modules before the modules their attributes reference (along the flow), with fewer crossings between links, inheritance and association lines.

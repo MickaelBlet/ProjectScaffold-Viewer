@@ -146,7 +146,7 @@ export const DEFAULT_SETTINGS: Settings = {
   editorMinimapRender: 'characters',
   sourceFollow: true,
   sourceChanges: true,
-  sourceFormat: 'file',
+  sourceFormat: 'dsl',
   explorerOrder: [],
   explorerHidden: [],
   explorerSticky: true,
